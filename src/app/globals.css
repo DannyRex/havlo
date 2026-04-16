@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap");
-
 :root {
   --brand:        #0057FF;
   --brand-dark:   #0041CC;
@@ -26,9 +24,15 @@ html {
 body {
   background-color: var(--navy-900);
   color: #f8fafc;
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.025em;
+  font-weight: 700;
 }
 
 /* Scrollbar */
@@ -139,3 +143,62 @@ body {
 /* Horizontal scroll without scrollbar */
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ── Hero entrance animations ─────────────────────────────────── */
+@keyframes heroFadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes heroFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes heroSlideRight {
+  from { opacity: 0; transform: translateX(32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.hero-enter {
+  animation: heroFadeUp 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.hero-enter-fade {
+  animation: heroFadeIn 0.6s ease both;
+}
+.hero-enter-right {
+  animation: heroSlideRight 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Ambient / continuous ─────────────────────────────────────── */
+@keyframes orbDrift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(24px, -16px) scale(1.04); }
+  66%       { transform: translate(-16px, 12px) scale(0.97); }
+}
+.orb-drift { animation: orbDrift 18s ease-in-out infinite; }
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+.gradient-shift {
+  background-size: 200% 200%;
+  animation: gradientShift 6s ease infinite;
+}
+
+@keyframes borderPulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(0,87,255,0.15); }
+  50%       { box-shadow: 0 0 0 1px rgba(0,87,255,0.45), 0 0 24px rgba(0,87,255,0.15); }
+}
+.border-pulse { animation: borderPulse 3s ease-in-out infinite; }
+
+/* ── Deal ticker scroll ───────────────────────────────────────── */
+@keyframes tickerUp {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+.ticker-scroll {
+  animation: tickerUp 22s linear infinite;
+}
+.ticker-scroll:hover {
+  animation-play-state: paused;
+}

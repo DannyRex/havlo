@@ -35,7 +35,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ['"Helvetica Neue"', "Helvetica", "Arial", "sans-serif"],
       },
       backgroundImage: {
         "hero-gradient":
@@ -57,11 +57,13 @@ const config: Config = {
         "deal-card":   "0 4px 24px rgba(0,0,0,0.4)",
       },
       animation: {
-        "float":       "float 6s ease-in-out infinite",
-        "pulse-slow":  "pulse 4s cubic-bezier(0.4,0,0.6,1) infinite",
-        "slide-up":    "slideUp 0.5s ease-out",
-        "fade-in":     "fadeIn 0.6s ease-out",
-        "shimmer":     "shimmer 2s linear infinite",
+        "float":        "float 6s ease-in-out infinite",
+        "float-slow":   "float 9s ease-in-out infinite",
+        "pulse-slow":   "pulse 4s cubic-bezier(0.4,0,0.6,1) infinite",
+        "slide-up":     "slideUp 0.5s ease-out",
+        "fade-in":      "fadeIn 0.6s ease-out",
+        "shimmer":      "shimmer 2s linear infinite",
+        "count-bar":    "countBar 1.2s cubic-bezier(0.22,1,0.36,1) both",
       },
       keyframes: {
         float: {
@@ -79,6 +81,10 @@ const config: Config = {
         shimmer: {
           "0%":   { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
+        },
+        countBar: {
+          "0%":   { transform: "scaleX(0)", opacity: "0" },
+          "100%": { transform: "scaleX(1)", opacity: "1" },
         },
       },
     },

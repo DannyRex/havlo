@@ -1,59 +1,60 @@
 import { Zap, BarChart3, Repeat, Bell, ShieldCheck, Smartphone } from "lucide-react";
+import AnimateIn from "@/components/ui/AnimateIn";
 
 const features = [
   {
     icon: Zap,
     color: "#0057FF",
-    glow: "rgba(0,87,255,0.2)",
-    title: "Curated Deal Feed",
+    glow: "rgba(0,87,255,0.15)",
+    title: "Deal feed",
     description:
-      "Scroll through hundreds of hand-picked deals from Jumia, Konga, Slot and 10+ more stores — filtered by category and ranked by discount.",
+      "Scroll through deals from Jumia, Konga, Slot and 8 more stores — sorted by discount, category, or what's trending today.",
     badge: "InstaDeals",
   },
   {
     icon: BarChart3,
     color: "#00C8FF",
-    glow: "rgba(0,200,255,0.2)",
-    title: "Live Price Comparison",
+    glow: "rgba(0,200,255,0.12)",
+    title: "Price comparison",
     description:
-      "Search any product and instantly see prices from every major Nigerian retailer side-by-side. Know exactly where to buy.",
-    badge: "Price Compare",
+      "Search any product and see prices from every major Nigerian retailer side by side. No tab-switching, no mental math.",
+    badge: "Compare",
   },
   {
     icon: Repeat,
     color: "#FF6B35",
-    glow: "rgba(255,107,53,0.2)",
-    title: "Smart Alternatives",
+    glow: "rgba(255,107,53,0.12)",
+    title: "Smarter alternatives",
     description:
-      "Found something too expensive? Dealesty suggests cheaper alternatives with similar specs — save up to 60% without sacrificing quality.",
+      "Product too expensive? We surface cheaper options with similar specs. Save up to 60% without giving up what matters.",
     badge: "Dupe Finder",
   },
   {
     icon: Bell,
     color: "#FFD600",
-    glow: "rgba(255,214,0,0.2)",
-    title: "Deal Alerts",
+    glow: "rgba(255,214,0,0.12)",
+    title: "Price drop alerts",
     description:
-      "Set price targets and get notified the moment a product drops to your target price across any of our 11+ partner stores.",
+      "Set a target price for anything. The moment any store hits it, you'll know first. No more checking daily.",
     badge: "Coming Soon",
   },
   {
     icon: ShieldCheck,
     color: "#00D68F",
-    glow: "rgba(0,214,143,0.2)",
-    title: "Verified Sellers Only",
+    glow: "rgba(0,214,143,0.12)",
+    title: "Verified stores only",
     description:
-      "Every deal is from a trusted, verified Nigerian retailer. No fake listings, no shady sellers — just genuine savings.",
+      "Every deal is from a legitimate Nigerian retailer. No grey-market listings, no unknown sellers — just real prices.",
     badge: "Trusted",
   },
   {
     icon: Smartphone,
     color: "#8B5CF6",
-    glow: "rgba(139,92,246,0.2)",
+    glow: "rgba(139,92,246,0.12)",
     title: "Built for Nigeria",
     description:
-      "Prices in Naira, Nigerian stores, and tailored to how Nigerians actually shop. No dollar conversions, no irrelevant results.",
-    badge: "🇳🇬 Local First",
+      "Prices in Naira, stores Nigerians actually use, results that make sense locally. Not a global platform adapted for NG.",
+    badge: "Local First",
   },
 ];
 
@@ -62,55 +63,56 @@ export default function Features() {
     <section className="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
 
       {/* Header */}
-      <div className="text-center mb-16">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold
-                        border border-white/10 text-slate-400 mb-4 uppercase tracking-wider">
+      <AnimateIn variant="fade-up" className="mb-16 max-w-xl">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-[0.1em] mb-4">
           Why Dealesty
-        </div>
-        <h2 className="section-title text-4xl sm:text-5xl font-black">
-          Everything you need to{" "}
+        </p>
+        <h2 className="text-4xl sm:text-5xl font-black text-white tracking-[-0.04em] leading-[1.05]">
+          Two tools.{" "}
           <span style={{
             background: "linear-gradient(135deg, #0057FF 0%, #00C8FF 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
           }}>
-            shop smarter
+            One platform.
           </span>
         </h2>
-        <p className="section-subtitle mx-auto mt-4 text-lg">
-          Two powerful tools in one platform — a deal discovery feed and a price comparison engine, built specifically for the Nigerian market.
+        <p className="text-slate-400 text-lg mt-4 leading-relaxed tracking-[-0.01em]">
+          A deal discovery feed and a price comparison engine — both built specifically for how Nigerians shop.
         </p>
-      </div>
+      </AnimateIn>
 
       {/* Feature grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {features.map(({ icon: Icon, color, glow, title, description, badge }) => (
-          <div key={title}
-               className="group relative glass rounded-2xl p-6 border border-white/[0.06]
-                          hover:border-white/[0.12] transition-all duration-300 hover:-translate-y-1"
-               style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.2)" }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {features.map(({ icon: Icon, color, glow, title, description, badge }, i) => (
+          <AnimateIn key={title} variant="fade-up" delay={i * 60}>
+          <div className="group relative glass rounded-2xl p-6 border border-white/[0.05]
+                          hover:border-white/[0.10] hover:-translate-y-1
+                          transition-all duration-300 h-full"
+               style={{ boxShadow: "0 2px 16px rgba(0,0,0,0.15)" }}>
 
             {/* Background glow on hover */}
             <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                 style={{ background: `radial-gradient(ellipse at top left, ${glow} 0%, transparent 60%)` }} />
+                 style={{ background: `radial-gradient(ellipse at top left, ${glow} 0%, transparent 65%)` }} />
 
             <div className="relative">
-              {/* Icon */}
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5"
-                   style={{ background: `${color}18`, border: `1px solid ${color}30` }}>
-                <Icon size={22} style={{ color }} />
+              {/* Icon + badge row */}
+              <div className="flex items-start justify-between mb-5">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                     style={{ background: `${color}15`, border: `1px solid ${color}25` }}>
+                  <Icon size={20} style={{ color }} />
+                </div>
+                <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full tracking-[-0.01em]"
+                      style={{ background: `${color}15`, color, border: `1px solid ${color}20` }}>
+                  {badge}
+                </span>
               </div>
 
-              {/* Badge */}
-              <span className="absolute top-0 right-0 text-xs font-semibold px-2.5 py-1 rounded-full"
-                    style={{ background: `${color}20`, color, border: `1px solid ${color}30` }}>
-                {badge}
-              </span>
-
-              <h3 className="text-base font-bold text-white mb-2">{title}</h3>
-              <p className="text-sm text-slate-500 leading-relaxed">{description}</p>
+              <h3 className="text-[15px] font-bold text-white mb-2 tracking-[-0.02em]">{title}</h3>
+              <p className="text-sm text-slate-500 leading-relaxed tracking-[-0.01em]">{description}</p>
             </div>
           </div>
+          </AnimateIn>
         ))}
       </div>
     </section>
