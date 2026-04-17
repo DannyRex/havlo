@@ -124,6 +124,66 @@ export const stores: Store[] = [
   },
 ];
 
-export const getStore = (id: string) => stores.find((s) => s.id === id);
+export const internationalStores: Store[] = [
+  {
+    id: "aliexpress",
+    name: "AliExpress",
+    slug: "aliexpress",
+    logo: "AE",
+    color: "#FF4747",
+    url: "https://www.aliexpress.com",
+    country: "INTL",
+    rating: 4.0,
+    trusted: true,
+  },
+  {
+    id: "temu",
+    name: "Temu",
+    slug: "temu",
+    logo: "TM",
+    color: "#FF7700",
+    url: "https://www.temu.com",
+    country: "INTL",
+    rating: 3.8,
+    trusted: true,
+  },
+  {
+    id: "shein",
+    name: "SHEIN",
+    slug: "shein",
+    logo: "SH",
+    color: "#000000",
+    url: "https://www.shein.com",
+    country: "INTL",
+    rating: 3.9,
+    trusted: true,
+  },
+  {
+    id: "amazon",
+    name: "Amazon",
+    slug: "amazon",
+    logo: "AM",
+    color: "#FF9900",
+    url: "https://www.amazon.com",
+    country: "INTL",
+    rating: 4.5,
+    trusted: true,
+  },
+  {
+    id: "ebay",
+    name: "eBay",
+    slug: "ebay",
+    logo: "EB",
+    color: "#0064D2",
+    url: "https://www.ebay.com",
+    country: "INTL",
+    rating: 4.1,
+    trusted: true,
+  },
+];
+
+export const allStores = [...stores, ...internationalStores];
+
+export const getStore = (id: string) => allStores.find((s) => s.id === id);
 
 export const nigerianStores = stores;

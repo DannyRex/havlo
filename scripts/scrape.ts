@@ -11,12 +11,16 @@ import { writeFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { RawDeal } from "./scrapers/types.js";
-import { scrapeJumia }     from "./scrapers/jumia.js";
-import { scrapeKonga }     from "./scrapers/konga.js";
-import { scrapeSlot }      from "./scrapers/slot.js";
-import { scrapeThreeChub } from "./scrapers/threechub.js";
-import { scrapeSpar }      from "./scrapers/spar.js";
-import { scrapeJiji }      from "./scrapers/jiji.js";
+import { scrapeJumia }      from "./scrapers/jumia.js";
+import { scrapeKonga }      from "./scrapers/konga.js";
+import { scrapeSlot }       from "./scrapers/slot.js";
+import { scrapeThreeChub }  from "./scrapers/threechub.js";
+import { scrapeSpar }       from "./scrapers/spar.js";
+import { scrapeJiji }       from "./scrapers/jiji.js";
+import { scrapeAliExpress } from "./scrapers/aliexpress.js";
+import { scrapeTemu }       from "./scrapers/temu.js";
+import { scrapeShein }      from "./scrapers/shein.js";
+import { scrapeAmazon }     from "./scrapers/amazon.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -74,7 +78,7 @@ function toTypeScriptArray(deals: RawDeal[]): string {
     originalPrice: ${deal.originalPrice},
     salePrice: ${deal.salePrice},
     discountPercent: ${deal.discountPercent},
-    currency: "NGN",${imageUrlLine}
+    currency: ${JSON.stringify(deal.currency ?? "NGN")},${imageUrlLine}
     imageGradient: ${JSON.stringify(gradient)},
     imageEmoji: ${JSON.stringify(deal.imageEmoji)},
     url: "${url}",
@@ -139,12 +143,18 @@ async function main() {
   const allDeals: RawDeal[] = [];
 
   const scrapers = [
-    { name: "Jumia",    fn: () => scrapeJumia(page) },
-    { name: "3C Hub",   fn: () => scrapeThreeChub(page) },
-    { name: "Slot",     fn: () => scrapeSlot(page) },
-    { name: "Konga",    fn: () => scrapeKonga(page) },
-    { name: "Spar",     fn: () => scrapeSpar(page) },
-    { name: "Jiji",     fn: () => scrapeJiji(page) },
+    // Nigerian stores
+    { name: "Jumia",      fn: () => scrapeJumia(page) },
+    { name: "3C Hub",     fn: () => scrapeThreeChub(page) },
+    { name: "Slot",       fn: () => scrapeSlot(page) },
+    { name: "Konga",      fn: () => scrapeKonga(page) },
+    { name: "Spar",       fn: () => scrapeSpar(page) },
+    { name: "Jiji",       fn: () => scrapeJiji(page) },
+    // International stores
+    { name: "AliExpress", fn: () => scrapeAliExpress(page) },
+    { name: "Temu",       fn: () => scrapeTemu(page) },
+    { name: "SHEIN",      fn: () => scrapeShein(page) },
+    { name: "Amazon",     fn: () => scrapeAmazon(page) },
   ];
 
   for (const { name, fn } of scrapers) {
@@ -161,14 +171,26 @@ async function main() {
   const unique = deduplicate(allDeals);
   const sorted = sortByDiscount(unique);
 
-  // Separate Jiji (no discount) from deal stores
-  const withDiscount    = sorted.filter((d) => d.discountPercent > 0);
-  const withoutDiscount = sorted.filter((d) => d.discountPercent === 0);
-  const final = [...withDiscount, ...withoutDiscount];
+  // Separate by currency: NGN (local) vs USD (international)
+  const ngDeals   = sorted.filter((d) => !d.currency || d.currency === "NGN");
+  const intlDeals = sorted.filter((d) => d.currency === "USD");
+
+  // Within each group: discounted first, then listings
+  const ngFinal = [
+    ...ngDeals.filter((d) => d.discountPercent > 0),
+    ...ngDeals.filter((d) => d.discountPercent === 0),
+  ];
+  const intlFinal = [
+    ...intlDeals.filter((d) => d.discountPercent > 0),
+    ...intlDeals.filter((d) => d.discountPercent === 0),
+  ];
+
+  // Nigerian deals first, then international
+  const final = [...ngFinal, ...intlFinal];
 
   console.log(`\n📦 Total unique deals: ${final.length}`);
-  console.log(`   With discount: ${withDiscount.length}`);
-  console.log(`   Listings (Jiji etc): ${withoutDiscount.length}`);
+  console.log(`   Nigerian (NGN): ${ngFinal.length}`);
+  console.log(`   International (USD): ${intlFinal.length}`);
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`\n⏱  Done in ${elapsed}s\n`);

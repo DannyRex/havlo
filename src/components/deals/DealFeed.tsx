@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Search, X, Globe } from "lucide-react";
 import CategoryNav from "./CategoryNav";
 import DiscountFilter from "./DiscountFilter";
 import DealCard from "./DealCard";
@@ -32,8 +32,11 @@ export default function DealFeed() {
 
   useEffect(() => { fetchDeals(); }, [fetchDeals]);
 
-  const featuredDeals = deals.filter((d) => d.isFeatured);
-  const regularDeals  = deals.filter((d) => !d.isFeatured);
+  const localDeals = deals.filter((d) => d.currency !== "USD");
+  const intlDeals  = deals.filter((d) => d.currency === "USD");
+
+  const featuredDeals = localDeals.filter((d) => d.isFeatured);
+  const regularDeals  = localDeals.filter((d) => !d.isFeatured);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -44,7 +47,7 @@ export default function DealFeed() {
           🔥 Today&apos;s Best Deals
         </h1>
         <p className="text-slate-500">
-          Fresh deals from Nigeria&apos;s top stores, updated daily.
+          Fresh deals from Nigeria&apos;s top stores + international sites, updated daily.
         </p>
       </div>
 
@@ -80,7 +83,7 @@ export default function DealFeed() {
             activeSort={sort}
             onTierChange={setTier}
             onSortChange={setSort}
-            resultCount={deals.length}
+            resultCount={localDeals.length}
           />
         </div>
       </div>
@@ -159,6 +162,42 @@ export default function DealFeed() {
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {regularDeals.map((deal) => (
+              <DealCard key={deal.id} deal={deal} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* International Deals */}
+      {!loading && intlDeals.length > 0 && (
+        <div className="mt-12">
+          {/* Section header */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Globe size={16} className="text-brand-400" />
+              <span className="text-base font-bold text-white">International Deals</span>
+              <span className="text-xs px-2 py-0.5 rounded-full text-brand-400 bg-brand-600/20 border border-brand-600/30 font-semibold">
+                {intlDeals.length}
+              </span>
+            </div>
+          </div>
+
+          {/* Disclaimer banner */}
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl mb-5 border"
+               style={{
+                 background: "rgba(255,153,0,0.07)",
+                 borderColor: "rgba(255,153,0,0.2)",
+               }}>
+            <Globe size={14} className="text-amber-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-amber-300/80 leading-relaxed">
+              <span className="font-semibold text-amber-300">Prices shown in USD.</span>{" "}
+              Shipping to Nigeria is not included and varies by seller. Use a forwarding
+              service (e.g. Courier Plus, Shop&Ship) or check if the seller ships directly.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {intlDeals.map((deal) => (
               <DealCard key={deal.id} deal={deal} />
             ))}
           </div>

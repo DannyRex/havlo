@@ -5,7 +5,7 @@ export interface Store {
   logo: string;
   color: string;
   url: string;
-  country: "NG";
+  country: "NG" | "INTL";
   rating: number;
   trusted: boolean;
 }
@@ -30,7 +30,7 @@ export interface Deal {
   originalPrice: number;
   salePrice: number;
   discountPercent: number;
-  currency: "NGN";
+  currency: "NGN" | "USD";
   imageUrl?: string;
   imageGradient: string;
   imageEmoji: string;

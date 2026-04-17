@@ -3,8 +3,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
-import { Heart, ExternalLink, Clock, Flame, ArrowRight } from "lucide-react";
-import { formatNaira, savings, timeAgo, daysUntil, cn } from "@/lib/utils";
+import { Heart, ExternalLink, Clock, Flame, ArrowRight, Globe } from "lucide-react";
+import { formatNaira, formatUSD, usdToNgn, formatCompact, savings, timeAgo, daysUntil, cn } from "@/lib/utils";
 import type { Deal } from "@/types";
 
 interface Props {
@@ -25,8 +25,17 @@ export default function DealCard({ deal, featured = false }: Props) {
   const [imgError, setImgError] = useState(false);
   const showImage = !!deal.imageUrl && !imgError;
 
+  const isUSD = deal.currency === "USD";
   const savingsAmount = savings(deal.originalPrice, deal.salePrice);
   const expiresIn = deal.expiresAt ? daysUntil(deal.expiresAt) : null;
+
+  // Formatted price strings
+  const salePriceStr = isUSD ? formatUSD(deal.salePrice) : formatNaira(deal.salePrice);
+  const origPriceStr = isUSD ? formatUSD(deal.originalPrice) : formatNaira(deal.originalPrice);
+  const savingsStr   = isUSD
+    ? formatUSD(savingsAmount)
+    : formatNaira(savingsAmount);
+  const ngnEquivStr  = isUSD ? `~${formatCompact(usdToNgn(deal.salePrice))}` : null;
 
   return (
     <div className={cn(
@@ -66,9 +75,11 @@ export default function DealCard({ deal, featured = false }: Props) {
         )}
 
         {/* Discount badge */}
-        <div className="absolute top-3 right-3 badge-discount text-sm font-black px-2.5 py-1">
-          −{deal.discountPercent}%
-        </div>
+        {deal.discountPercent > 0 && (
+          <div className="absolute top-3 right-3 badge-discount text-sm font-black px-2.5 py-1">
+            −{deal.discountPercent}%
+          </div>
+        )}
 
         {/* Save button */}
         <button
@@ -110,21 +121,37 @@ export default function DealCard({ deal, featured = false }: Props) {
         </h3>
 
         {/* Prices */}
-        <div className="flex items-baseline gap-2 mb-3">
+        <div className="flex items-baseline gap-2 mb-1">
           <span className="text-xl font-black text-white tracking-[-0.03em]">
-            {formatNaira(deal.salePrice)}
+            {salePriceStr}
           </span>
-          <span className="text-xs text-slate-600 line-through">
-            {formatNaira(deal.originalPrice)}
-          </span>
+          {deal.originalPrice > deal.salePrice && (
+            <span className="text-xs text-slate-600 line-through">
+              {origPriceStr}
+            </span>
+          )}
         </div>
+
+        {/* NGN equivalent for USD deals */}
+        {ngnEquivStr && (
+          <p className="text-xs text-slate-500 mb-2 tracking-[-0.01em]">
+            {ngnEquivStr} at current rate
+          </p>
+        )}
 
         {/* Savings pill */}
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-deal-green tracking-[-0.01em]"
-               style={{ background: "rgba(0,214,143,0.08)", border: "1px solid rgba(0,214,143,0.18)" }}>
-            Save {formatNaira(savingsAmount)}
-          </div>
+          {savingsAmount > 0 ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-deal-green tracking-[-0.01em]"
+                 style={{ background: "rgba(0,214,143,0.08)", border: "1px solid rgba(0,214,143,0.18)" }}>
+              Save {savingsStr}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-500 tracking-[-0.01em]"
+                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+              {isUSD ? <><Globe size={10} /> Ships from abroad</> : "Listed price"}
+            </div>
+          )}
           <span className="text-xs text-slate-600 flex items-center gap-1 tracking-[-0.01em]">
             <Heart size={10} />
             {saveCount.toLocaleString()}
