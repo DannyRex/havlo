@@ -1,0 +1,45 @@
+name: Scrape Deals
+
+on:
+  schedule:
+    # Runs every day at 6:00 AM WAT (5:00 AM UTC)
+    - cron: "0 5 * * *"
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run scrapers
+        run: npm run scrape
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          git diff --quiet src/lib/data/deals.ts || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit & push if deals changed
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          git config user.name  "Dealesty Bot"
+          git config user.email "bot@dealesty.vercel.app"
+          git add src/lib/data/deals.ts
+          git commit -m "chore: refresh deals [$(date '+%Y-%m-%d')]"
+          git push

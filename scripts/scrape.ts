@@ -1,0 +1,241 @@
+/**
+ * Dealesty Deal Scraper
+ * Run with: npm run scrape
+ *
+ * Scrapes Jumia, Konga, Slot, 3C Hub, Spar, Jiji using Playwright (headless Chromium).
+ * Outputs to src/lib/data/deals.ts — ready to commit and deploy.
+ */
+
+import { chromium } from "playwright";
+import { writeFileSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+import { RawDeal } from "./scrapers/types.js";
+import { scrapeJumia }     from "./scrapers/jumia.js";
+import { scrapeKonga }     from "./scrapers/konga.js";
+import { scrapeSlot }      from "./scrapers/slot.js";
+import { scrapeThreeChub } from "./scrapers/threechub.js";
+import { scrapeSpar }      from "./scrapers/spar.js";
+import { scrapeJiji }      from "./scrapers/jiji.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Emoji + gradient per store brand for imageGradient variety
+const STORE_STYLES: Record<string, string> = {
+  jumia:     "linear-gradient(135deg, #f97316 0%, #ef4444 100%)",
+  konga:     "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)",
+  slot:      "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+  threechub: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+  spar:      "linear-gradient(135deg, #22c55e 0%, #15803d 100%)",
+  jiji:      "linear-gradient(135deg, #10b981 0%, #047857 100%)",
+};
+
+function generateDealId(index: number): string {
+  return `d${index + 1}`;
+}
+
+function toTypeScriptArray(deals: RawDeal[]): string {
+  const today = new Date().toISOString().split("T")[0];
+
+  const entries = deals.map((deal, i) => {
+    const isHot      = deal.discountPercent >= 40;
+    const isFeatured = deal.discountPercent >= 55 || ["jumia", "threechub"].includes(deal.storeId);
+    const gradient   = deal.imageGradient || STORE_STYLES[deal.storeId] || STORE_STYLES["jumia"];
+
+    // Estimate engagement based on discount
+    const saves  = Math.floor(deal.discountPercent * 20 + Math.random() * 200);
+    const clicks = Math.floor(deal.discountPercent * 300 + Math.random() * 2000);
+
+    // Flash sale deals expire in 2 weeks; others have no expiry
+    const expiresAt = deal.storeId === "jumia" ? `"${getExpiryDate(14)}"` : "null";
+
+    const tags = JSON.stringify([...new Set(deal.tags)]);
+    const url  = deal.url.replace(/"/g, '\\"');
+
+    return `  {
+    id: "${generateDealId(i)}",
+    title: ${JSON.stringify(deal.title)},
+    description: ${JSON.stringify(deal.description)},
+    category: ${JSON.stringify(deal.category)},
+    categorySlug: ${JSON.stringify(deal.categorySlug)},
+    storeId: ${JSON.stringify(deal.storeId)},
+    storeName: ${JSON.stringify(deal.storeName)},
+    originalPrice: ${deal.originalPrice},
+    salePrice: ${deal.salePrice},
+    discountPercent: ${deal.discountPercent},
+    currency: "NGN",
+    imageGradient: ${JSON.stringify(gradient)},
+    imageEmoji: ${JSON.stringify(deal.imageEmoji)},
+    url: "${url}",
+    expiresAt: ${expiresAt},
+    isHot: ${isHot},
+    isFeatured: ${isFeatured},
+    tags: ${tags},
+    saves: ${saves},
+    clicks: ${clicks},
+    postedAt: "${today}",
+  }`;
+  });
+
+  return entries.join(",\n");
+}
+
+function getExpiryDate(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
+
+function deduplicate(deals: RawDeal[]): RawDeal[] {
+  const seen = new Set<string>();
+  return deals.filter((d) => {
+    const key = d.url.toLowerCase().replace(/[?#].*$/, "");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function sortByDiscount(deals: RawDeal[]): RawDeal[] {
+  return [...deals].sort((a, b) => b.discountPercent - a.discountPercent);
+}
+
+async function main() {
+  console.log("\n🛒 Dealesty Scraper — starting\n");
+  const startTime = Date.now();
+
+  const browser = await chromium.launch({
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-blink-features=AutomationControlled",
+    ],
+  });
+
+  const context = await browser.newContext({
+    userAgent:
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    viewport: { width: 1280, height: 800 },
+    locale: "en-NG",
+  });
+
+  // Block only heavy media — keep CSS so JS-rendered sites render correctly
+  await context.route("**/*.{png,jpg,jpeg,webp,gif,mp4,mp3,woff,woff2,ttf}", (route) => route.abort());
+
+  const page = await context.newPage();
+  const allDeals: RawDeal[] = [];
+
+  const scrapers = [
+    { name: "Jumia",    fn: () => scrapeJumia(page) },
+    { name: "3C Hub",   fn: () => scrapeThreeChub(page) },
+    { name: "Slot",     fn: () => scrapeSlot(page) },
+    { name: "Konga",    fn: () => scrapeKonga(page) },
+    { name: "Spar",     fn: () => scrapeSpar(page) },
+    { name: "Jiji",     fn: () => scrapeJiji(page) },
+  ];
+
+  for (const { name, fn } of scrapers) {
+    try {
+      const deals = await fn();
+      allDeals.push(...deals);
+    } catch (err) {
+      console.error(`✗ ${name} scraper crashed: ${err}`);
+    }
+  }
+
+  await browser.close();
+
+  const unique = deduplicate(allDeals);
+  const sorted = sortByDiscount(unique);
+
+  // Separate Jiji (no discount) from deal stores
+  const withDiscount    = sorted.filter((d) => d.discountPercent > 0);
+  const withoutDiscount = sorted.filter((d) => d.discountPercent === 0);
+  const final = [...withDiscount, ...withoutDiscount];
+
+  console.log(`\n📦 Total unique deals: ${final.length}`);
+  console.log(`   With discount: ${withDiscount.length}`);
+  console.log(`   Listings (Jiji etc): ${withoutDiscount.length}`);
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`\n⏱  Done in ${elapsed}s\n`);
+
+  // Generate TypeScript output
+  const output = `import type { Deal } from "@/types";
+
+// Auto-generated by scripts/scrape.ts — ${new Date().toUTCString()}
+// DO NOT edit manually. Run \`npm run scrape\` to refresh.
+
+export const deals: Deal[] = [
+${toTypeScriptArray(final)}
+];
+
+export function getDeals(params?: {
+  categorySlug?: string;
+  minDiscount?: number;
+  sort?: string;
+  search?: string;
+  limit?: number;
+}): Deal[] {
+  let result = [...deals];
+
+  if (params?.categorySlug && params.categorySlug !== "all") {
+    result = result.filter((d) => d.categorySlug === params.categorySlug);
+  }
+
+  if (params?.minDiscount && params.minDiscount > 0) {
+    result = result.filter((d) => d.discountPercent >= params.minDiscount!);
+  }
+
+  if (params?.search) {
+    const q = params.search.toLowerCase();
+    result = result.filter(
+      (d) =>
+        d.title.toLowerCase().includes(q) ||
+        d.description.toLowerCase().includes(q) ||
+        d.tags.some((t) => t.toLowerCase().includes(q))
+    );
+  }
+
+  switch (params?.sort) {
+    case "price_asc":
+      result.sort((a, b) => a.salePrice - b.salePrice);
+      break;
+    case "price_desc":
+      result.sort((a, b) => b.salePrice - a.salePrice);
+      break;
+    case "discount":
+      result.sort((a, b) => b.discountPercent - a.discountPercent);
+      break;
+    case "popular":
+      result.sort((a, b) => b.clicks - a.clicks);
+      break;
+    default:
+      result.sort((a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime());
+  }
+
+  if (params?.limit) result = result.slice(0, params.limit);
+
+  return result;
+}
+
+export const hotDeals = deals.filter((d) => d.isHot);
+export const featuredDeals = deals.filter((d) => d.isFeatured);
+`;
+
+  const outPath = resolve(__dirname, "../src/lib/data/deals.ts");
+  writeFileSync(outPath, output, "utf-8");
+
+  console.log(`✅ Written to src/lib/data/deals.ts`);
+  console.log(`\nNext steps:`);
+  console.log(`  1. Review the output: cat src/lib/data/deals.ts`);
+  console.log(`  2. Check the site: npm run dev`);
+  console.log(`  3. Deploy: git add -A && git commit -m "chore: refresh deals" && git push\n`);
+}
+
+main().catch((err) => {
+  console.error("Scraper failed:", err);
+  process.exit(1);
+});
