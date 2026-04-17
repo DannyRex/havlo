@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { Heart, ExternalLink, Clock, Flame, ArrowRight } from "lucide-react";
 import { formatNaira, savings, timeAgo, daysUntil, cn } from "@/lib/utils";
@@ -21,6 +22,9 @@ export default function DealCard({ deal, featured = false }: Props) {
     setSaveCount((c) => (saved ? c - 1 : c + 1));
   };
 
+  const [imgError, setImgError] = useState(false);
+  const showImage = !!deal.imageUrl && !imgError;
+
   const savingsAmount = savings(deal.originalPrice, deal.salePrice);
   const expiresIn = deal.expiresAt ? daysUntil(deal.expiresAt) : null;
 
@@ -33,12 +37,25 @@ export default function DealCard({ deal, featured = false }: Props) {
 
       {/* Image area */}
       <div className="relative h-44 flex items-center justify-center overflow-hidden"
-           style={{ background: deal.imageGradient }}>
+           style={{ background: showImage ? "#0a0f1e" : deal.imageGradient }}>
 
-        {/* Emoji */}
-        <span className="text-6xl select-none transition-transform duration-300 group-hover:scale-105 drop-shadow-lg">
-          {deal.imageEmoji}
-        </span>
+        {/* Real product image */}
+        {showImage ? (
+          <Image
+            src={deal.imageUrl!}
+            alt={deal.title}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="object-contain p-4 transition-transform duration-300 group-hover:scale-105"
+            onError={() => setImgError(true)}
+            unoptimized
+          />
+        ) : (
+          /* Emoji fallback */
+          <span className="text-6xl select-none transition-transform duration-300 group-hover:scale-105 drop-shadow-lg">
+            {deal.imageEmoji}
+          </span>
+        )}
 
         {/* Hot badge */}
         {deal.isHot && (

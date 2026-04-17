@@ -68,7 +68,11 @@ export async function scrapeKonga(page: Page): Promise<RawDeal[]> {
           const linkEl = card.querySelector("a[href*='/product/'], a[href*='konga.com']");
           const href   = linkEl?.getAttribute("href") ?? "";
 
-          return { title, discount, salePrice, originalPrice, href };
+          // Image — try src, then data-src (lazy-loaded)
+          const imgEl   = card.querySelector("img");
+          const imageUrl = imgEl?.getAttribute("src") || imgEl?.getAttribute("data-src") || "";
+
+          return { title, discount, salePrice, originalPrice, href, imageUrl };
         })
       );
 
@@ -100,6 +104,7 @@ export async function scrapeKonga(page: Page): Promise<RawDeal[]> {
           originalPrice: item.originalPrice,
           salePrice: item.salePrice,
           discountPercent,
+          imageUrl: item.imageUrl || undefined,
           imageEmoji: resolved.emoji,
           imageGradient: resolved.gradient,
           url: fullUrl,

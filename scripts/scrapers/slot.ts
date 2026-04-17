@@ -60,7 +60,11 @@ export async function scrapeSlot(page: Page): Promise<RawDeal[]> {
               href = firstLink?.getAttribute("href") ?? "";
             }
 
-            return { title, salePrice, originalPrice, href };
+            // Image
+            const imgEl   = card.querySelector("img");
+            const imageUrl = imgEl?.getAttribute("src") || imgEl?.getAttribute("data-src") || "";
+
+            return { title, salePrice, originalPrice, href, imageUrl };
           })
       );
 
@@ -92,6 +96,7 @@ export async function scrapeSlot(page: Page): Promise<RawDeal[]> {
           originalPrice: item.originalPrice,
           salePrice: item.salePrice,
           discountPercent,
+          imageUrl: item.imageUrl || undefined,
           imageEmoji: resolved.emoji,
           imageGradient: resolved.gradient,
           url: fullUrl,

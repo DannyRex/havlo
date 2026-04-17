@@ -28,7 +28,7 @@ export async function scrapeThreeChub(page: Page): Promise<RawDeal[]> {
       // Anchor on product links, then walk up to find the card container with price
       const items = await page.$$eval("a[href*='/products/']", (links) => {
         const seen = new Set<string>();
-        const results: Array<{ title: string; origText: string; saleText: string; href: string }> = [];
+        const results: Array<{ title: string; origText: string; saleText: string; href: string; imageUrl: string }> = [];
 
         for (const link of links) {
           const href = link.getAttribute("href") ?? "";
@@ -56,12 +56,23 @@ export async function scrapeThreeChub(page: Page): Promise<RawDeal[]> {
               const heading = container.querySelector("h2, h3, h4, [class*='title'], [class*='name']");
               const title   = (heading?.textContent ?? link.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 100);
 
+              // Image: Shopify CDN images are in img[src*='cdn.shopify'] or img[srcset]
+              const imgEl   = container.querySelector("img[src*='shopify'], img[src*='cdn'], img[src*='3chub'], img");
+              const rawSrc  = imgEl?.getAttribute("src") ?? imgEl?.getAttribute("data-src") ?? "";
+              // Shopify srcset often has better resolution — grab first entry
+              const srcset  = imgEl?.getAttribute("srcset") ?? "";
+              const srcsetFirst = srcset ? srcset.split(",")[0].trim().split(" ")[0] : "";
+              const imageUrl = srcsetFirst || rawSrc;
+              // Ensure absolute URL
+              const absoluteImg = imageUrl.startsWith("//") ? `https:${imageUrl}` : imageUrl;
+
               if (title && salePrice > 0) {
                 results.push({
                   title,
                   origText: originalPrice > salePrice ? String(originalPrice) : "",
                   saleText: String(salePrice),
                   href,
+                  imageUrl: absoluteImg,
                 });
               }
               break;
@@ -104,6 +115,7 @@ export async function scrapeThreeChub(page: Page): Promise<RawDeal[]> {
           originalPrice,
           salePrice,
           discountPercent,
+          imageUrl: item.imageUrl || undefined,
           imageEmoji: resolved.emoji,
           imageGradient: resolved.gradient,
           url: fullUrl,

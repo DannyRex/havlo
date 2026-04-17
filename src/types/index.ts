@@ -31,6 +31,7 @@ export interface Deal {
   salePrice: number;
   discountPercent: number;
   currency: "NGN";
+  imageUrl?: string;
   imageGradient: string;
   imageEmoji: string;
   url: string;

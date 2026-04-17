@@ -3,16 +3,10 @@
 const nextConfig = {
   images: {
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "logo.clearbit.com",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "www.google.com",
-        pathname: "/s2/favicons/**",
-      },
+      // Allow all HTTPS images (store CDNs vary widely)
+      { protocol: "https", hostname: "**" },
+      // Also allow HTTP for older store CDNs
+      { protocol: "http",  hostname: "**" },
     ],
   },
 };

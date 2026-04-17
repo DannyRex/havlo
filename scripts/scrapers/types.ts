@@ -8,6 +8,7 @@ export interface RawDeal {
   originalPrice: number;
   salePrice: number;
   discountPercent: number;
+  imageUrl?: string;
   imageEmoji: string;
   imageGradient: string;
   url: string;

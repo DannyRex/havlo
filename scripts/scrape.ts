@@ -52,6 +52,17 @@ function toTypeScriptArray(deals: RawDeal[]): string {
     const tags = JSON.stringify([...new Set(deal.tags)]);
     const url  = deal.url.replace(/"/g, '\\"');
 
+    // Filter placeholder GIFs and upgrade Shopify thumbnail resolution
+    let cleanImageUrl = deal.imageUrl ?? "";
+    if (cleanImageUrl.startsWith("data:") || cleanImageUrl.length < 10) cleanImageUrl = "";
+    if (cleanImageUrl.includes("cdn.shopify") || cleanImageUrl.includes("/cdn/shop/")) {
+      cleanImageUrl = cleanImageUrl.replace(/[?&]width=\d+/, "").replace(/\?$/, "") + (cleanImageUrl.includes("?") ? "&width=600" : "?width=600");
+    }
+
+    const imageUrlLine = cleanImageUrl
+      ? `\n    imageUrl: ${JSON.stringify(cleanImageUrl)},`
+      : "";
+
     return `  {
     id: "${generateDealId(i)}",
     title: ${JSON.stringify(deal.title)},
@@ -63,7 +74,7 @@ function toTypeScriptArray(deals: RawDeal[]): string {
     originalPrice: ${deal.originalPrice},
     salePrice: ${deal.salePrice},
     discountPercent: ${deal.discountPercent},
-    currency: "NGN",
+    currency: "NGN",${imageUrlLine}
     imageGradient: ${JSON.stringify(gradient)},
     imageEmoji: ${JSON.stringify(deal.imageEmoji)},
     url: "${url}",
