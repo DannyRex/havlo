@@ -126,6 +126,28 @@ export const stores: Store[] = [
 
 export const internationalStores: Store[] = [
   {
+    id: "dhgate",
+    name: "DHgate",
+    slug: "dhgate",
+    logo: "DH",
+    color: "#E53935",
+    url: "https://www.dhgate.com",
+    country: "INTL",
+    rating: 3.9,
+    trusted: true,
+  },
+  {
+    id: "asos",
+    name: "ASOS",
+    slug: "asos",
+    logo: "AS",
+    color: "#000000",
+    url: "https://www.asos.com",
+    country: "INTL",
+    rating: 4.3,
+    trusted: true,
+  },
+  {
     id: "aliexpress",
     name: "AliExpress",
     slug: "aliexpress",

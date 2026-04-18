@@ -1,57 +1,55 @@
 import { Page } from "playwright";
 import { RawDeal, resolveCategory } from "./types.js";
 
-// AliExpress affiliate: AliExpress Portals (portals.aliexpress.com) or Admitad
+// DHgate affiliate: DHgate.com Affiliate Program (partner.dhgate.com)
+// Ultra-cheap wholesale goods — same audience as Temu, much better accessibility
 
-const ALIEXPRESS_PAGES = [
-  { url: "https://www.aliexpress.com/wholesale?SearchText=electronics&SortType=total_tranpro_desc", cat: "electronics" },
-  { url: "https://www.aliexpress.com/wholesale?SearchText=smartphone&SortType=total_tranpro_desc",  cat: "phones" },
-  { url: "https://www.aliexpress.com/wholesale?SearchText=fashion+dress&SortType=total_tranpro_desc", cat: "fashion" },
-  { url: "https://www.aliexpress.com/wholesale?SearchText=hair+wig&SortType=total_tranpro_desc",    cat: "beauty" },
+const DHGATE_PAGES = [
+  { url: "https://www.dhgate.com/wholesale/electronics.html",       cat: "electronics" },
+  { url: "https://www.dhgate.com/wholesale/cell+phones.html",       cat: "phones" },
+  { url: "https://www.dhgate.com/wholesale/laptops.html",           cat: "computing" },
+  { url: "https://www.dhgate.com/wholesale/women+clothing.html",    cat: "fashion" },
+  { url: "https://www.dhgate.com/wholesale/hair+wig.html",          cat: "beauty" },
 ];
 
 function inferCategory(title: string): string {
   const t = title.toLowerCase();
-  if (/phone|smartphone|iphone|samsung|xiaomi|redmi|poco|earb|airpod|earbud|headphone|speaker|powerbank|power bank/.test(t)) return "phones";
-  if (/laptop|notebook|tablet|ipad/.test(t)) return "computing";
-  if (/\btv\b|television|smart tv/.test(t)) return "televisions";
-  if (/dress|shirt|blouse|trouser|jeans|skirt|cloth|fashion|sneaker|shoe|bag|purse/.test(t)) return "fashion";
-  if (/wig|hair|lace|bundle|curl|weave|extension/.test(t)) return "beauty";
+  if (/phone|smartphone|iphone|samsung|xiaomi|redmi|poco|charger|cable|powerbank/.test(t)) return "phones";
+  if (/laptop|notebook|tablet|keyboard|mouse|ssd|ram/.test(t)) return "computing";
+  if (/earb|airpod|earbud|headphone|speaker|earphone/.test(t)) return "audio";
+  if (/\btv\b|television|projector|monitor/.test(t)) return "televisions";
+  if (/dress|shirt|blouse|trouser|jeans|skirt|suit|cloth|fashion|sneaker|shoe|bag|purse/.test(t)) return "fashion";
+  if (/wig|hair|lace|bundle|weave|extension|curl/.test(t)) return "beauty";
   if (/cream|serum|lipstick|mascara|foundation|skin|make.?up|nail/.test(t)) return "beauty";
-  if (/fridge|washing|microwave|cooker|blender|iron|vacuum/.test(t)) return "appliances";
+  if (/fridge|washer|microwave|cooker|blender|fan|solar|inverter/.test(t)) return "appliances";
   return "electronics";
 }
 
-export async function scrapeAliExpress(page: Page): Promise<RawDeal[]> {
+export async function scrapeDHgate(page: Page): Promise<RawDeal[]> {
   const deals: RawDeal[] = [];
   const seenUrls = new Set<string>();
 
-  console.log("  → AliExpress...");
+  console.log("  → DHgate...");
 
-  for (const { url, cat } of ALIEXPRESS_PAGES) {
+  for (const { url, cat } of DHGATE_PAGES) {
     try {
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 35000 });
 
-      // Wait for product cards — either the gallery items or a captcha signal
-      const productSel = "a[href*='/item/']";
-      const captchaSel = "[class*='captcha'], [id*='captcha'], [class*='punish']";
+      // DHgate renders server-side — product links are present immediately
+      const found = await page.waitForSelector("a[href*='/product/']", { timeout: 10000 })
+        .then(() => true).catch(() => false);
 
-      const result = await Promise.race([
-        page.waitForSelector(productSel, { timeout: 12000 }).then(() => "products"),
-        page.waitForSelector(captchaSel, { timeout: 12000 }).then(() => "captcha"),
-      ]).catch(() => "timeout");
-
-      if (result === "captcha" || result === "timeout") {
-        const title = await page.title();
-        console.warn(`    AliExpress blocked (${result}): ${title}`);
+      if (!found) {
+        console.warn(`    DHgate: no products found at ${url}`);
         continue;
       }
 
-      // Give JS a moment to hydrate remaining cards
-      await page.waitForTimeout(1500);
+      // Optional scroll to load more
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
+      await page.waitForTimeout(1000);
 
       const items = await page.$$eval(
-        "a[href*='/item/']",
+        "a[href*='/product/']",
         (links) => {
           const seen = new Set<string>();
           const results: Array<{
@@ -61,17 +59,17 @@ export async function scrapeAliExpress(page: Page): Promise<RawDeal[]> {
 
           for (const link of links) {
             const href = link.getAttribute("href") ?? "";
-            // Only full item URLs
-            if (!href.includes("/item/")) continue;
+            if (!href.includes("/product/")) continue;
             const cleanHref = href.split("?")[0];
             if (seen.has(cleanHref)) continue;
             seen.add(cleanHref);
 
-            // Walk up to card container
+            // Walk up to find the product card with price
             let container: Element | null = link.parentElement;
-            for (let i = 0; i < 12; i++) {
+            for (let i = 0; i < 10; i++) {
               if (!container) break;
               const text = container.textContent ?? "";
+              // DHgate prices are USD: "$X.XX" or "US $X.XX"
               if (text.includes("$") && text.length < 2000) {
                 const fullText = text.replace(/\s+/g, " ").trim();
 
@@ -85,21 +83,29 @@ export async function scrapeAliExpress(page: Page): Promise<RawDeal[]> {
                 const salePrice = Math.min(...prices);
                 const origPrice = prices.length > 1 ? Math.max(...prices) : salePrice;
 
+                // Title: from the link text, img alt, or a heading
                 const heading = container.querySelector(
-                  "h1,h2,h3,[class*='title'],[class*='name'],[class*='Title'],[class*='Name'],[class*='product']"
+                  "[class*='title'],[class*='name'],[class*='Title'],[class*='Name'],h2,h3"
                 );
-                const rawTitle = (heading?.textContent ?? link.textContent ?? link.getAttribute("title") ?? "")
-                  .replace(/\s+/g, " ").trim().slice(0, 120);
-
                 const img = container.querySelector("img");
+                const rawTitle = (
+                  heading?.textContent ??
+                  link.getAttribute("title") ??
+                  img?.getAttribute("alt") ??
+                  link.textContent ??
+                  ""
+                ).replace(/\s+/g, " ").trim().slice(0, 120);
+
                 const imgSrc = img?.getAttribute("src") ?? img?.getAttribute("data-src") ?? "";
                 const imageUrl = imgSrc.startsWith("//") ? `https:${imgSrc}` : imgSrc;
 
                 if (rawTitle && salePrice > 0) {
-                  const absoluteHref = href.startsWith("http") ? href.split("?")[0] : `https://www.aliexpress.com${href.split("?")[0]}`;
-                  results.push({ title: rawTitle, salePriceText: String(salePrice),
+                  const absoluteHref = href.startsWith("http") ? href : `https://www.dhgate.com${href}`;
+                  results.push({
+                    title: rawTitle, salePriceText: String(salePrice),
                     origPriceText: origPrice > salePrice ? String(origPrice) : "",
-                    href: absoluteHref, imageUrl });
+                    href: absoluteHref, imageUrl,
+                  });
                 }
                 break;
               }
@@ -129,29 +135,26 @@ export async function scrapeAliExpress(page: Page): Promise<RawDeal[]> {
 
         deals.push({
           title: item.title,
-          description: `${item.title} — shop on AliExpress with worldwide shipping.`,
+          description: `${item.title} — wholesale prices on DHgate with worldwide shipping.`,
           category: resolved.category, categorySlug: resolved.slug,
-          storeId: "aliexpress", storeName: "AliExpress",
+          storeId: "dhgate", storeName: "DHgate",
           originalPrice: origPrice, salePrice, discountPercent,
           currency: "USD",
           imageUrl: item.imageUrl || undefined,
           imageEmoji: resolved.emoji, imageGradient: resolved.gradient,
           url: item.href,
-          tags: ["AliExpress", "International", resolved.category],
+          tags: ["DHgate", "International", resolved.category],
         });
         pageDeals++;
       }
 
-      const q = new URL(url).searchParams.get("SearchText") ?? "page";
-      console.log(`    AliExpress "${q}": ${items.length} links → ${pageDeals} deals`);
-
-      // Polite delay between pages — AliExpress rate-limits aggressive scrapers
-      await page.waitForTimeout(2500);
+      const slug = url.split("/wholesale/")[1]?.split(".")[0] ?? "page";
+      console.log(`    DHgate "${slug}": ${items.length} links → ${pageDeals} deals`);
     } catch (err) {
-      console.warn(`    AliExpress failed: ${err}`);
+      console.warn(`    DHgate failed: ${err}`);
     }
   }
 
-  console.log(`  ✓ AliExpress: ${deals.length} deals`);
+  console.log(`  ✓ DHgate: ${deals.length} deals`);
   return deals;
 }

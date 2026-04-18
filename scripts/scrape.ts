@@ -6,7 +6,11 @@
  * Outputs to src/lib/data/deals.ts — ready to commit and deploy.
  */
 
-import { chromium } from "playwright";
+// @ts-ignore — playwright-extra has no bundled TS types
+import { chromium } from "playwright-extra";
+// @ts-ignore
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+chromium.use(StealthPlugin());
 import { writeFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -18,8 +22,8 @@ import { scrapeThreeChub }  from "./scrapers/threechub.js";
 import { scrapeSpar }       from "./scrapers/spar.js";
 import { scrapeJiji }       from "./scrapers/jiji.js";
 import { scrapeAliExpress } from "./scrapers/aliexpress.js";
-import { scrapeTemu }       from "./scrapers/temu.js";
-import { scrapeShein }      from "./scrapers/shein.js";
+import { scrapeDHgate }     from "./scrapers/dhgate.js";
+import { scrapeAsos }       from "./scrapers/asos.js";
 import { scrapeAmazon }     from "./scrapers/amazon.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -129,32 +133,45 @@ async function main() {
     ],
   });
 
-  const context = await browser.newContext({
-    userAgent:
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  const COMMON_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+  // Nigerian context — locale en-NG
+  const ngContext = await browser.newContext({
+    userAgent: COMMON_UA,
     viewport: { width: 1280, height: 800 },
     locale: "en-NG",
   });
+  await ngContext.route("**/*.{png,jpg,jpeg,webp,gif,mp4,mp3,woff,woff2,ttf}", (route) => route.abort());
+  const page = await ngContext.newPage();
 
-  // Block only heavy media — keep CSS so JS-rendered sites render correctly
-  await context.route("**/*.{png,jpg,jpeg,webp,gif,mp4,mp3,woff,woff2,ttf}", (route) => route.abort());
+  // International context — locale en-US, wider viewport
+  const intlContext = await browser.newContext({
+    userAgent: COMMON_UA,
+    viewport: { width: 1440, height: 900 },
+    locale: "en-US",
+    extraHTTPHeaders: {
+      "Accept-Language": "en-US,en;q=0.9",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    },
+  });
+  // Don't block images for INTL — some lazy-load via same requests as content
+  const intlPage = await intlContext.newPage();
 
-  const page = await context.newPage();
   const allDeals: RawDeal[] = [];
 
   const scrapers = [
-    // Nigerian stores
+    // Nigerian stores (en-NG context)
     { name: "Jumia",      fn: () => scrapeJumia(page) },
     { name: "3C Hub",     fn: () => scrapeThreeChub(page) },
     { name: "Slot",       fn: () => scrapeSlot(page) },
     { name: "Konga",      fn: () => scrapeKonga(page) },
     { name: "Spar",       fn: () => scrapeSpar(page) },
     { name: "Jiji",       fn: () => scrapeJiji(page) },
-    // International stores
-    { name: "AliExpress", fn: () => scrapeAliExpress(page) },
-    { name: "Temu",       fn: () => scrapeTemu(page) },
-    { name: "SHEIN",      fn: () => scrapeShein(page) },
-    { name: "Amazon",     fn: () => scrapeAmazon(page) },
+    // International stores (en-US stealth context)
+    { name: "AliExpress", fn: () => scrapeAliExpress(intlPage) },
+    { name: "DHgate",     fn: () => scrapeDHgate(intlPage) },
+    { name: "ASOS",       fn: () => scrapeAsos(intlPage) },    // fetch-based, no page needed
+    { name: "Amazon",     fn: () => scrapeAmazon(intlPage) },
   ];
 
   for (const { name, fn } of scrapers) {
@@ -166,6 +183,8 @@ async function main() {
     }
   }
 
+  await ngContext.close();
+  await intlContext.close();
   await browser.close();
 
   const unique = deduplicate(allDeals);
