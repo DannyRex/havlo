@@ -16,8 +16,31 @@ const stores = [
   { name: "Temu",       logo: "/logos/temu.png" },
 ];
 
-/* Duplicate the list so the scroll loops seamlessly */
-const marqueeStores = [...stores, ...stores];
+function MarqueeTrack() {
+  return (
+    <div className="flex items-center gap-10 sm:gap-14 shrink-0">
+      {stores.map((store) => (
+        <div
+          key={store.name}
+          className="flex items-center gap-2.5 shrink-0 group cursor-default"
+        >
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg overflow-hidden flex items-center justify-center bg-white/10 shrink-0">
+            <Image
+              src={store.logo}
+              alt={store.name}
+              width={32}
+              height={32}
+              className="w-5 h-5 sm:w-6 sm:h-6 object-contain opacity-50 grayscale group-hover:opacity-100 group-hover:grayscale-0 transition-all duration-300"
+            />
+          </div>
+          <span className="text-sm sm:text-base font-semibold text-slate-500 group-hover:text-slate-200 transition-colors duration-300 whitespace-nowrap tracking-[-0.01em]">
+            {store.name}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function StoreLogos() {
   return (
@@ -33,22 +56,13 @@ export default function StoreLogos() {
 
       {/* Scrolling marquee */}
       <div className="relative overflow-hidden">
-        {/* Fade edges */}
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-32 sm:w-48 z-10" style={{ background: "linear-gradient(to right, #050B18 0%, #050B18 10%, rgba(5,11,24,0.85) 30%, rgba(5,11,24,0.4) 60%, transparent 100%)" }} />
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-32 sm:w-48 z-10" style={{ background: "linear-gradient(to left, #050B18 0%, #050B18 10%, rgba(5,11,24,0.85) 30%, rgba(5,11,24,0.4) 60%, transparent 100%)" }} />
+        {/* Fade edges — narrow on mobile, wider on desktop */}
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-10 sm:w-24 lg:w-36 z-10" style={{ background: "linear-gradient(to right, #050B18 0%, rgba(5,11,24,0.6) 50%, transparent 100%)" }} />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-10 sm:w-24 lg:w-36 z-10" style={{ background: "linear-gradient(to left, #050B18 0%, rgba(5,11,24,0.6) 50%, transparent 100%)" }} />
 
-        <div className="flex items-center gap-12 sm:gap-16 animate-marquee w-max">
-          {marqueeStores.map((store, i) => (
-            <div key={`${store.name}-${i}`} className="flex-shrink-0 flex items-center justify-center h-12">
-              <Image
-                src={store.logo}
-                alt={store.name}
-                width={120}
-                height={48}
-                className={`h-8 sm:h-10 w-auto object-contain grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition-all duration-300 ${store.name === "3C Hub" ? "max-h-6 sm:max-h-7" : ""}`}
-              />
-            </div>
-          ))}
+        <div className="flex items-center gap-10 sm:gap-14 animate-marquee w-max">
+          <MarqueeTrack />
+          <MarqueeTrack />
         </div>
       </div>
 

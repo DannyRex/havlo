@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import SearchBar from "@/components/compare/SearchBar";
 import PriceResults from "@/components/compare/PriceResults";
 import AlternativeCard from "@/components/compare/AlternativeCard";
+import { ShieldCheck, Zap, Banknote } from "lucide-react";
 import type { SearchResult } from "@/types";
 
 function CompareContent() {
@@ -80,7 +81,7 @@ function CompareContent() {
           {result.alternatives.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-5">
-                <h2 className="text-lg font-bold text-white">💡 Better-value picks</h2>
+                <h2 className="text-lg font-bold text-white">Better-value picks</h2>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-white/[0.06] text-slate-400 border border-white/[0.08]">
                   {result.alternatives.length}
                 </span>
@@ -100,23 +101,41 @@ function CompareContent() {
 
       {/* Empty / intro state */}
       {!result && !loading && (
-        <div className="mt-20 max-w-lg mx-auto text-center">
-          <div className="text-6xl mb-4">🔍</div>
-          <h3 className="text-xl font-bold text-white mb-2">
-            Search for something you're ready to buy
-          </h3>
-          <p className="text-slate-500 text-sm leading-relaxed">
-            We'll pull matching prices from major Nigerian retailers and surface cheaper alternatives when we find them.
-          </p>
-          <div className="mt-6 grid grid-cols-3 gap-3 text-center">
+        <div className="mt-16 sm:mt-20">
+          {/* How it works */}
+          <div className="max-w-2xl mx-auto text-center mb-12">
+            <h3 className="text-xl font-bold text-white mb-2">
+              Search any product. See every price.
+            </h3>
+            <p className="text-sm text-slate-500 leading-relaxed">
+              Type what you want to buy and we'll check major Nigerian retailers so you don't have to open a pile of tabs.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
             {[
-              { icon: "⚡", label: "Fast results" },
-              { icon: "🇳🇬", label: "Local retailers" },
-              { icon: "₦",  label: "Naira pricing" },
-            ].map(({ icon, label }) => (
-              <div key={label} className="glass rounded-xl p-3 border border-white/[0.05]">
-                <span className="text-2xl">{icon}</span>
-                <p className="text-xs text-slate-500 mt-1">{label}</p>
+              {
+                icon: <Zap size={20} className="text-deal-cyan" />,
+                title: "Instant comparison",
+                desc: "Prices from multiple stores in one view — ranked lowest to highest.",
+              },
+              {
+                icon: <ShieldCheck size={20} className="text-deal-green" />,
+                title: "Unbiased results",
+                desc: "We don't take commissions. The cheapest option always wins.",
+              },
+              {
+                icon: <Banknote size={20} className="text-deal-orange" />,
+                title: "Naira pricing",
+                desc: "Every price in NGN. No currency surprises at checkout.",
+              },
+            ].map(({ icon, title, desc }) => (
+              <div key={title} className="glass rounded-2xl p-5 border border-white/[0.05] text-center">
+                <div className="w-10 h-10 rounded-xl mx-auto flex items-center justify-center mb-3 bg-white/[0.04]">
+                  {icon}
+                </div>
+                <h4 className="text-sm font-semibold text-white mb-1">{title}</h4>
+                <p className="text-xs text-slate-500 leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
