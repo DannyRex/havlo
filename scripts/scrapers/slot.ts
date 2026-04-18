@@ -3,13 +3,28 @@ import { RawDeal, resolveCategory, parseNaira } from "./types.js";
 
 // Confirmed selector: [class*='item'][class*='product'] (60 cards per page)
 // Card text format: "TITLE₦PRICE Quick View Wishlist"  (or "TITLE₦ORIG₦SALE Quick View...")
-const SLOT_PAGES = [
-  { url: "https://www.slot.ng/product-category/smartphones/",          cat: "phones" },
-  { url: "https://www.slot.ng/product-category/laptops/",              cat: "computing" },
-  { url: "https://www.slot.ng/product-category/tablets/",              cat: "phones" },
-  { url: "https://www.slot.ng/product-category/smart-watches-bands/",  cat: "electronics" },
-  { url: "https://www.slot.ng/product-category/earphones-headphones/", cat: "audio" },
+const SLOT_BASE = [
+  { slug: "smartphones",          cat: "phones",      pages: 4 },
+  { slug: "laptops",              cat: "computing",   pages: 3 },
+  { slug: "tablets",              cat: "phones",      pages: 2 },
+  { slug: "smart-watches-bands",  cat: "electronics", pages: 2 },
+  { slug: "earphones-headphones", cat: "audio",       pages: 2 },
+  { slug: "televisions",          cat: "electronics", pages: 2 },
+  { slug: "gaming",               cat: "gaming",      pages: 2 },
+  { slug: "networking",           cat: "electronics", pages: 1 },
+  { slug: "power-solutions",      cat: "electronics", pages: 1 },
+  { slug: "speakers",             cat: "audio",       pages: 1 },
 ];
+
+// Expand into per-page URLs (?paged=2…). Slot uses standard WordPress pagination.
+const SLOT_PAGES = SLOT_BASE.flatMap(({ slug, cat, pages }) =>
+  Array.from({ length: pages }, (_, i) => ({
+    url: i === 0
+      ? `https://www.slot.ng/product-category/${slug}/`
+      : `https://www.slot.ng/product-category/${slug}/page/${i + 1}/`,
+    cat,
+  })),
+);
 
 export async function scrapeSlot(page: Page): Promise<RawDeal[]> {
   const deals: RawDeal[] = [];

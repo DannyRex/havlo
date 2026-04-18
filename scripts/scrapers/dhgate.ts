@@ -10,6 +10,11 @@ const DHGATE_PAGES = [
   { url: "https://www.dhgate.com/wholesale/laptops.html",           cat: "computing" },
   { url: "https://www.dhgate.com/wholesale/women+clothing.html",    cat: "fashion" },
   { url: "https://www.dhgate.com/wholesale/hair+wig.html",          cat: "beauty" },
+  { url: "https://www.dhgate.com/wholesale/headphones.html",        cat: "audio" },
+  { url: "https://www.dhgate.com/wholesale/watches.html",           cat: "fashion" },
+  { url: "https://www.dhgate.com/wholesale/shoes.html",             cat: "fashion" },
+  { url: "https://www.dhgate.com/wholesale/bags.html",              cat: "fashion" },
+  { url: "https://www.dhgate.com/wholesale/home+appliances.html",   cat: "appliances" },
 ];
 
 function inferCategory(title: string): string {

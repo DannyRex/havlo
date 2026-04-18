@@ -5,6 +5,9 @@ const JIJI_PAGES = [
   { url: "https://jiji.ng/nigeria/phones-and-tablets",  cat: "phones" },
   { url: "https://jiji.ng/nigeria/electronics",          cat: "electronics" },
   { url: "https://jiji.ng/nigeria/computers",            cat: "computing" },
+  { url: "https://jiji.ng/nigeria/fashion",              cat: "fashion" },
+  { url: "https://jiji.ng/nigeria/tv-audio-video",       cat: "electronics" },
+  { url: "https://jiji.ng/nigeria/games-consoles",       cat: "gaming" },
 ];
 
 export async function scrapeJiji(page: Page): Promise<RawDeal[]> {

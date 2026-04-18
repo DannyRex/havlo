@@ -49,6 +49,7 @@ export interface PriceResult {
   storeName: string;
   storeLogo: string;
   storeColor: string;
+  storeLogoUrl?: string;
   price: number;
   currency: "NGN";
   inStock: boolean;
@@ -56,6 +57,7 @@ export interface PriceResult {
   condition: "new" | "refurbished" | "used";
   deliveryDays: number;
   rating: number | null;
+  imageUrl?: string;
 }
 
 export interface Alternative {
@@ -66,6 +68,7 @@ export interface Alternative {
   currency: "NGN";
   imageGradient: string;
   imageEmoji: string;
+  imageUrl?: string;
   category: string;
   similarity: number;
   savingsPercent: number;
@@ -82,6 +85,7 @@ export interface SearchResult {
     category: string;
     imageEmoji: string;
     imageGradient: string;
+    imageUrl?: string;
   };
   prices: PriceResult[];
   alternatives: Alternative[];

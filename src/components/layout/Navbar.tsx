@@ -80,13 +80,6 @@ export default function Navbar() {
               {label}
             </Link>
           ))}
-          <div className="w-px h-4 bg-white/[0.1] mx-2" />
-          <Link
-            href="/deals"
-            className="btn-primary text-sm py-2 px-5 rounded-xl"
-          >
-            Browse Deals
-          </Link>
         </div>
 
         <div className="md:hidden w-10" aria-hidden="true" />

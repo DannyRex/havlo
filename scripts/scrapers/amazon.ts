@@ -8,6 +8,11 @@ const AMAZON_PAGES = [
   { url: "https://www.amazon.com/s?i=electronics&rh=n:172282,p_n_deal_type:23566064011&s=exact-aware-popularity-rank", cat: "electronics" },
   { url: "https://www.amazon.com/s?i=wireless&rh=n:2335752011,p_n_deal_type:23566064011&s=exact-aware-popularity-rank", cat: "phones" },
   { url: "https://www.amazon.com/s?i=fashion&rh=p_n_deal_type:23566064011&s=exact-aware-popularity-rank",              cat: "fashion" },
+  { url: "https://www.amazon.com/s?i=computers&rh=n:565108,p_n_deal_type:23566064011&s=exact-aware-popularity-rank",   cat: "computing" },
+  { url: "https://www.amazon.com/s?i=videogames&rh=n:468642,p_n_deal_type:23566064011&s=exact-aware-popularity-rank",  cat: "gaming" },
+  { url: "https://www.amazon.com/s?i=kitchen&rh=n:284507,p_n_deal_type:23566064011&s=exact-aware-popularity-rank",     cat: "home" },
+  { url: "https://www.amazon.com/s?i=beauty&rh=n:3760911,p_n_deal_type:23566064011&s=exact-aware-popularity-rank",     cat: "beauty" },
+  { url: "https://www.amazon.com/s?i=sporting&rh=n:3375251,p_n_deal_type:23566064011&s=exact-aware-popularity-rank",   cat: "sports" },
 ];
 
 function inferCategory(title: string): string {

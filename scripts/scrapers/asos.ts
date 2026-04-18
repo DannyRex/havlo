@@ -12,6 +12,14 @@ const ASOS_QUERIES = [
   { q: "men sneakers" },
   { q: "women bag" },
   { q: "women jeans" },
+  { q: "men jacket" },
+  { q: "women tops" },
+  { q: "men trousers" },
+  { q: "women skirt" },
+  { q: "men shorts" },
+  { q: "women activewear" },
+  { q: "men boots" },
+  { q: "women sunglasses" },
 ];
 
 interface ASOSProduct {

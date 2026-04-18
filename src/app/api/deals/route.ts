@@ -12,16 +12,18 @@ export async function GET(req: NextRequest) {
   const limit       = searchParams.get("limit")  ? parseInt(searchParams.get("limit")!,  10) : 20;
   const offset      = searchParams.get("offset") ? parseInt(searchParams.get("offset")!, 10) : 0;
 
-  const result = getDeals({
+  const all = getDeals({
     categorySlug: category,
     minDiscount:  minDiscount ? parseInt(minDiscount, 10) : undefined,
     sort,
     search,
-    limit,
-    offset,
   });
 
-  return NextResponse.json(result, {
+  const total = all.length;
+  const items = all.slice(offset, offset + limit);
+  const hasMore = offset + limit < total;
+
+  return NextResponse.json({ items, total, hasMore }, {
     headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate=300" },
   });
 }

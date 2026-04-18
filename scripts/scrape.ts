@@ -25,6 +25,7 @@ import { scrapeAliExpress } from "./scrapers/aliexpress.js";
 import { scrapeDHgate }     from "./scrapers/dhgate.js";
 import { scrapeAsos }       from "./scrapers/asos.js";
 import { scrapeAmazon }     from "./scrapers/amazon.js";
+import { scrapePopularSkus } from "./scrapers/popular-skus.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -170,6 +171,10 @@ async function main() {
     { name: "Konga",      fn: () => scrapeKonga(page) },
     { name: "Spar",       fn: () => scrapeSpar(page) },
     { name: "Jiji",       fn: () => scrapeJiji(page) },
+    // Targeted multi-store SKU sweep — populates the search/compare feature with
+    // products that exist at 2+ Nigerian stores (the category-page scrapes above
+    // miss most popular SKUs).
+    { name: "Popular SKUs", fn: () => scrapePopularSkus(page) },
     // International stores (en-US stealth context)
     { name: "AliExpress", fn: () => scrapeAliExpress(intlPage) },
     { name: "DHgate",     fn: () => scrapeDHgate(intlPage) },

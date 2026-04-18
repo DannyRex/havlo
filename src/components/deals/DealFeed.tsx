@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
 import CategoryNav from "./CategoryNav";
 import DiscountFilter from "./DiscountFilter";
@@ -23,6 +24,7 @@ export default function DealFeed() {
   const [search, setSearch]     = useState("");
 
   const offsetRef = useRef(0);
+  const router = useRouter();
 
   const buildParams = useCallback((offset: number) => {
     const p = new URLSearchParams();
@@ -97,9 +99,14 @@ export default function DealFeed() {
         <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
         <input
           type="text"
-          placeholder="Search deals, brands, or categories"
+          placeholder="Search a product to compare prices…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && search.trim()) {
+              router.push(`/compare?q=${encodeURIComponent(search.trim())}`);
+            }
+          }}
           className="w-full pl-9 pr-9 py-2.5 rounded-full text-base sm:text-sm text-white placeholder-slate-500 bg-white/[0.04] border border-white/10 focus:border-white/25 focus:bg-white/[0.06] outline-none transition-colors"
         />
         {search && (
@@ -163,7 +170,7 @@ export default function DealFeed() {
       {!loading && deals.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <Search size={32} className="text-slate-600 mb-3" strokeWidth={1.5} />
-          <h3 className="text-base font-medium text-white mb-1">No deals match that search yet</h3>
+          <h3 className="text-base font-medium text-white mb-1">No deals are available yet</h3>
           <p className="text-sm text-slate-500 mb-5 max-w-sm">
             Try a broader keyword or reset your filters to bring more offers back.
           </p>

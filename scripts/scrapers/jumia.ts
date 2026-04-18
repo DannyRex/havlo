@@ -87,7 +87,7 @@ export async function scrapeJumia(_page: Page): Promise<RawDeal[]> {
   const deals: RawDeal[] = [];
   const seenUrls = new Set<string>();
 
-  console.log("  → Jumia Flash Sales (fetch)...");
+  console.log("  → Jumia (fetch)...");
 
   const headers = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -97,25 +97,50 @@ export async function scrapeJumia(_page: Page): Promise<RawDeal[]> {
     "Cache-Control": "no-cache",
   };
 
-  for (let p = 1; p <= 5; p++) {
+  // Flash sales + multi-page category coverage. Jumia exposes ?page=N reliably.
+  const categoryBase: Array<{ slug: string; label: string; pages: number }> = [
+    { slug: "phones-tablets",  label: "phones",      pages: 4 },
+    { slug: "computing",       label: "computing",   pages: 3 },
+    { slug: "electronics",     label: "electronics", pages: 3 },
+    { slug: "televisions",     label: "televisions", pages: 2 },
+    { slug: "appliances",      label: "appliances",  pages: 2 },
+    { slug: "fashion",         label: "fashion",     pages: 3 },
+    { slug: "health-beauty",   label: "beauty",      pages: 2 },
+    { slug: "sporting-goods",  label: "sports",      pages: 1 },
+    { slug: "gaming",          label: "gaming",      pages: 1 },
+    { slug: "groceries",       label: "groceries",   pages: 1 },
+    { slug: "baby-products",   label: "baby",        pages: 1 },
+    { slug: "home-office",     label: "home",        pages: 2 },
+  ];
+
+  const pages = [
+    ...Array.from({ length: 5 }, (_, i) => ({ url: `https://www.jumia.com.ng/flash-sales/?page=${i + 1}`, label: `flash-sales p${i + 1}` })),
+    ...categoryBase.flatMap(({ slug, label, pages: n }) =>
+      Array.from({ length: n }, (_, i) => ({
+        url: `https://www.jumia.com.ng/${slug}/${i === 0 ? "" : `?page=${i + 1}`}`,
+        label: n > 1 ? `${label} p${i + 1}` : label,
+      })),
+    ),
+  ];
+
+  for (const { url, label } of pages) {
     try {
-      const url = `https://www.jumia.com.ng/flash-sales/?page=${p}`;
       const res = await fetch(url, { headers });
 
       if (!res.ok) {
-        console.warn(`    Jumia page ${p}: HTTP ${res.status}`);
-        break;
+        console.warn(`    Jumia ${label}: HTTP ${res.status}`);
+        continue;
       }
 
       const html = await res.text();
 
       // Detect Cloudflare challenge
       if (html.includes("Just a moment") || html.includes("cf-browser-verification")) {
-        console.warn(`    Jumia page ${p}: Cloudflare challenge — skipping`);
-        break;
+        console.warn(`    Jumia ${label}: Cloudflare challenge — skipping`);
+        continue;
       }
 
-      const pageDels = extractDealsFromHtml(html, p);
+      const pageDels = extractDealsFromHtml(html, 1);
       let newCount = 0;
 
       for (const deal of pageDels) {
@@ -125,14 +150,12 @@ export async function scrapeJumia(_page: Page): Promise<RawDeal[]> {
         newCount++;
       }
 
-      console.log(`    Jumia page ${p}: ${newCount} deals`);
-      if (pageDels.length === 0) break;
+      console.log(`    Jumia ${label}: ${newCount} deals`);
 
       // Polite delay
       await new Promise((r) => setTimeout(r, 800));
     } catch (err) {
-      console.warn(`    Jumia page ${p} error: ${err}`);
-      break;
+      console.warn(`    Jumia ${label} error: ${err}`);
     }
   }
 

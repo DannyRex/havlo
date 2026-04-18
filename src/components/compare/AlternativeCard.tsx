@@ -15,9 +15,14 @@ export default function AlternativeCard({ alt }: Props) {
                     hover:border-white/[0.14] transition-all duration-300 hover:-translate-y-1 group">
 
       {/* Image */}
-      <div className="h-28 sm:h-32 flex items-center justify-center text-4xl sm:text-5xl relative border-b border-white/[0.04]"
+      <div className="h-28 sm:h-32 flex items-center justify-center relative border-b border-white/[0.04] overflow-hidden"
            style={{ background: alt.imageGradient }}>
-        {alt.imageEmoji}
+        {alt.imageUrl ? (
+          <img src={alt.imageUrl} alt={alt.title}
+               className="w-full h-full object-contain p-3 bg-white" />
+        ) : (
+          <span className="text-4xl sm:text-5xl">{alt.imageEmoji}</span>
+        )}
 
         {/* Similarity badge */}
         <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold"

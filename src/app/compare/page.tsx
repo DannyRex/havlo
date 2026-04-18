@@ -1,144 +1,135 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense } from "react";
+import { SearchX, Sparkles } from "lucide-react";
 import SearchBar from "@/components/compare/SearchBar";
 import PriceResults from "@/components/compare/PriceResults";
-import AlternativeCard from "@/components/compare/AlternativeCard";
-import { ShieldCheck, Zap, Banknote } from "lucide-react";
-import type { SearchResult } from "@/types";
+import GroupCard from "@/components/compare/GroupCard";
+import type { SearchOutput } from "@/lib/search";
 
 function CompareContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const initialQuery = searchParams.get("q") ?? "";
+  const initialKey   = searchParams.get("key") ?? "";
 
   const [query, setQuery] = useState(initialQuery);
-  const [result, setResult] = useState<SearchResult | null>(null);
+  const [result, setResult] = useState<SearchOutput | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const fetchByKey = useCallback(async (key: string, displayQ: string) => {
+    setQuery(displayQ);
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await fetch(`/api/compare?key=${encodeURIComponent(key)}`);
+      setResult(await res.json() as SearchOutput);
+    } catch {
+      setResult({ mode: "empty", query: displayQ, suggestions: [] });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const handleSearch = useCallback(async (q: string) => {
     setQuery(q);
+    // Plain text search clears any drilled-in key from the URL
     router.replace(`/compare?q=${encodeURIComponent(q)}`, { scroll: false });
     setLoading(true);
     setResult(null);
-
-    // Simulate API latency for realism
-    await new Promise((r) => setTimeout(r, 600));
-
-    const res = await fetch(`/api/compare?q=${encodeURIComponent(q)}`);
-    const data: SearchResult = await res.json();
-    setResult(data);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/compare?q=${encodeURIComponent(q)}`);
+      setResult(await res.json() as SearchOutput);
+    } catch {
+      setResult({ mode: "empty", query: q, suggestions: [] });
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
 
-  // Auto-search if query in URL
+  // React to URL changes — both initial load and clicks on group cards (which
+  // change `?key=` while we stay on /compare) should trigger the right fetch.
   useEffect(() => {
-    if (initialQuery) handleSearch(initialQuery);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (initialKey) fetchByKey(initialKey, initialQuery);
+    else if (initialQuery) handleSearch(initialQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialKey, initialQuery]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-
-      {/* Search */}
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
       <SearchBar initialQuery={query} onSearch={handleSearch} loading={loading} />
 
-      {/* Loading state */}
+      {/* Loading skeletons */}
       {loading && (
-        <div className="mt-12 max-w-3xl mx-auto">
-          <div className="glass rounded-2xl p-5 border border-white/[0.06] mb-4 flex items-center gap-5">
-            <div className="skeleton w-20 h-20 rounded-xl flex-shrink-0" />
-            <div className="flex-1 space-y-3">
-              <div className="skeleton h-3 w-24 rounded-full" />
-              <div className="skeleton h-5 w-64 rounded-full" />
-              <div className="skeleton h-4 w-48 rounded-full" />
-            </div>
-          </div>
+        <div className="mt-10 max-w-3xl mx-auto space-y-3">
+          <div className="skeleton h-28 rounded-2xl" />
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="skeleton h-20 rounded-2xl mb-3" />
+            <div key={i} className="skeleton h-16 rounded-xl" />
           ))}
         </div>
       )}
 
-      {/* Results */}
-      {result && !loading && (
-        <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-          {/* Price comparison (left, 2/3) */}
+      {/* SINGLE — one product, many stores */}
+      {!loading && result?.mode === "single" && (
+        <div className="mt-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
-            <div className="flex items-center gap-2 mb-5">
-              <h2 className="text-lg font-bold text-white">Store prices</h2>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-white/[0.06] text-slate-400 border border-white/[0.08]">
-                {result.prices.length} retailers
-              </span>
-            </div>
-            <PriceResults result={result} />
+            <PriceResults group={result.group} />
           </div>
-
-          {/* Alternatives (right, 1/3) */}
           {result.alternatives.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-5">
-                <h2 className="text-lg font-bold text-white">Better-value picks</h2>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-white/[0.06] text-slate-400 border border-white/[0.08]">
-                  {result.alternatives.length}
-                </span>
+            <aside>
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles size={15} className="text-brand-400" />
+                <h2 className="text-sm font-semibold text-white tracking-tight">Similar products</h2>
               </div>
-              <p className="text-xs text-slate-600 mb-4">
-                If the exact item feels overpriced, these are similar options worth a look.
-              </p>
-              <div className="space-y-4">
-                {result.alternatives.map((alt) => (
-                  <AlternativeCard key={alt.id} alt={alt} />
-                ))}
+              <p className="text-xs text-slate-500 mb-4">Other options in {result.group.category} you might want to compare.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
+                {result.alternatives.map((g) => <GroupCard key={g.key} g={g} />)}
               </div>
-            </div>
+            </aside>
           )}
         </div>
       )}
 
-      {/* Empty / intro state */}
-      {!result && !loading && (
-        <div className="mt-16 sm:mt-20">
-          {/* How it works */}
-          <div className="max-w-2xl mx-auto text-center mb-12">
-            <h3 className="text-xl font-bold text-white mb-2">
-              Search any product. See every price.
-            </h3>
-            <p className="text-sm text-slate-500 leading-relaxed">
-              Type what you want to buy and we'll check major Nigerian retailers so you don't have to open a pile of tabs.
+      {/* LIST — vague query, show many product groups */}
+      {!loading && result?.mode === "list" && (
+        <div className="mt-10">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-base font-semibold text-white tracking-tight">
+              Found {result.total} products matching <span className="text-slate-400">&ldquo;{result.query}&rdquo;</span>
+            </h2>
+          </div>
+          <p className="text-xs text-slate-500 mb-6 max-w-2xl">
+            Pick one to see its price across every store. Add more detail to your search (brand, model, storage) to jump straight to a comparison.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-5 sm:gap-y-7">
+            {result.groups.map((g) => <GroupCard key={g.key} g={g} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Empty / no results */}
+      {!loading && result?.mode === "empty" && query && (
+        <div className="mt-16">
+          <div className="max-w-md mx-auto text-center mb-10">
+            <SearchX size={28} className="text-slate-600 mx-auto mb-3" strokeWidth={1.5} />
+            <h3 className="text-base font-medium text-white mb-1">No matches for &ldquo;{query}&rdquo;</h3>
+            <p className="text-sm text-slate-500">
+              Try a broader or different search term — e.g. just the brand or category.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
-            {[
-              {
-                icon: <Zap size={20} className="text-deal-cyan" />,
-                title: "Instant comparison",
-                desc: "Prices from multiple stores in one view — ranked lowest to highest.",
-              },
-              {
-                icon: <ShieldCheck size={20} className="text-deal-green" />,
-                title: "Unbiased results",
-                desc: "We don't take commissions. The cheapest option always wins.",
-              },
-              {
-                icon: <Banknote size={20} className="text-deal-orange" />,
-                title: "Naira pricing",
-                desc: "Every price in NGN. No currency surprises at checkout.",
-              },
-            ].map(({ icon, title, desc }) => (
-              <div key={title} className="glass rounded-2xl p-5 border border-white/[0.05] text-center">
-                <div className="w-10 h-10 rounded-xl mx-auto flex items-center justify-center mb-3 bg-white/[0.04]">
-                  {icon}
-                </div>
-                <h4 className="text-sm font-semibold text-white mb-1">{title}</h4>
-                <p className="text-xs text-slate-500 leading-relaxed">{desc}</p>
+          {result.suggestions.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-5 max-w-7xl mx-auto">
+                <Sparkles size={15} className="text-brand-400" />
+                <h2 className="text-sm font-semibold text-white tracking-tight">You might be looking for</h2>
               </div>
-            ))}
-          </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-5 sm:gap-y-7">
+                {result.suggestions.map((g) => <GroupCard key={g.key} g={g} />)}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -149,7 +140,7 @@ export default function ComparePage() {
   return (
     <Suspense fallback={
       <div className="max-w-7xl mx-auto px-4 py-12 flex items-center justify-center">
-        <div className="w-6 h-6 rounded-full border-2 border-brand-600/30 border-t-brand-600 animate-spin" />
+        <div className="w-6 h-6 rounded-full border-2 border-white/10 border-t-white animate-spin" />
       </div>
     }>
       <CompareContent />

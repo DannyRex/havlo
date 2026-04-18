@@ -17,13 +17,27 @@ function inferCategoryFromTitle(title: string): string {
 
 // Konga confirmed selector: article (40 items)
 // Text format: "- X%TITLE₦SALE₦ORIGINALSame Day..."
-const KONGA_PAGES = [
-  { url: "https://www.konga.com/category/phones-tablets-5261",   cat: "phones" },
-  { url: "https://www.konga.com/category/televisions-2713",       cat: "televisions" },
-  { url: "https://www.konga.com/category/home-appliances-4181",   cat: "appliances" },
-  { url: "https://www.konga.com/category/computing-5263",         cat: "computing" },
-  { url: "https://www.konga.com/category/home-kitchen-4186",      cat: "home" },
+const KONGA_BASE = [
+  { slug: "phones-tablets-5261",        cat: "phones",      pages: 3 },
+  { slug: "televisions-2713",           cat: "televisions", pages: 2 },
+  { slug: "home-appliances-4181",       cat: "appliances",  pages: 2 },
+  { slug: "computing-5263",             cat: "computing",   pages: 2 },
+  { slug: "home-kitchen-4186",          cat: "home",        pages: 2 },
+  { slug: "fashion-4191",               cat: "fashion",     pages: 2 },
+  { slug: "audio-headphones-2709",      cat: "audio",       pages: 1 },
+  { slug: "gaming-5411",                cat: "gaming",      pages: 1 },
+  { slug: "cameras-2699",               cat: "electronics", pages: 1 },
+  { slug: "generators-inverters-4183",  cat: "electronics", pages: 1 },
+  { slug: "health-beauty-personal-care-4180", cat: "beauty", pages: 2 },
+  { slug: "baby-products-4187",         cat: "home",        pages: 1 },
 ];
+
+const KONGA_PAGES = KONGA_BASE.flatMap(({ slug, cat, pages }) =>
+  Array.from({ length: pages }, (_, i) => ({
+    url: `https://www.konga.com/category/${slug}${i === 0 ? "" : `?page=${i + 1}`}`,
+    cat,
+  })),
+);
 
 export async function scrapeKonga(page: Page): Promise<RawDeal[]> {
   const deals: RawDeal[] = [];

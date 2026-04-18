@@ -12,6 +12,13 @@ const THREECHUB_COLLECTIONS = [
   { url: "https://www.3chub.com/collections/solar-products",         cat: "electronics" },
   { url: "https://www.3chub.com/collections/iphone",                 cat: "phones" },
   { url: "https://www.3chub.com/collections/all?sort_by=best-selling", cat: "electronics" },
+  { url: "https://www.3chub.com/collections/laptops",                cat: "computing" },
+  { url: "https://www.3chub.com/collections/televisions",            cat: "electronics" },
+  { url: "https://www.3chub.com/collections/audio",                  cat: "audio" },
+  { url: "https://www.3chub.com/collections/smart-watches",          cat: "electronics" },
+  { url: "https://www.3chub.com/collections/gaming",                 cat: "gaming" },
+  { url: "https://www.3chub.com/collections/accessories",            cat: "electronics" },
+  { url: "https://www.3chub.com/collections/tablets",                cat: "phones" },
 ];
 
 export async function scrapeThreeChub(page: Page): Promise<RawDeal[]> {
