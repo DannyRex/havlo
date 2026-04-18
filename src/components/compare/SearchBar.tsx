@@ -50,7 +50,7 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder="Search for a phone, TV, console, sneaker..."
-            className="flex-1 px-3 sm:px-4 py-4 bg-transparent text-white placeholder-slate-500 text-sm sm:text-base outline-none min-w-0"
+            className="flex-1 px-3 sm:px-4 py-4 bg-transparent text-white placeholder-slate-500 text-base outline-none min-w-0"
           />
           {value && (
             <button type="button" onClick={() => setValue("")}

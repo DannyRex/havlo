@@ -51,11 +51,11 @@ export default function CTA() {
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Link href="/compare" className="btn-primary text-sm px-7 py-3.5 rounded-xl gap-2">
+                  <Link href="/compare" className="btn-primary text-xs sm:text-sm px-5 sm:px-7 py-3.5 rounded-xl gap-2 whitespace-nowrap">
                     <TrendingDown size={15} />
                     Compare Prices
                   </Link>
-                  <Link href="/deals" className="btn-ghost text-sm px-7 py-3.5 rounded-xl gap-2">
+                  <Link href="/deals" className="btn-ghost text-xs sm:text-sm px-5 sm:px-7 py-3.5 rounded-xl gap-2 whitespace-nowrap">
                     Explore Deals
                     <ArrowRight size={15} />
                   </Link>

@@ -114,10 +114,9 @@ export default function Hero() {
             </h1>
 
             {/* Sub */}
-            <p className="text-lg text-slate-400 leading-relaxed mb-10 max-w-[480px] tracking-[-0.01em] hero-enter"
+            <p className="text-base sm:text-lg text-slate-400 leading-relaxed mb-10 max-w-[430px] tracking-[-0.01em] hero-enter"
                style={{ animationDelay: "180ms" }}>
-              Dealesty pulls together prices from stores Nigerians already shop, so you can spot the better deal,
-              avoid the expensive tab, and buy with more confidence.
+              Compare prices across trusted stores before you buy.
             </p>
 
             {/* Search bar */}
@@ -128,18 +127,19 @@ export default function Hero() {
                               hover:border-brand-600/40 focus-within:border-brand-600/60
                               transition-all duration-200"
                    style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.3)" }}>
-                <Search size={17} className="ml-5 text-slate-500 flex-shrink-0" />
+                <Search size={17} className="ml-3 sm:ml-5 text-slate-500 flex-shrink-0" />
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="What are you shopping for today?"
-                  className="flex-1 px-4 py-4 bg-transparent text-white placeholder-slate-600
-                             text-[15px] tracking-[-0.01em] outline-none"
+                  placeholder="What are you shopping for?"
+                  className="flex-1 min-w-0 px-3 sm:px-4 py-4 bg-transparent text-white placeholder-slate-600
+                             text-base tracking-[-0.01em] outline-none"
                 />
                 <button type="submit"
-                        className="m-2 btn-primary rounded-xl px-5 py-2.5 text-sm flex-shrink-0">
-                  Check price
+                        className="m-2 btn-primary rounded-xl px-4 sm:px-5 py-2.5 text-sm flex-shrink-0">
+                  <span className="hidden sm:inline">Check price</span>
+                  <span className="sm:hidden">Go</span>
                   <ArrowRight size={14} />
                 </button>
               </div>
@@ -161,13 +161,13 @@ export default function Hero() {
             </div>
 
             {/* Secondary CTA */}
-            <div className="flex items-center gap-4 hero-enter"
+            <div className="flex items-center gap-3 hero-enter"
                  style={{ animationDelay: "460ms" }}>
-              <Link href="/compare" className="btn-ghost text-sm px-6 py-3 rounded-xl">
+              <Link href="/compare" className="btn-ghost text-xs sm:text-sm px-4 sm:px-6 py-3 rounded-xl whitespace-nowrap">
                 <TrendingDown size={15} />
                 Compare prices
               </Link>
-              <Link href="/deals" className="btn-primary text-sm px-6 py-3 rounded-xl">
+              <Link href="/deals" className="btn-primary text-xs sm:text-sm px-4 sm:px-6 py-3 rounded-xl whitespace-nowrap">
                 Browse deals
               </Link>
             </div>

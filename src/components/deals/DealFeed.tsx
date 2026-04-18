@@ -100,7 +100,7 @@ export default function DealFeed() {
           placeholder="Search deals, brands, or categories"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-9 py-2.5 rounded-full text-sm text-white placeholder-slate-500 bg-white/[0.04] border border-white/10 focus:border-white/25 focus:bg-white/[0.06] outline-none transition-colors"
+          className="w-full pl-9 pr-9 py-2.5 rounded-full text-base sm:text-sm text-white placeholder-slate-500 bg-white/[0.04] border border-white/10 focus:border-white/25 focus:bg-white/[0.06] outline-none transition-colors"
         />
         {search && (
           <button
