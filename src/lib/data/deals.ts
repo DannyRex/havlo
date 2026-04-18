@@ -13524,7 +13524,8 @@ export function getDeals(params?: {
   sort?: string;
   search?: string;
   limit?: number;
-}): Deal[] {
+  offset?: number;
+}): { items: Deal[]; total: number; hasMore: boolean } {
   let result = [...deals];
 
   if (params?.categorySlug && params.categorySlug !== "all") {
@@ -13562,9 +13563,12 @@ export function getDeals(params?: {
       result.sort((a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime());
   }
 
-  if (params?.limit) result = result.slice(0, params.limit);
+  const total = result.length;
+  const offset = params?.offset ?? 0;
+  const limit = params?.limit ?? 20;
+  const items = result.slice(offset, offset + limit);
 
-  return result;
+  return { items, total, hasMore: offset + limit < total };
 }
 
 export const hotDeals = deals.filter((d) => d.isHot);

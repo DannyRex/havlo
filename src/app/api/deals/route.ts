@@ -9,19 +9,19 @@ export async function GET(req: NextRequest) {
   const minDiscount = searchParams.get("minDiscount")  ?? undefined;
   const sort        = (searchParams.get("sort") as SortOption) ?? "newest";
   const search      = searchParams.get("search")       ?? undefined;
-  const limit       = searchParams.get("limit")
-    ? parseInt(searchParams.get("limit")!, 10)
-    : undefined;
+  const limit       = searchParams.get("limit")  ? parseInt(searchParams.get("limit")!,  10) : 20;
+  const offset      = searchParams.get("offset") ? parseInt(searchParams.get("offset")!, 10) : 0;
 
-  const deals = getDeals({
+  const result = getDeals({
     categorySlug: category,
     minDiscount:  minDiscount ? parseInt(minDiscount, 10) : undefined,
     sort,
     search,
     limit,
+    offset,
   });
 
-  return NextResponse.json(deals, {
+  return NextResponse.json(result, {
     headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate=300" },
   });
 }
