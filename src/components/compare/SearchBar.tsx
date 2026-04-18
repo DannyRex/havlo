@@ -22,16 +22,16 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
     <div className="max-w-3xl mx-auto">
       <div className="text-center mb-8">
         <h1 className="text-3xl sm:text-4xl font-black text-white mb-2">
-          Compare prices across{" "}
+          Check who is selling it for{" "}
           <span style={{
             background: "linear-gradient(135deg, #0057FF 0%, #00C8FF 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
           }}>
-            11+ stores
+            less
           </span>
         </h1>
-        <p className="text-slate-500">Search any product to see prices from every major Nigerian retailer</p>
+        <p className="text-slate-500">Search once and compare prices across Nigerian retailers without opening a pile of tabs.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="relative group">
@@ -44,7 +44,7 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
             type="text"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="e.g. iPhone 15, Samsung TV, Nike Air Force 1…"
+            placeholder="Search for a phone, TV, console, sneaker..."
             className="flex-1 px-4 py-4 bg-transparent text-white placeholder-slate-500 text-base outline-none"
           />
           {value && (
@@ -59,7 +59,7 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
             {loading ? (
               <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
             ) : (
-              <>Compare <ArrowRight size={15} /></>
+              <>Check prices <ArrowRight size={15} /></>
             )}
           </button>
         </div>
@@ -68,7 +68,7 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
       {/* Popular searches */}
       {!initialQuery && (
         <div className="mt-5 flex flex-wrap justify-center gap-2">
-          <span className="text-xs text-slate-600 self-center">Try:</span>
+          <span className="text-xs text-slate-600 self-center">Popular:</span>
           {popularSearches.map((s) => (
             <button key={s}
                     onClick={() => { setValue(s); onSearch(s); }}

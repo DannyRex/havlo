@@ -1,26 +1,29 @@
 import Link from "next/link";
-import { Twitter, Instagram, Facebook } from "lucide-react";
 
-const footerLinks = {
-  Product: [
-    { label: "Browse Deals",   href: "/deals" },
-    { label: "Compare Prices", href: "/compare" },
-    { label: "Hot Deals",      href: "/deals?filter=hot" },
-    { label: "New Arrivals",   href: "/deals?sort=newest" },
-  ],
-  Categories: [
-    { label: "Electronics", href: "/deals?cat=electronics" },
-    { label: "Phones",      href: "/deals?cat=phones" },
-    { label: "Gaming",      href: "/deals?cat=gaming" },
-    { label: "Fashion",     href: "/deals?cat=fashion" },
-  ],
-  Stores: [
-    { label: "Jumia",  href: "#" },
-    { label: "Konga",  href: "#" },
-    { label: "Slot",   href: "#" },
-    { label: "3C Hub", href: "#" },
-  ],
-};
+const footerSections = [
+  {
+    title: "Explore",
+    links: [
+      { label: "Home", href: "/" },
+      { label: "Browse Deals", href: "/deals" },
+      { label: "Compare Prices", href: "/compare" },
+    ],
+  },
+  {
+    title: "Legal",
+    links: [
+      { label: "Privacy Policy", href: "/privacy-policy" },
+      { label: "Terms of Use", href: "/terms-of-use" },
+      { label: "Disclaimer", href: "/disclaimer" },
+    ],
+  },
+] as const;
+
+const footerNotes = [
+  "Independent shopping discovery platform",
+  "Prices and stock are controlled by each retailer",
+  "We send you straight to the store when you are ready to buy",
+] as const;
 
 function FooterLogo() {
   return (
@@ -39,15 +42,17 @@ function FooterLogo() {
 }
 
 export default function Footer() {
+  const currentYear = new Date().getFullYear();
+
   return (
     <footer className="border-t border-white/[0.06]" style={{ background: "var(--navy-800)" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
 
         {/* Top row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-14">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 mb-14">
 
           {/* Brand column */}
-          <div className="col-span-2 md:col-span-1">
+          <div className="sm:col-span-2 lg:col-span-1">
             <Link href="/" className="flex items-center gap-2.5 mb-5 select-none">
               <FooterLogo />
               <span className="text-base font-bold tracking-[-0.03em]">
@@ -55,29 +60,23 @@ export default function Footer() {
                 <span style={{ color: "#00C8FF" }}>esty</span>
               </span>
             </Link>
-            <p className="text-sm text-slate-500 leading-relaxed max-w-[200px]">
-              Compare prices across Nigeria&apos;s biggest stores before every purchase.
+            <p className="text-sm text-slate-400 leading-relaxed max-w-xs">
+              Dealesty helps you compare prices, spot worthwhile deals, and avoid paying the first price you see.
             </p>
-            <div className="flex gap-2 mt-5">
-              {[Twitter, Instagram, Facebook].map((Icon, i) => (
-                <a key={i} href="#" aria-label="Social link"
-                   className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500
-                              hover:text-white hover:bg-white/[0.07] transition-all border border-white/[0.06]">
-                  <Icon size={14} />
-                </a>
-              ))}
-            </div>
+            <p className="text-xs text-slate-500 leading-relaxed mt-4 max-w-sm">
+              Final prices, stock, delivery fees, and return policies are always set by the retailer.
+            </p>
           </div>
 
           {/* Link columns */}
-          {Object.entries(footerLinks).map(([title, links]) => (
+          {footerSections.map(({ title, links }) => (
             <div key={title}>
               <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.1em] mb-4">{title}</p>
               <ul className="space-y-2.5">
                 {links.map(({ label, href }) => (
                   <li key={label}>
                     <Link href={href}
-                          className="text-sm text-slate-500 hover:text-slate-200 transition-colors tracking-[-0.01em]">
+                          className="text-sm text-slate-400 hover:text-slate-200 transition-colors tracking-[-0.01em]">
                       {label}
                     </Link>
                   </li>
@@ -85,20 +84,28 @@ export default function Footer() {
               </ul>
             </div>
           ))}
+
+          <div>
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.1em] mb-4">What to expect</p>
+            <ul className="space-y-3">
+              {footerNotes.map((note) => (
+                <li key={note} className="flex items-start gap-3 text-sm text-slate-400 leading-relaxed tracking-[-0.01em]">
+                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-deal-green flex-shrink-0" />
+                  <span>{note}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         {/* Bottom bar */}
-        <div className="pt-6 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="pt-6 border-t border-white/[0.06] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <p className="text-xs text-slate-600 tracking-[-0.01em]">
-            © 2025 Dealesty. Prices are subject to change by retailers.
+            © {currentYear} Dealesty. Independent price discovery for Nigerian shoppers.
           </p>
-          <div className="flex items-center gap-5">
-            <span className="text-xs text-slate-600">Made for Nigeria 🇳🇬</span>
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-deal-green animate-pulse" />
-              <span className="text-xs text-slate-600">Live prices</span>
-            </div>
-          </div>
+          <p className="text-xs text-slate-600 tracking-[-0.01em]">
+            Always confirm the final product details and checkout total on the retailer's website.
+          </p>
         </div>
       </div>
     </footer>

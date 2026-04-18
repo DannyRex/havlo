@@ -85,10 +85,10 @@ export default function DealFeed() {
       {/* Header */}
       <div className="mb-5">
         <h1 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
-          Today&apos;s deals
+          Deals worth checking today
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          Fresh picks from Nigerian and international stores, updated daily.
+          Fresh price drops and standout offers from stores Nigerians already shop.
         </p>
       </div>
 
@@ -97,7 +97,7 @@ export default function DealFeed() {
         <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
         <input
           type="text"
-          placeholder="Search deals…"
+          placeholder="Search deals, brands, or categories"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full pl-9 pr-9 py-2.5 rounded-full text-sm text-white placeholder-slate-500 bg-white/[0.04] border border-white/10 focus:border-white/25 focus:bg-white/[0.06] outline-none transition-colors"
@@ -163,15 +163,15 @@ export default function DealFeed() {
       {!loading && deals.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <Search size={32} className="text-slate-600 mb-3" strokeWidth={1.5} />
-          <h3 className="text-base font-medium text-white mb-1">No deals found</h3>
+          <h3 className="text-base font-medium text-white mb-1">No deals match that search yet</h3>
           <p className="text-sm text-slate-500 mb-5 max-w-sm">
-            Try adjusting your filters.
+            Try a broader keyword or reset your filters to bring more offers back.
           </p>
           <button
             onClick={() => { setCategory("all"); setTier("all"); setSearch(""); }}
             className="text-sm text-slate-300 hover:text-white border border-white/15 hover:border-white/30 rounded-full px-4 py-2 transition-colors"
           >
-            Clear filters
+            Reset filters
           </button>
         </div>
       )}
@@ -191,7 +191,7 @@ export default function DealFeed() {
       {/* End of results */}
       {!loading && !hasMore && deals.length > 0 && (
         <p className="text-center text-xs text-slate-600 mt-10">
-          All {total} deals loaded
+          You've seen all {total} deals for now
         </p>
       )}
     </div>

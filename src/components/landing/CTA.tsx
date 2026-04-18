@@ -30,34 +30,34 @@ export default function CTA() {
                 <div className="inline-flex items-center gap-2 mb-6">
                   <span className="w-1.5 h-1.5 rounded-full bg-deal-green animate-pulse" />
                   <span className="text-sm font-medium text-slate-400 tracking-[-0.01em]">
-                    Free to use · No sign-up needed
+                    Free to use · Direct retailer links
                   </span>
                 </div>
 
                 <h2 className="text-4xl sm:text-5xl font-black text-white tracking-[-0.04em] leading-[1.05] mb-5">
-                  Stop overpaying.
+                  Before you buy it,
                   <br />
                   <span style={{
                     background: "linear-gradient(135deg, #0057FF 0%, #00C8FF 100%)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                   }}>
-                    Start comparing.
+                    price-check it.
                   </span>
                 </h2>
 
                 <p className="text-slate-400 text-lg leading-relaxed tracking-[-0.01em] mb-10 max-w-sm">
-                  Join thousands of Nigerians who check Dealesty before every purchase. Takes 3 seconds. Saves thousands.
+                  One quick search can show you a better price, a better store, or a better-value alternative. That is worth a few seconds.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Link href="/deals" className="btn-primary text-sm px-7 py-3.5 rounded-xl gap-2">
-                    Explore Deals
-                    <ArrowRight size={15} />
-                  </Link>
-                  <Link href="/compare" className="btn-ghost text-sm px-7 py-3.5 rounded-xl gap-2">
+                  <Link href="/compare" className="btn-primary text-sm px-7 py-3.5 rounded-xl gap-2">
                     <TrendingDown size={15} />
                     Compare Prices
+                  </Link>
+                  <Link href="/deals" className="btn-ghost text-sm px-7 py-3.5 rounded-xl gap-2">
+                    Explore Deals
+                    <ArrowRight size={15} />
                   </Link>
                 </div>
               </div>
@@ -65,10 +65,10 @@ export default function CTA() {
               {/* Right — stat callouts */}
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { value: "₦2B+",  label: "Savings tracked across\nall Nigerian stores" },
-                  { value: "50K+",  label: "Nigerians who've\nfound better prices" },
-                  { value: "11",    label: "Major stores\ntracked in real time" },
-                  { value: "Free",  label: "Always free.\nNo account needed." },
+                  { value: "11+",    label: "Major stores checked\nin one search" },
+                  { value: "Direct", label: "Go straight to the\nretailer you trust" },
+                  { value: "Naira",  label: "Local pricing that\nmakes quick sense" },
+                  { value: "Free",   label: "No account, no paywall,\nno added markup" },
                 ].map(({ value, label }, i) => (
                   <AnimateIn key={value} variant="fade-up" delay={200 + i * 80}>
                   <div className="glass-light rounded-2xl p-5 border border-white/[0.06]

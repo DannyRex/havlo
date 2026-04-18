@@ -64,6 +64,7 @@ const config: Config = {
         "fade-in":      "fadeIn 0.6s ease-out",
         "shimmer":      "shimmer 2s linear infinite",
         "count-bar":    "countBar 1.2s cubic-bezier(0.22,1,0.36,1) both",
+        "marquee":      "marquee 30s linear infinite",
       },
       keyframes: {
         float: {
@@ -85,6 +86,10 @@ const config: Config = {
         countBar: {
           "0%":   { transform: "scaleX(0)", opacity: "0" },
           "100%": { transform: "scaleX(1)", opacity: "1" },
+        },
+        marquee: {
+          "0%":   { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
         },
       },
     },

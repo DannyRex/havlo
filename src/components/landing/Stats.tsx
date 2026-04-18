@@ -1,10 +1,10 @@
 import AnimateIn from "@/components/ui/AnimateIn";
 
 const stats = [
-  { value: "11",     label: "Stores tracked",  sub: "Nigerian retailers" },
-  { value: "4,800+", label: "Active deals",     sub: "Updated hourly" },
-  { value: "₦180M+", label: "Savings found",    sub: "Across all stores" },
-  { value: "12,400", label: "Shoppers helped",  sub: "Since launch" },
+  { value: "12",    label: "Stores checked",      sub: "Nigerian and international retailers" },
+  { value: "Hourly", label: "Prices refreshed",   sub: "Fresh offers, not stale screenshots" },
+  { value: "3 sec", label: "Typical compare time", sub: "Search once and see the spread fast" },
+  { value: "Free",  label: "Always free to use",  sub: "No account and no added markup" },
 ];
 
 export default function Stats() {

@@ -68,9 +68,9 @@ function CompareContent() {
           {/* Price comparison (left, 2/3) */}
           <div className="lg:col-span-2">
             <div className="flex items-center gap-2 mb-5">
-              <h2 className="text-lg font-bold text-white">Price Comparison</h2>
+              <h2 className="text-lg font-bold text-white">Store prices</h2>
               <span className="text-xs px-2 py-0.5 rounded-full bg-white/[0.06] text-slate-400 border border-white/[0.08]">
-                {result.prices.length} stores
+                {result.prices.length} retailers
               </span>
             </div>
             <PriceResults result={result} />
@@ -80,13 +80,13 @@ function CompareContent() {
           {result.alternatives.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-5">
-                <h2 className="text-lg font-bold text-white">💡 Smart Alternatives</h2>
+                <h2 className="text-lg font-bold text-white">💡 Better-value picks</h2>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-white/[0.06] text-slate-400 border border-white/[0.08]">
                   {result.alternatives.length}
                 </span>
               </div>
               <p className="text-xs text-slate-600 mb-4">
-                Similar products at lower prices — find your best value.
+                If the exact item feels overpriced, these are similar options worth a look.
               </p>
               <div className="space-y-4">
                 {result.alternatives.map((alt) => (
@@ -103,16 +103,16 @@ function CompareContent() {
         <div className="mt-20 max-w-lg mx-auto text-center">
           <div className="text-6xl mb-4">🔍</div>
           <h3 className="text-xl font-bold text-white mb-2">
-            Search any product above
+            Search for something you're ready to buy
           </h3>
           <p className="text-slate-500 text-sm leading-relaxed">
-            We&apos;ll check prices across Jumia, Konga, Slot, 3C Hub, Jiji and 8+ more Nigerian stores simultaneously.
+            We'll pull matching prices from major Nigerian retailers and surface cheaper alternatives when we find them.
           </p>
           <div className="mt-6 grid grid-cols-3 gap-3 text-center">
             {[
-              { icon: "⚡", label: "Instant results" },
-              { icon: "🇳🇬", label: "Nigerian stores" },
-              { icon: "₦",  label: "Naira prices" },
+              { icon: "⚡", label: "Fast results" },
+              { icon: "🇳🇬", label: "Local retailers" },
+              { icon: "₦",  label: "Naira pricing" },
             ].map(({ icon, label }) => (
               <div key={label} className="glass rounded-xl p-3 border border-white/[0.05]">
                 <span className="text-2xl">{icon}</span>

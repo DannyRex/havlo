@@ -7,28 +7,28 @@ const steps = [
     num: "01",
     icon: Search,
     color: "#0057FF",
-    title: "Search or browse",
+    title: "Start with what you want",
     description:
-      "Type a product name to compare prices instantly — or scroll the deal feed to find what's on sale right now.",
-    action: { label: "Browse deals →", href: "/deals" },
+      "Search for a product when you know what you need, or head to the deals page when you're open to a smart find.",
+    action: { label: "See today's deals ->", href: "/deals" },
   },
   {
     num: "02",
     icon: SlidersHorizontal,
     color: "#00C8FF",
-    title: "Filter & compare",
+    title: "See the spread fast",
     description:
-      "All prices in Nigerian Naira, side by side. Filter by store, discount tier, or delivery time. No hidden costs.",
+      "We line up prices in Naira so the cheaper option is obvious, not buried behind extra tabs and mental math.",
     action: null,
   },
   {
     num: "03",
     icon: ShoppingBag,
     color: "#FF6B35",
-    title: "Buy with confidence",
+    title: "Buy from the store you trust",
     description:
-      "Click through directly to the store. No middleman markup, no redirects — just the best price we found.",
-    action: { label: "Compare prices →", href: "/compare" },
+      "When you're ready, go straight to the retailer. Dealesty does not sit in the middle of your checkout.",
+    action: { label: "Compare a product ->", href: "/compare" },
   },
 ];
 
@@ -44,15 +44,14 @@ export default function HowItWorks() {
             How It Works
           </p>
           <h2 className="text-4xl sm:text-5xl font-black text-white tracking-[-0.04em] leading-[1.05]">
-            From search to{" "}
+            See the spread.{" "}
             <span style={{
               background: "linear-gradient(135deg, #FF6B35 0%, #FFD600 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
             }}>
-              best deal
+              Pick the best buy.
             </span>
-            {" "}in seconds.
           </h2>
         </AnimateIn>
 

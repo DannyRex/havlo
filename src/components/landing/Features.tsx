@@ -6,28 +6,28 @@ const features = [
     icon: Zap,
     color: "#0057FF",
     glow: "rgba(0,87,255,0.15)",
-    title: "Deal feed",
+    title: "Deals worth your time",
     description:
-      "Scroll through deals from Jumia, Konga, Slot and 8 more stores — sorted by discount, category, or what's trending today.",
-    badge: "InstaDeals",
+      "Skip the noise. We surface standout offers from major stores and make it easy to sort by discount, category, or what is moving right now.",
+    badge: "Live feed",
   },
   {
     icon: BarChart3,
     color: "#00C8FF",
     glow: "rgba(0,200,255,0.12)",
-    title: "Price comparison",
+    title: "Compare in one glance",
     description:
-      "Search any product and see prices from every major Nigerian retailer side by side. No tab-switching, no mental math.",
-    badge: "Compare",
+      "Search once and line up prices side by side. No ten-tab routine. No guessing whether you really found the best offer.",
+    badge: "Side by side",
   },
   {
     icon: Repeat,
     color: "#FF6B35",
     glow: "rgba(255,107,53,0.12)",
-    title: "Smarter alternatives",
+    title: "Better-value alternatives",
     description:
-      "Product too expensive? We surface cheaper options with similar specs. Save up to 60% without giving up what matters.",
-    badge: "Dupe Finder",
+      "If the exact item feels overpriced, we point you to lower-priced options that still make sense for what you need.",
+    badge: "Smart switch",
   },
   {
     icon: Bell,
@@ -35,26 +35,26 @@ const features = [
     glow: "rgba(255,214,0,0.12)",
     title: "Price drop alerts",
     description:
-      "Set a target price for anything. The moment any store hits it, you'll know first. No more checking daily.",
+      "Set your target and let the deal come to you. When a store hits your number, you'll know without checking every day.",
     badge: "Coming Soon",
   },
   {
     icon: ShieldCheck,
     color: "#00D68F",
     glow: "rgba(0,214,143,0.12)",
-    title: "Verified stores only",
+    title: "Retailers you recognize",
     description:
-      "Every deal is from a legitimate Nigerian retailer. No grey-market listings, no unknown sellers — just real prices.",
+      "We focus on stores Nigerians already know, so you spend less time second-guessing and more time buying confidently.",
     badge: "Trusted",
   },
   {
     icon: Smartphone,
     color: "#8B5CF6",
     glow: "rgba(139,92,246,0.12)",
-    title: "Built for Nigeria",
+    title: "Built for shopping here",
     description:
-      "Prices in Naira, stores Nigerians actually use, results that make sense locally. Not a global platform adapted for NG.",
-    badge: "Local First",
+      "Naira pricing, familiar retailers, and results shaped around how people actually shop in Nigeria.",
+    badge: "Local first",
   },
 ];
 
@@ -68,17 +68,17 @@ export default function Features() {
           Why Dealesty
         </p>
         <h2 className="text-4xl sm:text-5xl font-black text-white tracking-[-0.04em] leading-[1.05]">
-          Two tools.{" "}
+          Know when it's{" "}
           <span style={{
             background: "linear-gradient(135deg, #0057FF 0%, #00C8FF 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
           }}>
-            One platform.
+            actually a deal.
           </span>
         </h2>
         <p className="text-slate-400 text-lg mt-4 leading-relaxed tracking-[-0.01em]">
-          A deal discovery feed and a price comparison engine — both built specifically for how Nigerians shop.
+          Browse when you want inspiration. Compare fast when you already know what you want.
         </p>
       </AnimateIn>
 
