@@ -141,7 +141,10 @@ async function main() {
     viewport: { width: 1280, height: 800 },
     locale: "en-NG",
   });
-  await ngContext.route("**/*.{png,jpg,jpeg,webp,gif,mp4,mp3,woff,woff2,ttf}", (route) => route.abort());
+  // Block heavy non-image assets only. Konga (and others) use next/image with native
+  // loading="lazy" + data:image placeholder src — blocking images would prevent the
+  // real cloudinary URL from ever populating the src attribute.
+  await ngContext.route("**/*.{mp4,mp3,woff,woff2,ttf,otf}", (route) => route.abort());
   const page = await ngContext.newPage();
 
   // International context — locale en-US, wider viewport

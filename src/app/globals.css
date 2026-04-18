@@ -81,16 +81,6 @@ h1, h2, h3, h4, h5, h6 {
     border-color: rgba(255, 255, 255, 0.2);
   }
 
-  .badge-hot {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold text-white;
-    background: linear-gradient(135deg, #FF6B35 0%, #FF3333 100%);
-  }
-
-  .badge-discount {
-    @apply inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold text-white;
-    background: linear-gradient(135deg, #FF3333 0%, #CC0000 100%);
-  }
-
   .badge-store {
     @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold;
     background: rgba(255, 255, 255, 0.08);

@@ -34,11 +34,21 @@ export async function scrapeKonga(page: Page): Promise<RawDeal[]> {
   for (const { url, cat } of KONGA_PAGES) {
     try {
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-      await page.waitForTimeout(4000);
+      await page.waitForTimeout(3000);
 
-      // Scroll to load more items
-      await page.evaluate(() => window.scrollTo(0, 1500));
-      await page.waitForTimeout(1500);
+      // Konga renders cards with next/image — the real Cloudinary src is only
+      // injected after Next.js's IntersectionObserver fires for that specific card.
+      // Scroll EACH card into view individually (don't scroll back to top — that
+      // can re-virtualize images back to placeholder), then wait briefly per card.
+      await page.evaluate(async () => {
+        const cards = Array.from(document.querySelectorAll("article"));
+        for (const card of cards) {
+          card.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
+          await new Promise((r) => setTimeout(r, 120));
+        }
+        // Final settle so the last batch's images can resolve
+        await new Promise((r) => setTimeout(r, 800));
+      });
 
       const items = await page.$$eval("article", (cards) =>
         cards.slice(0, 50).map((card) => {
@@ -68,9 +78,22 @@ export async function scrapeKonga(page: Page): Promise<RawDeal[]> {
           const linkEl = card.querySelector("a[href*='/product/'], a[href*='konga.com']");
           const href   = linkEl?.getAttribute("href") ?? "";
 
-          // Image — try src, then data-src (lazy-loaded)
-          const imgEl   = card.querySelector("img");
-          const imageUrl = imgEl?.getAttribute("src") || imgEl?.getAttribute("data-src") || "";
+          // Image — Konga lazy-loads, so check every common lazy-load attribute.
+          // Skip 1×1 placeholders / data: URIs / blank gifs.
+          const imgEl = card.querySelector("img");
+          const candidates = [
+            imgEl?.getAttribute("src"),
+            imgEl?.getAttribute("data-src"),
+            imgEl?.getAttribute("data-original"),
+            imgEl?.getAttribute("data-lazy"),
+            imgEl?.getAttribute("data-original-src"),
+            // srcset: take the first URL
+            (imgEl?.getAttribute("srcset") || imgEl?.getAttribute("data-srcset") || "")
+              .split(",")[0]?.trim().split(" ")[0],
+            // Some templates wrap the <img> in a <picture> with <source srcset>
+            card.querySelector("picture source")?.getAttribute("srcset")?.split(",")[0]?.trim().split(" ")[0],
+          ].filter((u): u is string => !!u && u.length > 10 && !u.startsWith("data:"));
+          const imageUrl = candidates[0] ?? "";
 
           return { title, discount, salePrice, originalPrice, href, imageUrl };
         })
