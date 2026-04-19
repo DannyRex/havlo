@@ -6,6 +6,12 @@ on:
     - cron: "0 5 * * *"
   workflow_dispatch: # Allow manual trigger from GitHub UI
 
+# Required so the auto-injected GITHUB_TOKEN can `git push` the refreshed deals
+# back to the repo. Without this, the default token is read-only on `contents`
+# and the commit step fails with HTTP 403.
+permissions:
+  contents: write
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
