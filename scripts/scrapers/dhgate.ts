@@ -2,7 +2,30 @@ import { Page } from "playwright";
 import { RawDeal, resolveCategory } from "./types.js";
 
 // DHgate affiliate: DHgate.com Affiliate Program (partner.dhgate.com)
-// Ultra-cheap wholesale goods — same audience as Temu, much better accessibility
+// Ultra-cheap wholesale goods — same audience as Temu, much better accessibility.
+//
+// Markup notes (verified via scripts/inspect-dh.ts artifact, Apr 2026):
+//   • Each product card in the main grid is `div.gitem` (id="product-N").
+//     Two auxiliary card layouts also appear on category pages:
+//       - `div.b-productitem`             top-of-page picks
+//       - `li.slide-item.video-item`      "newArrival" carousels
+//   • The PRICE is exposed in dedicated semantic elements per layout:
+//       - .gitem            →  `.pro-price strong`     ("US $330.91 - 339.44")
+//       - .b-productitem    →  `.price strong`         ("US $25.65")
+//       - slide-item        →  `.prod-price .price`    ("US $165.15")
+//     We read ONLY from those — never from card-level textContent — because
+//     DHgate sprinkles coupon nodes across every card:
+//       - `.j-new-coupon`             ("$12" from a sitewide "New User" popup)
+//       - `.amount-left`              ("$12")
+//       - `.sale-item`                ("Save $1 With Coupon", "Per $100 Save 10")
+//     Earlier versions text-mined the whole card and the coupon strings won,
+//     producing bogus "$1" sale prices and "90% OFF" discounts.
+//   • DHgate range prices are MOQ tier ranges. The LOWER bound is the
+//     ~100-piece per-unit price; the UPPER bound is what a buyer of 1 unit
+//     actually pays. We record the upper bound and never claim a discount
+//     from the spread.
+//   • Strikethrough originals (<s>, <del>, .old/.crossed/.through, .originPrice)
+//     do appear on some categories. We honour those when present, never invent.
 
 const DHGATE_PAGES = [
   { url: "https://www.dhgate.com/wholesale/electronics.html",       cat: "electronics" },
@@ -40,155 +63,127 @@ export async function scrapeDHgate(page: Page): Promise<RawDeal[]> {
     try {
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 35000 });
 
-      // DHgate renders server-side — product links are present immediately
-      const found = await page.waitForSelector("a[href*='/product/']", { timeout: 10000 })
-        .then(() => true).catch(() => false);
+      const found = await page
+        .waitForSelector("div.gitem, div.b-productitem, li.slide-item.video-item", { timeout: 10000 })
+        .then(() => true)
+        .catch(() => false);
 
       if (!found) {
         console.warn(`    DHgate: no products found at ${url}`);
         continue;
       }
 
-      // Optional scroll to load more
+      // Lazy-load: scroll once to wake up the bottom half of the grid.
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
       await page.waitForTimeout(1000);
 
       const items = await page.$$eval(
-        "a[href*='/product/']",
-        (links) => {
-          const seen = new Set<string>();
-          const results: Array<{
-            title: string; salePriceText: string; origPriceText: string;
-            isRange: boolean; href: string; imageUrl: string;
+        "div.gitem, div.b-productitem, li.slide-item.video-item",
+        (cards) => {
+          const out: Array<{
+            title: string;
+            salePrice: number;
+            origPrice: number;
+            isRange: boolean;
+            href: string;
+            imageUrl: string;
           }> = [];
 
-          // Match a single price token ($X.XX / US $X.XX). Captures the number.
-          const PRICE_TOKEN = /(?:US\s*)?\$\s*([\d,]+\.?\d*)/gi;
-
-          // Detect bulk-tier RANGE pricing on DHgate: "$2.50 - $8.99" or
-          // "$2.50-$8.99" or even with US prefix. The lower bound is the
-          // 100-piece MOQ rate; the buyer of 1 unit pays the UPPER bound.
-          const RANGE = /(?:US\s*)?\$\s*([\d,]+\.?\d*)\s*[-–—]\s*(?:US\s*)?\$\s*([\d,]+\.?\d*)/i;
-
-          // Convert a captured numeric string to a number, or NaN.
           const toNum = (s: string) => parseFloat(s.replace(/,/g, ""));
 
-          for (const link of links) {
-            const href = link.getAttribute("href") ?? "";
-            if (!href.includes("/product/")) continue;
-            const cleanHref = href.split("?")[0];
-            if (seen.has(cleanHref)) continue;
-            seen.add(cleanHref);
+          // Pull numbers out of a single price string like "US $25.65" or
+          // "US $330.91 - 339.44" or "$165.15". Returns numbers in order.
+          const extractNums = (text: string): number[] =>
+            [...text.matchAll(/[\d,]+\.?\d*/g)]
+              .map((m) => toNum(m[0]))
+              .filter((n) => Number.isFinite(n) && n >= 1 && n < 100000);
 
-            // Walk up to find the product card with price
-            let container: Element | null = link.parentElement;
-            for (let i = 0; i < 10; i++) {
-              if (!container) break;
-              const text = container.textContent ?? "";
-              if (!(text.includes("$") && text.length < 2000)) {
-                container = container.parentElement; continue;
-              }
+          for (const card of cards) {
+            // Resolve the price element using DHgate's actual semantic
+            // selectors. Order matters: most specific first.
+            const priceEl =
+              card.querySelector(".pro-price strong") ??
+              card.querySelector(".prod-price .price") ??
+              card.querySelector(".prod-price strong") ??
+              card.querySelector(".price strong") ??
+              card.querySelector(".b-productitem .price") ??
+              card.querySelector(".price");
+            if (!priceEl) continue;
 
-              const fullText = text.replace(/\s+/g, " ").trim();
+            const priceText = (priceEl.textContent ?? "").replace(/\s+/g, " ").trim();
+            const nums = extractNums(priceText);
+            if (nums.length === 0) continue;
 
-              // 1) Try semantic price elements first — much more reliable than
-              //    text-mining the whole card. DHgate marks crossed-out/original
-              //    prices with <s>, <del>, or class names containing "old"/"crossed"/"through".
-              const origPriceEl = container.querySelector(
-                "s, del, [class*='old'], [class*='Old'], [class*='crossed'], [class*='Crossed'], [class*='through'], [class*='Through'], [class*='originPrice'], [class*='OriginPrice']"
-              );
-              const origFromEl = (() => {
-                if (!origPriceEl) return NaN;
-                const m = (origPriceEl.textContent ?? "").match(/\$\s*([\d,]+\.?\d*)/);
-                return m ? toNum(m[1]) : NaN;
-              })();
+            // Range like "US $20 - $30" → buyer of 1 unit pays the upper bound.
+            const isRange = /[-–—]/.test(priceText) && nums.length >= 2;
+            const salePrice = isRange ? Math.max(nums[0], nums[1]) : nums[0];
 
-              // 2) Look for a range like "$2.50 - $8.99" — these are bulk-tier
-              //    products. We use the UPPER bound as the realistic single-item
-              //    price and DON'T treat the spread as a discount.
-              const rangeMatch = fullText.match(RANGE);
-              const isRange = !!rangeMatch;
-              const rangeUpper = rangeMatch ? toNum(rangeMatch[2]) : NaN;
-
-              // 3) All remaining price tokens — used as a fallback.
-              const allPrices = [...fullText.matchAll(PRICE_TOKEN)]
-                .map((m) => toNum(m[1]))
-                .filter((n) => Number.isFinite(n) && n >= 0.5 && n < 10000);
-
-              if (allPrices.length === 0) { container = container.parentElement; continue; }
-
-              // Pick the sale price.
-              //   - Range card → use the upper bound (realistic single-item price).
-              //   - Else → the first non-trivial price (skip $0.01/$1 coupon hooks).
-              let salePrice: number;
-              if (isRange && Number.isFinite(rangeUpper)) {
-                salePrice = rangeUpper;
-              } else {
-                const meaningful = allPrices.filter((p) => p >= 2);
-                salePrice = meaningful[0] ?? allPrices[0];
-              }
-
-              // Original price — ONLY if we found an explicit strikethrough element.
-              // We deliberately do NOT infer "original" from "the biggest number in
-              // the text" anymore — that's what produced the bogus 90% discounts.
-              let origPrice = salePrice;
-              if (Number.isFinite(origFromEl) && origFromEl > salePrice) {
-                origPrice = origFromEl;
-              }
-
-              // Title
-              const heading = container.querySelector(
-                "[class*='title'],[class*='name'],[class*='Title'],[class*='Name'],h2,h3"
-              );
-              const img = container.querySelector("img");
-              const rawTitle = (
-                heading?.textContent ??
-                link.getAttribute("title") ??
-                img?.getAttribute("alt") ??
-                link.textContent ??
-                ""
-              ).replace(/\s+/g, " ").trim().slice(0, 120);
-
-              const imgSrc = img?.getAttribute("src") ?? img?.getAttribute("data-src") ?? "";
-              const imageUrl = imgSrc.startsWith("//") ? `https:${imgSrc}` : imgSrc;
-
-              if (rawTitle && salePrice > 0) {
-                const absoluteHref = href.startsWith("http") ? href : `https://www.dhgate.com${href}`;
-                results.push({
-                  title: rawTitle, salePriceText: String(salePrice),
-                  origPriceText: origPrice > salePrice ? String(origPrice) : "",
-                  isRange,
-                  href: absoluteHref, imageUrl,
-                });
-              }
-              break;
+            // Strikethrough/original — ONLY from a real semantic element.
+            const origEl = card.querySelector(
+              "s, del, [class*='old'], [class*='Old'], [class*='crossed'], [class*='Crossed'], [class*='through'], [class*='Through'], [class*='originPrice'], [class*='OriginPrice']"
+            );
+            let origPrice = salePrice;
+            if (origEl) {
+              const o = extractNums(origEl.textContent ?? "")[0];
+              if (Number.isFinite(o) && o > salePrice) origPrice = o;
             }
-            if (results.length >= 40) break;
+
+            // Link + title
+            const linkEl = card.querySelector(
+              "p.pro-title a, a.subject.prod, a.pic, a[href*='/product/']"
+            ) as HTMLAnchorElement | null;
+            if (!linkEl) continue;
+
+            const rawHref = (linkEl.getAttribute("href") ?? "").split("#")[0].split("?")[0];
+            if (!rawHref.includes("/product/")) continue;
+            const href = rawHref.startsWith("http") ? rawHref : `https://www.dhgate.com${rawHref}`;
+
+            const imgEl = card.querySelector(
+              ".photo img.lthumbnail, .photo img, img.lthumbnail, img"
+            ) as HTMLImageElement | null;
+            const altTitle = imgEl?.getAttribute("alt") ?? "";
+            const linkTitle = (linkEl.textContent ?? "").replace(/\s+/g, " ").trim();
+            // The img alt is usually a richer description than the visible link
+            // text on DHgate ("Android Phone - Large Screen Smartphone with HD
+            // Display..." vs the same).
+            const title = (altTitle.length > linkTitle.length ? altTitle : linkTitle)
+              .replace(/\s+/g, " ")
+              .trim()
+              .slice(0, 120);
+            if (!title) continue;
+
+            const imgSrc =
+              imgEl?.getAttribute("src") ?? imgEl?.getAttribute("data-src") ?? "";
+            const imageUrl = imgSrc.startsWith("//") ? `https:${imgSrc}` : imgSrc;
+
+            out.push({ title, salePrice, origPrice, isRange, href, imageUrl });
+            if (out.length >= 40) break;
           }
-          return results;
+          return out;
         }
       );
 
       let pageDeals = 0;
       for (const item of items) {
         if (!item.title || !item.href) continue;
-        const salePrice = parseFloat(item.salePriceText);
-        const origPrice = item.origPriceText ? parseFloat(item.origPriceText) : salePrice;
-        if (!salePrice || salePrice < 0.5) continue;
-
+        // Defensive floor — the structural fix above already excludes coupon
+        // noise, but keep a low floor as a backstop. Genuine wholesale items
+        // below $1.50 effectively do not exist on DHgate.
+        if (!item.salePrice || item.salePrice < 1.5) continue;
         if (seenUrls.has(item.href)) continue;
         seenUrls.add(item.href);
 
-        let discountPercent = origPrice > salePrice
-          ? Math.round(((origPrice - salePrice) / origPrice) * 100) : 0;
+        let discountPercent =
+          item.origPrice > item.salePrice
+            ? Math.round(((item.origPrice - item.salePrice) / item.origPrice) * 100)
+            : 0;
 
-        // Sanity caps — DHgate "discounts" above ~80% are almost always
-        // bulk-vs-retail comparisons, not real deals. Drop the discount label
-        // rather than mislead users with a fake 95% off.
-        if (discountPercent > 80) discountPercent = 0;
-        // Range-priced cards use the upper bound as sale price — there's no
-        // meaningful "original" so never claim a discount.
+        // Range cards use the upper bound AS the displayed price — there is
+        // no meaningful "original", so never claim a discount.
         if (item.isRange) discountPercent = 0;
+        // Belt-and-braces: any computed discount above 80% is almost always a
+        // parsing artefact. Drop the discount label rather than the listing.
+        if (discountPercent > 80) discountPercent = 0;
 
         const catKey = inferCategory(item.title) || cat;
         const resolved = resolveCategory(catKey);
@@ -196,12 +191,19 @@ export async function scrapeDHgate(page: Page): Promise<RawDeal[]> {
         deals.push({
           title: item.title,
           description: `${item.title} — wholesale prices on DHgate with worldwide shipping.`,
-          category: resolved.category, categorySlug: resolved.slug,
-          storeId: "dhgate", storeName: "DHgate",
-          originalPrice: origPrice, salePrice, discountPercent,
+          category: resolved.category,
+          categorySlug: resolved.slug,
+          storeId: "dhgate",
+          storeName: "DHgate",
+          // If we ended up with no real discount, mirror salePrice as
+          // originalPrice so the UI doesn't show a strikethrough at all.
+          originalPrice: discountPercent > 0 ? item.origPrice : item.salePrice,
+          salePrice: item.salePrice,
+          discountPercent,
           currency: "USD",
           imageUrl: item.imageUrl || undefined,
-          imageEmoji: resolved.emoji, imageGradient: resolved.gradient,
+          imageEmoji: resolved.emoji,
+          imageGradient: resolved.gradient,
           url: item.href,
           tags: ["DHgate", "International", resolved.category],
         });
@@ -209,7 +211,7 @@ export async function scrapeDHgate(page: Page): Promise<RawDeal[]> {
       }
 
       const slug = url.split("/wholesale/")[1]?.split(".")[0] ?? "page";
-      console.log(`    DHgate "${slug}": ${items.length} links → ${pageDeals} deals`);
+      console.log(`    DHgate "${slug}": ${items.length} cards → ${pageDeals} deals`);
     } catch (err) {
       console.warn(`    DHgate failed: ${err}`);
     }
