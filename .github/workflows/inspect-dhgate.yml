@@ -1,0 +1,43 @@
+name: Inspect DHgate (debug)
+
+# Manual-only — run from Actions tab → "Inspect DHgate (debug)" → Run workflow.
+# Output is uploaded as an artifact you can download (no commit, no deploy).
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run DHgate inspector
+        # Don't fail the workflow if the script throws — we still want the
+        # partial artifact (and the inspector itself catches its own errors
+        # and writes them into the output file).
+        run: npx tsx scripts/inspect-dh.ts || true
+
+      - name: Upload inspector output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dhgate-debug
+          path: |
+            /tmp/dhgate-debug.txt
+            /tmp/dhgate.png
+          if-no-files-found: warn
+          retention-days: 7
