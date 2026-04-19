@@ -85,8 +85,17 @@ export async function scrapeDHgate(page: Page): Promise<RawDeal[]> {
 
                 if (prices.length === 0) { container = container.parentElement; continue; }
 
-                const salePrice = Math.min(...prices);
-                const origPrice = prices.length > 1 ? Math.max(...prices) : salePrice;
+                // DHgate cards often include stray "$1" tokens for coupons, samples,
+                // or placeholder ranges. Prefer the first meaningful in-card price when
+                // a tiny token appears alongside a much larger product price.
+                const firstPrice = prices[0];
+                const maxPrice = Math.max(...prices);
+                const meaningfulPrices = prices.filter((price) => price > 2);
+                const salePrice = firstPrice <= 2 && maxPrice >= 20
+                  ? (meaningfulPrices[0] ?? firstPrice)
+                  : firstPrice;
+                const higherPrices = prices.filter((price) => price > salePrice);
+                const origPrice = higherPrices.length > 0 ? Math.max(...higherPrices) : salePrice;
 
                 // Title: from the link text, img alt, or a heading
                 const heading = container.querySelector(

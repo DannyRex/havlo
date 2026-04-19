@@ -75,7 +75,7 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
           Compare prices across stores
         </h1>
         <p className="text-sm text-slate-500">
-          Be specific — "iPhone 15 Pro Max 256GB" beats "phone".
+          Search current offers from trusted retailers, updated regularly.
         </p>
       </div>
 
@@ -89,7 +89,7 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
             onFocus={() => setOpen(true)}
             onKeyDown={onKey}
             placeholder="Search any product…"
-            className="flex-1 pl-11 pr-3 py-3.5 bg-transparent text-white placeholder-slate-500 text-sm sm:text-base outline-none"
+            className="flex-1 pl-11 pr-3 py-3.5 bg-transparent text-white placeholder-slate-500 text-base outline-none"
             autoFocus
           />
           {value && (
@@ -128,6 +128,10 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
           </div>
         )}
       </form>
+
+      <p className="mt-3 text-center text-xs text-slate-500">
+        Be specific: "iPhone 15 Pro Max 256GB" beats "phone".
+      </p>
 
       {!initialQuery && suggestions.length === 0 && (
         <div className="mt-5 flex flex-wrap justify-center gap-2">

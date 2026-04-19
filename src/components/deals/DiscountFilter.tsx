@@ -54,7 +54,7 @@ export default function DiscountFilter({
         <select
           value={activeSort}
           onChange={(e) => onSortChange(e.target.value as SortOption)}
-          className="appearance-none bg-transparent text-xs text-slate-300 hover:text-white outline-none cursor-pointer"
+          className="appearance-none bg-transparent text-base sm:text-xs text-slate-300 hover:text-white outline-none cursor-pointer min-h-11"
         >
           {sortOptions.map(({ value, label }) => (
             <option key={value} value={value} className="bg-navy-800 text-white">
