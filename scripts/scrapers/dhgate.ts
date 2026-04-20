@@ -66,6 +66,23 @@ export async function scrapeDHgate(page: Page): Promise<RawDeal[]> {
 
   console.log("  → DHgate...");
 
+  // tsx v4 runs through esbuild with `keepNames: true`, which emits
+  // `__name(fn, "fn")` after every named function/arrow declaration. That
+  // helper is defined at module scope, so when Playwright serializes a
+  // $$eval callback and re-evaluates it in the page, the inlined `__name(...)`
+  // calls reference an identifier that doesn't exist in the browser — the
+  // whole callback throws with `ReferenceError: __name is not defined` before
+  // a single element is inspected.
+  //
+  // Fix: register a page-side `__name` shim that just returns the function
+  // unchanged. We pass the script as a STRING so it bypasses all TypeScript
+  // and esbuild transformation (an arrow function here would itself be
+  // vulnerable to the same wrap). addInitScript runs on every subsequent
+  // navigation, so one call covers all DHgate category pages in the loop.
+  await page.addInitScript(
+    "if (typeof globalThis.__name === 'undefined') { globalThis.__name = function (fn) { return fn; }; }"
+  );
+
   for (const { url, cat } of DHGATE_PAGES) {
     try {
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 35000 });
@@ -93,6 +110,43 @@ export async function scrapeDHgate(page: Page): Promise<RawDeal[]> {
       const items = await page.$$eval(
         "a[href*='/product/']",
         (links) => {
+          // `__name` is shimmed on globalThis via page.addInitScript at the top
+          // of scrapeDHgate — see the comment there for why. That means the
+          // `__name(toNum, "toNum")` etc. that esbuild sprinkles after each
+          // named declaration below resolve to a harmless passthrough.
+          function toNum(s: string): number {
+            return parseFloat(s.replace(/,/g, ""));
+          }
+
+          // Pull numbers out of a single price string like "US $25.65" or
+          // "US $330.91 - 339.44" or "$165.15". Returns numbers in order.
+          function extractNums(text: string): number[] {
+            const matches = text.matchAll(/[\d,]+\.?\d*/g);
+            const nums: number[] = [];
+            for (const m of matches) {
+              const n = toNum(m[0]);
+              if (Number.isFinite(n) && n >= 1 && n < 100000) nums.push(n);
+            }
+            return nums;
+          }
+
+          // The cheap-coupon nodes that previously polluted our extraction are:
+          //   .j-new-coupon   ("$12" NEW USER popup)
+          //   .amount-left    ("$12")
+          //   .sale-item      ("Save $1 With Coupon", "Per $100 Save 10")
+          // We never want to treat any of these as a product price.
+          const COUPON_RE = /j-new-coupon|amount-left|sale-item|sale-tag|J-proSale|coupon|srp-coupon/i;
+          function isCouponEl(el: Element | null): boolean {
+            if (!el) return true;
+            let cur: Element | null = el;
+            for (let i = 0; i < 4 && cur; i++) {
+              const cls = cur.getAttribute ? (cur.getAttribute("class") ?? "") : "";
+              if (COUPON_RE.test(cls)) return true;
+              cur = cur.parentElement;
+            }
+            return false;
+          }
+
           const seen = new Set<string>();
           const out: Array<{
             title: string;
@@ -102,35 +156,6 @@ export async function scrapeDHgate(page: Page): Promise<RawDeal[]> {
             href: string;
             imageUrl: string;
           }> = [];
-
-          const toNum = (s: string) => parseFloat(s.replace(/,/g, ""));
-
-          // Pull numbers out of a single price string like "US $25.65" or
-          // "US $330.91 - 339.44" or "$165.15". Returns numbers in order.
-          const extractNums = (text: string): number[] =>
-            [...text.matchAll(/[\d,]+\.?\d*/g)]
-              .map((m) => toNum(m[0]))
-              .filter((n) => Number.isFinite(n) && n >= 1 && n < 100000);
-
-          // The cheap-coupon nodes that previously polluted our extraction are:
-          //   .j-new-coupon   ("$12" NEW USER popup)
-          //   .amount-left    ("$12")
-          //   .sale-item      ("Save $1 With Coupon", "Per $100 Save 10")
-          // We never want to treat any of these as a product price. When we pick
-          // a price element we explicitly prefer semantic product-price selectors
-          // and reject these by class/ancestor.
-          const isCouponEl = (el: Element | null): boolean => {
-            if (!el) return true;
-            // Walk up a short distance — if any ancestor is a coupon container,
-            // this isn't a real product price.
-            let cur: Element | null = el;
-            for (let i = 0; i < 4 && cur; i++) {
-              const cls = cur.getAttribute?.("class") ?? "";
-              if (/j-new-coupon|amount-left|sale-item|sale-tag|J-proSale|coupon|srp-coupon/i.test(cls)) return true;
-              cur = cur.parentElement;
-            }
-            return false;
-          };
 
           for (const link of links) {
             const rawHref = link.getAttribute("href") ?? "";
