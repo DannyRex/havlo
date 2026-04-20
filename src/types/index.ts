@@ -96,3 +96,5 @@ export interface SearchResult {
 export type DiscountTier = "all" | "10" | "20" | "30" | "50";
 
 export type SortOption = "discount" | "price_asc" | "price_desc" | "newest" | "popular";
+
+export type OriginFilter = "all" | "local" | "intl";

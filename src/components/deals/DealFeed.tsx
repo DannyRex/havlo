@@ -6,8 +6,9 @@ import { Search, X } from "lucide-react";
 import CategoryNav from "./CategoryNav";
 import DiscountFilter from "./DiscountFilter";
 import DealCard from "./DealCard";
+import OriginToggle from "./OriginToggle";
 import AnimateIn from "@/components/ui/AnimateIn";
-import type { Deal, DiscountTier, SortOption } from "@/types";
+import type { Deal, DiscountTier, OriginFilter, SortOption } from "@/types";
 
 const PAGE_SIZE = 20;
 
@@ -22,6 +23,8 @@ export default function DealFeed() {
   const [tier, setTier]         = useState<DiscountTier>("all");
   const [sort, setSort]         = useState<SortOption>("newest");
   const [search, setSearch]     = useState("");
+  const [origin, setOrigin]     = useState<OriginFilter>("all");
+  const [originCounts, setOriginCounts] = useState<{ all: number; local: number; intl: number }>();
 
   const offsetRef = useRef(0);
   const router = useRouter();
@@ -32,10 +35,11 @@ export default function DealFeed() {
     if (tier !== "all")     p.set("minDiscount", tier);
     if (sort)               p.set("sort", sort);
     if (search)             p.set("search", search);
+    if (origin !== "all")   p.set("origin", origin);
     p.set("limit",  String(PAGE_SIZE));
     p.set("offset", String(offset));
     return p.toString();
-  }, [category, tier, sort, search]);
+  }, [category, tier, sort, search, origin]);
 
   // Reset + first page whenever filters change
   useEffect(() => {
@@ -45,10 +49,11 @@ export default function DealFeed() {
 
     fetch(`/api/deals?${buildParams(0)}`)
       .then((r) => r.json())
-      .then(({ items, total, hasMore }) => {
+      .then(({ items, total, hasMore, originCounts }) => {
         setDeals(items);
         setTotal(total);
         setHasMore(hasMore);
+        if (originCounts) setOriginCounts(originCounts);
         offsetRef.current = PAGE_SIZE;
       })
       .finally(() => setLoading(false));
@@ -92,6 +97,21 @@ export default function DealFeed() {
         <p className="text-sm text-slate-500 mt-1">
           Fresh price drops and standout offers from stores Nigerians already shop.
         </p>
+      </div>
+
+      {/* Origin toggle — prominent at the top so international stock is
+          discoverable without scrolling past the feed. */}
+      <div className="mb-4">
+        <OriginToggle
+          active={origin}
+          onChange={setOrigin}
+          counts={originCounts}
+        />
+        {origin === "intl" && (
+          <p className="mt-2 text-[11px] sm:text-xs text-slate-500">
+            Prices shown in USD with a ₦ estimate. Delivery and duties may apply.
+          </p>
+        )}
       </div>
 
       {/* Search */}
@@ -175,7 +195,7 @@ export default function DealFeed() {
             Try a broader keyword or reset your filters to bring more offers back.
           </p>
           <button
-            onClick={() => { setCategory("all"); setTier("all"); setSearch(""); }}
+            onClick={() => { setCategory("all"); setTier("all"); setSearch(""); setOrigin("all"); }}
             className="text-sm text-slate-300 hover:text-white border border-white/15 hover:border-white/30 rounded-full px-4 py-2 transition-colors"
           >
             Reset filters

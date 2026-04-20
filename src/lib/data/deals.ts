@@ -28008,6 +28008,7 @@ export function getDeals(params?: {
   minDiscount?: number;
   sort?: string;
   search?: string;
+  origin?: "all" | "local" | "intl";
   limit?: number;
 }): Deal[] {
   let result = [...deals];
@@ -28030,6 +28031,12 @@ export function getDeals(params?: {
     );
   }
 
+  if (params?.origin === "local") {
+    result = result.filter((d) => d.currency === "NGN");
+  } else if (params?.origin === "intl") {
+    result = result.filter((d) => d.currency === "USD");
+  }
+
   switch (params?.sort) {
     case "price_asc":
       result.sort((a, b) => a.salePrice - b.salePrice);
@@ -28050,6 +28057,43 @@ export function getDeals(params?: {
   if (params?.limit) result = result.slice(0, params.limit);
 
   return result;
+}
+
+/**
+ * Counts available deals by origin given the current category/discount/search
+ * filters — used by the Origin toggle so users can see at a glance how much
+ * Local vs International stock is available without having to flip the filter.
+ */
+export function getOriginCounts(params?: {
+  categorySlug?: string;
+  minDiscount?: number;
+  search?: string;
+}): { all: number; local: number; intl: number } {
+  let pool = [...deals];
+
+  if (params?.categorySlug && params.categorySlug !== "all") {
+    pool = pool.filter((d) => d.categorySlug === params.categorySlug);
+  }
+  if (params?.minDiscount && params.minDiscount > 0) {
+    pool = pool.filter((d) => d.discountPercent >= params.minDiscount!);
+  }
+  if (params?.search) {
+    const q = params.search.toLowerCase();
+    pool = pool.filter(
+      (d) =>
+        d.title.toLowerCase().includes(q) ||
+        d.description.toLowerCase().includes(q) ||
+        d.tags.some((t) => t.toLowerCase().includes(q))
+    );
+  }
+
+  let local = 0;
+  let intl = 0;
+  for (const d of pool) {
+    if (d.currency === "USD") intl++;
+    else local++;
+  }
+  return { all: pool.length, local, intl };
 }
 
 export const hotDeals = deals.filter((d) => d.isHot);
