@@ -58,7 +58,7 @@ PHASE 2 — Vector search   [MODEL: sonnet for 2.1–2.4 + 2.6–2.8; opus for 2
          ✓ Switch back to claude-sonnet-4-6 when vector.ts is done
 [x] 2.6  /api/compare swapped to use vector.search() (USE_VECTOR_SEARCH flag)
 [x] 2.7  Vector validation: 92% pass rate (23/25) — well above 80% bar
-[ ] 2.8  Commit + open PR titled "Phase 2: Vector + image search for dupes"
+[x] 2.8  Committed on main (c6033fb) — "Phase 1+2: LLM extraction + vector search engine"
 
 PHASE 3 — Cleanup         [MODEL: claude-sonnet-4-6]
 [ ] 3.1  Delete MODEL_HINTS, PRODUCT_TYPES, CATEGORY_KEYWORDS from normalize.ts

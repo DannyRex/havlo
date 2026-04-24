@@ -13,6 +13,13 @@ const STOP = new Set([
   "set", "model", "edition", "version", "support",
 ]);
 
+// ── HEURISTIC FALLBACK ONLY ───────────────────────────────────────────────
+// The blocks below (BRANDS, MODEL_HINTS, buildSignature, etc.) are kept as a
+// safety net for two cases:
+//   1. The feature flag USE_VECTOR_SEARCH=false → heuristic engine serves all queries.
+//   2. The vector path throws (Supabase/OpenAI down) → route.ts catches + falls back.
+// Do NOT delete until the heuristic fallback is explicitly retired.
+// ─────────────────────────────────────────────────────────────────────────
 // Known brand list — order matters for multi-word brands
 const BRANDS = [
   "apple", "iphone", "ipad", "macbook", "airpods", "earpods",

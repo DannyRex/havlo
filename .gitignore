@@ -35,3 +35,8 @@ Thumbs.db
 
 # TypeScript build cache
 *.tsbuildinfo
+
+# AI search — generated artefacts (large, contain API cost data, re-generatable)
+data/ai-search/extracted.json
+data/ai-search/baseline.json
+data/ai-search/cost-log.json

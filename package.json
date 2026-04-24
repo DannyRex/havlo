@@ -9,7 +9,14 @@
     "lint": "next lint",
     "scrape": "tsx --tsconfig tsconfig.scripts.json scripts/scrape.ts",
     "scrape:jumia": "tsx --tsconfig tsconfig.scripts.json scripts/scrape.ts --only=jumia",
-    "debug:selectors": "tsx --tsconfig tsconfig.scripts.json scripts/debug-selectors.ts"
+    "debug:selectors": "tsx --tsconfig tsconfig.scripts.json scripts/debug-selectors.ts",
+    "ai:extract": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/extract-products.ts",
+    "ai:embed": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/embed-deals.ts --all",
+    "ai:embed:text": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/embed-deals.ts --text",
+    "ai:embed:images": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/embed-deals.ts --images",
+    "ai:validate": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/validate-vector.ts",
+    "ai:reindex": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/reindex.ts",
+    "ai:smoke": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/smoke-test-vector.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.0",
