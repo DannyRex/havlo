@@ -38,22 +38,22 @@ export default function CTA() {
                   Before you buy it,
                   <br />
                   <span style={{
-                    background: "linear-gradient(135deg, #0057FF 0%, #00C8FF 100%)",
+                    background: "linear-gradient(135deg, #10B981 0%, #00C8FF 100%)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                   }}>
-                    price-check it.
+                    find it for less.
                   </span>
                 </h2>
 
                 <p className="text-slate-400 text-lg leading-relaxed tracking-[-0.01em] mb-10 max-w-sm">
-                  One quick search can show you a better price, a better store, or a better-value alternative. That is worth a few seconds.
+                  Start with what you love. Dealesty searches trusted retailers for similar products at a fraction of the price.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Link href="/compare" className="btn-primary text-xs sm:text-sm px-5 sm:px-7 py-3.5 rounded-xl gap-2 whitespace-nowrap">
                     <TrendingDown size={15} />
-                    Compare Prices
+                    Find for Less
                   </Link>
                   <Link href="/deals" className="btn-ghost text-xs sm:text-sm px-5 sm:px-7 py-3.5 rounded-xl gap-2 whitespace-nowrap">
                     Explore Deals

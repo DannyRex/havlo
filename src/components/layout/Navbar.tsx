@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 const navLinks = [
   { href: "/deals", label: "Browse deals" },
-  { href: "/compare", label: "Compare prices" },
+  { href: "/compare", label: "Find for less" },
 ];
 
 const legalLinks = [

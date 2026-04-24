@@ -53,7 +53,7 @@ export default function Hero() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (query.trim()) router.push(`/compare?q=${encodeURIComponent(query.trim())}`);
+    if (query.trim()) router.push(`/compare?q=${encodeURIComponent(query.trim())}&mode=similar`);
   };
 
   return (
@@ -90,21 +90,21 @@ export default function Hero() {
                  style={{ animationDelay: "0ms" }}>
               <span className="flex h-2 w-2 rounded-full bg-deal-green animate-pulse" />
               <span className="text-sm font-medium text-slate-400 tracking-[-0.01em]">
-                12 stores checked in one quick search
+                Research-backed picks, ranked for you
               </span>
             </div>
 
             {/* Headline */}
             <h1 className="text-5xl sm:text-6xl lg:text-[64px] font-black text-white leading-[1.0] tracking-[-0.04em] mb-6 hero-enter"
                 style={{ animationDelay: "80ms" }}>
-              Check the price{" "}
+              Find similar{" "}
               <span className="relative inline-block">
                 <span style={{
-                  background: "linear-gradient(135deg, #0057FF 0%, #00C8FF 60%, #38bdf8 100%)",
+                  background: "linear-gradient(135deg, #10B981 0%, #00C8FF 60%, #38bdf8 100%)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
                 }}>
-                  before you pay.
+                  products for less.
                 </span>
                 <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 8" fill="none">
                   <path d="M0 6 Q75 0 150 4 Q225 8 300 2" stroke="#0057FF" strokeWidth="2.5"
@@ -116,7 +116,7 @@ export default function Hero() {
             {/* Sub */}
             <p className="text-base sm:text-lg text-slate-400 leading-relaxed mb-10 max-w-[430px] tracking-[-0.01em] hero-enter"
                style={{ animationDelay: "180ms" }}>
-              Compare prices across trusted stores before you buy.
+              Start with what you love. We&apos;ll find alternatives you can actually afford.
             </p>
 
             {/* Search bar */}
@@ -132,13 +132,14 @@ export default function Hero() {
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="What are you shopping for?"
+                  placeholder="Search a product or paste a link…"
                   className="flex-1 min-w-0 px-3 sm:px-4 py-4 bg-transparent text-white placeholder-slate-600
                              text-base tracking-[-0.01em] outline-none"
                 />
                 <button type="submit"
-                        className="m-2 btn-primary rounded-xl px-4 sm:px-5 py-2.5 text-sm flex-shrink-0">
-                  <span className="hidden sm:inline">Check price</span>
+                        className="m-2 btn-primary rounded-xl px-4 sm:px-5 py-2.5 text-sm flex-shrink-0"
+                        style={{ background: "linear-gradient(135deg, #10B981, #059669)" }}>
+                  <span className="hidden sm:inline">Find dupes</span>
                   <span className="sm:hidden">Go</span>
                   <ArrowRight size={14} />
                 </button>
@@ -151,7 +152,7 @@ export default function Hero() {
               <span className="text-xs text-slate-600 self-center mr-1">Popular:</span>
               {suggestions.map((s) => (
                 <button key={s}
-                        onClick={() => router.push(`/compare?q=${encodeURIComponent(s)}`)}
+                        onClick={() => router.push(`/compare?q=${encodeURIComponent(s)}&mode=similar`)}
                         className="px-3 py-1.5 rounded-full text-xs font-medium text-slate-500
                                    hover:text-white hover:bg-white/[0.07] transition-all
                                    border border-white/[0.07] hover:border-white/[0.15] tracking-[-0.01em]">
@@ -165,7 +166,7 @@ export default function Hero() {
                  style={{ animationDelay: "460ms" }}>
               <Link href="/compare" className="btn-ghost text-xs sm:text-sm px-4 sm:px-6 py-3 rounded-xl whitespace-nowrap">
                 <TrendingDown size={15} />
-                Compare prices
+                Find for less
               </Link>
               <Link href="/deals" className="btn-primary text-xs sm:text-sm px-4 sm:px-6 py-3 rounded-xl whitespace-nowrap">
                 Browse deals

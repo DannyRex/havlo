@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, X, ArrowRight } from "lucide-react";
+import { Search, X, Sparkles, Link2 } from "lucide-react";
 
 interface Suggestion { title: string; key: string; storeCount: number }
 
@@ -15,6 +15,12 @@ const SUGGESTIONS = [
   "iPhone 15 Pro Max", "Galaxy A06", "Hisense 50 inch TV",
   "PlayStation 5", "Tecno Spark 30", "MacBook Pro M3", "AirPods Pro",
 ];
+
+/** Quick check if input looks like a URL */
+function looksLikeUrl(v: string): boolean {
+  const t = v.trim();
+  return /^https?:\/\//i.test(t) || /^(www\.|[a-z]+\.(com|ng|co))/i.test(t);
+}
 
 export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
   const [value, setValue] = useState(initialQuery);
@@ -68,27 +74,38 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
     }
   };
 
+  const isUrlInput = looksLikeUrl(value);
+
   return (
     <div className="max-w-2xl mx-auto" ref={wrapRef}>
+      {/* ── Heading ── */}
       <div className="text-center mb-6">
         <h1 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight mb-2">
-          Compare prices across stores
+          Find similar products for less
         </h1>
         <p className="text-sm text-slate-500">
-          Search current offers from trusted retailers, updated regularly.
+          Search a product name or paste a link — we&apos;ll find cheaper alternatives.
         </p>
       </div>
 
       <form onSubmit={(e) => { e.preventDefault(); submit(value); }} className="relative">
-        <div className="relative flex items-center bg-white/[0.04] border border-white/10 rounded-full focus-within:border-white/30 transition-colors">
-          <Search size={16} className="absolute left-4 text-slate-500 pointer-events-none" />
+        <div className={`relative flex items-center bg-white/[0.04] border rounded-full transition-colors ${
+          isUrlInput
+            ? "border-brand-500/30 focus-within:border-brand-500/50"
+            : "border-emerald-500/20 focus-within:border-emerald-500/40"
+        }`}>
+          {isUrlInput ? (
+            <Link2 size={16} className="absolute left-4 text-brand-400 pointer-events-none" />
+          ) : (
+            <Search size={16} className="absolute left-4 text-slate-500 pointer-events-none" />
+          )}
           <input
             type="text"
             value={value}
             onChange={(e) => { setValue(e.target.value); setOpen(true); setHighlighted(-1); }}
             onFocus={() => setOpen(true)}
             onKeyDown={onKey}
-            placeholder="Search any product…"
+            placeholder="Search a product or paste a link…"
             className="flex-1 pl-11 pr-3 py-3.5 bg-transparent text-white placeholder-slate-500 text-base outline-none"
             autoFocus
           />
@@ -99,11 +116,18 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
             </button>
           )}
           <button type="submit" disabled={!value.trim() || loading}
-                  className="m-1.5 px-4 py-2 rounded-full bg-white text-navy-900 text-sm font-medium hover:bg-white/90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5">
+                  className={`m-1.5 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-1.5
+                    disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${
+                    isUrlInput
+                      ? "bg-brand-500 text-white hover:bg-brand-400"
+                      : "bg-emerald-500 text-white hover:bg-emerald-400"
+                  }`}>
             {loading ? (
-              <span className="w-4 h-4 rounded-full border-2 border-navy-900/30 border-t-navy-900 animate-spin" />
+              <span className="w-4 h-4 rounded-full border-2 border-current/30 border-t-current animate-spin" />
+            ) : isUrlInput ? (
+              <>Smart switch <Link2 size={14} /></>
             ) : (
-              <>Compare <ArrowRight size={14} /></>
+              <>Find dupes <Sparkles size={14} /></>
             )}
           </button>
         </div>
@@ -130,7 +154,9 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
       </form>
 
       <p className="mt-3 text-center text-xs text-slate-500">
-        Be specific: "iPhone 15 Pro Max 256GB" beats "phone".
+        {isUrlInput
+          ? "We\u2019ll identify this product and find cheaper alternatives across stores."
+          : 'Paste a Jumia, Amazon, or AliExpress link — or search by name.'}
       </p>
 
       {!initialQuery && suggestions.length === 0 && (

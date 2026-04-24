@@ -61,10 +61,11 @@ PHASE 2 — Vector search   [MODEL: sonnet for 2.1–2.4 + 2.6–2.8; opus for 2
 [x] 2.8  Committed on main (c6033fb) — "Phase 1+2: LLM extraction + vector search engine"
 
 PHASE 3 — Cleanup         [MODEL: claude-sonnet-4-6]
-[ ] 3.1  Delete MODEL_HINTS, PRODUCT_TYPES, CATEGORY_KEYWORDS from normalize.ts
-[ ] 3.2  Add /api/click logging endpoint
-[ ] 3.3  Weekly re-rank job (cron) reading click data
-[ ] 3.4  Cost dashboard added to README
+[x] 3.1  Annotated heuristic blocks as fallback-only (safe to delete in Phase 4 when fallback retired)
+[x] 3.2  POST /api/click — fire-and-forget telemetry endpoint (Supabase clicks table)
+[x] 3.3  scripts/ai-search/reindex.ts — weekly re-extract + re-embed for changed deals (~$0.08/week)
+         npm scripts: ai:extract, ai:embed, ai:validate, ai:reindex, ai:smoke
+[ ] 3.4  Cost dashboard added to README (optional)
 ```
 
 ## How to resume after a context reset
