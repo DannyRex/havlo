@@ -3,9 +3,20 @@
 import Image from "next/image";
 import { TrendingDown, Minus, ExternalLink, Plane } from "lucide-react";
 import { formatNaira } from "@/lib/utils";
+import { trackClick } from "@/lib/trackClick";
 import type { DupeResult } from "@/lib/search";
 
-export default function DupeCard({ dupe, rank }: { dupe: DupeResult; rank: number }) {
+export default function DupeCard({
+  dupe,
+  rank,
+  query = "",
+  mode = "similar",
+}: {
+  dupe: DupeResult;
+  rank: number;
+  query?: string;
+  mode?: string;
+}) {
   const hasSavings = dupe.savingsPercent > 0;
   const savingsColor =
     dupe.savingsPercent >= 60
@@ -97,6 +108,7 @@ export default function DupeCard({ dupe, rank }: { dupe: DupeResult; rank: numbe
             href={offer.url}
             target="_blank"
             rel="noopener noreferrer sponsored"
+            onClick={() => trackClick(dupe.key, query, rank, mode)}
             className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-white/[0.06]
                        hover:border-white/[0.15] hover:bg-white/[0.04] transition-all text-xs group/link"
           >

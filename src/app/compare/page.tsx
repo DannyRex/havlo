@@ -8,6 +8,7 @@ import Image from "next/image";
 import PriceResults from "@/components/compare/PriceResults";
 import DupeCard from "@/components/compare/DupeCard";
 import { formatNaira } from "@/lib/utils";
+import { trackClick } from "@/lib/trackClick";
 import type { SearchOutput } from "@/lib/search";
 
 function CompareContent() {
@@ -78,7 +79,7 @@ function CompareContent() {
       {/* SINGLE — key-based price comparison across stores */}
       {!loading && result?.mode === "single" && (
         <div className="mt-10 max-w-3xl mx-auto">
-          <PriceResults group={result.group} />
+          <PriceResults group={result.group} query={query} mode="single" />
         </div>
       )}
 
@@ -128,12 +129,13 @@ function CompareContent() {
 
                   {/* Anchor store links */}
                   <div className="flex flex-wrap gap-2 mt-3">
-                    {result.anchor.offers.slice(0, 4).map((offer) => (
+                    {result.anchor.offers.slice(0, 4).map((offer, i) => (
                       <a
                         key={`${offer.storeId}-${offer.price}`}
                         href={offer.url}
                         target="_blank"
                         rel="noopener noreferrer sponsored"
+                        onClick={() => trackClick(result.anchor.key, query, i, "similar-anchor")}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium
                                    border border-white/[0.08] hover:border-white/20 hover:bg-white/[0.04] transition-all text-slate-400 hover:text-white"
                       >
@@ -179,7 +181,7 @@ function CompareContent() {
           {result.dupes.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {result.dupes.map((dupe, i) => (
-                <DupeCard key={dupe.key} dupe={dupe} rank={i} />
+                <DupeCard key={dupe.key} dupe={dupe} rank={i} query={query} mode="similar" />
               ))}
             </div>
           ) : (

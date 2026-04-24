@@ -1,9 +1,18 @@
 import Image from "next/image";
 import { ExternalLink, Trophy, Truck, Globe, Star } from "lucide-react";
 import { formatNaira } from "@/lib/utils";
+import { trackClick } from "@/lib/trackClick";
 import type { ProductGroup } from "@/lib/search";
 
-export default function PriceResults({ group }: { group: ProductGroup }) {
+export default function PriceResults({
+  group,
+  query = "",
+  mode = "single",
+}: {
+  group: ProductGroup;
+  query?: string;
+  mode?: string;
+}) {
   const { offers, bestPrice, maxSavings, title, imageUrl, imageEmoji, imageGradient, category, storeCount } = group;
 
   return (
@@ -47,6 +56,7 @@ export default function PriceResults({ group }: { group: ProductGroup }) {
           const extra = p.price - bestPrice;
           return (
             <a key={`${p.storeId}-${i}`} href={p.url} target="_blank" rel="noopener noreferrer sponsored"
+               onClick={() => trackClick(group.key, query, i, mode)}
                className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border transition-all hover:bg-white/[0.04] ${
                  isBest ? "border-emerald-500/40 bg-emerald-500/[0.04]" : "border-white/[0.06]"
                }`}>
