@@ -308,8 +308,11 @@ export function tokenJaccard(a: string[], b: string[]): number {
 // Loaded once at module init — safe in both Next.js server and scripts.
 // Falls back to heuristic buildSignature() when no entry exists (new deals
 // added between scrapes) or when confidence is too low to trust.
+// File is gitignored (generated artefact); loaded via fs so webpack doesn't
+// fail the build when it's absent — callers already handle null returns.
 
-import _aiRaw from "../../../data/ai-search/extracted.json";
+import { existsSync, readFileSync } from "fs";
+import { join } from "path";
 
 interface _AiEntry {
   brand: string | null;
@@ -325,7 +328,11 @@ interface _AiEntry {
   search_terms: string;
 }
 
-const _AI_DATA = _aiRaw as Record<string, _AiEntry>;
+const _AI_DATA: Record<string, _AiEntry> = (() => {
+  const p = join(process.cwd(), "data/ai-search/extracted.json");
+  if (!existsSync(p)) return {};
+  return JSON.parse(readFileSync(p, "utf8"));
+})();
 
 /**
  * Return a ProductSignature sourced from the LLM-extracted cache for a deal,
