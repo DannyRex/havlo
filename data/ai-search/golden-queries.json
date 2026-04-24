@@ -1,0 +1,127 @@
+[
+  {
+    "query": "iPhone 15 Pro Max",
+    "expect": { "mode": "single_or_list", "brand": "apple", "model_contains": "iphone" },
+    "notes": "Any iPhone is fine — catalog may not have 15 Pro Max specifically, but must return an Apple phone not an accessory"
+  },
+  {
+    "query": "Galaxy A06",
+    "expect": { "mode": "single_or_list", "brand": "samsung", "model_contains": "a06" },
+    "notes": "All storage variants (64/128/256) should bucket together"
+  },
+  {
+    "query": "Galaxy A06 128GB",
+    "expect": { "mode": "single_or_list", "brand": "samsung", "model_contains": "a06" },
+    "notes": "Specific storage should narrow but not prevent match"
+  },
+  {
+    "query": "Hisense 50 inch TV",
+    "expect": { "mode": "single_or_list", "brand": "hisense", "product_type": "tv" },
+    "notes": "Must return a Hisense TV — inches match is a bonus not required"
+  },
+  {
+    "query": "PlayStation 5",
+    "expect": { "mode": "empty_or_list", "skip_if_not_in_catalog": true },
+    "notes": "NOT IN CATALOG — empty is a valid pass. If present must be product_type=console"
+  },
+  {
+    "query": "Tecno Spark 30",
+    "expect": { "mode": "single_or_list", "brand": "tecno", "model_contains": "spark" },
+    "notes": "Spark 30 not in catalog — any Tecno Spark model is acceptable"
+  },
+  {
+    "query": "MacBook Pro M3",
+    "expect": { "mode": "empty_or_list", "skip_if_not_in_catalog": true },
+    "notes": "Only MacBook ACCESSORIES in catalog — empty is a valid pass. Must NOT return a phone."
+  },
+  {
+    "query": "AirPods Pro",
+    "expect": { "mode": "single_or_list", "brand": "apple", "product_type_any": ["premium-earbuds", "earbuds"] },
+    "notes": "Apple earbuds — either premium-earbuds or earbuds type is fine"
+  },
+  {
+    "query": "AirPods",
+    "expect": { "mode": "list", "brand": "apple", "product_type_any": ["premium-earbuds", "earbuds"] },
+    "notes": "Broader query — list mode Apple earbuds"
+  },
+  {
+    "query": "Infinix Hot 40",
+    "expect": { "mode": "single_or_list", "brand": "infinix", "model_contains": "hot" },
+    "notes": "Hot 40 may not be in catalog — any Infinix Hot is acceptable"
+  },
+  {
+    "query": "Samsung phone",
+    "expect": { "mode": "list", "brand": "samsung", "product_type_any": ["flagship-phone", "budget-phone"] },
+    "notes": "Generic two-word query — list mode, Samsung phones only"
+  },
+  {
+    "query": "phone",
+    "expect": { "mode": "list", "product_type_any": ["flagship-phone", "budget-phone"] },
+    "notes": "Single keyword — must return phones NOT dresses/accessories/TVs"
+  },
+  {
+    "query": "tv",
+    "expect": { "mode": "list", "product_type": "tv" },
+    "notes": "Only actual TVs — no TV stands, remotes, accessories"
+  },
+  {
+    "query": "earbuds",
+    "expect": { "mode": "list", "product_type_any": ["earbuds", "premium-earbuds"] },
+    "notes": "Both earbuds and premium-earbuds types are correct"
+  },
+  {
+    "query": "iphone case",
+    "expect": { "mode": "list", "is_accessory": true },
+    "notes": "User explicitly wants accessories — accessory penalty MUST be disabled"
+  },
+  {
+    "query": "Dell laptop 16gb ram",
+    "expect": { "mode": "empty_or_list", "skip_if_not_in_catalog": true },
+    "notes": "Only Dell laptop BAGS in catalog — empty is a valid pass. Must NOT return a phone."
+  },
+  {
+    "query": "JBL Clip 4",
+    "expect": { "mode": "single_or_list", "brand": "jbl", "product_type": "speaker" },
+    "notes": "Small portable speaker — model 'clip 4' is the key identifier"
+  },
+  {
+    "query": "Nike Air Max",
+    "expect": { "mode": "list", "brand": "nike", "product_type": "sneakers" },
+    "notes": "Sneaker variants of Air Max should group as alternatives"
+  },
+  {
+    "query": "https://www.jumia.com.ng/samsung-galaxy-a06-128gb-blue-356834.html",
+    "expect": { "mode": "similar_or_single", "from_url": true, "anchor_brand": "samsung" },
+    "notes": "Smart switch via URL — must extract a Samsung product as anchor"
+  },
+  {
+    "query": "https://www.amazon.com/dp/B0CHX1W1XY",
+    "expect": { "mode": "similar_or_empty", "from_url": true },
+    "notes": "Bare ASIN URL — any result or empty is a pass"
+  },
+  {
+    "query": "wireless earbuds",
+    "expect": { "mode": "list", "product_type_any": ["earbuds", "premium-earbuds"] },
+    "notes": "Semantic equivalent of 'earbuds' — same/similar results expected"
+  },
+  {
+    "query": "Xbox Series X",
+    "expect": { "mode": "empty_or_list", "skip_if_not_in_catalog": true },
+    "notes": "NOT IN CATALOG — empty is a valid pass. Must NOT return a TV or phone."
+  },
+  {
+    "query": "smart watch under 50000",
+    "expect": { "mode": "list", "product_type_any": ["smartwatch", "watch"] },
+    "notes": "Price filter not supported — must return watches/smartwatches NOT phones"
+  },
+  {
+    "query": "fridge",
+    "expect": { "mode": "empty_or_list", "skip_if_not_in_catalog": true },
+    "notes": "Only fridge magnets in catalog (2 actual fridges) — empty or fridge result both pass. Must NOT return phones."
+  },
+  {
+    "query": "asdfghjkl nonsense",
+    "expect": { "mode": "empty" },
+    "notes": "Must return empty mode with suggestions, not crash"
+  }
+]

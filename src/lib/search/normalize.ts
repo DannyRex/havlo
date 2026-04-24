@@ -296,3 +296,64 @@ export function tokenJaccard(a: string[], b: string[]): number {
   sa.forEach((t) => { if (sb.has(t)) inter++; });
   return inter / (sa.size + sb.size - inter);
 }
+
+/* ── AI-EXTRACTED SIGNATURES (extracted.json) ── */
+// Loaded once at module init — safe in both Next.js server and scripts.
+// Falls back to heuristic buildSignature() when no entry exists (new deals
+// added between scrapes) or when confidence is too low to trust.
+
+import _aiRaw from "../../../data/ai-search/extracted.json";
+
+interface _AiEntry {
+  brand: string | null;
+  model: string | null;
+  variant: string | null;
+  product_type: string | null;
+  storage_gb: number | null;
+  ram_gb: number | null;
+  inches: number | null;
+  color: string | null;
+  is_accessory: boolean;
+  confidence: "high" | "medium" | "low";
+  search_terms: string;
+}
+
+const _AI_DATA = _aiRaw as Record<string, _AiEntry>;
+
+/**
+ * Return a ProductSignature sourced from the LLM-extracted cache for a deal,
+ * or null if the entry is missing or low-confidence (caller falls back to
+ * heuristic buildSignature).
+ */
+export function extractedSignature(dealId: string, title: string): ProductSignature | null {
+  const e = _AI_DATA[dealId];
+  if (!e) return null;
+  // Low-confidence + no brand → not worth trusting over the heuristic
+  if (e.confidence === "low" && !e.brand) return null;
+
+  const norm = title
+    .toLowerCase()
+    .replace(/[^a-z0-9.\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const tokens = norm.split(/\s+/).filter((t) => t.length > 1);
+
+  const parts: string[] = [
+    e.brand ?? "?",
+    e.model ?? "?",
+    e.inches != null ? `${Math.round(e.inches)}in` : null,
+  ].filter((p): p is string => p !== null);
+
+  return {
+    brand:     e.brand,
+    model:     e.model,
+    storageGb: e.storage_gb,
+    ramGb:     e.ram_gb,
+    inches:    e.inches,
+    color:     e.color,
+    tokens,
+    key:       parts.join("|") + (e.is_accessory ? "|acc" : ""),
+    norm,
+  };
+}
+/* ── END AI-EXTRACTED SIGNATURES ── */

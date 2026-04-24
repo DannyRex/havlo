@@ -12,9 +12,12 @@
     "debug:selectors": "tsx --tsconfig tsconfig.scripts.json scripts/debug-selectors.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.0",
+    "@supabase/supabase-js": "^2.104.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.400.0",
     "next": "14.2.5",
+    "openai": "^6.34.0",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "react": "^18.3.1",

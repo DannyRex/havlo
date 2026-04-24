@@ -10,9 +10,10 @@ import type { Deal } from "@/types";
 import { deals } from "@/lib/data/deals";
 import { usdToNgn } from "@/lib/utils";
 import {
-  buildSignature, signatureMatches, tokenJaccard, tokensOf,
+  buildSignature, extractedSignature, signatureMatches, tokenJaccard, tokensOf,
   type ProductSignature,
 } from "./normalize";
+import { parseStoreUrl, isUrl } from "./url-parser";
 
 /* ── Types returned to API/UI ─────────────────────────────────────── */
 
@@ -30,6 +31,10 @@ export interface StoreOffer {
   rating: number;
   deliveryDays: number;
   isInternational: boolean;
+  /** For international stores: estimated shipping + customs in NGN */
+  landedCostExtra: number;
+  /** price + landedCostExtra */
+  landedPrice: number;
 }
 
 export interface ProductGroup {
@@ -50,9 +55,16 @@ export interface ProductGroup {
   offers: StoreOffer[];
 }
 
+export interface DupeResult extends ProductGroup {
+  similarityScore: number;    // 0–100
+  savingsVsAnchor: number;    // NGN saved
+  savingsPercent: number;     // 0–100
+}
+
 export type SearchOutput =
   | { mode: "single"; query: string; group: ProductGroup; alternatives: ProductGroup[] }
   | { mode: "list"; query: string; groups: ProductGroup[]; total: number }
+  | { mode: "similar"; query: string; anchor: ProductGroup; dupes: DupeResult[] }
   | { mode: "empty"; query: string; suggestions: ProductGroup[] };
 
 /* ── Store metadata ───────────────────────────────────────────────── */
@@ -74,10 +86,43 @@ function toNgn(d: Deal): number {
   return d.currency === "USD" ? usdToNgn(d.salePrice) : d.salePrice;
 }
 
+/** Estimate shipping + customs for international orders to Nigeria.
+ *  Categories with higher duty rates (electronics = 20%, fashion = 35%)
+ *  and realistic forwarding costs. */
+function estimateLandedCostExtra(priceNgn: number, category: string, storeId: string): number {
+  // Base shipping estimate per store (NGN)
+  const shippingEstimates: Record<string, number> = {
+    amazon:     12_000,
+    aliexpress:  8_000,
+    dhgate:     10_000,
+    asos:       15_000,
+    shein:       8_000,
+    temu:        8_000,
+  };
+  const shipping = shippingEstimates[storeId] ?? 12_000;
+
+  // Customs duty rate by category
+  const dutyRates: Record<string, number> = {
+    "Phones & Tablets": 0.20,
+    "Computing":        0.20,
+    "Electronics":      0.20,
+    "Audio":            0.20,
+    "Appliances":       0.25,
+    "Fashion":          0.35,
+    "Beauty":           0.10,
+  };
+  const dutyRate = dutyRates[category] ?? 0.15;
+  const customs = Math.round((priceNgn + shipping) * dutyRate);
+
+  return shipping + customs;
+}
+
 function dealToOffer(d: Deal): StoreOffer {
   const meta = STORE_META[d.storeId] ?? { name: d.storeName, color: "#64748B", rating: 3.8, deliveryDays: 5, intl: false };
   const price = toNgn(d);
   const orig  = d.currency === "USD" ? usdToNgn(d.originalPrice) : d.originalPrice;
+  const isIntl = meta.intl;
+  const landedCostExtra = isIntl ? estimateLandedCostExtra(price, d.category, d.storeId) : 0;
   return {
     storeId: d.storeId,
     storeName: meta.name,
@@ -91,7 +136,9 @@ function dealToOffer(d: Deal): StoreOffer {
     discountPercent: d.discountPercent,
     rating: meta.rating,
     deliveryDays: meta.deliveryDays,
-    isInternational: meta.intl,
+    isInternational: isIntl,
+    landedCostExtra,
+    landedPrice: price + landedCostExtra,
   };
 }
 
@@ -107,7 +154,7 @@ let _groups: ProductGroup[] | null = null;
 
 function getIndex(): IndexedDeal[] {
   if (_index) return _index;
-  _index = deals.map((d) => ({ deal: d, sig: buildSignature(d.title) }));
+  _index = deals.map((d) => ({ deal: d, sig: extractedSignature(d.id, d.title) ?? buildSignature(d.title) }));
   return _index;
 }
 
@@ -178,6 +225,40 @@ function getGroups(): ProductGroup[] {
   _groups = out;
   return out;
 }
+
+/* ── Public accessors for the vector layer (Phase 2.5) ───────────────
+ * Vector search returns dealIds from Supabase ANN; we still need to map
+ * each id back to its already-built ProductGroup with merged offers.
+ * These helpers keep that lookup cheap without leaking internals.        */
+
+let _dealIdToGroup: Map<string, ProductGroup> | null = null;
+
+export function getProductGroups(): ProductGroup[] {
+  return getGroups();
+}
+
+export function getDealIdToGroup(): Map<string, ProductGroup> {
+  if (_dealIdToGroup) return _dealIdToGroup;
+  const map = new Map<string, ProductGroup>();
+  // Re-walk the bucket logic to know which dealId went into which group.
+  // Cheap because getIndex() is already cached and we only do this once.
+  const idx = getIndex();
+  // Build the same key the bucket would have produced for each item.
+  for (const item of idx) {
+    let key = item.sig.key;
+    if (key === "?|?" || key === "?") {
+      const fallback = item.sig.tokens.slice(0, 4).sort().join("-");
+      key = `fallback|${item.deal.categorySlug}|${fallback || item.deal.id}`;
+    }
+    if (ACCESSORY_RE.test(item.deal.title)) key = `${key}|acc`;
+    const group = getGroups().find((g) => g.key === key);
+    if (group) map.set(item.deal.id, group);
+  }
+  _dealIdToGroup = map;
+  return map;
+}
+
+export { classifyProductType, dupeSimilarity, ACCESSORY_RE, RELATED_CATS, suggestFallbacks };
 
 /* ── Scoring ──────────────────────────────────────────────────────── */
 
@@ -376,16 +457,390 @@ export function searchByKey(key: string): SearchOutput {
   return { mode: "single", query: target.title, group: target, alternatives: alts };
 }
 
-/** Lightweight autocomplete: top N matching titles for type-ahead. */
+/* ── Find Similar / "Dupe" mode ────────────────────────────────── */
+
+// Related categories — products in these categories can be "dupes" of each other
+const RELATED_CATS: Record<string, string[]> = {
+  "Phones & Tablets": ["Phones & Tablets"],
+  "Computing":        ["Computing"],
+  "Electronics":      ["Electronics"],
+  "Audio":            ["Audio"],
+  "Appliances":       ["Appliances"],
+  "Fashion":          ["Fashion"],
+  "Beauty":           ["Beauty"],
+};
+
+// Product-type classifiers — sub-categories within a broad category.
+// Products within the same type are much stronger dupes of each other.
+const PRODUCT_TYPES: { re: RegExp; type: string; category: string }[] = [
+  // Phones
+  { re: /\b(iphone|galaxy\s*s\d|pixel\s*\d|oneplus|phantom|zero|note\s*\d+\s*pro)\b/i, type: "flagship-phone", category: "Phones & Tablets" },
+  { re: /\b(galaxy\s*a\d|spark|hot\s*\d|smart\s*\d|pop\s*\d|camon|pova|a0\d|a1\d|redmi\s*\d|poco)\b/i, type: "budget-phone", category: "Phones & Tablets" },
+  { re: /\b(ipad|tab\s*[as]|tablet|mediapad)\b/i, type: "tablet", category: "Phones & Tablets" },
+  // Computing
+  { re: /\b(macbook|thinkpad|zenbook|xps|swift|spectre|gram)\b/i, type: "premium-laptop", category: "Computing" },
+  { re: /\b(laptop|notebook|chromebook|ideapad|aspire|pavilion|inspiron)\b/i, type: "laptop", category: "Computing" },
+  // Audio
+  { re: /\b(airpods|buds\s*pro|wf-|galaxy\s*buds|freebuds)\b/i, type: "premium-earbuds", category: "Audio" },
+  { re: /\b(earbuds|earphones|earphone|wireless\s*ear|tws|earpods)\b/i, type: "earbuds", category: "Audio" },
+  { re: /\b(headphone|headphones|wh-|headset|over[\s-]*ear)\b/i, type: "headphones", category: "Audio" },
+  { re: /\b(speaker|soundbar|boombox|portable\s*speaker)\b/i, type: "speaker", category: "Audio" },
+  // Electronics
+  { re: /\b(tv|television|smart\s*tv|\d{2,3}\s*inch|\d{2,3}")\b/i, type: "tv", category: "Electronics" },
+  { re: /\b(playstation|ps[45]|xbox|nintendo|switch|console|gaming\s*console)\b/i, type: "console", category: "Electronics" },
+  { re: /\b(watch|smartwatch|smart\s*watch|band|fitness\s*tracker)\b/i, type: "smartwatch", category: "Electronics" },
+  // Fashion
+  { re: /\b(sneaker|trainer|running\s*shoe|air\s*max|air\s*force|jordan|yeezy|boost)\b/i, type: "sneakers", category: "Fashion" },
+  { re: /\b(dress|gown|maxi|midi)\b/i, type: "dress", category: "Fashion" },
+  { re: /\b(jacket|coat|hoodie|sweatshirt|puffer)\b/i, type: "outerwear", category: "Fashion" },
+  { re: /\b(shirt|tee|t-shirt|polo|blouse|top)\b/i, type: "tops", category: "Fashion" },
+  { re: /\b(jeans|pants|trousers|shorts|jogger|chinos)\b/i, type: "bottoms", category: "Fashion" },
+  { re: /\b(bag|handbag|backpack|tote|crossbody|clutch|purse)\b/i, type: "bags", category: "Fashion" },
+];
+
+function classifyProductType(title: string, category: string): string | null {
+  for (const pt of PRODUCT_TYPES) {
+    if (pt.re.test(title)) return pt.type;
+  }
+  return null;
+}
+
+// Price tiers relative to category medians. Products in the same tier are better dupes.
+function priceTier(price: number, category: string): "budget" | "mid" | "premium" {
+  // Approximate tier thresholds per category (in NGN)
+  const thresholds: Record<string, [number, number]> = {
+    "Phones & Tablets": [150_000, 600_000],
+    "Computing":        [300_000, 1_000_000],
+    "Electronics":      [100_000, 500_000],
+    "Audio":            [20_000, 100_000],
+    "Appliances":       [50_000, 200_000],
+    "Fashion":          [15_000, 80_000],
+    "Beauty":           [5_000, 25_000],
+  };
+  const [low, high] = thresholds[category] ?? [50_000, 200_000];
+  if (price <= low) return "budget";
+  if (price >= high) return "premium";
+  return "mid";
+}
+
+/** Score how "similar" a candidate product group is to an anchor product.
+ *  Returns 0–100 where higher = more similar (good dupe).
+ *
+ *  Key insight from Dupe.com: a good dupe is a product that serves the SAME
+ *  PURPOSE as the anchor — same type (phone vs phone, laptop vs laptop),
+ *  similar specs, from a different brand, at a better price. */
+function dupeSimilarity(anchor: ProductGroup, anchorSig: ProductSignature, anchorType: string | null,
+                        cand: ProductGroup): number {
+  const candSig = buildSignature(cand.title);
+  const candType = classifyProductType(cand.title, cand.category);
+  let score = 0;
+
+  // ── 1. Product type match (strongest signal) ──
+  // Same product type (e.g. both "flagship-phone") is the #1 indicator of a good dupe
+  if (anchorType && candType) {
+    if (anchorType === candType) {
+      score += 35; // exact type match: both flagship phones, both earbuds, etc.
+    } else {
+      // Adjacent types within same category still count (budget phone ↔ flagship phone)
+      const anchorBase = anchorType.replace(/^(premium|budget|flagship)-/, "");
+      const candBase = candType.replace(/^(premium|budget|flagship)-/, "");
+      if (anchorBase === candBase) {
+        score += 20; // same base type, different tier (budget-phone vs flagship-phone)
+      }
+    }
+  }
+
+  // ── 2. Same category base boost ──
+  // Even without type classification, being in the same category is essential
+  score += 10;
+
+  // ── 3. Spec proximity ──
+  // Storage similarity (128GB vs 256GB is similar; 32GB vs 1TB is not)
+  if (anchorSig.storageGb && candSig.storageGb) {
+    const ratio = Math.min(anchorSig.storageGb, candSig.storageGb) / Math.max(anchorSig.storageGb, candSig.storageGb);
+    score += ratio * 15;
+  }
+
+  // Screen size similarity
+  if (anchorSig.inches && candSig.inches) {
+    const diff = Math.abs(anchorSig.inches - candSig.inches);
+    const maxIn = Math.max(anchorSig.inches, candSig.inches);
+    const ratio = 1 - (diff / maxIn);
+    score += ratio * 12;
+  }
+
+  // ── 4. Feature token overlap (catches "pro", "gaming", "smart", "wireless", etc.) ──
+  // Filter out brand/model tokens to focus on feature descriptors
+  const anchorFeatures = anchorSig.tokens.filter((t) => t !== anchorSig.brand && !anchorSig.model?.includes(t));
+  const candFeatures = candSig.tokens.filter((t) => t !== candSig.brand && !candSig.model?.includes(t));
+  if (anchorFeatures.length > 0 && candFeatures.length > 0) {
+    const featureSim = tokenJaccard(anchorFeatures, candFeatures);
+    score += featureSim * 18;
+  }
+
+  // ── 5. Price tier proximity — same tier products are better dupes ──
+  const anchorTier = priceTier(anchor.bestPrice, anchor.category);
+  const candTier = priceTier(cand.bestPrice, cand.category);
+  if (anchorTier === candTier) {
+    score += 8;
+  } else if (
+    (anchorTier === "premium" && candTier === "mid") ||
+    (anchorTier === "mid" && candTier === "budget")
+  ) {
+    score += 5; // adjacent tier — still a reasonable dupe
+  }
+
+  // ── 6. Multi-store validation — available across stores = real product ──
+  if (cand.storeCount >= 3) score += 4;
+  else if (cand.storeCount >= 2) score += 2;
+
+  // ── 7. Brand diversity bonus — different brand is the whole point of "dupes" ──
+  if (cand.brand && anchor.brand && cand.brand !== anchor.brand) {
+    score += 6;
+  }
+
+  // ── Penalties ──
+  // Accessory penalty (a case is NOT a dupe for a phone)
+  if (ACCESSORY_RE.test(cand.title) && !ACCESSORY_RE.test(anchor.title)) {
+    score -= 40;
+  }
+
+  // Way too cheap = probably a different class of product or an accessory
+  if (cand.bestPrice > 0 && anchor.bestPrice > 0) {
+    const priceRatio = cand.bestPrice / anchor.bestPrice;
+    if (priceRatio < 0.05) score -= 20; // ₦5K phone for ₦1.2M anchor = noise
+  }
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+/** "Find for Less" — inspired by Dupe.com. Finds an anchor product then discovers
+ *  cross-brand alternatives that serve the same purpose at a lower price.
+ *
+ *  Key differences from regular search/compare:
+ *  - Finds DIFFERENT products, not the same product at different stores
+ *  - Cross-brand: Samsung can be a dupe for Apple, Tecno for Samsung
+ *  - Same-brand, different-model allowed: Galaxy A06 can dupe Galaxy S24
+ *  - Only the exact anchor product is excluded
+ *  - Includes items up to 10% more expensive (but prioritizes cheaper)
+ *  - Ranked by a blend of similarity + savings
+ */
+export function findSimilar(rawQuery: string, opts?: { limit?: number }): SearchOutput {
+  const q = rawQuery.trim();
+  if (!q) return { mode: "empty", query: q, suggestions: [] };
+
+  const limit = opts?.limit ?? 16;
+  const query = buildSignature(q);
+  const groups = getGroups();
+
+  // ── Step 1: find the anchor (same logic as regular search) ──
+  const scored = groups
+    .map((g) => ({ g, s: scoreGroup(query, q, g) }))
+    .filter((x) => x.s > 10)
+    .sort((a, b) => b.s - a.s);
+
+  if (scored.length === 0) {
+    return { mode: "empty", query: q, suggestions: suggestFallbacks(query, q, groups) };
+  }
+
+  const anchor = scored[0].g;
+  const anchorSig = buildSignature(anchor.title);
+  const anchorType = classifyProductType(anchor.title, anchor.category);
+
+  // Categories that count as "same type"
+  const relatedCats = RELATED_CATS[anchor.category] ?? [anchor.category];
+
+  // Price ceiling: include items up to 10% more expensive (user might want
+  // a slightly pricier but better-reviewed alternative from a different brand)
+  const priceCeiling = anchor.bestPrice * 1.1;
+
+  // ── Step 2: find dupes across the entire catalog ──
+  const dupes: DupeResult[] = [];
+
+  for (const g of groups) {
+    // Skip the exact same product
+    if (g.key === anchor.key) continue;
+    // Must be in a related category
+    if (!relatedCats.includes(g.category)) continue;
+    // Must be at or below price ceiling
+    if (g.bestPrice > priceCeiling) continue;
+    // Skip accessories when anchor is not an accessory
+    if (ACCESSORY_RE.test(g.title) && !ACCESSORY_RE.test(anchor.title)) continue;
+    // Skip unparseable fallback groups (noise)
+    if (g.key.startsWith("fallback|") && !g.brand) continue;
+
+    const similarityScore = dupeSimilarity(anchor, anchorSig, anchorType, g);
+    if (similarityScore < 15) continue; // too dissimilar
+
+    const savingsVsAnchor = anchor.bestPrice - g.bestPrice;
+    const savingsPercent = anchor.bestPrice > 0
+      ? Math.round((savingsVsAnchor / anchor.bestPrice) * 100)
+      : 0;
+
+    dupes.push({
+      ...g,
+      similarityScore,
+      savingsVsAnchor: Math.max(0, savingsVsAnchor), // clamp for slightly pricier items
+      savingsPercent: Math.max(0, savingsPercent),
+    });
+  }
+
+  // Sort: primary by similarity (good dupes first), secondary by savings
+  dupes.sort((a, b) => {
+    // Heavily weight similarity so good matches rank above random cheap stuff
+    const aScore = a.similarityScore * 0.55 + Math.min(a.savingsPercent, 80) * 0.45;
+    const bScore = b.similarityScore * 0.55 + Math.min(b.savingsPercent, 80) * 0.45;
+    if (Math.abs(bScore - aScore) > 2) return bScore - aScore;
+    // Tie-break: more stores = more validated product
+    return b.storeCount - a.storeCount;
+  });
+
+  return {
+    mode: "similar",
+    query: q,
+    anchor,
+    dupes: dupes.slice(0, limit),
+  };
+}
+
+/** "Smart Switch" — find similar products starting from a store URL.
+ *  Parses the URL to identify the product, finds it (or the closest match) in our
+ *  scraped catalog, then runs findSimilar to discover alternatives. */
+export function findSimilarByUrl(rawUrl: string): SearchOutput {
+  const parsed = parseStoreUrl(rawUrl);
+  if (!parsed || !parsed.searchTerms) {
+    return { mode: "empty", query: rawUrl, suggestions: [] };
+  }
+
+  const groups = getGroups();
+
+  // Strategy 1: Try to find the exact product by matching the URL in our deal data
+  let exactMatch: ProductGroup | null = null;
+  for (const g of groups) {
+    for (const offer of g.offers) {
+      // Normalize URLs for comparison (remove trailing slashes, query params, etc.)
+      const normalizedOffer = offer.url.replace(/[?#].*$/, "").replace(/\/+$/, "").toLowerCase();
+      const normalizedInput = parsed.originalUrl.replace(/[?#].*$/, "").replace(/\/+$/, "").toLowerCase();
+      if (normalizedOffer === normalizedInput) {
+        exactMatch = g;
+        break;
+      }
+    }
+    if (exactMatch) break;
+  }
+
+  // Strategy 2: If no exact URL match, search by extracted terms
+  if (!exactMatch) {
+    const query = buildSignature(parsed.searchTerms);
+    const scored = groups
+      .map((g) => ({ g, s: scoreGroup(query, parsed.searchTerms, g) }))
+      .filter((x) => x.s > 10)
+      .sort((a, b) => b.s - a.s);
+
+    // Boost results from the same store as the URL
+    const boosted = scored.map(({ g, s }) => ({
+      g, s: g.offers.some((o) => o.storeId === parsed.storeId) ? s + 30 : s,
+    })).sort((a, b) => b.s - a.s);
+
+    if (boosted.length > 0) {
+      exactMatch = boosted[0].g;
+    }
+  }
+
+  if (!exactMatch) {
+    return { mode: "empty", query: parsed.searchTerms, suggestions: suggestFallbacks(buildSignature(parsed.searchTerms), parsed.searchTerms, groups) };
+  }
+
+  // Now run the full dupe engine using the matched product as anchor
+  const anchor = exactMatch;
+  const anchorSig = buildSignature(anchor.title);
+  const anchorType = classifyProductType(anchor.title, anchor.category);
+  const relatedCats = RELATED_CATS[anchor.category] ?? [anchor.category];
+  const priceCeiling = anchor.bestPrice * 1.1;
+
+  const dupes: DupeResult[] = [];
+  for (const g of groups) {
+    if (g.key === anchor.key) continue;
+    if (!relatedCats.includes(g.category)) continue;
+    if (g.bestPrice > priceCeiling) continue;
+    if (ACCESSORY_RE.test(g.title) && !ACCESSORY_RE.test(anchor.title)) continue;
+    if (g.key.startsWith("fallback|") && !g.brand) continue;
+
+    const similarityScore = dupeSimilarity(anchor, anchorSig, anchorType, g);
+    if (similarityScore < 15) continue;
+
+    const savingsVsAnchor = anchor.bestPrice - g.bestPrice;
+    const savingsPercent = anchor.bestPrice > 0
+      ? Math.round((savingsVsAnchor / anchor.bestPrice) * 100)
+      : 0;
+
+    dupes.push({
+      ...g,
+      similarityScore,
+      savingsVsAnchor: Math.max(0, savingsVsAnchor),
+      savingsPercent: Math.max(0, savingsPercent),
+    });
+  }
+
+  dupes.sort((a, b) => {
+    const aScore = a.similarityScore * 0.55 + Math.min(a.savingsPercent, 80) * 0.45;
+    const bScore = b.similarityScore * 0.55 + Math.min(b.savingsPercent, 80) * 0.45;
+    if (Math.abs(bScore - aScore) > 2) return bScore - aScore;
+    return b.storeCount - a.storeCount;
+  });
+
+  return {
+    mode: "similar",
+    query: anchor.title,
+    anchor,
+    dupes: dupes.slice(0, 16),
+  };
+}
+
+export { isUrl } from "./url-parser";
+
+/** Lightweight autocomplete: top N matching titles for type-ahead.
+ *
+ *  The autocomplete's whole value prop is "pick a product you can COMPARE
+ *  across stores." So we bias hard toward multi-store groups:
+ *
+ *    1. Exclude `fallback|…` groups — these are products whose titles we
+ *       couldn't parse (wholesale-style DHgate/AliExpress/ASOS listings,
+ *       off-brand retailer entries, etc.). They're always single-store (the
+ *       deal id goes into the key), and clicking one just echoes that exact
+ *       title back — no new comparison.
+ *
+ *    2. When sorting, a multi-store group beats a single-store group of
+ *       similar score. Big score gaps (>25) still win so a perfect model
+ *       match isn't displaced by a fuzzier multi-store near-miss.
+ *
+ *    3. If we have ≥3 multi-store matches, cut single-store results
+ *       entirely — the dropdown is dense enough. Otherwise mix them in so
+ *       narrow queries (rare products) still surface *something*.
+ */
 export function suggest(rawQuery: string, n = 6): { title: string; key: string; storeCount: number }[] {
   const q = rawQuery.trim();
   if (q.length < 2) return [];
   const query = buildSignature(q);
   const groups = getGroups();
+
   const scored = groups
+    // Unparseable single-product buckets have no comparison value and just
+    // crowd out real grouped products — drop them from autosuggest.
+    .filter((g) => !g.key.startsWith("fallback|"))
     .map((g) => ({ g, s: scoreGroup(query, q, g) }))
     .filter((x) => x.s > 30)
-    .sort((a, b) => b.s - a.s)
-    .slice(0, n);
-  return scored.map(({ g }) => ({ title: g.title, key: g.key, storeCount: g.storeCount }));
+    .sort((a, b) => {
+      const aMulti = a.g.storeCount >= 2;
+      const bMulti = b.g.storeCount >= 2;
+      if (aMulti !== bMulti && Math.abs(a.s - b.s) < 25) return aMulti ? -1 : 1;
+      return b.s - a.s;
+    });
+
+  const multi = scored.filter((x) => x.g.storeCount >= 2);
+  const pool = multi.length >= 3 ? multi : scored;
+
+  return pool
+    .slice(0, n)
+    .map(({ g }) => ({ title: g.title, key: g.key, storeCount: g.storeCount }));
 }

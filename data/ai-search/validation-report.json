@@ -1,0 +1,500 @@
+{
+  "summary": {
+    "total": 25,
+    "passed": 24,
+    "failed": 1,
+    "regressed": 1,
+    "improved": 6,
+    "unchanged": 0,
+    "passRate": 96
+  },
+  "details": [
+    {
+      "query": "iPhone 15 Pro Max",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "iPhone 15 Pro Max",
+        "topTitle": "APPLE Iphone 17 Pro Max IOS Mobile Smart Phone With 256GB, 512GB & 1TB",
+        "topBrand": "apple",
+        "topModel": "iphone 17 pro max",
+        "topProductType": "flagship-phone",
+        "candidatesConsidered": 55
+      },
+      "expected": {
+        "mode": "single_or_list",
+        "brand": "apple",
+        "model_contains": "iphone"
+      },
+      "reasons": []
+    },
+    {
+      "query": "Galaxy A06",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "Galaxy A06",
+        "topTitle": "SAMSUNG Galaxy A06-A065F Android Mobile Smart Phone With 64GB+4GB & 128GB+4GB",
+        "topBrand": "samsung",
+        "topModel": "galaxy a06",
+        "topProductType": "budget-phone",
+        "candidatesConsidered": 12
+      },
+      "expected": {
+        "mode": "single_or_list",
+        "brand": "samsung",
+        "model_contains": "a06"
+      },
+      "reasons": []
+    },
+    {
+      "query": "Galaxy A06 128GB",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "Galaxy A06 128GB",
+        "topTitle": "SAMSUNG Galaxy A06-A065F Android Mobile Smart Phone With 64GB+4GB & 128GB+4GB",
+        "topBrand": "samsung",
+        "topModel": "galaxy a06",
+        "topProductType": "budget-phone",
+        "candidatesConsidered": 22
+      },
+      "expected": {
+        "mode": "single_or_list",
+        "brand": "samsung",
+        "model_contains": "a06"
+      },
+      "reasons": []
+    },
+    {
+      "query": "Hisense 50 inch TV",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "Hisense 50 inch TV",
+        "topTitle": "Hisense 50\" Uhd 4k Smart Tv,3hdmi,2usb,1av,free Wall",
+        "topBrand": "hisense",
+        "topModel": null,
+        "topProductType": "tv",
+        "candidatesConsidered": 45
+      },
+      "expected": {
+        "mode": "single_or_list",
+        "brand": "hisense",
+        "product_type": "tv"
+      },
+      "reasons": []
+    },
+    {
+      "query": "PlayStation 5",
+      "outcome": "improve",
+      "ok": true,
+      "shadow": {
+        "query": "PlayStation 5",
+        "topTitle": null,
+        "topBrand": null,
+        "topModel": null,
+        "topProductType": null,
+        "candidatesConsidered": 0
+      },
+      "expected": {
+        "mode": "empty_or_list",
+        "skip_if_not_in_catalog": true
+      },
+      "reasons": [
+        "empty — acceptable (not in catalog)"
+      ]
+    },
+    {
+      "query": "Tecno Spark 30",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "Tecno Spark 30",
+        "topTitle": "TECNO Spark 40-KM5 Android Mobile Smart Phone With 128GB+4GB & 256GB+8GB",
+        "topBrand": "tecno",
+        "topModel": "spark 40",
+        "topProductType": "budget-phone",
+        "candidatesConsidered": 13
+      },
+      "expected": {
+        "mode": "single_or_list",
+        "brand": "tecno",
+        "model_contains": "spark"
+      },
+      "reasons": []
+    },
+    {
+      "query": "MacBook Pro M3",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "MacBook Pro M3",
+        "topTitle": "Xiaomi Mi Notebook Pro 14 Laptop - Intel i5/i7 11th Gen, 16GB DDR4 RAM, 512GB SSD, NVIDIA GeForce MX450, 14 2560x1600 12",
+        "topBrand": "xiaomi",
+        "topModel": "mi notebook pro 14",
+        "topProductType": "laptop",
+        "candidatesConsidered": 2
+      },
+      "expected": {
+        "mode": "empty_or_list",
+        "skip_if_not_in_catalog": true
+      },
+      "reasons": []
+    },
+    {
+      "query": "AirPods Pro",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "AirPods Pro",
+        "topTitle": "USA Stock For airpods pro3 nd generation new Air pods 4 pros Bluetooth earphones ANC Wireless Headphones Earbuds Noise C",
+        "topBrand": "apple",
+        "topModel": "airpods pro",
+        "topProductType": "premium-earbuds",
+        "candidatesConsidered": 45
+      },
+      "expected": {
+        "mode": "single_or_list",
+        "brand": "apple",
+        "product_type_any": [
+          "premium-earbuds",
+          "earbuds"
+        ]
+      },
+      "reasons": []
+    },
+    {
+      "query": "AirPods",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "AirPods",
+        "topTitle": "USA Stock AirPods 3rd Gen Bluetooth Earphones - ANC Wireless Noise-Canceling Headphones with Solid Silicone Case for Air",
+        "topBrand": "apple",
+        "topModel": "airpods 3",
+        "topProductType": "earbuds",
+        "candidatesConsidered": 6
+      },
+      "expected": {
+        "mode": "list",
+        "brand": "apple",
+        "product_type_any": [
+          "premium-earbuds",
+          "earbuds"
+        ]
+      },
+      "reasons": []
+    },
+    {
+      "query": "Infinix Hot 40",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "Infinix Hot 40",
+        "topTitle": "INFINIX Hot 60 Pro-X6885 Android Mobile Smart Phone With 128GB+8GB",
+        "topBrand": "infinix",
+        "topModel": "hot 60 pro",
+        "topProductType": "budget-phone",
+        "candidatesConsidered": 14
+      },
+      "expected": {
+        "mode": "single_or_list",
+        "brand": "infinix",
+        "model_contains": "hot"
+      },
+      "reasons": []
+    },
+    {
+      "query": "Samsung phone",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "Samsung phone",
+        "topTitle": "SAMSUNG Galaxy A06-A065F Android Mobile Smart Phone With 64GB+4GB & 128GB+4GB",
+        "topBrand": "samsung",
+        "topModel": "galaxy a06",
+        "topProductType": "budget-phone",
+        "candidatesConsidered": 12
+      },
+      "expected": {
+        "mode": "list",
+        "brand": "samsung",
+        "product_type_any": [
+          "flagship-phone",
+          "budget-phone"
+        ]
+      },
+      "reasons": []
+    },
+    {
+      "query": "phone",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "phone",
+        "topTitle": "Phone I Pro Max 6.7-Inch Android Smartphone - New Model with Advanced Camera and Long Battery Life",
+        "topBrand": null,
+        "topModel": "phone i pro max",
+        "topProductType": "flagship-phone",
+        "candidatesConsidered": 1
+      },
+      "expected": {
+        "mode": "list",
+        "product_type_any": [
+          "flagship-phone",
+          "budget-phone"
+        ]
+      },
+      "reasons": []
+    },
+    {
+      "query": "tv",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "tv",
+        "topTitle": "iTEC 43'' Led Fhd Tv- Usb, Hdmi, Dolby + 1920 * 1080",
+        "topBrand": "itec",
+        "topModel": null,
+        "topProductType": "tv",
+        "candidatesConsidered": 42
+      },
+      "expected": {
+        "mode": "list",
+        "product_type": "tv"
+      },
+      "reasons": []
+    },
+    {
+      "query": "earbuds",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "earbuds",
+        "topTitle": "New Buds 4 Pro ANC True Wireless Earbuds Bluetooth Headphone HiFi Sound Low Latency Noise Cancelling Earphone for Smartp",
+        "topBrand": null,
+        "topModel": "buds 4 pro",
+        "topProductType": "premium-earbuds",
+        "candidatesConsidered": 15
+      },
+      "expected": {
+        "mode": "list",
+        "product_type_any": [
+          "earbuds",
+          "premium-earbuds"
+        ]
+      },
+      "reasons": []
+    },
+    {
+      "query": "iphone case",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "iphone case",
+        "topTitle": "APPLE Iphone 17 Pro Max IOS Mobile Smart Phone With 256GB, 512GB & 1TB",
+        "topBrand": "apple",
+        "topModel": "iphone 17 pro max",
+        "topProductType": "flagship-phone",
+        "candidatesConsidered": 30
+      },
+      "expected": {
+        "mode": "list",
+        "is_accessory": true
+      },
+      "reasons": []
+    },
+    {
+      "query": "Dell laptop 16gb ram",
+      "outcome": "improve",
+      "ok": true,
+      "shadow": {
+        "query": "Dell laptop 16gb ram",
+        "topTitle": "YACOO HL156GW Ultrabook Laptop - 14.1 in FHD 1920x1080 Display, Intel i7 Processor, 16GB RAM, 500GB SSD + 16GB SSD, Nvid",
+        "topBrand": "yacoo",
+        "topModel": "hl156gw",
+        "topProductType": "laptop",
+        "candidatesConsidered": 6
+      },
+      "expected": {
+        "mode": "empty_or_list",
+        "skip_if_not_in_catalog": true
+      },
+      "reasons": []
+    },
+    {
+      "query": "JBL Clip 4",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "JBL Clip 4",
+        "topTitle": "JBL Clip 4 Speaker",
+        "topBrand": "jbl",
+        "topModel": "clip 4",
+        "topProductType": "speaker",
+        "candidatesConsidered": 12
+      },
+      "expected": {
+        "mode": "single_or_list",
+        "brand": "jbl",
+        "product_type": "speaker"
+      },
+      "reasons": []
+    },
+    {
+      "query": "Nike Air Max",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "Nike Air Max",
+        "topTitle": "Nike Air Zoom Pegasus 42 sneakers in white and blue",
+        "topBrand": "nike",
+        "topModel": "air zoom pegasus 42",
+        "topProductType": "sneakers",
+        "candidatesConsidered": 42
+      },
+      "expected": {
+        "mode": "list",
+        "brand": "nike",
+        "product_type": "sneakers"
+      },
+      "reasons": []
+    },
+    {
+      "query": "https://www.jumia.com.ng/samsung-galaxy-a06-128gb-blue-356834.html",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "https://www.jumia.com.ng/samsung-galaxy-a06-128gb-blue-356834.html",
+        "topTitle": "SAMSUNG Galaxy A06-A065F Android Mobile Smart Phone With 64GB+4GB & 128GB+4GB",
+        "topBrand": "samsung",
+        "topModel": "galaxy a06",
+        "topProductType": "budget-phone",
+        "candidatesConsidered": 36
+      },
+      "expected": {
+        "mode": "similar_or_single",
+        "from_url": true,
+        "anchor_brand": "samsung"
+      },
+      "reasons": []
+    },
+    {
+      "query": "https://www.amazon.com/dp/B0CHX1W1XY",
+      "outcome": "improve",
+      "ok": true,
+      "shadow": {
+        "query": "https://www.amazon.com/dp/B0CHX1W1XY",
+        "topTitle": "Alexa Echo Show 8 3rd Gen - Black",
+        "topBrand": "amazon",
+        "topModel": "echo show 8",
+        "topProductType": "tablet",
+        "candidatesConsidered": 4
+      },
+      "expected": {
+        "mode": "similar_or_empty",
+        "from_url": true
+      },
+      "reasons": []
+    },
+    {
+      "query": "wireless earbuds",
+      "outcome": "pass",
+      "ok": true,
+      "shadow": {
+        "query": "wireless earbuds",
+        "topTitle": "New Buds 4 Pro ANC True Wireless Earbuds Bluetooth Headphone HiFi Sound Low Latency Noise Cancelling Earphone for Smartp",
+        "topBrand": null,
+        "topModel": "buds 4 pro",
+        "topProductType": "premium-earbuds",
+        "candidatesConsidered": 27
+      },
+      "expected": {
+        "mode": "list",
+        "product_type_any": [
+          "earbuds",
+          "premium-earbuds"
+        ]
+      },
+      "reasons": []
+    },
+    {
+      "query": "Xbox Series X",
+      "outcome": "improve",
+      "ok": true,
+      "shadow": {
+        "query": "Xbox Series X",
+        "topTitle": null,
+        "topBrand": null,
+        "topModel": null,
+        "topProductType": null,
+        "candidatesConsidered": 0
+      },
+      "expected": {
+        "mode": "empty_or_list",
+        "skip_if_not_in_catalog": true
+      },
+      "reasons": [
+        "empty — acceptable (not in catalog)"
+      ]
+    },
+    {
+      "query": "smart watch under 50000",
+      "outcome": "regress",
+      "ok": false,
+      "shadow": {
+        "query": "smart watch under 50000",
+        "topTitle": "Aude Mens Skeleton Watch - 40MM Automatic Waterproof Wristwatch with Sapphire Glass - Stainless Steel or Rubber Strap",
+        "topBrand": "aude",
+        "topModel": "skeleton watch",
+        "topProductType": "watch",
+        "candidatesConsidered": 9
+      },
+      "expected": {
+        "mode": "list",
+        "product_type": "smartwatch"
+      },
+      "reasons": [
+        "type: expected smartwatch, got watch"
+      ]
+    },
+    {
+      "query": "fridge",
+      "outcome": "improve",
+      "ok": true,
+      "shadow": {
+        "query": "fridge",
+        "topTitle": null,
+        "topBrand": null,
+        "topModel": null,
+        "topProductType": null,
+        "candidatesConsidered": 0
+      },
+      "expected": {
+        "mode": "empty_or_list",
+        "skip_if_not_in_catalog": true
+      },
+      "reasons": [
+        "empty — acceptable (not in catalog)"
+      ]
+    },
+    {
+      "query": "asdfghjkl nonsense",
+      "outcome": "improve",
+      "ok": true,
+      "shadow": {
+        "query": "asdfghjkl nonsense",
+        "topTitle": null,
+        "topBrand": null,
+        "topModel": null,
+        "topProductType": null,
+        "candidatesConsidered": 0
+      },
+      "expected": {
+        "mode": "empty"
+      },
+      "reasons": []
+    }
+  ]
+}

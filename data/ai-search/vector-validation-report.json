@@ -1,0 +1,199 @@
+{
+  "summary": {
+    "total": 25,
+    "passed": 23,
+    "failed": 2,
+    "passRate": 92
+  },
+  "details": [
+    {
+      "query": "iPhone 15 Pro Max",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "APPLE Iphone 17 Pro Max IOS Mobile Smart Phone With 256GB, 512GB & 1TB",
+      "mode": "list"
+    },
+    {
+      "query": "Galaxy A06",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "SAMSUNG Galaxy A06-A065F Android Mobile Smart Phone With 64GB+4GB & 128GB+4GB",
+      "mode": "single"
+    },
+    {
+      "query": "Galaxy A06 128GB",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "SAMSUNG Galaxy A06-A065F Android Mobile Smart Phone With 64GB+4GB & 128GB+4GB",
+      "mode": "single"
+    },
+    {
+      "query": "Hisense 50 inch TV",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "Hisense Tv Hd 43 Inch A5200",
+      "mode": "list"
+    },
+    {
+      "query": "PlayStation 5",
+      "outcome": "pass",
+      "reasons": [
+        "empty — ok (not in catalog)"
+      ],
+      "topTitle": "(empty)",
+      "mode": "empty"
+    },
+    {
+      "query": "Tecno Spark 30",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "TECNO Spark 40C-KM4K Android Mobile Smart Phone With 128GB+4GB",
+      "mode": "list"
+    },
+    {
+      "query": "MacBook Pro M3",
+      "outcome": "pass",
+      "reasons": [
+        "empty — ok (not in catalog)"
+      ],
+      "topTitle": "(empty)",
+      "mode": "empty"
+    },
+    {
+      "query": "AirPods Pro",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "USA Stock For airpods pro3 nd generation new Air pods 4 pros Bluetooth earphones ANC Wireless Headphones Earbuds Noise C",
+      "mode": "single"
+    },
+    {
+      "query": "AirPods",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "USA Stock For airpods pro3 nd generation new Air pods 4 pros Bluetooth earphones ANC Wireless Headphones Earbuds Noise C",
+      "mode": "single"
+    },
+    {
+      "query": "Infinix Hot 40",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "Infinix Hot 50 X6882b- 6.7\"-256gb Rom - 8gb Ram - 50",
+      "mode": "list"
+    },
+    {
+      "query": "Samsung phone",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "SAMSUNG Galaxy A17-A175F Android Mobile Smart Phone With 128GB+4GB, 128GB+6GB & 256GB+8GB",
+      "mode": "list"
+    },
+    {
+      "query": "phone",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "Phone I Pro Max 6.7-Inch Android Smartphone - New Model with Advanced Camera and Long Battery Life",
+      "mode": "list"
+    },
+    {
+      "query": "tv",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "iTEC 43'' Led Fhd Tv- Usb, Hdmi, Dolby + 1920 * 1080",
+      "mode": "list"
+    },
+    {
+      "query": "earbuds",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "studio buds Bluetooth Wireless Earbuds - True Wireless Stereo In-Ear Headphones with Noise Reduction for Sports and Musi",
+      "mode": "list"
+    },
+    {
+      "query": "iphone case",
+      "outcome": "fail",
+      "reasons": [
+        "expected accessory result, got \"USA EU stock Top Quality For Apple Airpods Pro 2 3\""
+      ],
+      "topTitle": "USA EU stock Top Quality For Apple Airpods Pro 2 3 2nd gen Air 2 3 4 Earphones Air 4 Bluetooth Headphone Accessories Sil",
+      "mode": "list"
+    },
+    {
+      "query": "Dell laptop 16gb ram",
+      "outcome": "pass",
+      "reasons": [
+        "empty — ok (not in catalog)"
+      ],
+      "topTitle": "(empty)",
+      "mode": "empty"
+    },
+    {
+      "query": "JBL Clip 4",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "Jbl Clip 4 - Mini Bluetooth Speaker - Big Audio And",
+      "mode": "single"
+    },
+    {
+      "query": "Nike Air Max",
+      "outcome": "fail",
+      "reasons": [
+        "type: expected sneakers, inferred null from \"Nike Sportswear Max 90 Club wash T-shirt in pink\""
+      ],
+      "topTitle": "Nike Sportswear Max 90 Club wash T-shirt in pink",
+      "mode": "list"
+    },
+    {
+      "query": "https://www.jumia.com.ng/samsung-galaxy-a06-128gb-blue-356834.html",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "SAMSUNG Galaxy A06-A065F Android Mobile Smart Phone With 64GB+4GB & 128GB+4GB",
+      "mode": "list"
+    },
+    {
+      "query": "https://www.amazon.com/dp/B0CHX1W1XY",
+      "outcome": "pass",
+      "reasons": [
+        "url query — any result ok"
+      ],
+      "topTitle": "Amazon Echo Dot Max - Purple",
+      "mode": "list"
+    },
+    {
+      "query": "wireless earbuds",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "studio buds Bluetooth Wireless Earbuds - True Wireless Stereo In-Ear Headphones with Noise Reduction for Sports and Musi",
+      "mode": "list"
+    },
+    {
+      "query": "Xbox Series X",
+      "outcome": "pass",
+      "reasons": [
+        "empty — ok (not in catalog)"
+      ],
+      "topTitle": "(empty)",
+      "mode": "empty"
+    },
+    {
+      "query": "smart watch under 50000",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "Man Battery Sports Smartwatches - Vintage 70s Retro-Futuristic LED Digital Watches - Flip Design Filp 26N0105",
+      "mode": "list"
+    },
+    {
+      "query": "fridge",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "Hisense Single Door Refrigerator - Ref093 - 90l - 57",
+      "mode": "list"
+    },
+    {
+      "query": "asdfghjkl nonsense",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "(empty)",
+      "mode": "empty"
+    }
+  ]
+}
