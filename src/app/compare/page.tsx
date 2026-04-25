@@ -128,9 +128,9 @@ function CompareContent() {
       {/* ── Sniff loading ── */}
       {sniffLoading && (
         <div className="mt-8 max-w-lg mx-auto flex items-center gap-3 px-5 py-4 rounded-2xl
-                        border border-white/[0.08] bg-white/[0.02]">
-          <span className="w-4 h-4 rounded-full border-2 border-white/10 border-t-white/60 animate-spin shrink-0" />
-          <p className="text-sm text-slate-400">Analysing link…</p>
+                        border border-border bg-surface-2">
+          <span className="w-4 h-4 rounded-full border-2 border-border border-t-brand animate-spin shrink-0" />
+          <p className="text-sm text-ink-2">Analysing link…</p>
         </div>
       )}
 
@@ -138,7 +138,7 @@ function CompareContent() {
       {sniffResult && !sniffLoading && (
         <div className={`mt-8 max-w-lg mx-auto flex items-center gap-4 px-5 py-4 rounded-2xl border ${
           sniffResult.ok
-            ? "border-emerald-500/20 bg-emerald-500/[0.03]"
+            ? "border-success/20 bg-success/[0.03]"
             : "border-amber-500/20 bg-amber-500/[0.02]"
         }`}>
           {sniffResult.ok && sniffResult.imageUrl && (
@@ -154,14 +154,14 @@ function CompareContent() {
           <div className="flex-1 min-w-0">
             {sniffResult.ok ? (
               <>
-                <p className="text-[11px] text-emerald-400/70 mb-0.5">
+                <p className="text-[11px] text-success/70 mb-0.5">
                   Found on {sniffResult.store}
                 </p>
-                <p className="text-sm font-medium text-white line-clamp-2">
+                <p className="text-sm font-medium text-ink line-clamp-2">
                   {sniffResult.title}
                 </p>
                 {sniffResult.price != null && sniffResult.currency && (
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-ink-2 mt-0.5">
                     {sniffResult.currency === "NGN"
                       ? formatNaira(sniffResult.price)
                       : `${sniffResult.currency} ${sniffResult.price.toLocaleString()}`}
@@ -176,7 +176,7 @@ function CompareContent() {
             )}
           </div>
           {sniffResult.ok ? (
-            <CheckCircle size={18} className="text-emerald-400 shrink-0" />
+            <CheckCircle size={18} className="text-success shrink-0" />
           ) : (
             <AlertCircle size={16} className="text-amber-400 shrink-0" />
           )}
@@ -202,91 +202,98 @@ function CompareContent() {
 
       {/* ── SIMILAR — anchor product + cheaper alternatives ── */}
       {!loading && result?.mode === "similar" && (
-        <div className="mt-10">
+        <div className="mt-8 sm:mt-10">
           {/* Anchor hero card */}
-          <div className="relative max-w-3xl mx-auto mb-10">
-            <div className="relative p-5 sm:p-6 rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.04] to-white/[0.01]
-                          overflow-hidden">
-              {/* Subtle glow */}
-              <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-emerald-500/[0.06] blur-3xl pointer-events-none" />
+          <div className="relative max-w-3xl mx-auto mb-8 sm:mb-10">
+            <div className="relative rounded-2xl border border-border bg-surface p-4 sm:p-6 overflow-hidden">
 
-              <div className="relative flex items-start gap-4 sm:gap-5">
-                {/* Image */}
+              <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
+                {/* Image — full-width on mobile, square on sm+ */}
                 {result.anchor.imageUrl ? (
-                  <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-xl overflow-hidden flex-shrink-0 bg-white">
-                    <img src={result.anchor.imageUrl} alt={result.anchor.title}
-                         className="w-full h-full object-contain p-2" />
+                  <div className="w-full sm:w-28 h-40 sm:h-28 rounded-xl overflow-hidden flex-shrink-0 bg-white">
+                    <img
+                      src={result.anchor.imageUrl}
+                      alt={result.anchor.title}
+                      className="w-full h-full object-contain p-2"
+                    />
                   </div>
                 ) : (
-                  <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-xl flex items-center justify-center text-3xl flex-shrink-0"
-                       style={{ background: result.anchor.imageGradient }}>
+                  <div
+                    className="w-full sm:w-28 h-40 sm:h-28 rounded-xl flex items-center justify-center text-3xl flex-shrink-0"
+                    style={{ background: result.anchor.imageGradient }}
+                  >
                     {result.anchor.imageEmoji}
                   </div>
                 )}
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-white/[0.06] px-2 py-0.5 rounded">
+                <div className="flex-1 min-w-0 w-full">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-ink-2 bg-surface-2 px-2 py-0.5 rounded">
                       Your pick
                     </span>
                     {result.anchor.brand && (
-                      <span className="text-[10px] uppercase tracking-wider text-slate-500">
+                      <span className="text-[10px] uppercase tracking-wider text-ink-3">
                         {result.anchor.brand}
                       </span>
                     )}
                   </div>
-                  <h2 className="text-base sm:text-lg font-semibold text-white leading-snug line-clamp-2">
+                  <h2 className="text-[15px] sm:text-lg font-semibold text-ink leading-snug line-clamp-2">
                     {result.anchor.title}
                   </h2>
-                  <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-2">
-                    <span className="text-lg sm:text-xl font-bold text-white">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
+                    <span className="text-lg sm:text-xl font-bold text-ink">
                       {formatNaira(result.anchor.bestPrice)}
                     </span>
                   </div>
 
-                  {/* Anchor store links */}
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {result.anchor.offers.slice(0, 4).map((offer, i) => (
-                      <a
-                        key={`${offer.storeId}-${offer.price}`}
-                        href={offer.url}
-                        target="_blank"
-                        rel="noopener noreferrer sponsored"
-                        onClick={() => trackClick(result.anchor.key, query, i, "similar-anchor")}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium
-                                   border border-white/[0.08] hover:border-white/20 hover:bg-white/[0.04] transition-all text-slate-400 hover:text-white"
-                      >
-                        <div className="w-4 h-4 rounded overflow-hidden shrink-0 bg-white/[0.08]">
-                          <Image src={offer.storeLogoUrl} alt={offer.storeName} width={16} height={16} className="object-contain"
-                                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-                        </div>
-                        {offer.storeName}
-                        {offer.isInternational && offer.landedCostExtra > 0 && (
-                          <span className="flex items-center gap-0.5 text-amber-400/80">
-                            <Plane size={8} />
-                          </span>
-                        )}
-                        <ExternalLink size={9} className="text-slate-600" />
-                      </a>
-                    ))}
+                  {/* Store chips — horizontally scroll on mobile, no awkward wraps */}
+                  <div className="-mx-4 sm:mx-0 mt-3">
+                    <div className="flex gap-1.5 overflow-x-auto no-scrollbar px-4 sm:px-0 sm:flex-wrap">
+                      {result.anchor.offers.slice(0, 4).map((offer, i) => (
+                        <a
+                          key={`${offer.storeId}-${offer.price}`}
+                          href={offer.url}
+                          target="_blank"
+                          rel="noopener noreferrer sponsored"
+                          onClick={() => trackClick(result.anchor.key, query, i, "similar-anchor")}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-border hover:border-border-strong hover:bg-surface-2 transition-all text-ink-2 hover:text-ink shrink-0 whitespace-nowrap"
+                        >
+                          <div className="w-4 h-4 rounded overflow-hidden shrink-0 bg-surface-2">
+                            <Image
+                              src={offer.storeLogoUrl}
+                              alt={offer.storeName}
+                              width={16}
+                              height={16}
+                              className="object-contain"
+                              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                            />
+                          </div>
+                          {offer.storeName}
+                          {offer.isInternational && offer.landedCostExtra > 0 && (
+                            <Plane size={9} className="text-amber-500" />
+                          )}
+                          <ExternalLink size={10} className="text-ink-3" />
+                        </a>
+                      ))}
+                    </div>
                   </div>
 
                   {result.dupes.length > 0 && result.dupes[0].savingsPercent > 0 && (
-                    <p className="mt-3 text-xs text-emerald-400/80">
-                      We found alternatives starting at {formatNaira(result.dupes.reduce((min, d) => Math.min(min, d.bestPrice), Infinity))}
+                    <p className="mt-3 text-xs text-success font-medium">
+                      Alternatives from {formatNaira(result.dupes.reduce((min, d) => Math.min(min, d.bestPrice), Infinity))}
                     </p>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Connector line */}
+            {/* Connector */}
             {result.dupes.length > 0 && (
               <div className="flex flex-col items-center mt-5 mb-2">
-                <div className="w-px h-6 bg-gradient-to-b from-white/10 to-emerald-500/30" />
-                <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                  <ArrowDown size={12} className="text-emerald-400" />
-                  <span className="text-xs font-medium text-emerald-400">
+                <div className="w-px h-6 bg-border" />
+                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-success/10 border border-success/20">
+                  <ArrowDown size={12} className="text-success" />
+                  <span className="text-xs font-semibold text-success">
                     {result.dupes.length} alternative{result.dupes.length > 1 ? "s" : ""} found
                   </span>
                 </div>
@@ -296,17 +303,31 @@ function CompareContent() {
 
           {/* Dupes grid */}
           {result.dupes.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-              {result.dupes.map((dupe, i) => (
-                <DupeCard key={dupe.key} dupe={dupe} rank={i} query={query} mode="similar" />
-              ))}
-            </div>
+            <>
+              <div className="max-w-3xl mx-auto mb-5 sm:mb-6 px-1">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-bold text-ink tracking-[-0.02em]">
+                      Cheaper alternatives
+                    </h3>
+                    <p className="text-xs sm:text-sm text-ink-2 mt-0.5">
+                      Sorted by best value, ranked across {result.dupes.reduce((acc, d) => acc + d.offers.length, 0)} offers.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                {result.dupes.map((dupe, i) => (
+                  <DupeCard key={dupe.key} dupe={dupe} rank={i} query={query} mode="similar" />
+                ))}
+              </div>
+            </>
           ) : (
             <div className="text-center py-12">
               <div className="max-w-sm mx-auto">
-                <SearchX size={28} className="text-slate-600 mx-auto mb-3" strokeWidth={1.5} />
-                <p className="text-sm text-white font-medium mb-1">No alternatives found</p>
-                <p className="text-xs text-slate-500">
+                <SearchX size={28} className="text-ink-3 mx-auto mb-3" strokeWidth={1.5} />
+                <p className="text-sm text-ink font-medium mb-1">No alternatives found</p>
+                <p className="text-xs text-ink-3">
                   We couldn&apos;t find similar products at a lower price. Try a different
                   product or a broader search like &quot;earbuds&quot; or &quot;laptop&quot;.
                 </p>
@@ -320,9 +341,9 @@ function CompareContent() {
       {!loading && result?.mode === "empty" && query && (
         <div className="mt-16">
           <div className="max-w-md mx-auto text-center mb-10">
-            <SearchX size={28} className="text-slate-600 mx-auto mb-3" strokeWidth={1.5} />
-            <h3 className="text-base font-medium text-white mb-1">No matches for &ldquo;{query}&rdquo;</h3>
-            <p className="text-sm text-slate-500">
+            <SearchX size={28} className="text-ink-3 mx-auto mb-3" strokeWidth={1.5} />
+            <h3 className="text-base font-medium text-ink mb-1">No matches for &ldquo;{query}&rdquo;</h3>
+            <p className="text-sm text-ink-3">
               Try a broader or different search term — e.g. just the brand or category.
             </p>
           </div>
@@ -336,7 +357,7 @@ export default function ComparePage() {
   return (
     <Suspense fallback={
       <div className="max-w-7xl mx-auto px-4 py-12 flex items-center justify-center">
-        <div className="w-6 h-6 rounded-full border-2 border-white/10 border-t-white animate-spin" />
+        <div className="w-6 h-6 rounded-full border-2 border-border border-t-brand animate-spin" />
       </div>
     }>
       <CompareContent />

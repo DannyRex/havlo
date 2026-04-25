@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { TrendingDown, Minus, ExternalLink, Plane } from "lucide-react";
+import { TrendingDown, ExternalLink, Plane, ChevronDown } from "lucide-react";
+import { useState } from "react";
 import { formatNaira } from "@/lib/utils";
 import { trackClick } from "@/lib/trackClick";
 import type { DupeResult } from "@/lib/search";
@@ -18,48 +19,40 @@ export default function DupeCard({
   mode?: string;
 }) {
   const hasSavings = dupe.savingsPercent > 0;
-  const savingsColor =
-    dupe.savingsPercent >= 60
-      ? "from-emerald-400 to-green-300"
-      : dupe.savingsPercent >= 30
-        ? "from-emerald-400 to-teal-300"
-        : "from-teal-400 to-cyan-300";
-
-  // Best (cheapest) offer for primary CTA
   const bestOffer = dupe.offers[0];
+  const extraStores = dupe.offers.length - 1;
+  const [showAll, setShowAll] = useState(false);
+  const visibleOffers = showAll ? dupe.offers : dupe.offers.slice(0, 1);
 
   return (
-    <div
-      className="group relative flex flex-col rounded-2xl border border-white/[0.06] bg-white/[0.02]
-                 hover:border-white/[0.14] hover:bg-white/[0.04] transition-all duration-300
-                 hover:-translate-y-1 hover:shadow-[0_8px_32px_rgba(0,200,150,0.08)] overflow-hidden"
-      style={{ animationDelay: `${rank * 60}ms` }}
-    >
-      {/* Savings / similar-price ribbon */}
-      <div className="absolute top-3 right-3 z-10">
-        {hasSavings ? (
-          <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-navy-900
-                          bg-gradient-to-r ${savingsColor} shadow-lg`}>
-            <TrendingDown size={11} strokeWidth={2.5} />
-            {dupe.savingsPercent}% less
-          </div>
-        ) : (
-          <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold
-                          bg-white/10 text-slate-300 backdrop-blur-sm">
-            <Minus size={11} strokeWidth={2.5} />
-            Similar price
-          </div>
-        )}
-      </div>
+    <div className="group relative flex flex-col rounded-2xl border border-border bg-surface overflow-hidden hover:border-border-strong hover:-translate-y-0.5 hover:shadow-card transition-all duration-200">
 
-      {/* Image */}
+      {/* Savings badge — perfect circle, top-right, on the image */}
+      {hasSavings && (
+        <div
+          className="absolute top-2.5 right-2.5 z-10 w-12 h-12 sm:w-14 sm:h-14 rounded-full flex flex-col items-center justify-center text-white select-none"
+          style={{
+            background: "#16a34a",
+            boxShadow: "0 4px 12px rgba(22,163,74,0.35), 0 0 0 3px rgba(255,255,255,0.85)",
+          }}
+        >
+          <span className="text-[14px] sm:text-[17px] font-black leading-none tracking-tight">
+            −{dupe.savingsPercent}%
+          </span>
+          <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.1em] mt-0.5 opacity-90">
+            less
+          </span>
+        </div>
+      )}
+
+      {/* Image — square, edge-to-edge */}
       <div className="relative w-full aspect-square overflow-hidden bg-white">
         {dupe.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={dupe.imageUrl}
             alt={dupe.title}
-            className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-contain p-3 group-hover:scale-[1.04] transition-transform duration-500"
           />
         ) : (
           <div
@@ -71,69 +64,96 @@ export default function DupeCard({
         )}
       </div>
 
-      {/* Content */}
-      <div className="flex-1 flex flex-col p-4">
-        <p className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">
+      {/* Caption */}
+      <div className="flex-1 flex flex-col px-3.5 pt-3 pb-3.5">
+        <p className="text-[10px] uppercase tracking-[0.08em] text-ink-3 font-semibold">
           {dupe.brand ?? dupe.category}
         </p>
-        <h3 className="mt-1 text-sm font-semibold text-white leading-snug line-clamp-2">
+        <h3 className="mt-1 text-sm font-semibold text-ink leading-snug line-clamp-2 tracking-[-0.005em]">
           {dupe.title}
         </h3>
 
-        <div className="mt-auto pt-3">
-          {/* Price */}
-          <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold text-white">
-              {formatNaira(dupe.bestPrice)}
+        {/* Price + savings line */}
+        <div className="mt-2.5 flex items-baseline gap-2">
+          <span className="text-base font-bold text-ink">
+            {formatNaira(dupe.bestPrice)}
+          </span>
+          {hasSavings && (
+            <span className="text-[11px] text-success font-semibold">
+              save {formatNaira(dupe.savingsVsAnchor)}
             </span>
-          </div>
-          {/* Savings line */}
-          {hasSavings ? (
-            <p className="mt-1 text-xs text-emerald-400/90 font-medium">
-              Save {formatNaira(dupe.savingsVsAnchor)}
-            </p>
-          ) : (
-            <p className="mt-1 text-xs text-slate-500">
-              Alternative option
-            </p>
           )}
         </div>
-      </div>
 
-      {/* Store links — direct to product pages */}
-      <div className="px-4 pb-4 pt-0 space-y-1.5">
-        {dupe.offers.slice(0, 3).map((offer) => (
+        {/* Primary store CTA — best (cheapest) offer prominent */}
+        {bestOffer && (
           <a
-            key={`${offer.storeId}-${offer.price}`}
-            href={offer.url}
+            href={bestOffer.url}
             target="_blank"
             rel="noopener noreferrer sponsored"
             onClick={() => trackClick(dupe.key, query, rank, mode)}
-            className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-white/[0.06]
-                       hover:border-white/[0.15] hover:bg-white/[0.04] transition-all text-xs group/link"
+            className="mt-3 inline-flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-ink text-bg text-xs font-semibold hover:opacity-90 transition-opacity"
           >
-            <div className="w-5 h-5 rounded flex items-center justify-center bg-white/[0.08] shrink-0 overflow-hidden">
-              <Image src={offer.storeLogoUrl} alt={offer.storeName} width={16} height={16}
-                     className="object-contain"
-                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-            </div>
-            <span className="text-slate-400 truncate flex-1">{offer.storeName}</span>
-            <div className="text-right shrink-0">
-              <span className="font-semibold text-white">{formatNaira(offer.price)}</span>
-              {offer.isInternational && offer.landedCostExtra > 0 && (
-                <div className="flex items-center gap-0.5 text-[9px] text-amber-400/80">
-                  <Plane size={8} />
-                  <span>+{formatNaira(offer.landedCostExtra)} landed</span>
-                </div>
+            <span className="inline-flex items-center gap-1.5 min-w-0">
+              <span className="w-4 h-4 rounded overflow-hidden bg-white shrink-0 flex items-center justify-center">
+                <Image
+                  src={bestOffer.storeLogoUrl}
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="object-contain"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                />
+              </span>
+              <span className="truncate">View on {bestOffer.storeName}</span>
+              {bestOffer.isInternational && bestOffer.landedCostExtra > 0 && (
+                <Plane size={11} className="text-amber-300 shrink-0" />
               )}
-            </div>
-            <ExternalLink size={10} className="text-slate-600 group-hover/link:text-brand-400 shrink-0 transition-colors" />
+            </span>
+            <ExternalLink size={12} className="shrink-0 opacity-80" />
           </a>
-        ))}
-        {dupe.offers.length > 3 && (
-          <p className="text-center text-[10px] text-slate-600">
-            +{dupe.offers.length - 3} more store{dupe.offers.length - 3 > 1 ? "s" : ""}
-          </p>
+        )}
+
+        {/* Other offers — collapsible */}
+        {extraStores > 0 && (
+          <div className="mt-2">
+            {!showAll ? (
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                className="w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors"
+              >
+                +{extraStores} more store{extraStores > 1 ? "s" : ""}
+                <ChevronDown size={12} />
+              </button>
+            ) : (
+              <div className="space-y-1">
+                {visibleOffers.slice(1).map((offer) => (
+                  <a
+                    key={`${offer.storeId}-${offer.price}`}
+                    href={offer.url}
+                    target="_blank"
+                    rel="noopener noreferrer sponsored"
+                    onClick={() => trackClick(dupe.key, query, rank, mode)}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border hover:border-border-strong hover:bg-surface-2 transition-colors text-[11px]"
+                  >
+                    <div className="w-4 h-4 rounded overflow-hidden bg-surface-2 shrink-0 flex items-center justify-center">
+                      <Image
+                        src={offer.storeLogoUrl}
+                        alt=""
+                        width={16}
+                        height={16}
+                        className="object-contain"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                      />
+                    </div>
+                    <span className="text-ink-2 truncate flex-1">{offer.storeName}</span>
+                    <span className="font-semibold text-ink tabular-nums">{formatNaira(offer.price)}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

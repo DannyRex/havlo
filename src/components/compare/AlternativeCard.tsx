@@ -11,11 +11,11 @@ export default function AlternativeCard({ alt }: Props) {
   const isCheaper = alt.savingsPercent > 0;
 
   return (
-    <div className="glass rounded-2xl overflow-hidden border border-white/[0.06]
-                    hover:border-white/[0.14] transition-all duration-300 hover:-translate-y-1 group">
+    <div className="card rounded-2xl overflow-hidden border border-border
+                    hover:border-border-strong transition-all duration-300 hover:-translate-y-1 group">
 
       {/* Image */}
-      <div className="h-28 sm:h-32 flex items-center justify-center relative border-b border-white/[0.04] overflow-hidden"
+      <div className="h-28 sm:h-32 flex items-center justify-center relative border-b border-border overflow-hidden"
            style={{ background: alt.imageGradient }}>
         {alt.imageUrl ? (
           <img src={alt.imageUrl} alt={alt.title}
@@ -42,18 +42,18 @@ export default function AlternativeCard({ alt }: Props) {
 
       {/* Content */}
       <div className="p-4">
-        <p className="text-[11px] text-slate-600 mb-0.5">{alt.brand}</p>
-        <h3 className="text-sm font-bold text-white mb-2 line-clamp-2 group-hover:text-brand-400 transition-colors leading-snug">
+        <p className="text-[11px] text-ink-3 mb-0.5">{alt.brand}</p>
+        <h3 className="text-sm font-bold text-ink mb-2 line-clamp-2 group-hover:text-brand transition-colors leading-snug">
           {alt.title}
         </h3>
 
         {/* Price range */}
         <div className="mb-3">
-          <span className="text-lg font-black text-white">
+          <span className="text-lg font-black text-ink">
             {formatNaira(alt.priceRange.min)}
           </span>
           {alt.priceRange.max !== alt.priceRange.min && (
-            <span className="text-xs text-slate-600 ml-1">
+            <span className="text-xs text-ink-3 ml-1">
               – {formatNaira(alt.priceRange.max)}
             </span>
           )}
@@ -63,14 +63,14 @@ export default function AlternativeCard({ alt }: Props) {
         <div className="flex flex-wrap gap-1.5 mb-3">
           {alt.tags.slice(0, 3).map((tag) => (
             <span key={tag}
-                  className="text-[11px] px-2 py-0.5 rounded-md text-slate-400 bg-white/[0.05] border border-white/[0.06]">
+                  className="text-[11px] px-2 py-0.5 rounded-md text-ink-2 bg-surface-2 border border-border">
               {tag}
             </span>
           ))}
         </div>
 
         {/* Store info */}
-        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mb-3">
+        <div className="flex items-center gap-1.5 text-[11px] text-ink-3 mb-3">
           <Store size={11} />
           From {alt.topStore} · {alt.storeCount} stores
         </div>
@@ -79,7 +79,7 @@ export default function AlternativeCard({ alt }: Props) {
         <Link
           href={`/compare?q=${encodeURIComponent(alt.title)}`}
           className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-semibold
-                     text-white transition-all duration-200 hover:bg-white/[0.12]"
+                     text-ink transition-all duration-200 hover:bg-surface-2"
           style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)" }}
         >
           Compare prices

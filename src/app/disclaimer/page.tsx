@@ -3,15 +3,15 @@ import LegalPage from "@/components/legal/LegalPage";
 
 const sections = [
   {
-    title: "Dealesty is not the seller",
+    title: "Havlo is not the seller",
     paragraphs: [
-      "Dealesty is an independent comparison and deal-discovery platform. We help you find offers, but we do not sell the products listed and we do not fulfill orders on behalf of retailers.",
+      "Havlo is an independent comparison and deal-discovery platform. We help you find offers, but we do not sell the products listed and we do not fulfill orders on behalf of retailers.",
     ],
   },
   {
     title: "Prices can change quickly",
     paragraphs: [
-      "Retailers may change prices, stock levels, delivery charges, or promotional terms at any time. A deal you see on Dealesty may look different by the time you reach the retailer's checkout page.",
+      "Retailers may change prices, stock levels, delivery charges, or promotional terms at any time. A deal you see on Havlo may look different by the time you reach the retailer's checkout page.",
     ],
   },
   {
@@ -23,21 +23,21 @@ const sections = [
   {
     title: "External websites and decisions",
     paragraphs: [
-      "When you leave Dealesty for a third-party site, you do so at your own discretion. Your purchase, payment, delivery, and after-sales support are handled by that retailer, not by Dealesty.",
+      "When you leave Havlo for a third-party site, you do so at your own discretion. Your purchase, payment, delivery, and after-sales support are handled by that retailer, not by Havlo.",
     ],
   },
   {
     title: "No guarantees",
     paragraphs: [
-      "Dealesty aims to be helpful and current, but we cannot guarantee that every listing, price, or product detail will always be complete, available, or error-free.",
+      "Havlo aims to be helpful and current, but we cannot guarantee that every listing, price, or product detail will always be complete, available, or error-free.",
     ],
   },
 ];
 
 export const metadata: Metadata = {
-  title: "Disclaimer | Dealesty",
+  title: "Disclaimer | Havlo",
   description:
-    "Understand the limits of the information on Dealesty and why final product, price, and checkout details should be verified with each retailer.",
+    "Understand the limits of the information on Havlo and why final product, price, and checkout details should be verified with each retailer.",
 };
 
 export default function DisclaimerPage() {
@@ -45,7 +45,7 @@ export default function DisclaimerPage() {
     <LegalPage
       eyebrow="Legal"
       title="Disclaimer"
-      description="Dealesty helps you compare prices and discover deals, but the final transaction always happens with the retailer. This page explains the limits of the information shown on the site."
+      description="Havlo helps you compare prices and discover deals, but the final transaction always happens with the retailer. This page explains the limits of the information shown on the site."
       lastUpdated="18 April 2026"
       sections={sections}
     />

@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: "class",
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -8,93 +9,59 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      colors: {
-        brand: {
-          50:  "#eff6ff",
-          100: "#dbeafe",
-          200: "#bfdbfe",
-          400: "#60a5fa",
-          500: "#3b82f6",
-          600: "#0057FF",
-          700: "#0041CC",
-          800: "#002B99",
-          900: "#001A66",
-        },
-        navy: {
-          900: "#050B18",
-          800: "#0A1428",
-          700: "#0F1E3D",
-          600: "#152652",
-        },
-        deal: {
-          orange: "#FF6B35",
-          red:    "#FF3333",
-          green:  "#00D68F",
-          cyan:   "#00C8FF",
-          yellow: "#FFD600",
-        },
-      },
       fontFamily: {
-        sans:    ['"Helvetica Neue"', "Helvetica", "Arial", "sans-serif"],
-        display: ["var(--font-display)", "Georgia", "serif"],
+        sans: ["var(--font-inter)", "Inter", "system-ui", "-apple-system", "Segoe UI", "Helvetica", "Arial", "sans-serif"],
       },
-      backgroundImage: {
-        "hero-gradient":
-          "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0,87,255,0.35) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 90% 40%, rgba(0,200,255,0.15) 0%, transparent 50%), linear-gradient(180deg, #050B18 0%, #0A1428 100%)",
-        "card-gradient":
-          "linear-gradient(135deg, rgba(15,30,61,0.8) 0%, rgba(10,20,40,0.9) 100%)",
-        "blue-glow":
-          "radial-gradient(ellipse at center, rgba(0,87,255,0.2) 0%, transparent 70%)",
-        "orange-badge":
-          "linear-gradient(135deg, #FF6B35 0%, #FF3333 100%)",
-        "cyan-badge":
-          "linear-gradient(135deg, #00C8FF 0%, #0057FF 100%)",
-        "green-badge":
-          "linear-gradient(135deg, #00D68F 0%, #00A86B 100%)",
+      colors: {
+        // Brand
+        brand: {
+          DEFAULT: "#0057FF",
+          hover:   "#0041CC",
+          subtle:  "rgba(0, 87, 255, 0.08)",
+        },
+        // Semantic surfaces (use bg-bg, bg-surface, etc.)
+        bg:           "rgb(var(--bg-rgb) / <alpha-value>)",
+        surface:      "rgb(var(--surface-rgb) / <alpha-value>)",
+        "surface-2":  "rgb(var(--surface-2-rgb) / <alpha-value>)",
+        border:       "rgb(var(--border-rgb) / <alpha-value>)",
+        "border-strong": "rgb(var(--border-strong-rgb) / <alpha-value>)",
+        // Semantic text
+        ink:          "rgb(var(--ink-rgb) / <alpha-value>)",
+        "ink-2":      "rgb(var(--ink-2-rgb) / <alpha-value>)",
+        "ink-3":      "rgb(var(--ink-3-rgb) / <alpha-value>)",
+        // Status
+        success: { DEFAULT: "#16a34a", subtle: "rgba(22, 163, 74, 0.10)" },
+        danger:  { DEFAULT: "#dc2626", subtle: "rgba(220, 38, 38, 0.10)" },
+        warn:    { DEFAULT: "#ca8a04", subtle: "rgba(202, 138, 4, 0.10)" },
       },
       boxShadow: {
-        "brand-glow": "0 0 40px rgba(0,87,255,0.25)",
-        "card-hover":  "0 20px 60px rgba(0,87,255,0.15)",
-        "deal-card":   "0 4px 24px rgba(0,0,0,0.4)",
+        card:        "0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06)",
+        "card-hover":"0 4px 14px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04)",
+        "brand":     "0 6px 20px rgba(0, 87, 255, 0.20)",
+        "input":     "0 0 0 4px rgba(0, 87, 255, 0.10)",
+      },
+      borderRadius: {
+        xl: "0.875rem",
+        "2xl": "1.25rem",
+        "3xl": "1.75rem",
       },
       animation: {
-        "float":        "float 6s ease-in-out infinite",
-        "float-slow":   "float 9s ease-in-out infinite",
-        "pulse-slow":   "pulse 4s cubic-bezier(0.4,0,0.6,1) infinite",
-        "slide-up":     "slideUp 0.5s ease-out",
-        "fade-in":      "fadeIn 0.6s ease-out",
-        "shimmer":      "shimmer 2s linear infinite",
-        "count-bar":    "countBar 1.2s cubic-bezier(0.22,1,0.36,1) both",
-        "marquee":      "marquee 30s linear infinite",
+        shimmer:  "shimmer 2s linear infinite",
+        "fade-up":"fadeUp 0.5s ease-out both",
+        "fade-in":"fadeIn 0.4s ease-out both",
       },
       keyframes: {
-        float: {
-          "0%, 100%": { transform: "translateY(0px)" },
-          "50%":       { transform: "translateY(-12px)" },
+        shimmer: {
+          "0%":   { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
         },
-        slideUp: {
-          "0%":   { opacity: "0", transform: "translateY(20px)" },
+        fadeUp: {
+          "0%":   { opacity: "0", transform: "translateY(12px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
         fadeIn: {
           "0%":   { opacity: "0" },
           "100%": { opacity: "1" },
-        },
-        shimmer: {
-          "0%":   { backgroundPosition: "-200% 0" },
-          "100%": { backgroundPosition: "200% 0" },
-        },
-        countBar: {
-          "0%":   { transform: "scaleX(0)", opacity: "0" },
-          "100%": { transform: "scaleX(1)", opacity: "1" },
-        },
-        marquee: {
-          "0%":   { transform: "translateX(0)" },
-          "100%": { transform: "translateX(-50%)" },
-        },
-        slideInLeft: {
-          "0%":   { transform: "translateX(-100%)" },
-          "100%": { transform: "translateX(0)" },
         },
       },
     },

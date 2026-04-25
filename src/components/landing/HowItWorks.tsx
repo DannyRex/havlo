@@ -27,23 +27,23 @@ const steps = [
     color: "#FF6B35",
     title: "Buy from the store you trust",
     description:
-      "When you're ready, go straight to the retailer. Dealesty does not sit in the middle of your checkout.",
+      "When you're ready, go straight to the retailer. Havlo does not sit in the middle of your checkout.",
     action: { label: "Compare a product ->", href: "/compare" },
   },
 ];
 
 export default function HowItWorks() {
   return (
-    <section className="py-24 relative overflow-hidden" style={{ background: "var(--navy-800)" }}>
+    <section className="py-24 relative overflow-hidden" style={{ background: "rgb(var(--surface-rgb))" }}>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Header */}
         <AnimateIn variant="slide-left" className="mb-16 max-w-lg">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-[0.1em] mb-4">
+          <p className="text-xs font-semibold text-ink-3 uppercase tracking-[0.1em] mb-4">
             How It Works
           </p>
-          <h2 className="text-4xl sm:text-5xl font-black text-white tracking-[-0.04em] leading-[1.05]">
+          <h2 className="text-4xl sm:text-5xl font-black text-ink tracking-[-0.04em] leading-[1.05]">
             See the spread.{" "}
             <span style={{
               background: "linear-gradient(135deg, #FF6B35 0%, #FFD600 100%)",
@@ -76,8 +76,8 @@ export default function HowItWorks() {
                 </span>
               </div>
 
-              <h3 className="text-lg font-bold text-white mb-3 tracking-[-0.03em]">{title}</h3>
-              <p className="text-sm text-slate-500 leading-relaxed tracking-[-0.01em] mb-5">
+              <h3 className="text-lg font-bold text-ink mb-3 tracking-[-0.03em]">{title}</h3>
+              <p className="text-sm text-ink-3 leading-relaxed tracking-[-0.01em] mb-5">
                 {description}
               </p>
 

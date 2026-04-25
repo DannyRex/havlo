@@ -64,10 +64,10 @@ export default function Features() {
 
       {/* Header */}
       <AnimateIn variant="fade-up" className="mb-16 max-w-xl">
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-[0.1em] mb-4">
-          Why Dealesty
+        <p className="text-xs font-semibold text-ink-3 uppercase tracking-[0.1em] mb-4">
+          Why Havlo
         </p>
-        <h2 className="text-4xl sm:text-5xl font-black text-white tracking-[-0.04em] leading-[1.05]">
+        <h2 className="text-4xl sm:text-5xl font-black text-ink tracking-[-0.04em] leading-[1.05]">
           Know when it's{" "}
           <span style={{
             background: "linear-gradient(135deg, #0057FF 0%, #00C8FF 100%)",
@@ -77,7 +77,7 @@ export default function Features() {
             actually a deal.
           </span>
         </h2>
-        <p className="text-slate-400 text-lg mt-4 leading-relaxed tracking-[-0.01em]">
+        <p className="text-ink-2 text-lg mt-4 leading-relaxed tracking-[-0.01em]">
           Browse when you want inspiration. Compare fast when you already know what you want.
         </p>
       </AnimateIn>
@@ -86,8 +86,8 @@ export default function Features() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {features.map(({ icon: Icon, color, glow, title, description, badge }, i) => (
           <AnimateIn key={title} variant="fade-up" delay={i * 60}>
-          <div className="group relative glass rounded-2xl p-6 border border-white/[0.05]
-                          hover:border-white/[0.10] hover:-translate-y-1
+          <div className="group relative glass rounded-2xl p-6 border border-border
+                          hover:border-border-strong hover:-translate-y-1
                           transition-all duration-300 h-full"
                style={{ boxShadow: "0 2px 16px rgba(0,0,0,0.15)" }}>
 
@@ -108,8 +108,8 @@ export default function Features() {
                 </span>
               </div>
 
-              <h3 className="text-[15px] font-bold text-white mb-2 tracking-[-0.02em]">{title}</h3>
-              <p className="text-sm text-slate-500 leading-relaxed tracking-[-0.01em]">{description}</p>
+              <h3 className="text-[15px] font-bold text-ink mb-2 tracking-[-0.02em]">{title}</h3>
+              <p className="text-sm text-ink-3 leading-relaxed tracking-[-0.01em]">{description}</p>
             </div>
           </div>
           </AnimateIn>

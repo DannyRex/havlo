@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, X, Sparkles, Link2 } from "lucide-react";
+import { Search, X, Sparkles, Link2, ArrowUp } from "lucide-react";
 
 interface Suggestion { title: string; key: string; storeCount: number }
 
@@ -13,10 +13,9 @@ interface Props {
 
 const SUGGESTIONS = [
   "iPhone 15 Pro Max", "Galaxy A06", "Hisense 50 inch TV",
-  "PlayStation 5", "Tecno Spark 30", "MacBook Pro M3", "AirPods Pro",
+  "PlayStation 5", "MacBook Pro M3", "AirPods Pro",
 ];
 
-/** Quick check if input looks like a URL */
 function looksLikeUrl(v: string): boolean {
   const t = v.trim();
   return /^https?:\/\//i.test(t) || /^(www\.|[a-z]+\.(com|ng|co))/i.test(t);
@@ -32,7 +31,6 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
 
   useEffect(() => { setValue(initialQuery); }, [initialQuery]);
 
-  // Debounced autocomplete
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!value.trim() || value.trim().length < 2) {
@@ -47,7 +45,6 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
     }, 180);
   }, [value]);
 
-  // Close dropdown on outside click
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
@@ -75,96 +72,132 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
   };
 
   const isUrlInput = looksLikeUrl(value);
+  const canSubmit = value.trim().length > 0 && !loading;
 
   return (
-    <div className="max-w-2xl mx-auto" ref={wrapRef}>
-      {/* ── Heading ── */}
-      <div className="text-center mb-6">
-        <h1 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight mb-2">
+    <div className="max-w-2xl mx-auto px-1 sm:px-0" ref={wrapRef}>
+      {/* Heading */}
+      <div className="text-center mb-5 sm:mb-6 px-2">
+        <h1 className="text-[24px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight mb-2">
           Find similar products for less
         </h1>
-        <p className="text-sm text-slate-500">
-          Search a product name or paste a link — we&apos;ll find cheaper alternatives.
+        <p className="text-[13px] sm:text-sm text-ink-2">
+          Search a product or paste a link — we&apos;ll find cheaper alternatives.
         </p>
       </div>
 
-      <form onSubmit={(e) => { e.preventDefault(); submit(value); }} className="relative">
-        <div className={`relative flex items-center bg-white/[0.04] border rounded-full transition-colors ${
-          isUrlInput
-            ? "border-brand-500/30 focus-within:border-brand-500/50"
-            : "border-emerald-500/20 focus-within:border-emerald-500/40"
-        }`}>
-          {isUrlInput ? (
-            <Link2 size={16} className="absolute left-4 text-brand-400 pointer-events-none" />
-          ) : (
-            <Search size={16} className="absolute left-4 text-slate-500 pointer-events-none" />
-          )}
+      <form
+        onSubmit={(e) => { e.preventDefault(); submit(value); }}
+        className="relative"
+      >
+        <div
+          className={`relative flex items-center bg-surface border rounded-full transition-all ${
+            isUrlInput
+              ? "border-brand/40 focus-within:border-brand focus-within:shadow-input"
+              : "border-border-strong focus-within:border-brand focus-within:shadow-input"
+          }`}
+        >
+          {/* Left icon */}
+          <div className="absolute left-4 pointer-events-none">
+            {isUrlInput ? (
+              <Link2 size={16} className="text-brand" />
+            ) : (
+              <Search size={16} className="text-ink-3" />
+            )}
+          </div>
+
           <input
             type="text"
             value={value}
             onChange={(e) => { setValue(e.target.value); setOpen(true); setHighlighted(-1); }}
             onFocus={() => setOpen(true)}
             onKeyDown={onKey}
-            placeholder="Search a product or paste a link…"
-            className="flex-1 pl-11 pr-3 py-3.5 bg-transparent text-white placeholder-slate-500 text-base outline-none"
+            placeholder="Search or paste a link…"
+            className="flex-1 min-w-0 pl-11 pr-2 py-3.5 bg-transparent text-ink placeholder:text-ink-3 text-base outline-none"
+            style={{ fontSize: "16px" }}
             autoFocus
           />
+
           {value && (
-            <button type="button" onClick={() => { setValue(""); setSuggestions([]); }}
-                    className="p-2 text-slate-500 hover:text-white">
-              <X size={15} />
+            <button
+              type="button"
+              onClick={() => { setValue(""); setSuggestions([]); }}
+              aria-label="Clear search"
+              className="p-2 text-ink-3 hover:text-ink shrink-0"
+            >
+              <X size={16} />
             </button>
           )}
-          <button type="submit" disabled={!value.trim() || loading}
-                  className={`m-1.5 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-1.5
-                    disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${
-                    isUrlInput
-                      ? "bg-brand-500 text-white hover:bg-brand-400"
-                      : "bg-emerald-500 text-white hover:bg-emerald-400"
-                  }`}>
+
+          {/* Submit button — icon-only on mobile, label on sm+ */}
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            aria-label={isUrlInput ? "Smart switch" : "Find dupes"}
+            className={`m-1.5 shrink-0 inline-flex items-center justify-center gap-1.5 rounded-full text-sm font-semibold transition-all
+              h-10 w-10 sm:h-10 sm:w-auto sm:px-4
+              ${canSubmit
+                ? isUrlInput
+                  ? "bg-brand text-white hover:bg-brand-hover active:scale-95"
+                  : "bg-ink text-bg hover:opacity-90 active:scale-95"
+                : "bg-ink/10 text-ink-3 cursor-not-allowed"}`}
+          >
             {loading ? (
-              <span className="w-4 h-4 rounded-full border-2 border-current/30 border-t-current animate-spin" />
+              <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
             ) : isUrlInput ? (
-              <>Smart switch <Link2 size={14} /></>
+              <>
+                <Link2 size={14} className="sm:hidden" />
+                <span className="hidden sm:inline">Smart switch</span>
+                <Link2 size={14} className="hidden sm:inline" />
+              </>
             ) : (
-              <>Find dupes <Sparkles size={14} /></>
+              <>
+                <ArrowUp size={16} className="sm:hidden" strokeWidth={2.5} />
+                <span className="hidden sm:inline">Find dupes</span>
+                <Sparkles size={14} className="hidden sm:inline" />
+              </>
             )}
           </button>
         </div>
 
-        {/* Autocomplete dropdown */}
         {open && suggestions.length > 0 && (
-          <div className="absolute left-0 right-0 mt-2 bg-navy-800 border border-white/10 rounded-2xl overflow-hidden shadow-xl z-50">
+          <div className="absolute left-0 right-0 mt-2 bg-surface border border-border rounded-2xl overflow-hidden shadow-xl z-50">
             {suggestions.map((s, i) => (
               <button
                 key={s.key}
                 type="button"
                 onMouseDown={(e) => { e.preventDefault(); submit(s.title); }}
                 onMouseEnter={() => setHighlighted(i)}
-                className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 text-sm transition-colors ${
-                  highlighted === i ? "bg-white/[0.06]" : "hover:bg-white/[0.04]"
+                className={`w-full text-left px-4 py-3 flex items-center justify-between gap-3 text-sm transition-colors ${
+                  highlighted === i ? "bg-surface-2" : "hover:bg-surface-2"
                 }`}
               >
-                <span className="text-white truncate">{s.title}</span>
-                <span className="text-[11px] text-slate-500 shrink-0">{s.storeCount} store{s.storeCount > 1 ? "s" : ""}</span>
+                <span className="text-ink truncate">{s.title}</span>
+                <span className="text-[11px] text-ink-3 shrink-0">
+                  {s.storeCount} store{s.storeCount > 1 ? "s" : ""}
+                </span>
               </button>
             ))}
           </div>
         )}
       </form>
 
-      <p className="mt-3 text-center text-xs text-slate-500">
+      <p className="mt-3 text-center text-[11px] sm:text-xs text-ink-3 px-4">
         {isUrlInput
-          ? "We\u2019ll identify this product and find cheaper alternatives across stores."
-          : 'Paste a Jumia, Amazon, or AliExpress link — or search by name.'}
+          ? "We'll identify this product and find cheaper alternatives across stores."
+          : "Paste a Jumia, Amazon, or AliExpress link — or search by name."}
       </p>
 
       {!initialQuery && suggestions.length === 0 && (
-        <div className="mt-5 flex flex-wrap justify-center gap-2">
-          <span className="text-xs text-slate-500 self-center mr-1">Try:</span>
+        <div className="mt-5 flex flex-wrap justify-center gap-2 px-2">
+          <span className="text-xs text-ink-3 self-center mr-1">Try:</span>
           {SUGGESTIONS.map((s) => (
-            <button key={s} onClick={() => { setValue(s); submit(s); }}
-                    className="px-3 py-1.5 rounded-full text-xs text-slate-300 border border-white/10 hover:border-white/25 hover:text-white transition-colors">
+            <button
+              key={s}
+              type="button"
+              onClick={() => { setValue(s); submit(s); }}
+              className="px-3 py-1.5 rounded-full text-xs text-ink-2 hover:text-ink bg-surface-2 hover:bg-surface border border-border hover:border-border-strong transition-colors"
+            >
               {s}
             </button>
           ))}

@@ -18,7 +18,7 @@ export default function PriceResults({
   return (
     <div>
       {/* Product header */}
-      <div className="flex items-start gap-4 sm:gap-5 p-4 sm:p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] mb-6">
+      <div className="flex items-start gap-4 sm:gap-5 p-4 sm:p-5 rounded-2xl bg-surface-2 border border-border mb-6">
         {imageUrl ? (
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden flex-shrink-0 bg-white">
             <img src={imageUrl} alt={title} className="w-full h-full object-contain p-2" />
@@ -30,19 +30,19 @@ export default function PriceResults({
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] uppercase tracking-wide text-slate-500">{category}</p>
-          <h2 className="text-base sm:text-lg font-semibold text-white leading-snug mt-0.5 line-clamp-2">{title}</h2>
+          <p className="text-[11px] uppercase tracking-wide text-ink-3">{category}</p>
+          <h2 className="text-base sm:text-lg font-semibold text-ink leading-snug mt-0.5 line-clamp-2">{title}</h2>
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-3">
             <div>
-              <span className="text-[11px] text-slate-500">Best price · </span>
-              <span className="text-lg font-bold text-emerald-400">{formatNaira(bestPrice)}</span>
+              <span className="text-[11px] text-ink-3">Best price · </span>
+              <span className="text-lg font-bold text-success">{formatNaira(bestPrice)}</span>
             </div>
             {maxSavings > 0 && (
-              <div className="text-xs text-slate-400">
-                Save up to <span className="font-semibold text-white">{formatNaira(maxSavings)}</span> vs. highest
+              <div className="text-xs text-ink-2">
+                Save up to <span className="font-semibold text-ink">{formatNaira(maxSavings)}</span> vs. highest
               </div>
             )}
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-ink-3">
               {storeCount} store{storeCount > 1 ? "s" : ""}
             </div>
           </div>
@@ -57,8 +57,8 @@ export default function PriceResults({
           return (
             <a key={`${p.storeId}-${i}`} href={p.url} target="_blank" rel="noopener noreferrer sponsored"
                onClick={() => trackClick(group.key, query, i, mode)}
-               className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border transition-all hover:bg-white/[0.04] ${
-                 isBest ? "border-emerald-500/40 bg-emerald-500/[0.04]" : "border-white/[0.06]"
+               className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border transition-all hover:bg-surface-2 ${
+                 isBest ? "border-success/40 bg-success/[0.04]" : "border-border"
                }`}>
               {/* Rank */}
               <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
@@ -70,7 +70,7 @@ export default function PriceResults({
               </div>
 
               {/* Logo */}
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/[0.06] p-1.5 shrink-0">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-surface-2 p-1.5 shrink-0">
                 <Image src={p.storeLogoUrl} alt={p.storeName} width={28} height={28} className="object-contain"
                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
               </div>
@@ -85,9 +85,9 @@ export default function PriceResults({
               {/* Store info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold text-white">{p.storeName}</span>
+                  <span className="text-sm font-semibold text-ink">{p.storeName}</span>
                   {isBest && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold uppercase tracking-wide">Best</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/20 text-success font-semibold uppercase tracking-wide">Best</span>
                   )}
                   {p.isInternational && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-medium flex items-center gap-1">
@@ -95,24 +95,24 @@ export default function PriceResults({
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-3 mt-0.5 text-[11px] text-slate-500">
+                <div className="flex items-center gap-3 mt-0.5 text-[11px] text-ink-3">
                   <span className="flex items-center gap-1"><Truck size={10} />{p.deliveryDays === 1 ? "Next day" : `~${p.deliveryDays}d`}</span>
                   <span className="flex items-center gap-1"><Star size={10} className="text-yellow-500/70" />{p.rating}</span>
                   {p.discountPercent > 0 && (
-                    <span className="text-emerald-400 font-medium">−{p.discountPercent}%</span>
+                    <span className="text-success font-medium">−{p.discountPercent}%</span>
                   )}
                 </div>
               </div>
 
               {/* Price */}
               <div className="text-right shrink-0">
-                <p className={`text-base sm:text-lg font-bold ${isBest ? "text-emerald-400" : "text-white"}`}>
+                <p className={`text-base sm:text-lg font-bold ${isBest ? "text-success" : "text-ink"}`}>
                   {formatNaira(p.price)}
                 </p>
-                {extra > 0 && <p className="text-[11px] text-slate-500">+{formatNaira(extra)}</p>}
+                {extra > 0 && <p className="text-[11px] text-ink-3">+{formatNaira(extra)}</p>}
               </div>
 
-              <ExternalLink size={14} className="text-slate-500 shrink-0" />
+              <ExternalLink size={14} className="text-ink-3 shrink-0" />
             </a>
           );
         })}

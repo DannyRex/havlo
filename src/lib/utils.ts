@@ -26,6 +26,17 @@ export function formatUSD(amount: number): string {
   }).format(amount);
 }
 
+/**
+ * Compact USD formatter for product cards: rounds to 2dp, drops trailing
+ * zeros so `$7.0000000036` → `$7`, `$7.5` → `$7.50`, `$7.99` → `$7.99`.
+ * Defends against float-precision artifacts from `original - sale` math.
+ */
+export function formatUSDPrice(amount: number): string {
+  const rounded = Math.round(amount * 100) / 100;
+  if (Number.isInteger(rounded)) return `$${rounded}`;
+  return `$${rounded.toFixed(2)}`;
+}
+
 export function usdToNgn(usd: number): number {
   return Math.round(usd * USD_TO_NGN);
 }
@@ -37,7 +48,8 @@ export function formatCompact(amount: number): string {
 }
 
 export function savings(original: number, sale: number): number {
-  return original - sale;
+  // Round to 2dp to defend against float-precision artifacts (e.g. 7.0000…0036)
+  return Math.round((original - sale) * 100) / 100;
 }
 
 export function timeAgo(dateStr: string): string {

@@ -31,8 +31,8 @@ export default function CategoryNav({ active, onChange }: Props) {
               "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm whitespace-nowrap flex-shrink-0",
               "border transition-colors duration-150",
               isActive
-                ? "bg-white text-navy-900 border-white font-medium"
-                : "text-slate-300 border-white/10 hover:text-white hover:border-white/25 bg-transparent",
+                ? "bg-ink text-bg border-ink font-medium"
+                : "text-ink-2 border-border hover:text-ink hover:border-border-strong bg-transparent",
             )}
           >
             <Icon size={14} strokeWidth={2} />

@@ -1,90 +1,166 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, TrendingDown } from "lucide-react";
-import AnimateIn from "@/components/ui/AnimateIn";
+import { useMemo } from "react";
+import { deals } from "@/lib/data/deals";
+
+/* Pick three real product images for the visual — deterministic so SSR matches */
+function pickCollage() {
+  const candidates = deals
+    .filter((d) => d.imageUrl && d.discountPercent >= 20 && d.title.length < 60)
+    .sort((a, b) => a.id.localeCompare(b.id));
+  return candidates.slice(0, 3);
+}
+
+/* Reusable mini product card used in the collage */
+function CollageCard({
+  img, store, title, percent, w, h, rotate, top, left, right, bottom, z, badgeSize,
+}: {
+  img: string; store: string; title: string; percent: number;
+  w: string; h: string; rotate: number;
+  top?: string; left?: string; right?: string; bottom?: string;
+  z?: number; badgeSize?: "sm" | "md" | "lg";
+}) {
+  const sz = badgeSize ?? "md";
+  const badgeWH =
+    sz === "lg" ? "w-14 h-14" : sz === "sm" ? "w-11 h-11" : "w-12 h-12";
+  const numClass =
+    sz === "lg" ? "text-base" : sz === "sm" ? "text-[13px]" : "text-sm";
+  return (
+    <div
+      className={`absolute ${w} ${h} rounded-2xl bg-bg overflow-hidden shadow-2xl pointer-events-auto`}
+      style={{
+        transform: `rotate(${rotate}deg)`,
+        top, left, right, bottom,
+        zIndex: z,
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={img} alt="" className="w-full h-[72%] object-cover" />
+      <div className="px-3.5 py-3">
+        <p className="text-[11px] text-ink-3 truncate">{store}</p>
+        <p className="text-[13px] font-semibold text-ink truncate mt-0.5">{title}</p>
+      </div>
+      <div
+        className={`absolute top-3 right-3 ${badgeWH} rounded-full bg-red-600 text-white flex flex-col items-center justify-center`}
+        style={{ boxShadow: "0 4px 12px rgba(220,38,38,0.4), 0 0 0 3px rgba(255,255,255,0.9)" }}
+      >
+        <span className={`${numClass} font-black leading-none`}>{percent}%</span>
+        <span className="text-[8px] font-bold uppercase tracking-[0.1em] mt-0.5 opacity-90">off</span>
+      </div>
+    </div>
+  );
+}
 
 export default function CTA() {
+  const collage = useMemo(pickCollage, []);
+
   return (
-    <section className="py-24 px-4 sm:px-6 lg:px-8">
-      <AnimateIn variant="scale-in" className="max-w-5xl mx-auto">
+    <section className="py-14 sm:py-24 bg-bg">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        <div className="relative rounded-3xl overflow-hidden border border-white/[0.07]"
-             style={{
-               background: "linear-gradient(135deg, #050B18 0%, #0A1428 50%, #0d1c3a 100%)",
-               boxShadow: "0 0 0 1px rgba(0,87,255,0.12), 0 40px 80px rgba(0,0,0,0.4)",
-             }}>
+        {/* Outer relative wrapper — does NOT clip, lets cards bleed past panel */}
+        <div className="relative">
 
-          {/* Blue glow */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-                          w-[600px] h-[300px] rounded-full blur-[120px] pointer-events-none opacity-40"
-               style={{ background: "radial-gradient(circle, rgba(0,87,255,0.5) 0%, transparent 70%)" }} />
+          {/* Dark panel — clips its own glow, but cards live outside it */}
+          <div className="relative overflow-hidden rounded-[28px] sm:rounded-[36px] bg-ink text-bg lg:min-h-[480px]">
+            {/* Subtle accent — bottom-left */}
+            <div
+              aria-hidden="true"
+              className="absolute -bottom-24 -left-24 w-[360px] h-[360px] rounded-full pointer-events-none"
+              style={{
+                background: "radial-gradient(closest-side, rgba(0,87,255,0.18), transparent 70%)",
+              }}
+            />
 
-          {/* Top-right accent */}
-          <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none"
-               style={{ background: "rgba(0,200,255,0.06)", transform: "translate(30%, -30%)" }} />
+            {/* Left column lives in normal flow */}
+            <div className="relative grid lg:grid-cols-2 items-center">
+              <div className="px-6 py-12 sm:px-12 sm:py-16 lg:py-14 lg:pr-6">
+                <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-bg/60 mb-5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                  Free · No account required
+                </p>
 
-          <div className="relative z-10 px-8 sm:px-16 py-16 lg:py-20">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-
-              {/* Left */}
-              <div>
-                <div className="inline-flex items-center gap-2 mb-6">
-                  <span className="w-1.5 h-1.5 rounded-full bg-deal-green animate-pulse" />
-                  <span className="text-sm font-medium text-slate-400 tracking-[-0.01em]">
-                    Free to use · Direct retailer links
-                  </span>
-                </div>
-
-                <h2 className="text-4xl sm:text-5xl font-black text-white tracking-[-0.04em] leading-[1.05] mb-5">
+                <h2 className="text-[32px] sm:text-5xl font-bold text-bg tracking-[-0.035em] leading-[1.04] mb-5">
                   Before you buy it,
                   <br />
-                  <span style={{
-                    background: "linear-gradient(135deg, #10B981 0%, #00C8FF 100%)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                  }}>
-                    find it for less.
-                  </span>
+                  <span className="text-bg/75">find it for less.</span>
                 </h2>
 
-                <p className="text-slate-400 text-lg leading-relaxed tracking-[-0.01em] mb-10 max-w-sm">
-                  Start with what you love. Dealesty searches trusted retailers for similar products at a fraction of the price.
+                <p className="text-bg/70 text-[15px] sm:text-lg leading-relaxed max-w-md mb-8">
+                  Paste a product link or search anything. Havlo finds cheaper alternatives across the world&apos;s biggest stores in seconds.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Link href="/compare" className="btn-primary text-xs sm:text-sm px-5 sm:px-7 py-3.5 rounded-xl gap-2 whitespace-nowrap">
-                    <TrendingDown size={15} />
-                    Find for Less
+                  <Link
+                    href="/compare"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full font-semibold text-sm bg-bg text-ink hover:bg-bg/90 transition-colors active:scale-[0.98]"
+                  >
+                    <TrendingDown size={16} />
+                    Find for less
                   </Link>
-                  <Link href="/deals" className="btn-ghost text-xs sm:text-sm px-5 sm:px-7 py-3.5 rounded-xl gap-2 whitespace-nowrap">
-                    Explore Deals
-                    <ArrowRight size={15} />
+                  <Link
+                    href="/deals"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full font-semibold text-sm text-bg border border-bg/25 hover:bg-bg/10 transition-colors active:scale-[0.98]"
+                  >
+                    Browse deals
+                    <ArrowRight size={16} />
                   </Link>
                 </div>
               </div>
 
-              {/* Right — stat callouts */}
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { value: "11+",    label: "Major stores checked\nin one search" },
-                  { value: "Direct", label: "Go straight to the\nretailer you trust" },
-                  { value: "Naira",  label: "Local pricing that\nmakes quick sense" },
-                  { value: "Free",   label: "No account, no paywall,\nno added markup" },
-                ].map(({ value, label }, i) => (
-                  <AnimateIn key={value} variant="fade-up" delay={200 + i * 80}>
-                  <div className="glass-light rounded-2xl p-5 border border-white/[0.06]
-                                  hover:border-white/[0.12] hover:scale-[1.02] transition-all duration-200 cursor-default">
-                    <p className="text-3xl font-black text-white tracking-[-0.04em] mb-1">{value}</p>
-                    <p className="text-xs text-slate-500 leading-relaxed tracking-[-0.01em] whitespace-pre-line">
-                      {label}
-                    </p>
-                  </div>
-                  </AnimateIn>
-                ))}
-              </div>
+              {/* Right column = empty placeholder; the cards float outside on top */}
+              <div aria-hidden="true" className="hidden lg:block" />
             </div>
           </div>
+
+          {/* ── Free-floating product cards — bleed past panel edges ── */}
+          {collage.length === 3 && (
+            <div className="hidden lg:block absolute inset-0 pointer-events-none">
+              {/* Back card — extends slightly above the panel */}
+              <CollageCard
+                img={collage[0].imageUrl ?? ""}
+                store={collage[0].storeName}
+                title={collage[0].title}
+                percent={collage[0].discountPercent}
+                w="w-60" h="h-80"
+                rotate={-7}
+                top="-24px" left="52%"
+                z={1}
+                badgeSize="md"
+              />
+
+              {/* Main card — bleeds past the right edge of the panel */}
+              <CollageCard
+                img={collage[1].imageUrl ?? ""}
+                store={collage[1].storeName}
+                title={collage[1].title}
+                percent={collage[1].discountPercent}
+                w="w-72" h="h-[26rem]"
+                rotate={5}
+                top="40px" right="-48px"
+                z={2}
+                badgeSize="lg"
+              />
+
+              {/* Front card — extends below the panel */}
+              <CollageCard
+                img={collage[2].imageUrl ?? ""}
+                store={collage[2].storeName}
+                title={collage[2].title}
+                percent={collage[2].discountPercent}
+                w="w-56" h="h-72"
+                rotate={-3}
+                bottom="-40px" left="56%"
+                z={3}
+                badgeSize="sm"
+              />
+            </div>
+          )}
         </div>
-      </AnimateIn>
+
+      </div>
     </section>
   );
 }
