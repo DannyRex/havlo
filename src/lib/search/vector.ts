@@ -237,6 +237,9 @@ function rescoreToGroups(hits: AnnHit[], queryRaw: string, intent: QueryIntent):
     if (intent.productTypes && h.product_type && !intent.productTypes.includes(h.product_type)) continue;
     const g = idToGroup.get(h.id);
     if (!g) continue;
+    // Skip scraper artefacts — groups whose representative title is too short
+    // to be a real product (e.g. title = "1", "a", etc.)
+    if (g.title.trim().length < 5) continue;
     const cur = byGroup.get(g.key);
     if (!cur) byGroup.set(g.key, { group: g, bestAnn: h.score, hitCount: 1, hits: [h] });
     else { cur.bestAnn = Math.max(cur.bestAnn, h.score); cur.hitCount++; cur.hits.push(h); }

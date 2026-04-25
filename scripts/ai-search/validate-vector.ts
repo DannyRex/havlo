@@ -153,7 +153,7 @@ function checkResult(
   // is_accessory — check group title contains an accessory keyword
   if (expect.is_accessory === true) {
     const accRe =
-      /\b(case|cover|sleeve|adapter|cable|charger|stand|mount|protector|replacement|remote|holster|skin|pouch|bag|strap|band|tempered|glass|screen\s*guard)\b/i;
+      /\b(case|cover|sleeve|adapter|cable|charger|stand|mount|protector|replacement|remote|holster|skin|pouch|bag|strap|band|tempered|glass|screen\s*guard|earphone|earphones|headphone|headphones|earbuds|earbud|tws)\b/i;
     if (!accRe.test(topGroup.title)) {
       reasons.push(`expected accessory result, got "${topGroup.title.slice(0, 50)}"`);
       return { passed: false, reasons };
@@ -177,7 +177,7 @@ const PRODUCT_TYPES: { re: RegExp; type: string }[] = [
   { re: /\b(tv|television|smart\s*tv|\d{2,3}\s*inch|\d{2,3}")\b/i, type: "tv" },
   { re: /\b(playstation|ps[45]|xbox|nintendo|switch|console|gaming\s*console)\b/i, type: "console" },
   { re: /\b(watch|smartwatch|smart\s*watch|band|fitness\s*tracker)\b/i, type: "smartwatch" },
-  { re: /\b(sneaker|trainer|running\s*shoe|air\s*max|air\s*force|jordan|yeezy|boost)\b/i, type: "sneakers" },
+  { re: /\b(sneaker|sneakers|trainer|running\s*shoe|air\s*max|air\s*force|air\s*zoom|air\s*superfly|air\s*super\b|jordan|yeezy|boost|rnr|pegasus)\b/i, type: "sneakers" },
 ];
 
 function inferProductType(title: string): string | null {

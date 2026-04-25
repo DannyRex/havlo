@@ -44,10 +44,14 @@ const run = (cmd: string) => {
 };
 
 console.log(`\n🔄 Dealesty weekly reindex — ${new Date().toISOString()}`);
-console.log("   Step 1/2: Re-extract changed deals (Haiku)...");
+
+console.log("   Step 1/3: Clean up stale Supabase rows...");
+run(`${TSX} scripts/ai-search/cleanup-stale.ts`);
+
+console.log("\n   Step 2/3: Re-extract changed deals (Haiku)...");
 run(`${TSX} scripts/ai-search/extract-products.ts`);
 
-console.log("\n   Step 2/2: Re-embed changed deals (OpenAI + Cohere)...");
+console.log("\n   Step 3/3: Re-embed changed deals (OpenAI + Cohere)...");
 run(`${TSX} scripts/ai-search/embed-deals.ts --all`);
 
 console.log("\n✅ Reindex complete.");

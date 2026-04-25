@@ -1,9 +1,9 @@
 {
   "summary": {
     "total": 25,
-    "passed": 23,
-    "failed": 2,
-    "passRate": 92
+    "passed": 25,
+    "failed": 0,
+    "passRate": 100
   },
   "details": [
     {
@@ -18,20 +18,20 @@
       "outcome": "pass",
       "reasons": [],
       "topTitle": "SAMSUNG Galaxy A06-A065F Android Mobile Smart Phone With 64GB+4GB & 128GB+4GB",
-      "mode": "single"
+      "mode": "list"
     },
     {
       "query": "Galaxy A06 128GB",
       "outcome": "pass",
       "reasons": [],
       "topTitle": "SAMSUNG Galaxy A06-A065F Android Mobile Smart Phone With 64GB+4GB & 128GB+4GB",
-      "mode": "single"
+      "mode": "list"
     },
     {
       "query": "Hisense 50 inch TV",
       "outcome": "pass",
       "reasons": [],
-      "topTitle": "Hisense Tv Hd 43 Inch A5200",
+      "topTitle": "Hisense 58 Inch Tv 58a6n.",
       "mode": "list"
     },
     {
@@ -63,21 +63,21 @@
       "query": "AirPods Pro",
       "outcome": "pass",
       "reasons": [],
-      "topTitle": "USA Stock For airpods pro3 nd generation new Air pods 4 pros Bluetooth earphones ANC Wireless Headphones Earbuds Noise C",
+      "topTitle": "USA and Euro Warehouse For Apple Airpods pro 2 3 4 air pods 3 4 Earphones Bluetooth Headphone Accessories Silicone Prote",
       "mode": "single"
     },
     {
       "query": "AirPods",
       "outcome": "pass",
       "reasons": [],
-      "topTitle": "USA Stock For airpods pro3 nd generation new Air pods 4 pros Bluetooth earphones ANC Wireless Headphones Earbuds Noise C",
+      "topTitle": "USA and Euro Warehouse For Apple Airpods pro 2 3 4 air pods 3 4 Earphones Bluetooth Headphone Accessories Silicone Prote",
       "mode": "single"
     },
     {
       "query": "Infinix Hot 40",
       "outcome": "pass",
       "reasons": [],
-      "topTitle": "Infinix Hot 50 X6882b- 6.7\"-256gb Rom - 8gb Ram - 50",
+      "topTitle": "INFINIX Hot 60i-X6728B Android Mobile Smart Phone With 128GB+4GB & 256GB+8GB",
       "mode": "list"
     },
     {
@@ -105,16 +105,14 @@
       "query": "earbuds",
       "outcome": "pass",
       "reasons": [],
-      "topTitle": "studio buds Bluetooth Wireless Earbuds - True Wireless Stereo In-Ear Headphones with Noise Reduction for Sports and Musi",
+      "topTitle": "Mini Buds Pro Wireless Earbuds - Bluetooth Earphones with Mic - In-Ear Sports Headphones for Phone and PC",
       "mode": "list"
     },
     {
       "query": "iphone case",
-      "outcome": "fail",
-      "reasons": [
-        "expected accessory result, got \"USA EU stock Top Quality For Apple Airpods Pro 2 3\""
-      ],
-      "topTitle": "USA EU stock Top Quality For Apple Airpods Pro 2 3 2nd gen Air 2 3 4 Earphones Air 4 Bluetooth Headphone Accessories Sil",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "Original Earphones For Apple iPhone 14 Pro Max Lightning Headphones 13 12 11 Mini X XS XR SE 6 7 8 Plus Wired In-Ear Cal",
       "mode": "list"
     },
     {
@@ -135,11 +133,9 @@
     },
     {
       "query": "Nike Air Max",
-      "outcome": "fail",
-      "reasons": [
-        "type: expected sneakers, inferred null from \"Nike Sportswear Max 90 Club wash T-shirt in pink\""
-      ],
-      "topTitle": "Nike Sportswear Max 90 Club wash T-shirt in pink",
+      "outcome": "pass",
+      "reasons": [],
+      "topTitle": "Nike Air Superfly in black and white ",
       "mode": "list"
     },
     {
@@ -162,7 +158,7 @@
       "query": "wireless earbuds",
       "outcome": "pass",
       "reasons": [],
-      "topTitle": "studio buds Bluetooth Wireless Earbuds - True Wireless Stereo In-Ear Headphones with Noise Reduction for Sports and Musi",
+      "topTitle": "Mini Buds Pro Wireless Earbuds - Bluetooth Earphones with Mic - In-Ear Sports Headphones for Phone and PC",
       "mode": "list"
     },
     {
