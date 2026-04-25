@@ -12,6 +12,10 @@
 | 2026-04-24 | 2 | embed-deals --text (167 deals) | — | — | — | — | — | $0.0001 | model=text-embedding-3-small tokens=3373 |
 | 2026-04-24 | 2 | embed-deals --images (0 deals) | — | — | — | — | — | $0.0000 | model=embed-v4.0 |
 | 2026-04-24 | 2 | embed-deals --images (1116 deals) | — | — | — | — | — | $0.1116 | model=embed-v4.0 |
+| 2026-04-24 | 1 | extract-products (719 deals) | Anthropic | claude-haiku-4-5 | 1079442 | 111607 | — | $1.6375 | prompt=extract-v1 |
+| 2026-04-24 | 1 | extract-products (1119 deals) | Anthropic | claude-haiku-4-5 | 1681610 | 180997 | — | $2.5866 | prompt=extract-v1 |
+| 2026-04-25 | 2 | embed-deals --text (1119 deals) | — | — | — | — | — | $0.0006 | model=text-embedding-3-small tokens=28118 |
+| 2026-04-25 | 2 | embed-deals --images (1117 deals) | — | — | — | — | — | $0.1117 | model=embed-v4.0 |
 
 ## Rolling totals
 

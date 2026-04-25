@@ -49,13 +49,15 @@ export default function DealFeed() {
 
     fetch(`/api/deals?${buildParams(0)}`)
       .then((r) => r.json())
-      .then(({ items, total, hasMore, originCounts }) => {
+      .then(({ items, total, hasMore, originCounts, error }) => {
+        if (error) return;
         setDeals(items);
         setTotal(total);
         setHasMore(hasMore);
         if (originCounts) setOriginCounts(originCounts);
         offsetRef.current = PAGE_SIZE;
       })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [buildParams]);
 
@@ -65,11 +67,13 @@ export default function DealFeed() {
 
     fetch(`/api/deals?${buildParams(offsetRef.current)}`)
       .then((r) => r.json())
-      .then(({ items, hasMore: more }) => {
+      .then(({ items, hasMore: more, error }) => {
+        if (error) return;
         setDeals((prev) => [...prev, ...items]);
         setHasMore(more);
         offsetRef.current += PAGE_SIZE;
       })
+      .catch(() => {})
       .finally(() => setLoadingMore(false));
   }, [buildParams, hasMore, loadingMore]);
 
