@@ -35,7 +35,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['"Helvetica Neue"', "Helvetica", "Arial", "sans-serif"],
+        sans:    ['"Helvetica Neue"', "Helvetica", "Arial", "sans-serif"],
+        display: ["var(--font-display)", "Georgia", "serif"],
       },
       backgroundImage: {
         "hero-gradient":

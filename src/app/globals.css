@@ -17,6 +17,12 @@
   box-sizing: border-box;
 }
 
+/* iOS safe-area support for bottom tab bar */
+:root {
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+.h-safe-bottom { height: var(--safe-bottom); }
+
 html {
   scroll-behavior: smooth;
 }
@@ -133,6 +139,76 @@ h1, h2, h3, h4, h5, h6 {
 /* Horizontal scroll without scrollbar */
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ── Composer search box (dupe.com style) ─────────────────────── */
+@layer components {
+  .composer {
+    @apply relative w-full rounded-3xl bg-white/[0.04] border border-white/[0.08] transition-all duration-200;
+  }
+  .composer:focus-within {
+    border-color: rgba(0, 200, 255, 0.35);
+    box-shadow: 0 0 0 4px rgba(0, 200, 255, 0.08);
+  }
+  .composer textarea {
+    @apply w-full bg-transparent text-white placeholder-slate-500 outline-none resize-none text-base leading-relaxed;
+  }
+
+  /* Cyan ambient glow that sits behind the composer */
+  .ambient-glow {
+    position: absolute;
+    width: 480px;
+    height: 240px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(0, 200, 255, 0.18) 0%, transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    left: 50%;
+    transform: translateX(-50%);
+    top: -40px;
+    z-index: 0;
+  }
+
+  /* Price-drop arrow format: ₦X → ₦Y */
+  .price-arrow {
+    @apply flex items-center gap-1.5 flex-wrap;
+  }
+  .price-arrow .price-old {
+    @apply text-slate-500 line-through text-sm;
+  }
+  .price-arrow .price-sep {
+    @apply text-slate-600 text-xs;
+  }
+  .price-arrow .price-new {
+    @apply text-white font-semibold;
+  }
+  .price-arrow .price-badge {
+    @apply text-[11px] font-bold px-1.5 py-0.5 rounded-full;
+    background: rgba(0, 214, 143, 0.15);
+    color: #00D68F;
+  }
+
+  /* Category pill chip */
+  .cat-pill {
+    @apply inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium whitespace-nowrap
+           border border-white/[0.08] text-slate-400 transition-all duration-150 cursor-pointer select-none;
+  }
+  .cat-pill:hover {
+    @apply text-white border-white/20 bg-white/[0.04];
+  }
+  .cat-pill.active {
+    background: rgba(0, 87, 255, 0.15);
+    border-color: rgba(0, 87, 255, 0.4);
+    @apply text-white;
+  }
+
+  /* Verified store badge */
+  .badge-verified {
+    @apply inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded;
+    background: rgba(0, 214, 143, 0.12);
+    color: #00D68F;
+    border: 1px solid rgba(0, 214, 143, 0.2);
+  }
+}
 
 /* ── Hero entrance animations ─────────────────────────────────── */
 @keyframes heroFadeUp {

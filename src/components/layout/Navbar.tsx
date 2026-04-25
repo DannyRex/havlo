@@ -2,21 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Home, Tag, Sparkles, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const navLinks = [
-  { href: "/deals", label: "Browse deals" },
-  { href: "/compare", label: "Find for less" },
-];
-
-const legalLinks = [
-  { href: "/privacy-policy", label: "Privacy policy" },
-  { href: "/terms-of-use", label: "Terms of use" },
-  { href: "/disclaimer", label: "Disclaimer" },
-];
-
+/* ── Logo ───────────────────────────────────────────────────────── */
 function LogoMark() {
   return (
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true">
@@ -33,27 +22,28 @@ function LogoMark() {
   );
 }
 
+/* ── Desktop nav links ──────────────────────────────────────────── */
+const desktopLinks = [
+  { href: "/deals",   label: "Browse deals" },
+  { href: "/compare", label: "Find for less" },
+];
+
+/* ── Mobile bottom tab links ────────────────────────────────────── */
+const tabLinks = [
+  { href: "/",        label: "Home",         Icon: Home     },
+  { href: "/deals",   label: "Deals",        Icon: Tag      },
+  { href: "/compare", label: "Find for less", Icon: Sparkles },
+  { href: "/compare", label: "Search",       Icon: Search,  searchFocus: true },
+];
+
 export default function Navbar() {
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <>
-    <header className="sticky top-0 z-50 glass border-b border-white/[0.06]">
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-
-        <div className="flex items-center gap-2.5 shrink-0">
-          {/* Mobile toggle */}
-          <button
-            type="button"
-            onClick={() => setMenuOpen((open) => !open)}
-            className="md:hidden p-2 -ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.05] transition-colors"
-            aria-label="Toggle menu"
-            aria-expanded={menuOpen}
-            aria-controls="mobile-nav-drawer"
-          >
-            {menuOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
+      {/* ── Desktop / top nav ─────────────────────────────────────── */}
+      <header className="sticky top-0 z-50 glass border-b border-white/[0.06]">
+        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
 
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 select-none shrink-0">
@@ -62,113 +52,78 @@ export default function Navbar() {
               Deal<span style={{ color: "#00C8FF" }}>esty</span>
             </span>
           </Link>
-        </div>
 
-        {/* Right — nav links + CTA */}
-        <div className="hidden md:flex items-center gap-1">
-          {navLinks.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "px-4 py-2 rounded-lg text-sm font-medium tracking-[-0.01em] transition-all duration-150",
-                pathname === href
-                  ? "text-white"
-                  : "text-slate-400 hover:text-white"
-              )}
-            >
-              {label}
-            </Link>
-          ))}
-        </div>
-
-        <div className="md:hidden w-10" aria-hidden="true" />
-      </nav>
-
-    </header>
-
-    <MobileDrawer open={menuOpen} onClose={() => setMenuOpen(false)} pathname={pathname} />
-    </>
-  );
-}
-
-/* ── Mobile Drawer (portal-style, rendered outside header) ── */
-function MobileDrawer({
-  open,
-  onClose,
-  pathname,
-}: {
-  open: boolean;
-  onClose: () => void;
-  pathname: string;
-}) {
-  if (!open) return null;
-
-  return (
-    <div className="md:hidden fixed inset-0 z-[60]">
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        className="absolute inset-0 bg-[#050B18]/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
-      />
-
-      {/* Drawer panel */}
-      <div
-        id="mobile-nav-drawer"
-        className="absolute inset-y-0 left-0 w-[min(20rem,84vw)] bg-[#0A1628] border-r border-white/[0.08] flex flex-col shadow-[24px_0_60px_rgba(0,0,0,0.5)] animate-[slideInLeft_0.25s_ease-out]"
-      >
-        {/* Drawer header */}
-        <div className="flex items-center justify-between px-5 h-16 border-b border-white/[0.06]">
-          <Link href="/" onClick={onClose} className="flex items-center gap-2.5 select-none">
-            <LogoMark />
-            <span className="text-[17px] font-bold tracking-[-0.03em] text-white">
-              Deal<span style={{ color: "#00C8FF" }}>esty</span>
-            </span>
-          </Link>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 -mr-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors"
-            aria-label="Close menu"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Nav links */}
-        <div className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
-          {navLinks.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              onClick={onClose}
-              className={cn(
-                "px-4 py-3.5 rounded-xl text-[15px] font-medium transition-all whitespace-nowrap",
-                pathname === href
-                  ? "bg-white/[0.08] text-white"
-                  : "text-slate-400 hover:text-white hover:bg-white/[0.05]"
-              )}
-            >
-              {label}
-            </Link>
-          ))}
-
-          {/* Legal */}
-          <div className="mt-4 pt-4 border-t border-white/[0.06] flex flex-col gap-1">
-            <span className="px-4 pb-1 text-[11px] font-medium uppercase tracking-widest text-slate-600">Legal</span>
-            {legalLinks.map(({ href, label }) => (
+          {/* Desktop links (hidden on mobile — bottom tab handles it) */}
+          <div className="hidden md:flex items-center gap-1">
+            {desktopLinks.map(({ href, label }) => (
               <Link
-                key={href}
+                key={href + label}
                 href={href}
-                onClick={onClose}
-                className="px-4 py-2.5 rounded-xl text-[13px] text-slate-500 hover:text-slate-300 hover:bg-white/[0.04] transition-all whitespace-nowrap"
+                className={cn(
+                  "px-4 py-2 rounded-lg text-sm font-medium tracking-[-0.01em] transition-all duration-150",
+                  pathname === href
+                    ? "text-white bg-white/[0.06]"
+                    : "text-slate-400 hover:text-white hover:bg-white/[0.04]",
+                )}
               >
                 {label}
               </Link>
             ))}
           </div>
+
+          {/* Desktop CTA */}
+          <div className="hidden md:flex items-center gap-3">
+            <Link
+              href="/compare"
+              className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all"
+              style={{ background: "linear-gradient(135deg,#0057FF,#00C8FF)" }}
+            >
+              Find for less
+            </Link>
+          </div>
+
+        </nav>
+      </header>
+
+      {/* ── Mobile bottom tab bar (spoken.io style) ───────────────── */}
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-white/[0.08]"
+        style={{ background: "rgba(5,11,24,0.95)", backdropFilter: "blur(16px)" }}
+        aria-label="Mobile navigation"
+      >
+        <div className="grid grid-cols-4 h-16">
+          {tabLinks.map(({ href, label, Icon, searchFocus }) => {
+            const isActive = searchFocus
+              ? false // Search tab never shows "active" — it's an action
+              : pathname === href || (href !== "/" && pathname.startsWith(href));
+
+            return (
+              <Link
+                key={label}
+                href={searchFocus ? "/compare?focus=1" : href}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors",
+                  isActive ? "text-white" : "text-slate-500",
+                )}
+              >
+                <div className={cn(
+                  "flex items-center justify-center w-8 h-8 rounded-2xl transition-all",
+                  isActive && "bg-white/[0.08]",
+                )}>
+                  <Icon
+                    size={20}
+                    strokeWidth={isActive ? 2.5 : 1.75}
+                    className={isActive ? "text-[#00C8FF]" : ""}
+                  />
+                </div>
+                <span className={isActive ? "text-white" : ""}>{label}</span>
+              </Link>
+            );
+          })}
         </div>
-      </div>
-    </div>
+        {/* Safe area spacer for phones with home indicator */}
+        <div className="h-safe-bottom bg-transparent" />
+      </nav>
+    </>
   );
 }
