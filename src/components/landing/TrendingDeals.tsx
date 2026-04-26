@@ -145,9 +145,65 @@ export default async function TrendingDeals() {
 
   if (picks.length === 0) return null;
 
-  const mobileCols  = chunkLeftToRight(picks, 2);
-  const tabletCols  = chunkLeftToRight(picks, 3);
-  const desktopCols = chunkLeftToRight(picks, 4);
+  /* Stagger local + international so the grid feels mixed instead of
+     "Nigerian section on top, world below". Build the order row-by-row
+     for the desktop 4-column layout, with a per-row phase rotation so
+     an intl in column 0 of one row doesn't put another intl in column 0
+     of the next row. The same array is reused for the 2- and 3-column
+     viewports — they end up well-mixed too because intl cards are
+     distributed throughout the sequence rather than grouped. */
+  function staggerByOrigin(items: Deal[]): Deal[] {
+    const local = items.filter((d) => d.currency !== "USD");
+    const intl  = items.filter((d) => d.currency === "USD");
+    if (local.length === 0 || intl.length === 0) return items;
+
+    const cols  = 4; // optimize for desktop; sub-optimal cases remain mixed
+    const total = items.length;
+    const rows  = Math.ceil(total / cols);
+
+    /* Bresenham accumulator — distributes intls across rows in proportion
+       to their share of the pool, with no row going over its quota. */
+    const result: Deal[] = new Array(total);
+    let li = 0; let ii = 0;
+    let intlAcc = 0;
+    let intlAssigned = 0;
+
+    for (let r = 0; r < rows; r++) {
+      const rowSize = Math.min(cols, total - r * cols);
+      intlAcc += (intl.length * rowSize) / total;
+      const want = Math.round(intlAcc) - intlAssigned;
+      const intlThisRow = Math.max(0, Math.min(want, intl.length - intlAssigned, rowSize));
+
+      // Place intls at strided columns + per-row offset so vertical
+      // alignment doesn't form (e.g. all-intl col, all-local col)
+      const intlCols = new Set<number>();
+      if (intlThisRow > 0) {
+        const stride = Math.max(1, Math.floor(rowSize / intlThisRow));
+        for (let k = 0; k < intlThisRow; k++) {
+          intlCols.add((k * stride + r) % rowSize);
+        }
+      }
+
+      for (let c = 0; c < rowSize; c++) {
+        const pos = r * cols + c;
+        if (intlCols.has(c) && ii < intl.length) {
+          result[pos] = intl[ii++];
+        } else if (li < local.length) {
+          result[pos] = local[li++];
+        } else if (ii < intl.length) {
+          result[pos] = intl[ii++];
+        }
+      }
+      intlAssigned += intlThisRow;
+    }
+    return result;
+  }
+
+  const staggered = staggerByOrigin(picks);
+
+  const mobileCols  = chunkLeftToRight(staggered, 2);
+  const tabletCols  = chunkLeftToRight(staggered, 3);
+  const desktopCols = chunkLeftToRight(staggered, 4);
 
   return (
     <section className="py-12 sm:py-20 bg-bg">
