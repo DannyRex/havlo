@@ -42,8 +42,8 @@ function seededShuffle<T>(items: T[], rng: () => number): T[] {
 }
 
 function MasonryColumn({
-  items, gapClass, startIndex,
-}: { items: Deal[]; gapClass: string; startIndex: number }) {
+  items, gapClass, startIndex, eagerFirst = 0,
+}: { items: Deal[]; gapClass: string; startIndex: number; eagerFirst?: number }) {
   return (
     <div className={`flex-1 flex flex-col ${gapClass} min-w-0`}>
       {items.map((d, i) => (
@@ -51,6 +51,7 @@ function MasonryColumn({
           <MasonryCard
             deal={d}
             aspect={MASONRY_ASPECTS[(startIndex + i) % MASONRY_ASPECTS.length]}
+            priority={i < eagerFirst}
           />
         </AnimateIn>
       ))}
@@ -63,40 +64,83 @@ export default async function TrendingDeals() {
      static fallback otherwise). Sort by discount → over-sample top N
      → shuffle → per-store cap → take 16. */
   const provider = await getActiveBrowseProvider();
-  const pool = await provider.fetchDeals({
-    sort: "discount",
-    minDiscount: 15,
-  });
 
-  // Quality filter — same rules as before but applied to live data
-  const quality = pool.filter(
-    (d) =>
-      d.title.length >= 10 &&
-      d.title.length <= 70 &&
-      !d.title.includes("\\") &&
-      !(d.currency === "USD" && d.salePrice < 10),
-  );
+  /* Fetch local + international pools SEPARATELY so the locality quota
+     can actually be honored. Earlier we sorted by discount across the
+     whole pool — international deals tend to carry larger discount %,
+     so the top 60 ended up mostly USD and the local quota under-filled.
+     Splitting upstream guarantees enough local candidates to draw from. */
+  const [localPool, intlPool] = await Promise.all([
+    provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "local" }),
+    provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "intl" }),
+  ]);
 
-  if (quality.length === 0) return null;
+  const qualityFilter = (d: Deal) =>
+    d.title.length >= 10 &&
+    d.title.length <= 70 &&
+    !d.title.includes("\\") &&
+    !(d.currency === "USD" && d.salePrice < 10);
 
-  // Over-sample the top 60 by discount, then shuffle deterministically
-  const top = quality.slice(0, 60);
+  const localQuality = localPool.filter(qualityFilter);
+  const intlQuality  = intlPool.filter(qualityFilter);
+
+  if (localQuality.length + intlQuality.length === 0) return null;
+
+  // Independent seeded shuffles so each pool rotates its own picks
   const rng = makeRng(freshnessSeed());
-  const shuffled = seededShuffle(top, rng);
+  const localShuffled = seededShuffle(localQuality.slice(0, 60), rng);
+  const intlShuffled  = seededShuffle(intlQuality.slice(0, 60), rng);
 
-  // Dedupe + per-store cap for visual diversity
+  /* Dedupe + per-store cap + locality quota.
+     Havlo is Nigeria-first, so the homepage should feel like a Nigerian
+     marketplace with international deals as accent — not the other way
+     around. Target ratio: ~70% local (NGN), 30% international (USD).
+     Caps below are computed from TARGET_TOTAL so the math stays obvious. */
+  const TARGET_TOTAL = 16;
+  const LOCAL_QUOTA  = Math.round(TARGET_TOTAL * 0.7); // 11
+  const INTL_QUOTA   = TARGET_TOTAL - LOCAL_QUOTA;     // 5
+
   const seen = new Set<string>();
   const storeCount: Record<string, number> = {};
   const picks: Deal[] = [];
-  for (const d of shuffled) {
-    if (picks.length >= 16) break;
+
+  function tryPush(d: Deal, perStoreCap = 4): boolean {
     const sc = storeCount[d.storeId] ?? 0;
-    if (sc >= 4) continue;
+    if (sc >= perStoreCap) return false;
     const key = d.storeId + d.title.slice(0, 20);
-    if (seen.has(key)) continue;
+    if (seen.has(key)) return false;
     seen.add(key);
     storeCount[d.storeId] = sc + 1;
     picks.push(d);
+    return true;
+  }
+
+  // Fill quotas from the dedicated pools first
+  let localPicks = 0;
+  let intlPicks  = 0;
+  for (const d of localShuffled) {
+    if (localPicks >= LOCAL_QUOTA) break;
+    if (tryPush(d)) localPicks++;
+  }
+  for (const d of intlShuffled) {
+    if (intlPicks >= INTL_QUOTA) break;
+    if (tryPush(d)) intlPicks++;
+  }
+
+  /* Backfill from whichever side has more candidates if either pool
+     under-filled (e.g. local pool too thin at this rotation window).
+     Prefer local backfill so the homepage stays Naira-leaning. */
+  if (picks.length < TARGET_TOTAL) {
+    for (const d of localShuffled) {
+      if (picks.length >= TARGET_TOTAL) break;
+      tryPush(d);
+    }
+  }
+  if (picks.length < TARGET_TOTAL) {
+    for (const d of intlShuffled) {
+      if (picks.length >= TARGET_TOTAL) break;
+      tryPush(d);
+    }
   }
 
   if (picks.length === 0) return null;
@@ -135,19 +179,22 @@ export default async function TrendingDeals() {
           </Link>
         </div>
 
+        {/* eagerFirst={1} on each column: only the topmost card per column
+            is eagerly loaded. That's the LCP candidate set on every viewport
+            without flooding the network with priority hints. */}
         <div className="flex gap-2 sm:hidden">
           {mobileCols.map((col, i) => (
-            <MasonryColumn key={i} items={col} gapClass="gap-2" startIndex={i * 100} />
+            <MasonryColumn key={i} items={col} gapClass="gap-2" startIndex={i * 100} eagerFirst={1} />
           ))}
         </div>
         <div className="hidden sm:flex lg:hidden gap-3">
           {tabletCols.map((col, i) => (
-            <MasonryColumn key={i} items={col} gapClass="gap-3" startIndex={i * 100} />
+            <MasonryColumn key={i} items={col} gapClass="gap-3" startIndex={i * 100} eagerFirst={1} />
           ))}
         </div>
         <div className="hidden lg:flex gap-4">
           {desktopCols.map((col, i) => (
-            <MasonryColumn key={i} items={col} gapClass="gap-4" startIndex={i * 100} />
+            <MasonryColumn key={i} items={col} gapClass="gap-4" startIndex={i * 100} eagerFirst={1} />
           ))}
         </div>
 

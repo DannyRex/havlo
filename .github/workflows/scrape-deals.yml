@@ -1,4 +1,4 @@
-name: Scrape Deals
+name: Refresh data (scrape + ingest)
 
 on:
   schedule:
@@ -53,3 +53,25 @@ jobs:
           git add src/lib/data/deals.ts
           git commit -m "chore: refresh deals [$(date '+%Y-%m-%d')]"
           git push
+
+      # ── Ingestion: pushes the refreshed deals.ts into Supabase so the
+      # app's DB-backed providers serve fresh rows immediately. Both steps
+      # are gated on Supabase secrets being present so the workflow doesn't
+      # fail on forks or environments without DB access.
+      - name: Ingest scraped deals → Supabase
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        env:
+          SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run ingest:scraped
+
+      # ── Live SerpAPI ingestion: 6 countries × 10 categories. Skipped
+      # automatically when SERPAPI_KEY isn't set so devs can run the
+      # workflow on a dry repo without burning API credits.
+      - name: Ingest SerpAPI live deals → Supabase
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != ''
+        env:
+          SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SERPAPI_KEY:                ${{ secrets.SERPAPI_KEY }}
+        run: npm run ingest

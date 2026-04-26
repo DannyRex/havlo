@@ -12,6 +12,12 @@ const footerSections = [
     ],
   },
   {
+    title: "Company",
+    links: [
+      { label: "Contact", href: "/contact" },
+    ],
+  },
+  {
     title: "Legal",
     links: [
       { label: "Privacy Policy", href: "/privacy-policy" },
@@ -28,7 +34,7 @@ export default function Footer() {
     <footer className="border-t border-border bg-surface">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
 
-        <div className="grid gap-10 sm:grid-cols-3 mb-12">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 mb-12">
           {/* Brand */}
           <div>
             <Link href="/" className="inline-block mb-4" aria-label="Havlo home">
@@ -37,12 +43,12 @@ export default function Footer() {
             <p className="text-sm text-ink-2 leading-relaxed max-w-xs mb-4">
               Find similar products for less. Paste any link or search anything, we surface the cheaper alternatives.
             </p>
-            <a
-              href="mailto:hello@havlo.io"
+            <Link
+              href="/contact"
               className="text-sm text-ink-2 hover:text-ink transition-colors underline-offset-4 hover:underline"
             >
-              hello@havlo.io
-            </a>
+              Contact us →
+            </Link>
           </div>
 
           {/* Link columns */}

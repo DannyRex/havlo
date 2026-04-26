@@ -130,6 +130,79 @@ function detectFamily(title: string): string | null {
   return null;
 }
 
+/* Category-class queries — bare nouns / plurals that name a product class
+   rather than a specific product. When the user's literal query matches
+   one of these, the anchor + dupes MUST be in that family (otherwise FTS
+   trigram overlap surfaces "headphones" for the bare query "phones").
+
+   Map any category-class word → the canonical PRODUCT_FAMILIES key. */
+const CATEGORY_CLASS_QUERIES: Record<string, keyof typeof PRODUCT_FAMILIES> = {
+  phone: "phone", phones: "phone", smartphone: "phone", smartphones: "phone",
+  tablet: "tablet", tablets: "tablet", ipad: "tablet",
+  laptop: "laptop", laptops: "laptop", notebook: "laptop", notebooks: "laptop",
+  headphone: "headphones", headphones: "headphones", headset: "headphones",
+  earbud: "earbuds", earbuds: "earbuds",
+  speaker: "speaker", speakers: "speaker", soundbar: "speaker",
+  tv: "tv", tvs: "tv", television: "tv", televisions: "tv",
+  console: "console", consoles: "console",
+  smartwatch: "watch", watch: "watch", watches: "watch",
+  camera: "camera", cameras: "camera",
+};
+
+function queryFamily(rawQuery: string): keyof typeof PRODUCT_FAMILIES | null {
+  const tokens = rawQuery.toLowerCase().split(/\s+/).filter(Boolean);
+  // Only treat as a category-class query if EVERY meaningful token is a
+  // class noun (so "iphone 15" isn't reduced to "phone"). Skip very short
+  // articles that don't carry meaning.
+  const meaningful = tokens.filter((t) => !/^(the|a|an|for|to|of)$/.test(t));
+  if (meaningful.length === 0 || meaningful.length > 2) return null;
+  const fams = meaningful.map((t) => CATEGORY_CLASS_QUERIES[t]);
+  if (fams.every((f) => f && f === fams[0])) return fams[0] ?? null;
+  return null;
+}
+
+/* Accessory / parts noise — when these tokens appear in a candidate title
+   for a product-name query, we drop the candidate. A query for "iPhone 15
+   Pro Max" should never anchor on a phone case, screen protector, or
+   replacement LCD. Whole-word boundaries to avoid false positives like
+   "case" inside "casework" (not a real concern but good hygiene). */
+const ACCESSORY_NOISE = [
+  "case", "cover", "skin", "holder", "stand", "tripod", "selfie stick",
+  "screen protector", "tempered glass", "replacement", "repair", "lcd screen",
+  "battery replacement", "charger only", "cable only", "adapter only",
+  "lens kit", "gimbal",
+];
+
+function looksLikeAccessory(title: string): boolean {
+  const t = title.toLowerCase();
+  return ACCESSORY_NOISE.some((kw) => {
+    // simple word-boundary check — kw can be multi-word so we use \b at
+    // either end where alphabetic
+    const pattern = new RegExp(`(^|[^a-z])${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z]|$)`);
+    return pattern.test(t);
+  });
+}
+
+/* Strip trailing modifier tokens for fallback queries.
+   "iphone 15 pro max" → "iphone 15", "macbook pro 16" → "macbook pro".
+   Rules: drop trailing color words, sizes, storage, generic modifiers. */
+const TRAILING_MODIFIERS = new Set([
+  "pro", "max", "ultra", "plus", "mini", "lite", "se", "air",
+  "blue", "red", "black", "white", "silver", "gold", "titanium",
+  "graphite", "gray", "grey", "purple", "pink", "green", "starlight",
+  "256gb", "512gb", "128gb", "64gb", "1tb", "2tb",
+  "5g", "4g", "lte", "wifi",
+]);
+
+function stripTrailingModifiers(query: string): string | null {
+  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+  let i = tokens.length;
+  while (i > 1 && TRAILING_MODIFIERS.has(tokens[i - 1])) i--;
+  if (i === tokens.length) return null;     // nothing stripped
+  if (i < 2) return null;                   // would over-strip
+  return tokens.slice(0, i).join(" ");
+}
+
 /* True if anchor + candidate are in incompatible families (e.g. phone vs tablet).
    Allows the case where one (or both) families are unidentified — only blocks
    when we have HIGH CONFIDENCE both items are in different known families. */
@@ -220,10 +293,10 @@ function ftsRowToDupe(row: FtsRow, anchor: ProductGroup): DupeResult {
 
   /* Suppress savings UI for absurdly-high "savings" — almost always a
      category mismatch (case shown as dupe for phone) or upstream parsing
-     error. >85% off the anchor's best price is a strong red flag. We still
+     error. >=85% off the anchor's best price is a strong red flag. We still
      return the dupe but with savings zeroed so the green badge doesn't
      misrepresent the comparison. */
-  const looksFake = rawPercent > 85;
+  const looksFake = rawPercent >= 85;
   const savings = looksFake ? 0 : rawSavings;
   const savingsPercent = looksFake ? 0 : Math.min(rawPercent, 99);
 
@@ -274,6 +347,7 @@ export async function pgFtsFindDupes(
      filter; UI then ranks by FTS similarity alone. */
   const noCeiling = anchorPriceNgn <= 0;
   const limit = opts?.limit ?? 16;
+  const qFamily = queryFamily(query);
 
   const { data: matches, error } = await supa.rpc("search_products_fts", {
     q: query,
@@ -304,10 +378,19 @@ export async function pgFtsFindDupes(
        If we don't (sniff returned no price), keep all plausible matches. */
     .filter((r) => noCeiling || priceInNgn(r.current_price, r.currency) < anchorPriceNgn * 0.99)
     .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug))
-    // Same product-family gate as the main findSimilar path
+    // Drop accessory / parts / replacement noise
+    .filter((r) => !looksLikeAccessory(r.title))
+    // Product-family gate: an iPhone anchor must not get iPad / MacBook dupes.
     .filter((r) => !familiesIncompatible(query, r.title))
-    .slice(0, limit * 2)
+    // Category-class queries ("phones") must produce dupes in that family
+    .filter((r) => !qFamily || detectFamily(r.title) === qFamily)
     .map((r) => ftsRowToDupe(r, fakeAnchor))
+    /* When we have an anchor price, also drop near-zero-savings rows.
+       Anything < 5% off is noise; the user wants meaningful alternatives. */
+    .filter((d) => noCeiling || d.savingsPercent >= 5)
+    // Drop the >=85% suppressed rows entirely (savingsPercent zeroed by builder)
+    .filter((d) => noCeiling || d.savingsPercent > 0)
+    .slice(0, limit * 2)
     .sort((a, b) => {
       const aScore = a.similarityScore * 0.55 + Math.min(a.savingsPercent, 80) * 0.45;
       const bScore = b.similarityScore * 0.55 + Math.min(b.savingsPercent, 80) * 0.45;
@@ -329,18 +412,40 @@ export async function pgFtsFindSimilar(
   if (!supa) return { mode: "empty", query: q, suggestions: [] };
 
   const limit = opts?.limit ?? 16;
+  const qFam = queryFamily(q);
 
-  /* 1. Pick the anchor — top FTS match against the user's query */
-  const { data: anchorMatches, error: anchorErr } = await supa.rpc(
-    "search_products_fts",
-    { q, max_results: 1 },
-  );
-
-  if (anchorErr || !anchorMatches || anchorMatches.length === 0) {
-    return { mode: "empty", query: q, suggestions: [] };
+  /* 1. Pick the anchor — top FTS match against the user's query.
+        Pull a small candidate set (not just top-1) so we can apply
+        family + accessory filters BEFORE picking the anchor. The first
+        FTS hit for "phones" is "Sony Headphones" (trigram overlap) — by
+        scoring with our gates we pick the first phone instead. */
+  async function fetchAnchorCandidate(query: string): Promise<FtsRow | null> {
+    const { data, error } = await supa!.rpc("search_products_fts", {
+      q: query,
+      max_results: 20,
+    });
+    if (error || !data) return null;
+    const candidates = (data as FtsRow[])
+      .filter((r) => !looksLikeAccessory(r.title))
+      .filter((r) => !qFam || detectFamily(r.title) === qFam);
+    return candidates[0] ?? null;
   }
 
-  const topRow = anchorMatches[0] as FtsRow;
+  let topRow = await fetchAnchorCandidate(q);
+
+  /* Fallback: if the user's specific query yields no anchor, try a less
+     specific form by stripping trailing modifiers ("iphone 15 pro max"
+     → "iphone 15"). The Apple iPhone 15 Pro Max row may not be in the
+     DB but Apple iPhone 15 likely is — better to anchor on a related
+     model than show empty for the headline product family. */
+  if (!topRow) {
+    const fallback = stripTrailingModifiers(q);
+    if (fallback) topRow = await fetchAnchorCandidate(fallback);
+  }
+
+  if (!topRow) {
+    return { mode: "empty", query: q, suggestions: [] };
+  }
 
   /* 2. Fetch full anchor product with all per-store offers (for price comparison) */
   const { data: productData, error: pErr } = await supa
@@ -380,7 +485,7 @@ export async function pgFtsFindSimilar(
 
   const dupes: DupeResult[] = ((similarMatches as FtsRow[]) ?? [])
     // Drop the anchor itself
-    .filter((r) => r.product_id !== topRow.product_id)
+    .filter((r) => r.product_id !== topRow!.product_id)
     // Same category preferred (when the anchor has one)
     .filter((r) => !anchor.category || anchor.category === "general" || r.category_slug === anchor.category)
     // Strict cheaper-only — the anchor's own offer leaks through with
@@ -388,10 +493,15 @@ export async function pgFtsFindSimilar(
     .filter((r) => priceInNgn(r.current_price, r.currency) < anchor.bestPrice * 0.99)
     // Implausibly low prices are almost always upstream data errors.
     .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug))
+    // Drop accessory / parts / replacement noise
+    .filter((r) => !looksLikeAccessory(r.title))
     // Product-family gate: an iPhone anchor must not get iPad / MacBook dupes.
     .filter((r) => !familiesIncompatible(anchor.title, r.title))
-    .slice(0, limit * 2) // over-sample, then re-rank
     .map((r) => ftsRowToDupe(r, anchor))
+    // Drop near-zero-savings rows (≤ 1% rounding noise) and the
+    // suppressed >=85% rows (savingsPercent zeroed by builder)
+    .filter((d) => d.savingsPercent >= 5)
+    .slice(0, limit * 2) // over-sample, then re-rank
     .sort((a, b) => {
       // Blend: similarity (FTS rank) + savings, capped to avoid runaway
       const aScore = a.similarityScore * 0.55 + Math.min(a.savingsPercent, 80) * 0.45;

@@ -307,9 +307,15 @@ function CompareContent() {
                     {result.anchor.title}
                   </h2>
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
-                    <span className="text-lg sm:text-xl font-bold text-ink">
-                      {formatNaira(result.anchor.bestPrice)}
-                    </span>
+                    {result.anchor.bestPrice > 0 ? (
+                      <span className="text-lg sm:text-xl font-bold text-ink">
+                        {formatNaira(result.anchor.bestPrice)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-ink-3 italic">
+                        Price not shown on the source page
+                      </span>
+                    )}
                   </div>
 
                   {/* Store chips — horizontally scroll on mobile, no awkward wraps */}

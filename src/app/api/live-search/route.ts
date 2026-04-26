@@ -75,11 +75,35 @@ export async function GET(req: NextRequest) {
     .split(/\s+/)
     .filter((w) => w.length >= 3 && !STOP.has(w));
 
-  const relevant = queryTokens.length === 0
+  const tokenRelevant = queryTokens.length === 0
     ? deduped  // can't filter without tokens
     : deduped.filter((it) => {
         const title = it.title.toLowerCase();
         return queryTokens.some((t) => title.includes(t));
+      });
+
+  /* Accessory exclusion — when the query itself is a product name (e.g.
+     "iphone 15 pro max"), drop results whose titles are accessories /
+     parts (case, cover, screen protector, replacement LCD, etc.). The
+     "iPhone 15 Pro Max Ronaldo Football Phone Case" should not be the
+     top live result for a phone search. Skip when the query already
+     names the accessory class so a "phone case" search still works. */
+  const ACCESSORY_KW = [
+    "case", "cover", "skin", "holder", "stand", "tripod", "selfie stick",
+    "screen protector", "tempered glass", "replacement", "repair",
+    "lcd screen", "battery replacement", "lens kit", "gimbal",
+  ];
+  const lowerQ = q.toLowerCase();
+  const queryIsAccessory = ACCESSORY_KW.some((kw) => lowerQ.includes(kw));
+
+  const relevant = queryIsAccessory
+    ? tokenRelevant
+    : tokenRelevant.filter((it) => {
+        const t = it.title.toLowerCase();
+        return !ACCESSORY_KW.some((kw) => {
+          const re = new RegExp(`(^|[^a-z])${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z]|$)`);
+          return re.test(t);
+        });
       });
 
   return NextResponse.json(

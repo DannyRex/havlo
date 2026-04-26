@@ -46,9 +46,12 @@ interface Props {
   aspect: string;
   /** Show the small INTL chip on USD-priced items */
   showOriginBadge?: boolean;
+  /** Above-the-fold cards opt in to eager + high-priority image loading
+      so the LCP pixel arrives without waiting for the lazy heuristic. */
+  priority?: boolean;
 }
 
-export default function MasonryCard({ deal, aspect, showOriginBadge = true }: Props) {
+export default function MasonryCard({ deal, aspect, showOriginBadge = true, priority = false }: Props) {
   const isUSD = deal.currency === "USD";
   const saved = savings(deal.originalPrice, deal.salePrice);
   const cleanedTitle = cleanTitle(deal.title);
@@ -77,7 +80,12 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true }: Pr
           <img
             src={deal.imageUrl}
             alt=""
-            loading="lazy"
+            /* `priority` is set on the first few above-the-fold cards so the
+               LCP image starts loading immediately instead of being deferred
+               by the browser's lazy heuristic. Everything else stays lazy. */
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
+            decoding={priority ? "sync" : "async"}
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05] motion-reduce:group-hover:scale-100"
           />
         ) : (

@@ -179,12 +179,13 @@ export default function Navbar() {
             <p className="text-[11px] text-ink-3 leading-relaxed">
               Havlo finds cheaper alternatives across 12+ stores worldwide.
             </p>
-            <a
-              href="mailto:hello@havlo.io"
+            <Link
+              href="/contact"
+              onClick={() => setDrawerOpen(false)}
               className="text-[11px] text-ink-2 hover:text-ink transition-colors mt-2 inline-block underline-offset-4 hover:underline"
             >
-              hello@havlo.io
-            </a>
+              Contact us →
+            </Link>
           </div>
         </div>
       </aside>
