@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
   const lowerQ = q.toLowerCase();
   const queryIsAccessory = ACCESSORY_KW.some((kw) => lowerQ.includes(kw));
 
-  const relevant = queryIsAccessory
+  const accessoryFiltered = queryIsAccessory
     ? tokenRelevant
     : tokenRelevant.filter((it) => {
         const t = it.title.toLowerCase();
@@ -104,6 +104,36 @@ export async function GET(req: NextRequest) {
           const re = new RegExp(`(^|[^a-z])${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z]|$)`);
           return re.test(t);
         });
+      });
+
+  /* Cross-family exclusion. Token-relevance is too lax for queries like
+     "iphone 15 pro max" — the bare token "pro" matches "iPad Pro 13inch
+     M4 WiFi" because both contain "pro". Detect the query's family and
+     drop candidates from incompatible families. Mirrors the same gate
+     pgFtsFindSimilar uses on the DB-backed path so live + DB results are
+     consistent. */
+  const FAMILY_TOKENS: Record<string, RegExp> = {
+    phone:      /\b(iphone|galaxy|pixel|tecno|infinix|redmi|oneplus|smartphone|phone)\b/,
+    tablet:     /\b(ipad|tablet|matepad|mediapad)\b/,
+    laptop:     /\b(macbook|thinkpad|laptop|notebook|chromebook)\b/,
+    headphones: /\b(headphones?|headset|airpods\s+max|wh-1000)\b/,
+    earbuds:    /\b(airpods|earbuds|earpods|tws)\b/,
+    tv:         /\b(smart\s*tv|qled|oled|led\s*tv|uhd\s*tv|4k\s*tv)\b/,
+  };
+  function detectQueryFamily(s: string): string | null {
+    for (const [fam, re] of Object.entries(FAMILY_TOKENS)) {
+      if (re.test(s)) return fam;
+    }
+    return null;
+  }
+  const qFam = detectQueryFamily(lowerQ);
+  const relevant = !qFam
+    ? accessoryFiltered
+    : accessoryFiltered.filter((it) => {
+        const t = it.title.toLowerCase();
+        const titleFam = detectQueryFamily(t);
+        // Allow when title family unknown OR matches query family
+        return !titleFam || titleFam === qFam;
       });
 
   return NextResponse.json(

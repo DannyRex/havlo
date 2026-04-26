@@ -92,11 +92,19 @@ export default function ContactForm({ endpoint }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-      {/* Honeypot — visually hidden, accessible-hidden, but real to bots */}
-      <div aria-hidden="true" className="hidden">
-        <label>
+      {/* Honeypot — visually hidden + screen-reader hidden + tabindex=-1
+          so keyboard users skip it entirely. Bots that parse the DOM
+          and fill every input still get caught. */}
+      <div aria-hidden="true" className="hidden" tabIndex={-1}>
+        <label aria-hidden="true">
           Website
-          <input type="text" name="website" tabIndex={-1} autoComplete="off" />
+          <input
+            type="text"
+            name="website"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+          />
         </label>
       </div>
 

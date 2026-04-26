@@ -483,6 +483,7 @@ function CompareContent() {
                 <SearchX size={28} className="text-ink-3 mx-auto mb-3" strokeWidth={1.5} />
                 <h3 className="text-base font-medium text-ink mb-1">
                   No matches anywhere for &ldquo;{displayQuery}&rdquo;
+                  <span className="text-ink-3"> · </span>
                 </h3>
                 <p className="text-sm text-ink-3">
                   Try a broader or different term, like just the brand or category.

@@ -108,24 +108,39 @@ function priceLooksPlausible(priceNgn: number, categorySlug: string | null): boo
      • Headphone anchor → Speaker dupes (already partly handled by FTS)
 
    Lightweight string-match — no regex chains, no maintenance per brand. */
+/* IMPORTANT: order matters. The first family whose tokens match wins.
+   Headphones / earbuds / desktop / tablet are listed BEFORE phone so a
+   title like "Sony WH-CH520 Wireless Headphones" detects as headphones,
+   not as phone (the substring "phone" lives inside "headphones"). */
 const PRODUCT_FAMILIES: Record<string, string[]> = {
-  phone:       ["iphone", "galaxy", "pixel", "tecno", "infinix", "redmi", "oneplus", "phone", "smartphone"],
-  tablet:      ["ipad", "tablet", "tab a", "tab s", "matepad", "mediapad"],
-  laptop:      ["macbook", "thinkpad", "xps", "pavilion", "ideapad", "zenbook", "laptop", "notebook", "chromebook"],
-  desktop:     ["imac", "mac mini", "mac pro", "all-in-one"],
   headphones:  ["airpods max", "wh-1000", "headphones", "headphone", "headset", "over-ear", "over ear"],
-  earbuds:     ["airpods", "earbuds", "earpods", "buds", "tws"],
+  earbuds:     ["airpods", "earbuds", "earpods", "tws"],
+  tablet:      ["ipad", "tablet", "tab a", "tab s", "matepad", "mediapad"],
+  desktop:     ["imac", "mac mini", "mac pro", "all-in-one"],
+  laptop:      ["macbook", "thinkpad", "xps", "pavilion", "ideapad", "zenbook", "laptop", "notebook", "chromebook"],
   speaker:     ["speaker", "soundbar", "boombox", "home theater", "home theatre"],
   tv:          ["smart tv", "qled", "oled", "led tv", "uhd tv", "4k tv"],
   console:     ["playstation", "ps5", "ps4", "xbox", "nintendo", "switch"],
   watch:       ["smartwatch", "smart watch", "apple watch", "garmin", "fitbit", "fossil"],
   camera:      ["dslr", "mirrorless", "camcorder", "gopro"],
+  phone:       ["iphone", "galaxy", "pixel", "tecno", "infinix", "redmi", "oneplus", "smartphone", "phone"],
 };
+
+/* Single-word tokens that are dangerous as substrings (e.g. "phone"
+   inside "headphones", "buds" inside "earbuds-style"). For these we
+   require a real word boundary instead of a naive String.includes. */
+const WORD_BOUNDARY_TOKENS = new Set(["phone", "tv", "buds", "tablet", "watch"]);
+
+function tokenMatchesTitle(token: string, lowerTitle: string): boolean {
+  if (!WORD_BOUNDARY_TOKENS.has(token)) return lowerTitle.includes(token);
+  const re = new RegExp(`(^|[^a-z])${token}([^a-z]|$)`);
+  return re.test(lowerTitle);
+}
 
 function detectFamily(title: string): string | null {
   const t = title.toLowerCase();
   for (const [family, tokens] of Object.entries(PRODUCT_FAMILIES)) {
-    if (tokens.some((tok) => t.includes(tok))) return family;
+    if (tokens.some((tok) => tokenMatchesTitle(tok, t))) return family;
   }
   return null;
 }
@@ -431,51 +446,64 @@ export async function pgFtsFindSimilar(
     return candidates[0] ?? null;
   }
 
-  let topRow = await fetchAnchorCandidate(q);
+  /* Build a candidate anchor from a single FTS row, validating it has
+     in-stock offers AND a category-plausible price. Returns null when
+     the row exists but doesn't survive validation — caller should then
+     try a fallback query (e.g. token-stripped form) before giving up. */
+  async function resolveAnchorFromRow(row: FtsRow): Promise<ProductGroup | null> {
+    const { data: productData, error: pErr } = await supa!
+      .from("products")
+      .select(`
+        id, title, category_slug, brand, image_url,
+        offers (
+          id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
+          stores ( id, name, logo_url, is_international )
+        )
+      `)
+      .eq("id", row.product_id)
+      .single();
+    if (pErr || !productData) return null;
+    const a = buildAnchorGroup(productData as unknown as AnchorProduct);
+    if (a.offers.length === 0) return null;
+    if (!priceLooksPlausible(a.bestPrice, a.category)) return null;
+    return a;
+  }
 
-  /* Fallback: if the user's specific query yields no anchor, try a less
-     specific form by stripping trailing modifiers ("iphone 15 pro max"
-     → "iphone 15"). The Apple iPhone 15 Pro Max row may not be in the
-     DB but Apple iPhone 15 likely is — better to anchor on a related
-     model than show empty for the headline product family. */
-  if (!topRow) {
+  /* Try in this order:
+       1. The user's exact query
+       2. A token-stripped fallback ("iphone 15 pro max" → "iphone 15")
+     For each candidate query we walk the top-N FTS rows (not just top-1)
+     so a single bad row (offers gone, category-implausible price) can't
+     poison the entire result. The Apple iPhone 15 Pro Max row may not
+     exist; Apple iPhone 15 likely does — anchoring on the related model
+     beats showing empty for the headline product family. */
+  async function pickAnchor(query: string): Promise<{ row: FtsRow; anchor: ProductGroup } | null> {
+    const { data, error } = await supa!.rpc("search_products_fts", {
+      q: query,
+      max_results: 20,
+    });
+    if (error || !data) return null;
+    const candidates = (data as FtsRow[])
+      .filter((r) => !looksLikeAccessory(r.title))
+      .filter((r) => !qFam || detectFamily(r.title) === qFam);
+    for (const row of candidates) {
+      const anchor = await resolveAnchorFromRow(row);
+      if (anchor) return { row, anchor };
+    }
+    return null;
+  }
+
+  let picked = await pickAnchor(q);
+  if (!picked) {
     const fallback = stripTrailingModifiers(q);
-    if (fallback) topRow = await fetchAnchorCandidate(fallback);
+    if (fallback) picked = await pickAnchor(fallback);
   }
-
-  if (!topRow) {
+  if (!picked) {
     return { mode: "empty", query: q, suggestions: [] };
   }
 
-  /* 2. Fetch full anchor product with all per-store offers (for price comparison) */
-  const { data: productData, error: pErr } = await supa
-    .from("products")
-    .select(`
-      id, title, category_slug, brand, image_url,
-      offers (
-        id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
-        stores ( id, name, logo_url, is_international )
-      )
-    `)
-    .eq("id", topRow.product_id)
-    .single();
-
-  if (pErr || !productData) {
-    return { mode: "empty", query: q, suggestions: [] };
-  }
-
-  const anchor = buildAnchorGroup(productData as unknown as AnchorProduct);
-  if (anchor.offers.length === 0) {
-    return { mode: "empty", query: q, suggestions: [] };
-  }
-
-  /* If the top match's best price is implausibly low for its category,
-     it's almost certainly bad data (a case mis-listed as a phone, etc.).
-     Return empty so the live SerpAPI section can serve real anchors
-     instead of presenting a clearly-wrong product. */
-  if (!priceLooksPlausible(anchor.bestPrice, anchor.category)) {
-    return { mode: "empty", query: q, suggestions: [] };
-  }
+  const topRow = picked.row;
+  const anchor = picked.anchor;
 
   /* 3. Find similar products via FTS using the anchor's title (richer query than user's) */
   const { data: similarMatches } = await supa.rpc("search_products_fts", {
