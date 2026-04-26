@@ -198,6 +198,40 @@ function looksLikeAccessory(title: string): boolean {
   });
 }
 
+/* Suspicious / counterfeit-looking titles. These slip past family +
+   accessory + price filters because they LOOK like the real product
+   ("Apple MacBook Neo A18 Pro 13-inch") but combine known-Apple naming
+   with a non-Apple chipset (A18 is Mediatek/Infinix; Apple uses M1–M5).
+   Hard to detect generically — we maintain a small denylist of known
+   bad patterns. Easy to extend as new fake listings surface. */
+const SUSPICIOUS_PATTERNS: RegExp[] = [
+  // "Apple MacBook ... <non-Apple chip>" — Apple ships M1–M5 only.
+  /\bmacbook\b.*\b(a1[0-9]|a2[0-9]|helio|snapdragon|exynos|kirin|dimensity|tensor)\b/i,
+  // "Apple MacBook Neo" — Apple has never made a "Neo" line.
+  /\bmacbook\s+neo\b/i,
+  // "Apple iPhone ... <Android marker>" — fake iPhone clones.
+  /\biphone\b.*\b(android|harmonyos|miui|oneui)\b/i,
+];
+
+function looksSuspicious(title: string): boolean {
+  return SUSPICIOUS_PATTERNS.some((re) => re.test(title));
+}
+
+/* Score a candidate title against the user's query.
+   Token-overlap with a 3× boost for numeric tokens (model numbers like
+   "15" in "iphone 15 pro max" are the strongest disambiguator). Returns
+   a number — higher is better. */
+function scoreCandidate(query: string, candidateTitle: string): number {
+  const qTokens = query.toLowerCase().split(/\s+/).filter((t) => t.length >= 2);
+  const t = candidateTitle.toLowerCase();
+  let score = 0;
+  for (const tok of qTokens) {
+    const isNumeric = /^\d+/.test(tok);
+    if (t.includes(tok)) score += isNumeric ? 3 : 1;
+  }
+  return score;
+}
+
 /* Strip trailing modifier tokens for fallback queries.
    "iphone 15 pro max" → "iphone 15", "macbook pro 16" → "macbook pro".
    Rules: drop trailing color words, sizes, storage, generic modifiers. */
@@ -395,6 +429,8 @@ export async function pgFtsFindDupes(
     .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug))
     // Drop accessory / parts / replacement noise
     .filter((r) => !looksLikeAccessory(r.title))
+    // Drop counterfeit-looking titles ("Apple MacBook Neo A18 Pro")
+    .filter((r) => !looksSuspicious(r.title))
     // Product-family gate: an iPhone anchor must not get iPad / MacBook dupes.
     .filter((r) => !familiesIncompatible(query, r.title))
     // Category-class queries ("phones") must produce dupes in that family
@@ -483,10 +519,21 @@ export async function pgFtsFindSimilar(
       max_results: 20,
     });
     if (error || !data) return null;
+
+    /* Re-rank candidates by query-token overlap (with a 3× boost for
+       numeric tokens). FTS rank alone treats "iphone 15 pro max" against
+       "iPhone 17 Pro" as a strong match because "iphone" + "pro" both
+       hit. By weighting model numbers heavily we keep the literal "15"
+       in the user's query from being silently swapped for "17". */
     const candidates = (data as FtsRow[])
       .filter((r) => !looksLikeAccessory(r.title))
-      .filter((r) => !qFam || detectFamily(r.title) === qFam);
-    for (const row of candidates) {
+      .filter((r) => !looksSuspicious(r.title))
+      .filter((r) => !qFam || detectFamily(r.title) === qFam)
+      .map((r) => ({ row: r, score: scoreCandidate(query, r.title) }))
+      // Stable sort: score desc, then preserve original FTS rank as tiebreak
+      .sort((a, b) => b.score - a.score);
+
+    for (const { row } of candidates) {
       const anchor = await resolveAnchorFromRow(row);
       if (anchor) return { row, anchor };
     }
@@ -523,6 +570,8 @@ export async function pgFtsFindSimilar(
     .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug))
     // Drop accessory / parts / replacement noise
     .filter((r) => !looksLikeAccessory(r.title))
+    // Drop counterfeit-looking titles ("Apple MacBook Neo A18 Pro")
+    .filter((r) => !looksSuspicious(r.title))
     // Product-family gate: an iPhone anchor must not get iPad / MacBook dupes.
     .filter((r) => !familiesIncompatible(anchor.title, r.title))
     .map((r) => ftsRowToDupe(r, anchor))
