@@ -206,11 +206,15 @@ function looksLikeAccessory(title: string): boolean {
    bad patterns. Easy to extend as new fake listings surface. */
 const SUSPICIOUS_PATTERNS: RegExp[] = [
   // "Apple MacBook ... <non-Apple chip>" — Apple ships M1–M5 only.
-  /\bmacbook\b.*\b(a1[0-9]|a2[0-9]|helio|snapdragon|exynos|kirin|dimensity|tensor)\b/i,
+  /macbook[^a-z0-9]+.*\b(a1[0-9]|a2[0-9]|helio|snapdragon|exynos|kirin|dimensity|tensor)\b/i,
   // "Apple MacBook Neo" — Apple has never made a "Neo" line.
-  /\bmacbook\s+neo\b/i,
+  // Allow any non-letter separator so "MacBook-Neo", "MacBook  Neo" all match.
+  /macbook[^a-z]+neo/i,
   // "Apple iPhone ... <Android marker>" — fake iPhone clones.
-  /\biphone\b.*\b(android|harmonyos|miui|oneui)\b/i,
+  /iphone[^a-z]+.*\b(android|harmonyos|miui|oneui)\b/i,
+  // Generic: a title that names two competing chip ecosystems is bogus.
+  // Apple Silicon (M1–M5) AND a competing chip in the same title.
+  /\bm[1-5]\b.*(snapdragon|mediatek|helio|a1[0-9]|a2[0-9])/i,
 ];
 
 function looksSuspicious(title: string): boolean {
@@ -465,23 +469,6 @@ export async function pgFtsFindSimilar(
   const limit = opts?.limit ?? 16;
   const qFam = queryFamily(q);
 
-  /* 1. Pick the anchor — top FTS match against the user's query.
-        Pull a small candidate set (not just top-1) so we can apply
-        family + accessory filters BEFORE picking the anchor. The first
-        FTS hit for "phones" is "Sony Headphones" (trigram overlap) — by
-        scoring with our gates we pick the first phone instead. */
-  async function fetchAnchorCandidate(query: string): Promise<FtsRow | null> {
-    const { data, error } = await supa!.rpc("search_products_fts", {
-      q: query,
-      max_results: 20,
-    });
-    if (error || !data) return null;
-    const candidates = (data as FtsRow[])
-      .filter((r) => !looksLikeAccessory(r.title))
-      .filter((r) => !qFam || detectFamily(r.title) === qFam);
-    return candidates[0] ?? null;
-  }
-
   /* Build a candidate anchor from a single FTS row, validating it has
      in-stock offers AND a category-plausible price. Returns null when
      the row exists but doesn't survive validation — caller should then
@@ -540,11 +527,29 @@ export async function pgFtsFindSimilar(
     return null;
   }
 
-  let picked = await pickAnchor(q);
-  if (!picked) {
-    const fallback = stripTrailingModifiers(q);
-    if (fallback) picked = await pickAnchor(fallback);
+  /* Always try BOTH the literal query AND the token-stripped fallback,
+     then pick whichever anchor scores higher against the ORIGINAL user
+     query. FTS ranks "iPhone 17 Pro" above "Apple iPhone 15" for the
+     query "iphone 15 pro max" (3 of 4 tokens vs 2 of 4) — so iPhone 15
+     never enters the top-20 candidate set if we only run one query.
+     The stripped fallback "iphone 15" reliably surfaces iPhone 15 SKUs;
+     the comparison then pins the result to the right model generation. */
+  const fallbackQ = stripTrailingModifiers(q);
+  const [primary, fallback] = await Promise.all([
+    pickAnchor(q),
+    fallbackQ ? pickAnchor(fallbackQ) : Promise.resolve(null),
+  ]);
+
+  function pickBetter(
+    a: { row: FtsRow; anchor: ProductGroup } | null,
+    b: { row: FtsRow; anchor: ProductGroup } | null,
+  ): { row: FtsRow; anchor: ProductGroup } | null {
+    if (!a) return b;
+    if (!b) return a;
+    return scoreCandidate(q, b.anchor.title) > scoreCandidate(q, a.anchor.title) ? b : a;
   }
+
+  const picked = pickBetter(primary, fallback);
   if (!picked) {
     return { mode: "empty", query: q, suggestions: [] };
   }
