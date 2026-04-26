@@ -59,20 +59,24 @@ export default function Navbar() {
           {/* Right cluster — links + theme toggle */}
           <div className="flex items-center gap-1">
             <div className="hidden md:flex items-center gap-1 mr-2">
-              {navLinks.map(({ href, label }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className={cn(
-                    "px-3.5 py-2 rounded-full text-sm font-medium transition-colors",
-                    isActive(href)
-                      ? "text-ink bg-surface-2"
-                      : "text-ink-2 hover:text-ink hover:bg-surface-2",
-                  )}
-                >
-                  {label}
-                </Link>
-              ))}
+              {navLinks.map(({ href, label }) => {
+                const active = isActive(href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "px-3.5 py-2 rounded-full text-sm font-medium transition-colors",
+                      active
+                        ? "text-ink bg-surface-2"
+                        : "text-ink-2 hover:text-ink hover:bg-surface-2",
+                    )}
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
             </div>
             <ThemeToggle />
           </div>
@@ -91,6 +95,7 @@ export default function Navbar() {
               <Link
                 key={href}
                 href={href}
+                aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors min-w-0",
                   active ? "text-ink" : "text-ink-3",
@@ -100,6 +105,7 @@ export default function Navbar() {
                   size={22}
                   strokeWidth={active ? 2.4 : 1.75}
                   className={active ? "text-brand" : ""}
+                  aria-hidden="true"
                 />
                 <span className="truncate">{label}</span>
               </Link>

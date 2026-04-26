@@ -81,14 +81,16 @@ export default function Hero() {
           <span>18,432 comparisons in the last 24 hours</span>
         </div>
 
-        {/* Headline — large, editorial, single tone */}
+        {/* Headline — large, editorial, single tone.
+            Note: literal whitespace between "similar" and "products" so
+            screen readers don't merge them via the line-break.
+            clamp() min lowered to 1.95rem so "products" doesn't clip at 320px. */}
         <h1
           className="font-bold text-ink leading-[0.98] tracking-[-0.04em] mb-5 sm:mb-6 animate-fade-up"
-          style={{ fontSize: "clamp(2.75rem, 8vw, 5rem)" }}
+          style={{ fontSize: "clamp(1.95rem, 8vw, 5rem)" }}
         >
-          Find similar
-          <br />
-          products for less.
+          Find similar products{" "}
+          <span className="block sm:inline">for less.</span>
         </h1>
 
         <p

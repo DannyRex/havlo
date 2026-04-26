@@ -359,14 +359,27 @@ function CompareContent() {
               />
             </>
           ) : (liveLoading || liveResults.length > 0) ? (
-            /* No internal dupes, but live SerpAPI has (or is loading) results. */
+            /* No internal dupes, but live has (or is loading) results. */
             <LiveResults
               items={liveResults}
               loading={liveLoading}
               providers={liveProviders}
             />
+          ) : !liveLoading && liveProviders.length === 0 ? (
+            /* Live providers misconfigured — distinct from "nothing matches" */
+            <div className="text-center py-12">
+              <div className="max-w-sm mx-auto">
+                <AlertCircle size={28} className="text-amber-500 mx-auto mb-3" strokeWidth={1.5} />
+                <p className="text-sm text-ink font-medium mb-1">
+                  Live search unavailable
+                </p>
+                <p className="text-xs text-ink-3">
+                  We couldn&apos;t reach the live shopping providers — only your local catalog was searched.
+                </p>
+              </div>
+            </div>
           ) : (
-            /* Both internal and live came back empty. */
+            /* Both internal and live came back empty for real */
             <div className="text-center py-12">
               <div className="max-w-sm mx-auto">
                 <SearchX size={28} className="text-ink-3 mx-auto mb-3" strokeWidth={1.5} />
@@ -383,38 +396,62 @@ function CompareContent() {
       )}
 
       {/* ── Empty / no results ──
-           Three sub-states:
+           Sub-states:
            A) live is loading → show LiveResults skeletons, suppress empty copy
-           B) live has items   → show only LiveResults (with a small context note)
-           C) both empty       → show helpful "try a different search" guidance */}
-      {!loading && result?.mode === "empty" && query && (
-        <div className="mt-12">
-          {(liveLoading || liveResults.length > 0) ? (
-            <>
-              <div className="max-w-3xl mx-auto mb-5 px-1 text-center sm:text-left">
-                <p className="text-[13px] text-ink-2">
-                  Nothing in our local index for &ldquo;{query}&rdquo; yet — here&apos;s what&apos;s live online:
+           B) live has items   → show LiveResults with a context note
+           C) live providers misconfigured → distinct "service unavailable" message
+           D) both genuinely empty → "no matches" guidance */}
+      {!loading && result?.mode === "empty" && query && (() => {
+        // Prefer the sniffed product title over the raw URL when present
+        const displayQuery =
+          sniffResult?.ok && sniffResult.title ? sniffResult.title : query;
+
+        // Live providers configured but returned 0? vs not configured at all?
+        const liveAvailable = liveLoading || liveResults.length > 0;
+        const liveMisconfigured = !liveLoading && liveProviders.length === 0;
+
+        return (
+          <div className="mt-12">
+            {liveAvailable ? (
+              <>
+                <div className="max-w-3xl mx-auto mb-5 px-1 text-center sm:text-left">
+                  <p className="text-[13px] text-ink-2">
+                    Nothing in our local index for &ldquo;{displayQuery}&rdquo; yet —
+                    here&apos;s what&apos;s live online:
+                  </p>
+                </div>
+                <LiveResults
+                  items={liveResults}
+                  loading={liveLoading}
+                  providers={liveProviders}
+                />
+              </>
+            ) : liveMisconfigured ? (
+              <div className="max-w-md mx-auto text-center py-12">
+                <AlertCircle size={28} className="text-amber-500 mx-auto mb-3" strokeWidth={1.5} />
+                <h3 className="text-base font-medium text-ink mb-1">
+                  Live search unavailable
+                </h3>
+                <p className="text-sm text-ink-3">
+                  We don&apos;t have &ldquo;{displayQuery}&rdquo; in our index yet, and live
+                  shopping providers aren&apos;t reachable right now. Try again in a moment, or browse{" "}
+                  <a href="/deals" className="text-ink underline underline-offset-2">deals</a>.
                 </p>
               </div>
-              <LiveResults
-                items={liveResults}
-                loading={liveLoading}
-                providers={liveProviders}
-              />
-            </>
-          ) : (
-            <div className="max-w-md mx-auto text-center py-12">
-              <SearchX size={28} className="text-ink-3 mx-auto mb-3" strokeWidth={1.5} />
-              <h3 className="text-base font-medium text-ink mb-1">
-                No matches for &ldquo;{query}&rdquo;
-              </h3>
-              <p className="text-sm text-ink-3">
-                Try a broader or different term — e.g. just the brand or category.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+            ) : (
+              <div className="max-w-md mx-auto text-center py-12">
+                <SearchX size={28} className="text-ink-3 mx-auto mb-3" strokeWidth={1.5} />
+                <h3 className="text-base font-medium text-ink mb-1">
+                  No matches for &ldquo;{displayQuery}&rdquo;
+                </h3>
+                <p className="text-sm text-ink-3">
+                  Try a broader or different term — e.g. just the brand or category.
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

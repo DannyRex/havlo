@@ -101,37 +101,39 @@ export default function CTA() {
         {/* Outer relative wrapper — does NOT clip, lets cards bleed past panel */}
         <div className="relative">
 
-          {/* Dark panel — clean, no decorative gradients */}
-          <div className="relative overflow-hidden rounded-[28px] sm:rounded-[36px] bg-ink text-bg lg:min-h-[480px]">
+          {/* Dark panel — fixed-color (zinc-950) instead of semantic bg-ink so
+              it stays consistently dark in both themes. With bg-ink the panel
+              would invert to near-white in dark mode and clash with the page. */}
+          <div className="relative overflow-hidden rounded-[28px] sm:rounded-[36px] bg-zinc-950 text-white lg:min-h-[480px]">
             {/* Left column lives in normal flow */}
             <div className="relative grid lg:grid-cols-2 items-center">
               <div className="px-6 py-12 sm:px-12 sm:py-16 lg:py-14 lg:pr-6">
-                <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-bg/60 mb-5">
+                <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-white/60 mb-5">
                   <span className="w-1.5 h-1.5 rounded-full bg-success" />
                   Free · No account required
                 </p>
 
-                <h2 className="text-[32px] sm:text-5xl font-bold text-bg tracking-[-0.035em] leading-[1.04] mb-5">
+                <h2 className="text-[32px] sm:text-5xl font-bold text-white tracking-[-0.035em] leading-[1.04] mb-5">
                   Before you buy it,
                   <br />
-                  <span className="text-bg/75">find it for less.</span>
+                  <span className="text-white/75">find it for less.</span>
                 </h2>
 
-                <p className="text-bg/70 text-[15px] sm:text-lg leading-relaxed max-w-md mb-8">
+                <p className="text-white/70 text-[15px] sm:text-lg leading-relaxed max-w-md mb-8">
                   Paste a product link or search anything. Havlo finds cheaper alternatives across the world&apos;s biggest stores in seconds.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Link
                     href="/compare"
-                    className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full font-semibold text-sm bg-bg text-ink hover:bg-bg/90 transition-colors active:scale-[0.98]"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full font-semibold text-sm bg-white text-zinc-950 hover:bg-white/90 transition-colors active:scale-[0.98]"
                   >
                     <TrendingDown size={16} />
                     Find for less
                   </Link>
                   <Link
                     href="/deals"
-                    className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full font-semibold text-sm text-bg border border-bg/25 hover:bg-bg/10 transition-colors active:scale-[0.98]"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full font-semibold text-sm text-white border border-white/25 hover:bg-white/10 transition-colors active:scale-[0.98]"
                   >
                     Browse deals
                     <ArrowRight size={16} />

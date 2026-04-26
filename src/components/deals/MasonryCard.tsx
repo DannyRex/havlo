@@ -113,12 +113,15 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true }: Pr
         )}
       </div>
 
-      {/* Caption */}
+      {/* Caption.
+          Eyebrow priority: store name always shows in full (shrink-0).
+          Time-ago only renders on sm+ where there's room — on narrow
+          mobile cards, dropping it beats truncating "Konga" to "K...". */}
       <div className="pt-2 sm:pt-2.5 px-0.5">
-        <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-ink-3 mb-0.5 sm:mb-1 leading-none">
-          <span className="font-medium truncate text-ink-2">{deal.storeName}</span>
-          <span aria-hidden="true">·</span>
-          <span className="shrink-0">{timeAgo(deal.postedAt)}</span>
+        <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-ink-3 mb-0.5 sm:mb-1 leading-none min-w-0">
+          <span className="font-medium text-ink-2 truncate">{deal.storeName}</span>
+          <span aria-hidden="true" className="shrink-0 hidden sm:inline">·</span>
+          <span className="shrink-0 hidden sm:inline">{timeAgo(deal.postedAt)}</span>
         </div>
 
         <p className="text-[12px] sm:text-[13px] font-medium text-ink leading-snug line-clamp-2 mb-1 sm:mb-1.5 tracking-[-0.005em]">

@@ -97,6 +97,11 @@ export default function DealFeed() {
     setLoading(true);
     setItems([]);
     offsetRef.current = 0;
+    // Scroll to top so the user lands on the new results, not stuck at the
+    // bottom of the previous (longer) list.
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
 
     fetch(`/api/deals?${buildParams(0)}`)
       .then((r) => r.json())

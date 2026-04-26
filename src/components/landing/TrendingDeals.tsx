@@ -1,15 +1,13 @@
 import Link from "next/link";
-import { deals } from "@/lib/data/deals";
+import { getActiveBrowseProvider } from "@/lib/providers";
 import type { Deal } from "@/types";
 import MasonryCard, {
   MASONRY_ASPECTS,
   chunkLeftToRight,
 } from "@/components/deals/MasonryCard";
 
-/* Deterministic seed bucketed into 5-minute windows so the picks rotate
-   every 5 min. Server component renders pick this seed; page revalidates
-   every 300s + client `<RefreshOnInterval />` triggers a refetch — together
-   they give a "live" rotation without hydration mismatch. */
+/* Deterministic seed bucketed into 5-minute windows so picks rotate
+   every 5 min. Server-rendered → no hydration mismatch. */
 const ROTATION_MS = 5 * 60 * 1000;
 
 function freshnessSeed(): number {
@@ -22,17 +20,21 @@ function freshnessSeed(): number {
   return h >>> 0;
 }
 
-function seededShuffle<T>(items: T[], seed: number): T[] {
-  const arr = [...items];
+function makeRng(seed: number) {
   let s = seed || 1;
-  for (let i = arr.length - 1; i > 0; i--) {
-    // mulberry32-style PRNG step
+  return () => {
     s = (s + 0x6D2B79F5) >>> 0;
     let t = s;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    const r = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    const j = Math.floor(r * (i + 1));
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function seededShuffle<T>(items: T[], rng: () => number): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
@@ -54,26 +56,33 @@ function MasonryColumn({
   );
 }
 
-export default function TrendingDeals() {
-  /* Build the candidate pool by quality filter, then shuffle by 5-min seed.
-     Over-sample (top 60 by discount) then shuffle, so each 5-min rotation
-     has real variety — not just the same items rearranged. */
-  const seed = freshnessSeed();
-  const pool = deals
-    .filter(
-      (d) =>
-        d.discountPercent >= 15 &&
-        d.title.length >= 10 &&
-        d.title.length <= 70 &&
-        !d.title.includes("\\") &&
-        !(d.currency === "USD" && d.salePrice < 10),
-    )
-    .sort((a, b) => b.discountPercent - a.discountPercent)
-    .slice(0, 60);
+export default async function TrendingDeals() {
+  /* Pull from whichever browse provider is active (DB when populated,
+     static fallback otherwise). Sort by discount → over-sample top N
+     → shuffle → per-store cap → take 16. */
+  const provider = await getActiveBrowseProvider();
+  const pool = await provider.fetchDeals({
+    sort: "discount",
+    minDiscount: 15,
+  });
 
-  const shuffled = seededShuffle(pool, seed);
+  // Quality filter — same rules as before but applied to live data
+  const quality = pool.filter(
+    (d) =>
+      d.title.length >= 10 &&
+      d.title.length <= 70 &&
+      !d.title.includes("\\") &&
+      !(d.currency === "USD" && d.salePrice < 10),
+  );
 
-  // Dedupe + per-store cap for visual diversity, take 16
+  if (quality.length === 0) return null;
+
+  // Over-sample the top 60 by discount, then shuffle deterministically
+  const top = quality.slice(0, 60);
+  const rng = makeRng(freshnessSeed());
+  const shuffled = seededShuffle(top, rng);
+
+  // Dedupe + per-store cap for visual diversity
   const seen = new Set<string>();
   const storeCount: Record<string, number> = {};
   const picks: Deal[] = [];
@@ -124,21 +133,16 @@ export default function TrendingDeals() {
           </Link>
         </div>
 
-        {/* Mobile — 2 cols, L→R */}
         <div className="flex gap-2 sm:hidden">
           {mobileCols.map((col, i) => (
             <MasonryColumn key={i} items={col} gapClass="gap-2" startIndex={i * 100} />
           ))}
         </div>
-
-        {/* Tablet — 3 cols */}
         <div className="hidden sm:flex lg:hidden gap-3">
           {tabletCols.map((col, i) => (
             <MasonryColumn key={i} items={col} gapClass="gap-3" startIndex={i * 100} />
           ))}
         </div>
-
-        {/* Desktop — 4 cols */}
         <div className="hidden lg:flex gap-4">
           {desktopCols.map((col, i) => (
             <MasonryColumn key={i} items={col} gapClass="gap-4" startIndex={i * 100} />
