@@ -18,9 +18,12 @@ export async function GET(req: NextRequest) {
     10,
   );
 
-  if (!q || !maxPriceNgn || maxPriceNgn <= 0) {
+  if (!q) {
     return NextResponse.json({ dupes: [] });
   }
+  /* maxPriceNgn = 0 is now a valid "no ceiling" mode, used when the
+     sniffed product had a title but no extractable price. The dupes
+     engine returns top-similar matches without a price filter. */
 
   try {
     const dupes = await pgFtsFindDupes(q, maxPriceNgn);

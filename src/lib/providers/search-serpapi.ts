@@ -93,6 +93,36 @@ function computeDiscount(originalPrice: number, salePrice: number): number {
   return Math.round(((originalPrice - salePrice) / originalPrice) * 100);
 }
 
+/* USD-equivalent floors per category — same intent as the NGN floors in
+   pg-fts.ts, but applied to live SerpAPI results before they reach the UI.
+   Anything below the floor is upstream parsing error or scammy listing. */
+const CATEGORY_USD_FLOOR: Record<string, number> = {
+  phones:      30,    // ~₦40K
+  computing:   60,    // ~₦80K
+  electronics: 12,    // ~₦15K
+  audio:       4,     // ~₦5K
+  appliances:  15,    // ~₦20K
+  gaming:      12,
+  fashion:     2,
+  beauty:      1,
+  home:        2,
+  sports:      2,
+};
+
+/* Shaky heuristic: infer category from the title for the floor check.
+   Better than nothing — catches the desertcart-iPhone-for-$5 case. */
+function inferCategoryFromTitle(title: string): string | null {
+  const t = title.toLowerCase();
+  if (/\b(iphone|galaxy|pixel|tecno|infinix|smartphone)\b/.test(t)) return "phones";
+  if (/\b(macbook|laptop|notebook|chromebook|thinkpad|xps)\b/.test(t)) return "computing";
+  if (/\b(ipad|tablet|tab a|tab s)\b/.test(t)) return "computing";
+  if (/\b(airpods|headphone|headset|earbuds|earphone|speaker)\b/.test(t)) return "audio";
+  if (/\b(tv|television|qled|oled)\b/.test(t)) return "electronics";
+  if (/\b(playstation|ps5|ps4|xbox|nintendo|switch)\b/.test(t)) return "gaming";
+  if (/\b(fridge|washer|dryer|microwave)\b/.test(t)) return "appliances";
+  return null;
+}
+
 function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | null {
   const saleNative = r.extracted_price;
   const originalNative = r.extracted_old_price;     // undefined ⇒ not on sale
@@ -114,6 +144,12 @@ function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | nu
 
   // After USD rounding, a "fake" discount can collapse to 0 — drop those too
   if (discountPercent === 0 && !hasSaleTag) return null;
+
+  // Reject implausibly-low prices — same logic as pg-fts dupe filter,
+  // applied here before the UI sees the data.
+  const inferredCat = inferCategoryFromTitle(title);
+  const floor: number = inferredCat ? (CATEGORY_USD_FLOOR[inferredCat] ?? 0.5) : 0.5;
+  if (sale < floor) return null;
 
   const storeId = inferStoreId(store);
 

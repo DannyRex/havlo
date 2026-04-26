@@ -78,11 +78,13 @@ function CollageCard({
         zIndex: z,
       }}
     >
-      {/* Polaroid-style inner padding: 12px gutter on top/left/right + 12px
-          below caption. Image lives in a softly-tinted frame; caption tucks
-          under it within the same padded area. */}
+      {/* True polaroid: 12px white gutter on all sides (from the outer
+          card's bg-white showing through), image inset within. The inner
+          frame previously used bg-zinc-50 which was too close to white
+          to read as a frame — now transparent so the card's true white
+          surrounds the image cleanly. */}
       <div className="absolute inset-0 p-3 flex flex-col">
-        <div className="flex-1 overflow-hidden rounded-lg bg-zinc-50">
+        <div className="flex-1 overflow-hidden rounded-lg ring-1 ring-zinc-100">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={img} alt="" className="w-full h-full object-cover" />
         </div>

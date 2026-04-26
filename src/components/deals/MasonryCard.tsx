@@ -5,6 +5,7 @@
    server-safe APIs (no hooks, no event handlers). */
 
 import {
+  cleanTitle,
   formatCompact,
   formatUSDPrice,
   savings,
@@ -50,6 +51,7 @@ interface Props {
 export default function MasonryCard({ deal, aspect, showOriginBadge = true }: Props) {
   const isUSD = deal.currency === "USD";
   const saved = savings(deal.originalPrice, deal.salePrice);
+  const cleanedTitle = cleanTitle(deal.title);
 
   const priceFmt = isUSD ? formatUSDPrice(deal.salePrice)     : formatCompact(deal.salePrice);
   const origFmt  = isUSD ? formatUSDPrice(deal.originalPrice) : formatCompact(deal.originalPrice);
@@ -62,7 +64,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true }: Pr
       href={deal.url}
       target="_blank"
       rel="noopener noreferrer sponsored"
-      aria-label={`${deal.title}, ${priceFmt} at ${deal.storeName}`}
+      aria-label={`${cleanedTitle}, ${priceFmt} at ${deal.storeName}`}
       className="group block"
     >
       {/* Image — varied aspect, edge-to-edge.
@@ -128,7 +130,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true }: Pr
         </div>
 
         <p className="text-[12px] sm:text-[13px] font-medium text-ink leading-snug line-clamp-2 mb-1 sm:mb-1.5 tracking-[-0.005em]">
-          {deal.title}
+          {cleanedTitle}
         </p>
 
         <div className="flex items-baseline gap-1 sm:gap-1.5 flex-wrap">

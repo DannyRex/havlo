@@ -98,6 +98,48 @@ function priceLooksPlausible(priceNgn: number, categorySlug: string | null): boo
   return priceNgn >= floor;
 }
 
+/* Product-family detection — token sets that should NOT cross-match.
+   When the anchor title contains a token from one family, dupe titles
+   containing tokens from a different family are rejected.
+
+   Repro this prevents:
+     • iPhone anchor → iPad / MacBook dupes (Apple cross-product)
+     • Phone anchor → Tablet / Laptop / TV dupes
+     • Headphone anchor → Speaker dupes (already partly handled by FTS)
+
+   Lightweight string-match — no regex chains, no maintenance per brand. */
+const PRODUCT_FAMILIES: Record<string, string[]> = {
+  phone:       ["iphone", "galaxy", "pixel", "tecno", "infinix", "redmi", "oneplus", "phone", "smartphone"],
+  tablet:      ["ipad", "tablet", "tab a", "tab s", "matepad", "mediapad"],
+  laptop:      ["macbook", "thinkpad", "xps", "pavilion", "ideapad", "zenbook", "laptop", "notebook", "chromebook"],
+  desktop:     ["imac", "mac mini", "mac pro", "all-in-one"],
+  headphones:  ["airpods max", "wh-1000", "headphones", "headphone", "headset", "over-ear", "over ear"],
+  earbuds:     ["airpods", "earbuds", "earpods", "buds", "tws"],
+  speaker:     ["speaker", "soundbar", "boombox", "home theater", "home theatre"],
+  tv:          ["smart tv", "qled", "oled", "led tv", "uhd tv", "4k tv"],
+  console:     ["playstation", "ps5", "ps4", "xbox", "nintendo", "switch"],
+  watch:       ["smartwatch", "smart watch", "apple watch", "garmin", "fitbit", "fossil"],
+  camera:      ["dslr", "mirrorless", "camcorder", "gopro"],
+};
+
+function detectFamily(title: string): string | null {
+  const t = title.toLowerCase();
+  for (const [family, tokens] of Object.entries(PRODUCT_FAMILIES)) {
+    if (tokens.some((tok) => t.includes(tok))) return family;
+  }
+  return null;
+}
+
+/* True if anchor + candidate are in incompatible families (e.g. phone vs tablet).
+   Allows the case where one (or both) families are unidentified — only blocks
+   when we have HIGH CONFIDENCE both items are in different known families. */
+function familiesIncompatible(anchorTitle: string, candTitle: string): boolean {
+  const af = detectFamily(anchorTitle);
+  const cf = detectFamily(candTitle);
+  if (!af || !cf) return false; // unknown → allow
+  return af !== cf;
+}
+
 function offerToStoreOffer(o: NestedOffer): StoreOffer {
   const store = o.stores;
   const priceN = priceInNgn(o.current_price, o.currency);
@@ -224,8 +266,13 @@ export async function pgFtsFindDupes(
   opts?: { limit?: number },
 ): Promise<DupeResult[]> {
   const supa = getSupabaseAdmin();
-  if (!supa || !query.trim() || anchorPriceNgn <= 0) return [];
+  if (!supa || !query.trim()) return [];
 
+  /* anchorPriceNgn === 0 means "no price ceiling" — used when sniff
+     extracted a title but no price (Jumia + many other retailers).
+     We still return similar products, just without the cheaper-than-X
+     filter; UI then ranks by FTS similarity alone. */
+  const noCeiling = anchorPriceNgn <= 0;
   const limit = opts?.limit ?? 16;
 
   const { data: matches, error } = await supa.rpc("search_products_fts", {
@@ -253,10 +300,12 @@ export async function pgFtsFindDupes(
   };
 
   return ((matches as FtsRow[]))
-    /* Strict cheaper-only since we have a real external anchor price.
-       Allow a tiny 5% slack for items that match the product better. */
-    .filter((r) => priceInNgn(r.current_price, r.currency) <= anchorPriceNgn * 1.05)
+    /* If we have an anchor price, strict cheaper-only (≤ 99% of anchor).
+       If we don't (sniff returned no price), keep all plausible matches. */
+    .filter((r) => noCeiling || priceInNgn(r.current_price, r.currency) < anchorPriceNgn * 0.99)
     .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug))
+    // Same product-family gate as the main findSimilar path
+    .filter((r) => !familiesIncompatible(query, r.title))
     .slice(0, limit * 2)
     .map((r) => ftsRowToDupe(r, fakeAnchor))
     .sort((a, b) => {
@@ -334,12 +383,13 @@ export async function pgFtsFindSimilar(
     .filter((r) => r.product_id !== topRow.product_id)
     // Same category preferred (when the anchor has one)
     .filter((r) => !anchor.category || anchor.category === "general" || r.category_slug === anchor.category)
-    // ≤ 115% of anchor price (slightly pricier still allowed if it's a much better match)
-    .filter((r) => priceInNgn(r.current_price, r.currency) <= anchor.bestPrice * 1.15)
-    // Implausibly low prices are almost always upstream data errors —
-    // accessories mis-tagged as the product, scammy listings, or currency
-    // unit confusion. Filter at the source so they never reach the UI.
+    // Strict cheaper-only — the anchor's own offer leaks through with
+    // equal price otherwise; allow ≤ 99% of anchor so true sub-100% only.
+    .filter((r) => priceInNgn(r.current_price, r.currency) < anchor.bestPrice * 0.99)
+    // Implausibly low prices are almost always upstream data errors.
     .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug))
+    // Product-family gate: an iPhone anchor must not get iPad / MacBook dupes.
+    .filter((r) => !familiesIncompatible(anchor.title, r.title))
     .slice(0, limit * 2) // over-sample, then re-rank
     .map((r) => ftsRowToDupe(r, anchor))
     .sort((a, b) => {

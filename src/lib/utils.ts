@@ -61,6 +61,20 @@ export function savings(original: number, sale: number): number {
   return Math.round((original - sale) * 100) / 100;
 }
 
+/* Clean up dirty product titles from upstream scrapers (especially ASOS
+   which spits out "Brand – Product – – Material" with repeated en-dashes).
+   Collapses any run of separator characters (en-dash, em-dash, hyphen, |)
+   with optional whitespace into a single " – ", and strips leading/trailing
+   separators. Safe to call multiple times. */
+export function cleanTitle(raw: string): string {
+  return raw
+    .replace(/[–—|\-]+(\s*[–—|\-]+)+/g, " – ") // collapse runs
+    .replace(/^\s*[–—|\-]+\s*/, "")                       // trim leading
+    .replace(/\s*[–—|\-]+\s*$/, "")                       // trim trailing
+    .replace(/\s{2,}/g, " ")                                         // collapse spaces
+    .trim();
+}
+
 export function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const days = Math.floor(diff / 86400000);

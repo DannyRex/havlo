@@ -475,7 +475,7 @@ function CompareContent() {
               <div className="max-w-md mx-auto text-center py-12">
                 <SearchX size={28} className="text-ink-3 mx-auto mb-3" strokeWidth={1.5} />
                 <h3 className="text-base font-medium text-ink mb-1">
-                  No matches for &ldquo;{displayQuery}&rdquo;
+                  No matches anywhere for &ldquo;{displayQuery}&rdquo;
                 </h3>
                 <p className="text-sm text-ink-3">
                   Try a broader or different term, like just the brand or category.

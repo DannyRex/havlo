@@ -21,12 +21,19 @@ function inferStoreId(store: string): string {
 }
 
 export function sniffToAnchor(sniff: SniffResult): ProductGroup | null {
-  if (!sniff.ok || !sniff.title || !sniff.price || sniff.price <= 0) {
-    return null;
-  }
+  /* Title is required — without it we have nothing useful to display.
+     Price is OPTIONAL: many retailers (Jumia included) hide price behind
+     JS or don't expose it via og:price meta. We still want to render the
+     anchor (image, store, "View on …" link) even when price is unknown
+     — the dupes call falls back to "no ceiling" mode so we still surface
+     cheaper alternatives based on similarity alone. */
+  if (!sniff.ok || !sniff.title) return null;
 
+  const hasPrice = typeof sniff.price === "number" && sniff.price > 0;
   const currency = (sniff.currency ?? "NGN").toUpperCase();
-  const priceNgn = currency === "USD" ? usdToNgn(sniff.price) : sniff.price;
+  const priceNgn = hasPrice
+    ? (currency === "USD" ? usdToNgn(sniff.price as number) : (sniff.price as number))
+    : 0;
   const storeId = inferStoreId(sniff.store ?? "external");
 
   const offer: StoreOffer = {

@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import type { OriginFilter, SortOption } from "@/types";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
 
     const category    = searchParams.get("category")    ?? undefined;
-    const minDiscount = searchParams.get("minDiscount") ?? undefined;
+    /* Floor: when no minDiscount is requested, hide items with <5% off so
+       the default /deals view feels like deals, not a generic catalog.
+       Users who explicitly want "any" can still pass minDiscount=0. */
+    const minDiscount = searchParams.get("minDiscount") ?? "5";
     const sort        = (searchParams.get("sort") as SortOption) ?? "newest";
     const search      = searchParams.get("search")      ?? undefined;
     const originParam = searchParams.get("origin") as OriginFilter | null;

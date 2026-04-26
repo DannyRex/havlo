@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import DealFeed from "@/components/deals/DealFeed";
 
@@ -14,5 +15,9 @@ export const metadata: Metadata = {
 };
 
 export default function DealsPage() {
-  return <DealFeed />;
+  return (
+    <Suspense>
+      <DealFeed />
+    </Suspense>
+  );
 }
