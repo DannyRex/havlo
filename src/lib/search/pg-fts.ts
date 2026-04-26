@@ -76,6 +76,28 @@ function priceInNgn(price: number, currency: "NGN" | "USD"): number {
   return currency === "USD" ? usdToNgn(price) : price;
 }
 
+/* Per-category price floors in NGN. Anything below the floor is almost
+   always bad data (mis-parsed accessory/case price tagged as the product,
+   currency unit confusion, or scammy listing). Conservative numbers —
+   genuine deals that fall below should be the exception, not the rule. */
+const CATEGORY_PRICE_FLOOR_NGN: Record<string, number> = {
+  phones:      40_000,
+  computing:   80_000,
+  electronics: 15_000,
+  audio:        5_000,
+  appliances:  20_000,
+  gaming:      15_000,
+  fashion:      3_000,
+  beauty:       1_500,
+  home:         3_000,
+  sports:       2_500,
+};
+
+function priceLooksPlausible(priceNgn: number, categorySlug: string | null): boolean {
+  const floor = categorySlug ? (CATEGORY_PRICE_FLOOR_NGN[categorySlug] ?? 1_000) : 1_000;
+  return priceNgn >= floor;
+}
+
 function offerToStoreOffer(o: NestedOffer): StoreOffer {
   const store = o.stores;
   const priceN = priceInNgn(o.current_price, o.currency);
@@ -149,10 +171,19 @@ function buildAnchorGroup(p: AnchorProduct): ProductGroup {
 
 function ftsRowToDupe(row: FtsRow, anchor: ProductGroup): DupeResult {
   const offer = ftsRowToSingleOffer(row);
-  const savings = Math.max(0, anchor.bestPrice - offer.landedPrice);
-  const savingsPercent = anchor.bestPrice > 0
-    ? Math.max(0, Math.round((savings / anchor.bestPrice) * 100))
+  const rawSavings = Math.max(0, anchor.bestPrice - offer.landedPrice);
+  const rawPercent = anchor.bestPrice > 0
+    ? Math.max(0, Math.round((rawSavings / anchor.bestPrice) * 100))
     : 0;
+
+  /* Suppress savings UI for absurdly-high "savings" — almost always a
+     category mismatch (case shown as dupe for phone) or upstream parsing
+     error. >85% off the anchor's best price is a strong red flag. We still
+     return the dupe but with savings zeroed so the green badge doesn't
+     misrepresent the comparison. */
+  const looksFake = rawPercent > 85;
+  const savings = looksFake ? 0 : rawSavings;
+  const savingsPercent = looksFake ? 0 : Math.min(rawPercent, 99);
 
   return {
     key:            row.product_id,
@@ -174,6 +205,66 @@ function ftsRowToDupe(row: FtsRow, anchor: ProductGroup): DupeResult {
     savingsVsAnchor: savings,
     savingsPercent,
   };
+}
+
+/* ── Dupes-only entrypoint (for sniffed-URL flow) ─────────────────────
+   Used when the anchor is provided externally (e.g. parsed from a
+   user-pasted store URL). We skip anchor selection entirely and just
+   return cheaper alternatives ranked by similarity to the given title. */
+
+interface FakeAnchor {
+  title: string;
+  bestPrice: number;
+  category?: string | null;
+}
+
+export async function pgFtsFindDupes(
+  query: string,
+  anchorPriceNgn: number,
+  opts?: { limit?: number },
+): Promise<DupeResult[]> {
+  const supa = getSupabaseAdmin();
+  if (!supa || !query.trim() || anchorPriceNgn <= 0) return [];
+
+  const limit = opts?.limit ?? 16;
+
+  const { data: matches, error } = await supa.rpc("search_products_fts", {
+    q: query,
+    max_results: 60,
+  });
+  if (error || !matches) return [];
+
+  // Build a lightweight anchor stand-in for similarity scoring
+  const fakeAnchor: ProductGroup = {
+    key:           "external-sniff",
+    title:         query,
+    category:      "general",
+    imageEmoji:    "",
+    imageGradient: "",
+    brand:         null,
+    model:         null,
+    storageGb:     null,
+    inches:        null,
+    storeCount:    1,
+    bestPrice:     anchorPriceNgn,
+    worstPrice:    anchorPriceNgn,
+    maxSavings:    0,
+    offers:        [],
+  };
+
+  return ((matches as FtsRow[]))
+    /* Strict cheaper-only since we have a real external anchor price.
+       Allow a tiny 5% slack for items that match the product better. */
+    .filter((r) => priceInNgn(r.current_price, r.currency) <= anchorPriceNgn * 1.05)
+    .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug))
+    .slice(0, limit * 2)
+    .map((r) => ftsRowToDupe(r, fakeAnchor))
+    .sort((a, b) => {
+      const aScore = a.similarityScore * 0.55 + Math.min(a.savingsPercent, 80) * 0.45;
+      const bScore = b.similarityScore * 0.55 + Math.min(b.savingsPercent, 80) * 0.45;
+      return bScore - aScore;
+    })
+    .slice(0, limit);
 }
 
 /* ── Main entrypoint ──────────────────────────────────────────────── */
@@ -224,6 +315,14 @@ export async function pgFtsFindSimilar(
     return { mode: "empty", query: q, suggestions: [] };
   }
 
+  /* If the top match's best price is implausibly low for its category,
+     it's almost certainly bad data (a case mis-listed as a phone, etc.).
+     Return empty so the live SerpAPI section can serve real anchors
+     instead of presenting a clearly-wrong product. */
+  if (!priceLooksPlausible(anchor.bestPrice, anchor.category)) {
+    return { mode: "empty", query: q, suggestions: [] };
+  }
+
   /* 3. Find similar products via FTS using the anchor's title (richer query than user's) */
   const { data: similarMatches } = await supa.rpc("search_products_fts", {
     q: anchor.title,
@@ -237,6 +336,10 @@ export async function pgFtsFindSimilar(
     .filter((r) => !anchor.category || anchor.category === "general" || r.category_slug === anchor.category)
     // ≤ 115% of anchor price (slightly pricier still allowed if it's a much better match)
     .filter((r) => priceInNgn(r.current_price, r.currency) <= anchor.bestPrice * 1.15)
+    // Implausibly low prices are almost always upstream data errors —
+    // accessories mis-tagged as the product, scammy listings, or currency
+    // unit confusion. Filter at the source so they never reach the UI.
+    .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug))
     .slice(0, limit * 2) // over-sample, then re-rank
     .map((r) => ftsRowToDupe(r, anchor))
     .sort((a, b) => {

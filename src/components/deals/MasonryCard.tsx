@@ -62,7 +62,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true }: Pr
       href={deal.url}
       target="_blank"
       rel="noopener noreferrer sponsored"
-      aria-label={`${deal.title} — ${priceFmt} at ${deal.storeName}`}
+      aria-label={`${deal.title}, ${priceFmt} at ${deal.storeName}`}
       className="group block"
     >
       {/* Image — varied aspect, edge-to-edge.

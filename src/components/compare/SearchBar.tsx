@@ -82,7 +82,7 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
           Find similar products for less
         </h1>
         <p className="text-[13px] sm:text-sm text-ink-2">
-          Search a product or paste a link — we&apos;ll find cheaper alternatives.
+          Search a product or paste a link. We&apos;ll find cheaper alternatives.
         </p>
       </div>
 
@@ -185,7 +185,7 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
       <p className="mt-3 text-center text-[11px] sm:text-xs text-ink-3 px-4">
         {isUrlInput
           ? "We'll identify this product and find cheaper alternatives across stores."
-          : "Paste a Jumia, Amazon, or AliExpress link — or search by name."}
+          : "Paste a Jumia, Amazon, or AliExpress link, or search by name."}
       </p>
 
       {!initialQuery && suggestions.length === 0 && (

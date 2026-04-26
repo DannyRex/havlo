@@ -5,24 +5,7 @@ import { usePathname } from "next/navigation";
 import { Home, Tag, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ui/ThemeToggle";
-
-/* ── Wordmark ───────────────────────────────────────────────────── */
-function Wordmark() {
-  return (
-    <span className="inline-flex items-center gap-2 select-none">
-      <span
-        aria-hidden="true"
-        className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-white text-[15px] font-bold"
-        style={{ background: "#0057FF", letterSpacing: "-0.04em" }}
-      >
-        h
-      </span>
-      <span className="text-[18px] font-bold tracking-[-0.03em] text-ink">
-        havlo
-      </span>
-    </span>
-  );
-}
+import Logo from "@/components/ui/Logo";
 
 const navLinks = [
   { href: "/deals",   label: "Deals" },
@@ -51,9 +34,10 @@ export default function Navbar() {
           <Link
             href="/"
             aria-label="Havlo home"
+            aria-current={pathname === "/" ? "page" : undefined}
             className="-ml-1 px-1 py-1 rounded-lg hover:bg-surface-2 transition-colors"
           >
-            <Wordmark />
+            <Logo size={28} />
           </Link>
 
           {/* Right cluster — links + theme toggle */}

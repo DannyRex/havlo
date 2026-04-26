@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Havlo">
+  <title>Havlo</title>
+  <!-- Brand-blue rounded square -->
+  <rect width="64" height="64" rx="14" fill="#0057FF"/>
+  <!-- Lowercase h, geometric construction -->
+  <g fill="#FFFFFF">
+    <!-- Left vertical stem (full height) -->
+    <rect x="18" y="15" width="7" height="34" rx="1.5"/>
+    <!-- Mid horizontal connector -->
+    <rect x="18" y="26" width="27" height="7" rx="1.5"/>
+    <!-- Right vertical (from mid to baseline) -->
+    <rect x="38" y="26" width="7" height="23" rx="1.5"/>
+  </g>
+</svg>

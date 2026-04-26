@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe, ArrowUpRight } from "lucide-react";
+import { Globe } from "lucide-react";
 import {
   formatUSDPrice,
   savings,
@@ -26,18 +26,23 @@ function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
   const ngnEquiv = isUSD ? `≈ ${formatCompact(usdToNgn(deal.salePrice))}` : null;
   const hasDiscount = deal.originalPrice > deal.salePrice && deal.discountPercent > 0;
 
-  // Country tag is stored in tags as "country:us" — extract for the label
-  const country = deal.tags
-    .find((t) => t.startsWith("country:"))
-    ?.split(":")[1]
-    ?.toUpperCase();
+  /* Country chip — show the specific code when SerpAPI tagged it
+     ("country:us" → "US"); fall back to "INTL" for items that came
+     from pg-fts (DB) and have an "intl" tag but no country code; hide
+     entirely for known-local items. Keeps the chip visually consistent
+     across all live cards instead of appearing/disappearing. */
+  const countryTag = deal.tags.find((t) => t.startsWith("country:"))?.split(":")[1];
+  const isIntl = deal.tags.includes("intl") || deal.tags.includes("live");
+  const country = countryTag
+    ? countryTag.toUpperCase()
+    : (isIntl ? "INTL" : null);
 
   return (
     <a
       href={deal.url}
       target="_blank"
       rel="noopener noreferrer sponsored"
-      aria-label={`${deal.title} — ${priceFmt} at ${deal.storeName}`}
+      aria-label={`${deal.title}, ${priceFmt} at ${deal.storeName}`}
       className="group card card-hover overflow-hidden flex flex-col"
     >
       {/* Image — varied aspect for masonry feel */}
@@ -167,34 +172,23 @@ export default function LiveResults({ items, loading, providers }: Props) {
 
       {/* Section header */}
       <div className="max-w-3xl mx-auto mb-5 sm:mb-6 px-1">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="relative flex h-2 w-2" aria-hidden="true">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 animate-ping" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
-              </span>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-success">
-                Live · On sale now
-              </span>
-            </div>
-            <h3 className="text-lg sm:text-xl font-bold text-ink tracking-[-0.02em]">
-              Real deals from across the world
-            </h3>
-            <p className="text-xs sm:text-sm text-ink-2 mt-0.5">
-              {items.length > 0 ? `${items.length} hand-picked discounts ` : "Hand-picked discounts "}
-              from global stores, refreshed every few minutes. Prices in USD, shipping to Nigeria.
-            </p>
-          </div>
-          <a
-            href="https://serpapi.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden sm:inline-flex items-center gap-1 text-[11px] text-ink-3 hover:text-ink-2 transition-colors shrink-0"
-          >
-            via SerpAPI <ArrowUpRight size={11} />
-          </a>
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="relative flex h-2 w-2" aria-hidden="true">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 animate-ping" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+          </span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-success">
+            Live, on sale now
+          </span>
         </div>
+        <h3 className="text-lg sm:text-xl font-bold text-ink tracking-[-0.02em]">
+          {items.length > 0
+            ? `${items.length} live deals from global stores`
+            : "Live deals from global stores"}
+        </h3>
+        <p className="text-xs sm:text-sm text-ink-2 mt-0.5">
+          Prices in USD, ships to Nigeria.
+        </p>
       </div>
 
       {/* Masonry — left-to-right column distribution, varying aspects */}

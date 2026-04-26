@@ -16,25 +16,25 @@ const siteUrl = "https://havlo.io";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Havlo — Find similar products for less",
+    default: "Havlo · Find similar products for less",
     template: "%s · Havlo",
   },
   description:
-    "Paste any product link or search anything — Havlo finds cheaper alternatives across the world's biggest stores.",
+    "Paste any product link or search anything. Havlo finds cheaper alternatives across the world's biggest stores.",
   keywords: [
     "price comparison", "find alternatives", "dupes", "find similar products",
     "deals", "discount finder", "shopping search",
   ],
   openGraph: {
     type: "website",
-    title: "Havlo — Find similar products for less",
+    title: "Havlo · Find similar products for less",
     description: "Paste a link, get cheaper alternatives in seconds.",
     url: siteUrl,
     siteName: "Havlo",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Havlo — Find similar products for less",
+    title: "Havlo · Find similar products for less",
     description: "Paste a link, get cheaper alternatives in seconds.",
   },
   icons: { icon: "/favicon.ico" },

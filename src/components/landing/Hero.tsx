@@ -137,7 +137,7 @@ export default function Hero() {
                 ) : (
                   <button
                     type="button"
-                    title="Image search — coming soon"
+                    title="Image search (coming soon)"
                     disabled
                     className="inline-flex items-center gap-1.5 text-ink-3 disabled:cursor-not-allowed"
                   >

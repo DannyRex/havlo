@@ -11,6 +11,7 @@ import LiveResults from "@/components/compare/LiveResults";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/MasonryCard";
 import { formatNaira } from "@/lib/utils";
 import { trackClick } from "@/lib/trackClick";
+import { sniffToAnchor } from "@/lib/sniff-to-anchor";
 import type { SearchOutput, DupeResult } from "@/lib/search";
 import type { SniffResult } from "@/app/api/sniff/route";
 import type { Deal } from "@/types";
@@ -70,7 +71,13 @@ function CompareContent() {
     }
   }, []);
 
-  /* ── URL path: sniff → extract title → search ───────────────────────── */
+  /* ── URL path: sniff → use sniffed product as the literal anchor ─────
+     Old flow: sniffed title → /api/compare → pg-fts picks a *similar*
+     product as anchor. Bug: anchor often a different model than what
+     the user pasted (Pro Max shown for base iPhone 15, etc.).
+     New flow: sniff → build anchor from sniff data itself → fetch
+     dupes that are CHEAPER than the sniffed price. The user's actual
+     pasted product is the centerpiece. */
   const handleUrlSearch = useCallback(async (rawUrl: string) => {
     setQuery(rawUrl);
     setSniffResult(null);
@@ -88,25 +95,51 @@ function CompareContent() {
       sniff = await res.json() as SniffResult;
       setSniffResult(sniff);
     } catch {
-      // Network error — proceed with slug fallback
+      // Network error — fall through to slug fallback
     } finally {
       setSniffLoading(false);
     }
 
-    // Use AI-extracted title if available, otherwise fall back to raw URL
-    // which vectorFindSimilarByUrl will handle via slug parsing.
     const searchTerm = sniff?.ok && sniff.title ? sniff.title : rawUrl;
 
     setLoading(true);
-    // Fire live search in parallel — uses the sniffed title (real product name)
-    // rather than the raw URL, so SerpAPI gets a real query
+    // Live search uses the sniffed title — best signal for SerpAPI
     fetchLive(searchTerm);
 
+    /* Sniff produced a usable product (title + price)? Build the anchor
+       client-side from the sniff itself; ask the server only for dupes
+       that undercut the sniffed price. */
+    const sniffedAnchor = sniff ? sniffToAnchor(sniff) : null;
+
+    if (sniffedAnchor) {
+      try {
+        const url = `/api/compare/dupes?q=${encodeURIComponent(sniffedAnchor.title)}&maxPriceNgn=${sniffedAnchor.bestPrice}`;
+        const res = await fetch(url);
+        const data = await res.json() as { dupes: DupeResult[] };
+        setResult({
+          mode:   "similar",
+          query:  searchTerm,
+          anchor: sniffedAnchor,
+          dupes:  data.dupes ?? [],
+        });
+      } catch {
+        // Dupes call failed — still show the sniffed anchor on its own
+        setResult({
+          mode:   "similar",
+          query:  searchTerm,
+          anchor: sniffedAnchor,
+          dupes:  [],
+        });
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    /* Sniff failed or returned no usable price → fall back to the legacy
+       title-search path so the page still renders something useful. */
     try {
-      const endpoint = sniff?.ok && sniff.title
-        ? `/api/compare?q=${encodeURIComponent(searchTerm)}&mode=similar`
-        : `/api/compare?q=${encodeURIComponent(rawUrl)}&mode=similar`;
-      const res = await fetch(endpoint);
+      const res = await fetch(`/api/compare?q=${encodeURIComponent(searchTerm)}&mode=similar`);
       setResult(await res.json() as SearchOutput);
     } catch {
       setResult({ mode: "empty", query: searchTerm, suggestions: [] });
@@ -203,7 +236,7 @@ function CompareContent() {
               </>
             ) : (
               <p className="text-sm text-amber-300/80">
-                Could not read that page — searching by URL instead.
+                Could not read that page. Searching by URL instead.
               </p>
             )}
           </div>
@@ -374,7 +407,7 @@ function CompareContent() {
                   Live search unavailable
                 </p>
                 <p className="text-xs text-ink-3">
-                  We couldn&apos;t reach the live shopping providers — only your local catalog was searched.
+                  We couldn&apos;t reach the live shopping providers. Only your local catalog was searched.
                 </p>
               </div>
             </div>
@@ -416,8 +449,8 @@ function CompareContent() {
               <>
                 <div className="max-w-3xl mx-auto mb-5 px-1 text-center sm:text-left">
                   <p className="text-[13px] text-ink-2">
-                    Nothing in our local index for &ldquo;{displayQuery}&rdquo; yet —
-                    here&apos;s what&apos;s live online:
+                    Nothing in our local index for &ldquo;{displayQuery}&rdquo; yet.
+                    Here&apos;s what&apos;s live online:
                   </p>
                 </div>
                 <LiveResults
@@ -445,7 +478,7 @@ function CompareContent() {
                   No matches for &ldquo;{displayQuery}&rdquo;
                 </h3>
                 <p className="text-sm text-ink-3">
-                  Try a broader or different term — e.g. just the brand or category.
+                  Try a broader or different term, like just the brand or category.
                 </p>
               </div>
             )}

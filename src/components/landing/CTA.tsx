@@ -78,12 +78,20 @@ function CollageCard({
         zIndex: z,
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={img} alt="" className="w-full h-[72%] object-cover" />
-      <div className="px-3.5 py-3">
-        <p className="text-[11px] text-zinc-500 truncate">{store}</p>
-        <p className="text-[13px] font-semibold text-zinc-900 truncate mt-0.5">{title}</p>
+      {/* Polaroid-style inner padding: 12px gutter on top/left/right + 12px
+          below caption. Image lives in a softly-tinted frame; caption tucks
+          under it within the same padded area. */}
+      <div className="absolute inset-0 p-3 flex flex-col">
+        <div className="flex-1 overflow-hidden rounded-lg bg-zinc-50">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={img} alt="" className="w-full h-full object-cover" />
+        </div>
+        <div className="pt-2.5 px-0.5">
+          <p className="text-[11px] text-zinc-500 truncate">{store}</p>
+          <p className="text-[13px] font-semibold text-zinc-900 truncate mt-0.5">{title}</p>
+        </div>
       </div>
+      {/* Discount badge — anchored to the card corner, sits on the image edge */}
       <div
         className={`absolute top-3 right-3 ${badgeWH} rounded-full bg-red-600 text-white flex flex-col items-center justify-center`}
         style={{ boxShadow: "0 4px 12px rgba(220,38,38,0.4), 0 0 0 3px rgba(255,255,255,0.9)" }}

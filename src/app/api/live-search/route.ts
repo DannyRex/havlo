@@ -61,9 +61,30 @@ export async function GET(req: NextRequest) {
     return true;
   });
 
+  /* Sanity-check: at least one query token (≥3 chars, non-stopword) must
+     appear in the result title. Without this, gibberish like "xyzxyz"
+     surfaces unrelated SerpAPI top-N (Walmart Zyrtec, Yeezy Boost, etc.)
+     because Google's relevance score never returns "no results", just
+     "least-bad results". */
+  const STOP = new Set([
+    "the", "and", "for", "with", "of", "on", "in", "at", "to", "from",
+    "by", "or", "an", "a", "is", "be", "new",
+  ]);
+  const queryTokens = q
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !STOP.has(w));
+
+  const relevant = queryTokens.length === 0
+    ? deduped  // can't filter without tokens
+    : deduped.filter((it) => {
+        const title = it.title.toLowerCase();
+        return queryTokens.some((t) => title.includes(t));
+      });
+
   return NextResponse.json(
     {
-      items: deduped.slice(0, limit),
+      items: relevant.slice(0, limit),
       providers: providers.map((p) => p.id),
     },
     { headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=900" } },

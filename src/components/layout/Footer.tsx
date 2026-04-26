@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Logo from "@/components/ui/Logo";
 
 /* Only links to pages that actually exist. Contact + Press kit removed
    per request. About removed (no page yet — easy to add back later). */
@@ -30,15 +31,8 @@ export default function Footer() {
         <div className="grid gap-10 sm:grid-cols-3 mb-12">
           {/* Brand */}
           <div>
-            <Link href="/" className="inline-flex items-center gap-2 mb-4 select-none" aria-label="Havlo home">
-              <span
-                aria-hidden="true"
-                className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-white text-[15px] font-bold"
-                style={{ background: "#0057FF", letterSpacing: "-0.04em" }}
-              >
-                h
-              </span>
-              <span className="text-[18px] font-bold tracking-[-0.03em] text-ink">havlo</span>
+            <Link href="/" className="inline-block mb-4" aria-label="Havlo home">
+              <Logo size={28} />
             </Link>
             <p className="text-sm text-ink-2 leading-relaxed max-w-xs mb-4">
               Find similar products for less. Paste any link or search anything, we surface the cheaper alternatives.

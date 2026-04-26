@@ -97,11 +97,6 @@ export default function DealFeed() {
     setLoading(true);
     setItems([]);
     offsetRef.current = 0;
-    // Scroll to top so the user lands on the new results, not stuck at the
-    // bottom of the previous (longer) list.
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "instant" });
-    }
 
     fetch(`/api/deals?${buildParams(0)}`)
       .then((r) => r.json())
@@ -112,6 +107,16 @@ export default function DealFeed() {
         setHasMore(hasMore);
         if (originCounts) setOriginCounts(originCounts);
         offsetRef.current = PAGE_SIZE;
+        /* Scroll AFTER items have rendered. Doing it synchronously in the
+           effect lands the user mid-page if the previous (longer) list
+           causes the browser to clamp scroll to the visible content height
+           before the new (shorter) page paints. requestAnimationFrame
+           waits for the next paint cycle, then we scroll. */
+        if (typeof window !== "undefined") {
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: 0, behavior: "instant" });
+          });
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
