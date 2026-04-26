@@ -65,8 +65,11 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true }: Pr
       aria-label={`${deal.title} — ${priceFmt} at ${deal.storeName}`}
       className="group block"
     >
-      {/* Image — varied aspect, edge-to-edge */}
-      <div className={`relative overflow-hidden rounded-xl sm:rounded-2xl bg-surface-2 ${aspect}`}>
+      {/* Image — varied aspect, edge-to-edge.
+          1px border so card edges (and therefore the masonry varying
+          heights) are visible in light mode where bg-surface-2 ≈ bg-bg
+          and most product photos are also white. */}
+      <div className={`relative overflow-hidden rounded-xl sm:rounded-2xl bg-surface-2 border border-border ${aspect}`}>
         {deal.imageUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img

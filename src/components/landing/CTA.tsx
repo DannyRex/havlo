@@ -53,12 +53,12 @@ function pickCollage() {
 
 /* Reusable mini product card used in the collage */
 function CollageCard({
-  img, store, title, percent, w, h, rotate, top, left, right, bottom, z, badgeSize,
+  img, store, title, percent, w, h, rotate, top, left, right, bottom, z, badgeSize, className = "",
 }: {
   img: string; store: string; title: string; percent: number;
   w: string; h: string; rotate: number;
   top?: string; left?: string; right?: string; bottom?: string;
-  z?: number; badgeSize?: "sm" | "md" | "lg";
+  z?: number; badgeSize?: "sm" | "md" | "lg"; className?: string;
 }) {
   const sz = badgeSize ?? "md";
   const badgeWH =
@@ -67,7 +67,11 @@ function CollageCard({
     sz === "lg" ? "text-base" : sz === "sm" ? "text-[13px]" : "text-sm";
   return (
     <div
-      className={`absolute ${w} ${h} rounded-2xl bg-bg overflow-hidden shadow-2xl pointer-events-auto`}
+      /* bg-white + fixed dark text so cards stay readable in BOTH themes —
+         using semantic bg-bg/text-ink would invert in dark mode and the
+         card would blend into the dark panel. Real product cards from
+         retail sites are always white-bg too. */
+      className={`absolute ${w} ${h} rounded-2xl bg-white overflow-hidden shadow-2xl pointer-events-auto ${className}`}
       style={{
         transform: `rotate(${rotate}deg)`,
         top, left, right, bottom,
@@ -77,8 +81,8 @@ function CollageCard({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={img} alt="" className="w-full h-[72%] object-cover" />
       <div className="px-3.5 py-3">
-        <p className="text-[11px] text-ink-3 truncate">{store}</p>
-        <p className="text-[13px] font-semibold text-ink truncate mt-0.5">{title}</p>
+        <p className="text-[11px] text-zinc-500 truncate">{store}</p>
+        <p className="text-[13px] font-semibold text-zinc-900 truncate mt-0.5">{title}</p>
       </div>
       <div
         className={`absolute top-3 right-3 ${badgeWH} rounded-full bg-red-600 text-white flex flex-col items-center justify-center`}
@@ -146,7 +150,50 @@ export default function CTA() {
             </div>
           </div>
 
-          {/* ── Free-floating product cards — bleed past panel edges ── */}
+          {/* ── Tablet only (sm–md): cards positioned mostly ABOVE the panel
+                 in the section's top whitespace, so they never overlap CTA
+                 text. CTA section py-24 (96px) + StoreLogos py-20 bottom
+                 (80px) = ~176px of clear space between StoreLogos content
+                 and the CTA panel — plenty of room for the cards to float.
+                 Mobile (<sm) has no cards — see prior commit reasoning.
+                 Desktop (lg+) gets the full 3-card collage further down. ── */}
+          {collage.length >= 2 && (
+            <div className="absolute inset-0 pointer-events-none hidden sm:block lg:hidden">
+              {/* Primary card — top of card sits 140px above the panel; card
+                  bottom (panel_top + ~64) lands exactly where the panel's
+                  top padding ends, just before the headline. No text overlap. */}
+              <CollageCard
+                img={collage[1].imageUrl ?? ""}
+                store={collage[1].storeName}
+                title={collage[1].title}
+                percent={collage[1].discountPercent}
+                w="w-40"
+                h="h-52"
+                rotate={6}
+                top="-100px"
+                right="20px"
+                z={2}
+                badgeSize="sm"
+              />
+              {/* Second card — bottom lands ~56px into panel padding (still
+                  no text), tilted left, slightly behind the primary */}
+              <CollageCard
+                img={collage[0].imageUrl ?? ""}
+                store={collage[0].storeName}
+                title={collage[0].title}
+                percent={collage[0].discountPercent}
+                w="w-36"
+                h="h-44"
+                rotate={-8}
+                top="-90px"
+                right="200px"
+                z={1}
+                badgeSize="sm"
+              />
+            </div>
+          )}
+
+          {/* ── Desktop: 3-card collage bleeding past edges ── */}
           {collage.length === 3 && (
             <div className="hidden lg:block absolute inset-0 pointer-events-none">
               {/* Back card — extends slightly above the panel */}
@@ -175,15 +222,16 @@ export default function CTA() {
                 badgeSize="lg"
               />
 
-              {/* Front card — extends below the panel */}
+              {/* Front card — smaller + lowered so it doesn't smother the
+                 main card's caption behind it. Tilted left, peeks below panel. */}
               <CollageCard
                 img={collage[2].imageUrl ?? ""}
                 store={collage[2].storeName}
                 title={collage[2].title}
                 percent={collage[2].discountPercent}
-                w="w-56" h="h-72"
-                rotate={-3}
-                bottom="-40px" left="56%"
+                w="w-44" h="h-60"
+                rotate={-4}
+                bottom="-72px" left="50%"
                 z={3}
                 badgeSize="sm"
               />
