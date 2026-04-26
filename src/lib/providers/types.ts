@@ -51,6 +51,10 @@ export interface BrowseProvider {
   fetchDeals(q: BrowseQuery): Promise<Deal[]>;
   /** Counts per origin bucket — cheap O(n) over filtered set */
   getOriginCounts(q: Omit<BrowseQuery, "origin" | "limit" | "offset">): Promise<OriginCounts>;
+  /** Map of category slug → count of products in that category. Used for
+      live counts on the homepage Shop-by-category tiles instead of the
+      hardcoded numbers in src/lib/data/categories.ts. */
+  getCategoryCounts(): Promise<Record<string, number>>;
 }
 
 /**

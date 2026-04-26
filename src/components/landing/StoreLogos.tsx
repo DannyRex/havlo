@@ -48,7 +48,7 @@ function Track({ ariaHidden = false }: { ariaHidden?: boolean }) {
 
 export default function StoreLogos() {
   return (
-    <section className="py-12 sm:py-20 bg-bg border-t border-border">
+    <section className="py-12 sm:py-20 bg-bg">
       <div className="max-w-7xl mx-auto">
 
         <div className="px-4 sm:px-6 lg:px-8 mb-8 sm:mb-10 text-center">

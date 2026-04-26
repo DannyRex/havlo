@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Havlo logo concepts</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 48px 32px;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: #f8f9fa;
+      color: #0F172A;
+    }
+    h1 { font-size: 32px; margin: 0 0 8px; letter-spacing: -0.025em; }
+    .lede { color: #475569; margin: 0 0 48px; max-width: 640px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 32px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .card {
+      background: white;
+      border: 1px solid #e8eaed;
+      border-radius: 20px;
+      padding: 28px;
+    }
+    .stage {
+      background: #fafbfc;
+      border-radius: 14px;
+      padding: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .label {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .label h2 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+    .label .num {
+      font-size: 11px;
+      font-weight: 600;
+      color: #94a3b8;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .desc {
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.5;
+      margin: 6px 0 18px;
+    }
+    .sizes {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid #f1f3f5;
+    }
+    .sizes img {
+      display: block;
+      border-radius: 6px;
+    }
+    .size-label {
+      font-size: 10px;
+      color: #94a3b8;
+      text-align: center;
+      margin-top: 4px;
+    }
+    .size {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .footer {
+      max-width: 640px;
+      margin: 64px auto 0;
+      padding: 24px;
+      background: white;
+      border: 1px solid #e8eaed;
+      border-radius: 16px;
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.6;
+    }
+    .footer code {
+      background: #f1f3f5;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Havlo logo concepts</h1>
+  <p class="lede">
+    Six initial directions per the master prompt. Each rendered at the spec'd 1024×1024 viewBox,
+    plus 32px (favicon) and 64px (app icon) previews to test legibility at small sizes.
+    Pick a direction, tell me which, and I'll iterate variants.
+  </p>
+
+  <div class="grid">
+
+    <div class="card">
+      <div class="label"><h2>"h" with downward arrow</h2><span class="num">01</span></div>
+      <p class="desc">Lowercase h letterform with the right vertical truncated and a downward arrow tip — price-drop metaphor baked into the type.</p>
+      <div class="stage"><img src="01-h-with-arrow.svg" width="200" height="200" alt="" /></div>
+      <div class="sizes">
+        <div class="size"><img src="01-h-with-arrow.svg" width="64" height="64" /><div class="size-label">64px</div></div>
+        <div class="size"><img src="01-h-with-arrow.svg" width="32" height="32" /><div class="size-label">32px</div></div>
+        <div class="size"><img src="01-h-with-arrow.svg" width="16" height="16" /><div class="size-label">16px</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label"><h2>Overlapping squares</h2><span class="num">02</span></div>
+      <p class="desc">Outlined "before" square + filled "after" square offset diagonally. Reads as "compare two options, one is your pick."</p>
+      <div class="stage"><img src="02-overlapping-squares.svg" width="200" height="200" alt="" /></div>
+      <div class="sizes">
+        <div class="size"><img src="02-overlapping-squares.svg" width="64" height="64" /><div class="size-label">64px</div></div>
+        <div class="size"><img src="02-overlapping-squares.svg" width="32" height="32" /><div class="size-label">32px</div></div>
+        <div class="size"><img src="02-overlapping-squares.svg" width="16" height="16" /><div class="size-label">16px</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label"><h2>Arrow "h" silhouette</h2><span class="num">03</span></div>
+      <p class="desc">Up arrow + connector + shorter down arrow. Reads as direct price comparison: original (up) vs cheaper find (down).</p>
+      <div class="stage"><img src="03-arrow-h-silhouette.svg" width="200" height="200" alt="" /></div>
+      <div class="sizes">
+        <div class="size"><img src="03-arrow-h-silhouette.svg" width="64" height="64" /><div class="size-label">64px</div></div>
+        <div class="size"><img src="03-arrow-h-silhouette.svg" width="32" height="32" /><div class="size-label">32px</div></div>
+        <div class="size"><img src="03-arrow-h-silhouette.svg" width="16" height="16" /><div class="size-label">16px</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label"><h2>Aperture / lens</h2><span class="num">04</span></div>
+      <p class="desc">Circle ring with two intersecting blades + centered dot. Suggests "find / focus / discover" — tonally close to a search engine mark.</p>
+      <div class="stage"><img src="04-aperture.svg" width="200" height="200" alt="" /></div>
+      <div class="sizes">
+        <div class="size"><img src="04-aperture.svg" width="64" height="64" /><div class="size-label">64px</div></div>
+        <div class="size"><img src="04-aperture.svg" width="32" height="32" /><div class="size-label">32px</div></div>
+        <div class="size"><img src="04-aperture.svg" width="16" height="16" /><div class="size-label">16px</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label"><h2>"H" monogram, shorter right bar</h2><span class="num">05</span></div>
+      <p class="desc">Capital H with the right vertical visibly shorter, plus a faint dot showing where it "would have ended." Pure-type approach with a subtle savings hint.</p>
+      <div class="stage"><img src="05-monogram-shorter-bar.svg" width="200" height="200" alt="" /></div>
+      <div class="sizes">
+        <div class="size"><img src="05-monogram-shorter-bar.svg" width="64" height="64" /><div class="size-label">64px</div></div>
+        <div class="size"><img src="05-monogram-shorter-bar.svg" width="32" height="32" /><div class="size-label">32px</div></div>
+        <div class="size"><img src="05-monogram-shorter-bar.svg" width="16" height="16" /><div class="size-label">16px</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label"><h2>Price tag with chevron</h2><span class="num">06</span></div>
+      <p class="desc">Price-tag silhouette with the punched string-hole + a downward chevron in the body. Most literal — easy to read, slightly closer to "shopping" cliché.</p>
+      <div class="stage"><img src="06-price-tag-chevron.svg" width="200" height="200" alt="" /></div>
+      <div class="sizes">
+        <div class="size"><img src="06-price-tag-chevron.svg" width="64" height="64" /><div class="size-label">64px</div></div>
+        <div class="size"><img src="06-price-tag-chevron.svg" width="32" height="32" /><div class="size-label">32px</div></div>
+        <div class="size"><img src="06-price-tag-chevron.svg" width="16" height="16" /><div class="size-label">16px</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    Files live in <code>public/logo-concepts/</code>. Open this gallery directly at <code>/logo-concepts/index.html</code>
+    once the dev server is running, or open any individual SVG in your browser. Tell me a number (or two) you want to iterate, plus what to tweak — proportions, color, accent — and I'll generate refined variants.
+  </div>
+</body>
+</html>

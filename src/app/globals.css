@@ -52,7 +52,10 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  letter-spacing: -0.02em;
+  /* Bricolage Grotesque for all headers — sharper, more editorial
+     than the body Inter. Loaded via next/font in app/layout.tsx. */
+  font-family: var(--font-display), "Inter", system-ui, sans-serif;
+  letter-spacing: -0.025em;
   font-weight: 700;
 }
 

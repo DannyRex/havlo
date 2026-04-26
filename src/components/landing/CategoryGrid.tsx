@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { categories } from "@/lib/data/categories";
+import { getActiveBrowseProvider } from "@/lib/providers";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
   BeautyIcon, SportsIcon, EarbudsIcon, AppliancesIcon, ElectronicsIcon,
@@ -24,7 +25,13 @@ const ICON_FOR: Record<string, IconComp> = {
 
 const browsable = categories.filter((c) => c.slug !== "all");
 
-export default function CategoryGrid() {
+export default async function CategoryGrid() {
+  /* Live counts from the active browse provider. Falls back to the
+     hardcoded value in categories.ts if the count is zero (e.g. category
+     hasn't been ingested yet) so empty cards don't read as broken. */
+  const provider = await getActiveBrowseProvider();
+  const counts = await provider.getCategoryCounts();
+
   return (
     <section className="py-12 sm:py-20 bg-bg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -32,7 +39,7 @@ export default function CategoryGrid() {
         <div className="flex items-end justify-between mb-6 sm:mb-10 gap-4">
           <div>
             <h2 className="text-[26px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
-              Shop by category
+              Deals by category
             </h2>
             <p className="text-sm sm:text-base text-ink-2 mt-1.5">
               Browse what&apos;s on sale across every department.
@@ -55,6 +62,7 @@ export default function CategoryGrid() {
         >
           {browsable.map((cat) => {
             const Icon = ICON_FOR[cat.slug];
+            const count = counts[cat.slug] ?? cat.dealCount;
             return (
               <Link
                 key={cat.id}
@@ -84,7 +92,7 @@ export default function CategoryGrid() {
                       {cat.name}
                     </p>
                     <p className="text-[11px] sm:text-xs text-ink-3 mt-0.5 tabular-nums">
-                      {cat.dealCount} deals
+                      {count.toLocaleString()} deals
                     </p>
                   </div>
                 </div>

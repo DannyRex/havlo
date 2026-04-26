@@ -3,6 +3,7 @@
 
 import type { BrowseProvider, BrowseQuery, OriginCounts } from "./types";
 import { getDeals, getOriginCounts as staticOriginCounts } from "@/lib/data/deals";
+import { deals } from "@/lib/data/deals";
 import type { Deal } from "@/types";
 
 export const staticBrowseProvider: BrowseProvider = {
@@ -29,5 +30,14 @@ export const staticBrowseProvider: BrowseProvider = {
       minDiscount: q.minDiscount,
       search: q.search,
     });
+  },
+
+  async getCategoryCounts(): Promise<Record<string, number>> {
+    const counts: Record<string, number> = {};
+    for (const d of deals) {
+      if (!d.categorySlug) continue;
+      counts[d.categorySlug] = (counts[d.categorySlug] ?? 0) + 1;
+    }
+    return counts;
   },
 };

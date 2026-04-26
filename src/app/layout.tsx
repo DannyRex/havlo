@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -8,6 +8,16 @@ import ThemeProvider from "@/components/ui/ThemeProvider";
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+  display: "swap",
+});
+
+/* Header / display font — Bricolage Grotesque has sharp letterforms,
+   tight spacing, and a magazine-cover feel that pairs cleanly with
+   Inter's neutral body text. */
+const displayFont = Bricolage_Grotesque({
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  variable: "--font-display",
   display: "swap",
 });
 
@@ -46,7 +56,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} scroll-smooth`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${displayFont.variable} scroll-smooth`} suppressHydrationWarning>
       <body className="min-h-screen flex flex-col antialiased font-sans pb-16 md:pb-0 bg-bg text-ink">
         <ThemeProvider>
           <Navbar />

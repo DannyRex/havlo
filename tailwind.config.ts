@@ -10,7 +10,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-inter)", "Inter", "system-ui", "-apple-system", "Segoe UI", "Helvetica", "Arial", "sans-serif"],
+        sans:    ["var(--font-inter)", "Inter", "system-ui", "-apple-system", "Segoe UI", "Helvetica", "Arial", "sans-serif"],
+        display: ["var(--font-display)", "Bricolage Grotesque", "Inter", "system-ui", "sans-serif"],
       },
       colors: {
         // Brand

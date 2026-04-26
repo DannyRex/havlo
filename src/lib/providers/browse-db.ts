@@ -115,6 +115,21 @@ export const dbBrowseProvider: BrowseProvider = {
     return (data as BestOfferRow[]).map(rowToDeal);
   },
 
+  async getCategoryCounts(): Promise<Record<string, number>> {
+    const supa = getSupabaseAdmin();
+    if (!supa) return {};
+    const { data, error } = await supa
+      .from("products")
+      .select("category_slug");
+    if (error || !data) return {};
+    const counts: Record<string, number> = {};
+    for (const r of data as Array<{ category_slug: string | null }>) {
+      if (!r.category_slug) continue;
+      counts[r.category_slug] = (counts[r.category_slug] ?? 0) + 1;
+    }
+    return counts;
+  },
+
   async getOriginCounts(q): Promise<OriginCounts> {
     const supa = getSupabaseAdmin();
     if (!supa) return { all: 0, local: 0, intl: 0 };

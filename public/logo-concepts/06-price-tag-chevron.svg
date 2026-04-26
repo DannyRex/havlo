@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Havlo concept 6: price tag with downward chevron">
+  <title>Havlo · price-tag-chevron</title>
+  <rect width="1024" height="1024" rx="128" fill="#0057FF"/>
+  <g fill="#FFFFFF">
+    <!-- Price tag silhouette: rectangle with notched top-left + string hole -->
+    <path d="
+      M 380 240
+      L 800 240
+      Q 832 240 832 272
+      L 832 752
+      Q 832 784 800 784
+      L 380 784
+      L 192 596
+      Q 168 572 192 548
+      L 380 360
+      Z
+    "/>
+    <!-- String hole in the notched corner — punched out as the tag's hole -->
+    <circle cx="320" cy="464" r="40" fill="#0057FF"/>
+    <!-- Down chevron in the body (price-drop signal) -->
+    <path d="M484 460 L612 460 L548 600 Z" fill="#0057FF"/>
+  </g>
+</svg>

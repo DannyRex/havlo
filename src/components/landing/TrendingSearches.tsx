@@ -98,7 +98,7 @@ export default function TrendingSearches() {
   const items = shuffled.map((q) => ({ q, trend: realisticTrend(rng) }));
 
   return (
-    <section className="py-12 sm:py-16 bg-surface-2/50 border-y border-border">
+    <section className="py-12 sm:py-16 bg-surface-2/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <div className="flex items-end justify-between mb-5 sm:mb-6 gap-4">

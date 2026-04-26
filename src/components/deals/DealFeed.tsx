@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X, SlidersHorizontal } from "lucide-react";
 import CategoryNav from "./CategoryNav";
 import OriginToggle from "./OriginToggle";
@@ -62,18 +62,43 @@ function SkeletonColumn({ count, gapClass, startIndex }: { count: number; gapCla
   );
 }
 
+/* Whitelist of valid filter values from the URL — defends against
+   junk params (e.g. /deals?tier=DROP%20TABLE) silently breaking state. */
+const VALID_TIERS = new Set<DiscountTier>(["all", "10", "20", "30", "50"]);
+const VALID_SORTS = new Set<SortOption>(["newest", "discount", "popular", "price_asc", "price_desc"]);
+const VALID_ORIGINS = new Set<OriginFilter>(["all", "local", "intl"]);
+
 export default function DealFeed() {
+  /* Read initial filter state from URL params so /deals?category=phones
+     (linked from homepage CategoryGrid tiles) lands on the correct
+     filtered view instead of the default "all". */
+  const searchParams = useSearchParams();
+  const initialCategory = searchParams.get("category") ?? "all";
+  const initialTierRaw = searchParams.get("minDiscount") ?? "all";
+  const initialTier = VALID_TIERS.has(initialTierRaw as DiscountTier)
+    ? (initialTierRaw as DiscountTier)
+    : "all";
+  const initialSortRaw = searchParams.get("sort") ?? "newest";
+  const initialSort = VALID_SORTS.has(initialSortRaw as SortOption)
+    ? (initialSortRaw as SortOption)
+    : "newest";
+  const initialSearch = searchParams.get("search") ?? "";
+  const initialOriginRaw = searchParams.get("origin") ?? "all";
+  const initialOrigin = VALID_ORIGINS.has(initialOriginRaw as OriginFilter)
+    ? (initialOriginRaw as OriginFilter)
+    : "all";
+
   const [items, setItems]       = useState<Deal[]>([]);
   const [total, setTotal]       = useState(0);
   const [hasMore, setHasMore]   = useState(false);
   const [loading, setLoading]   = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const [category, setCategory] = useState("all");
-  const [tier, setTier]         = useState<DiscountTier>("all");
-  const [sort, setSort]         = useState<SortOption>("newest");
-  const [search, setSearch]     = useState("");
-  const [origin, setOrigin]     = useState<OriginFilter>("all");
+  const [category, setCategory] = useState(initialCategory);
+  const [tier, setTier]         = useState<DiscountTier>(initialTier);
+  const [sort, setSort]         = useState<SortOption>(initialSort);
+  const [search, setSearch]     = useState(initialSearch);
+  const [origin, setOrigin]     = useState<OriginFilter>(initialOrigin);
   const [originCounts, setOriginCounts] =
     useState<{ all: number; local: number; intl: number }>();
 
@@ -121,6 +146,25 @@ export default function DealFeed() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [buildParams]);
+
+  /* Sync filter state back to URL so /deals?category=phones updates as
+     the user changes filters → bookmarkable + shareable + back-button
+     friendly. Skip the write when URL already matches the desired state
+     (avoids history-flooding loops). */
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (category !== "all") params.set("category", category);
+    if (tier !== "all")     params.set("minDiscount", tier);
+    if (sort !== "newest")  params.set("sort", sort);
+    if (search.trim())      params.set("search", search.trim());
+    if (origin !== "all")   params.set("origin", origin);
+
+    const desired = params.toString();
+    const current = searchParams.toString();
+    if (desired === current) return;
+
+    router.replace(desired ? `/deals?${desired}` : "/deals", { scroll: false });
+  }, [category, tier, sort, search, origin, router, searchParams]);
 
   const loadMore = useCallback(() => {
     if (loadingMore || !hasMore) return;

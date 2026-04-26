@@ -28,13 +28,22 @@ export function formatUSD(amount: number): string {
 
 /**
  * Compact USD formatter for product cards: rounds to 2dp, drops trailing
- * zeros so `$7.0000000036` → `$7`, `$7.5` → `$7.50`, `$7.99` → `$7.99`.
+ * zeros, and adds thousands-separator commas for prices ≥ 1000.
+ *   7        → "$7"
+ *   7.5      → "$7.50"
+ *   1500     → "$1,500"
+ *   1500.99  → "$1,500.99"
+ *   1234567  → "$1,234,567"
  * Defends against float-precision artifacts from `original - sale` math.
  */
 export function formatUSDPrice(amount: number): string {
   const rounded = Math.round(amount * 100) / 100;
-  if (Number.isInteger(rounded)) return `$${rounded}`;
-  return `$${rounded.toFixed(2)}`;
+  const isInt = Number.isInteger(rounded);
+  const body = rounded.toLocaleString("en-US", {
+    minimumFractionDigits: isInt ? 0 : 2,
+    maximumFractionDigits: isInt ? 0 : 2,
+  });
+  return `$${body}`;
 }
 
 export function usdToNgn(usd: number): number {

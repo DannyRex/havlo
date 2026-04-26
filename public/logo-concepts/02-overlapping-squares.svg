@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Havlo concept 2: overlapping squares">
+  <title>Havlo · overlapping-squares</title>
+  <rect width="1024" height="1024" rx="128" fill="#0057FF"/>
+  <!-- Back square: outlined white (the "original" / higher-priced option) -->
+  <rect x="208" y="208" width="448" height="448" rx="56" fill="none" stroke="#FFFFFF" stroke-width="56"/>
+  <!-- Front square: filled white (the "find / chosen" option) -->
+  <rect x="396" y="396" width="448" height="448" rx="56" fill="#FFFFFF"/>
+  <!-- Punch the inner overlap so the back square shows through cleanly -->
+  <rect x="396" y="396" width="260" height="260" rx="56" fill="#0057FF"/>
+</svg>
