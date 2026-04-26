@@ -1,0 +1,239 @@
+"use client";
+
+import { Globe, ArrowUpRight } from "lucide-react";
+import {
+  formatUSDPrice,
+  savings,
+  formatCompact,
+  usdToNgn,
+} from "@/lib/utils";
+import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/MasonryCard";
+import type { Deal } from "@/types";
+
+interface Props {
+  items: Deal[];
+  loading: boolean;
+  providers: string[];
+}
+
+/* ── Single live-result card — compact, image-first, varied aspect ── */
+function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
+  const isUSD = deal.currency === "USD";
+  const saved = savings(deal.originalPrice, deal.salePrice);
+  const priceFmt = isUSD ? formatUSDPrice(deal.salePrice)     : formatCompact(deal.salePrice);
+  const origFmt  = isUSD ? formatUSDPrice(deal.originalPrice) : formatCompact(deal.originalPrice);
+  const saveFmt  = saved > 0 ? (isUSD ? formatUSDPrice(saved) : formatCompact(saved)) : null;
+  const ngnEquiv = isUSD ? `≈ ${formatCompact(usdToNgn(deal.salePrice))}` : null;
+  const hasDiscount = deal.originalPrice > deal.salePrice && deal.discountPercent > 0;
+
+  // Country tag is stored in tags as "country:us" — extract for the label
+  const country = deal.tags
+    .find((t) => t.startsWith("country:"))
+    ?.split(":")[1]
+    ?.toUpperCase();
+
+  return (
+    <a
+      href={deal.url}
+      target="_blank"
+      rel="noopener noreferrer sponsored"
+      aria-label={`${deal.title} — ${priceFmt} at ${deal.storeName}`}
+      className="group card card-hover overflow-hidden flex flex-col"
+    >
+      {/* Image — varied aspect for masonry feel */}
+      <div className={`relative overflow-hidden bg-white ${aspect}`}>
+        {deal.imageUrl ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={deal.imageUrl}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-[1.04] transition-transform duration-500 motion-reduce:group-hover:scale-100"
+          />
+        ) : (
+          <div
+            className="absolute inset-0 flex items-center justify-center text-4xl"
+            aria-hidden="true"
+          >
+            {deal.imageEmoji}
+          </div>
+        )}
+
+        {/* Discount badge — perfect circle, top-right */}
+        {hasDiscount && (
+          <div
+            className="absolute top-2 right-2 w-11 h-11 rounded-full flex flex-col items-center justify-center text-white select-none"
+            style={{
+              background: "#dc2626",
+              boxShadow: "0 3px 10px rgba(220,38,38,0.35), 0 0 0 3px rgba(255,255,255,0.85)",
+            }}
+          >
+            <span className="text-[13px] font-black leading-none tracking-tight">
+              {deal.discountPercent}%
+            </span>
+            <span className="text-[8px] font-bold uppercase tracking-[0.1em] mt-0.5 opacity-90">
+              off
+            </span>
+          </div>
+        )}
+
+        {/* Country chip — subtle, bottom-left */}
+        {country && (
+          <span
+            className="absolute left-2 bottom-2 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-white/95 backdrop-blur-sm"
+            style={{ background: "rgba(0,0,0,0.55)" }}
+          >
+            <Globe size={9} />
+            {country}
+          </span>
+        )}
+      </div>
+
+      {/* Caption */}
+      <div className="p-3 flex flex-col flex-1">
+        <p className="text-[10px] uppercase tracking-[0.08em] text-ink-3 font-semibold truncate">
+          {deal.storeName}
+        </p>
+        <p className="mt-1 text-sm font-medium text-ink leading-snug line-clamp-2 tracking-[-0.005em]">
+          {deal.title}
+        </p>
+
+        <div className="mt-auto pt-2.5 flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-sm font-bold text-ink">{priceFmt}</span>
+          {hasDiscount && (
+            <span className="text-[11px] text-ink-3 line-through">{origFmt}</span>
+          )}
+          {saveFmt && (
+            <span className="ml-auto text-[11px] font-semibold text-success">
+              −{saveFmt}
+            </span>
+          )}
+        </div>
+
+        {ngnEquiv && (
+          <p className="text-[10px] text-ink-3 mt-0.5">{ngnEquiv}</p>
+        )}
+      </div>
+    </a>
+  );
+}
+
+/* ── Skeleton card ───────────────────────────────────────────────── */
+function SkeletonCard({ aspect }: { aspect: string }) {
+  return (
+    <div className="card overflow-hidden flex flex-col">
+      <div className={`skeleton ${aspect}`} />
+      <div className="p-3 space-y-2">
+        <div className="skeleton h-2.5 w-1/3 rounded" />
+        <div className="skeleton h-3 w-3/4 rounded" />
+        <div className="skeleton h-3 w-1/3 rounded mt-1" />
+      </div>
+    </div>
+  );
+}
+
+/* ── Masonry column wrapper ───────────────────────────────────────── */
+function LiveColumn({
+  items, gapClass, startIndex,
+}: { items: Deal[]; gapClass: string; startIndex: number }) {
+  return (
+    <div className={`flex-1 flex flex-col ${gapClass} min-w-0`}>
+      {items.map((d, i) => (
+        <LiveCard key={d.id} deal={d} aspect={MASONRY_ASPECTS[(startIndex + i) % MASONRY_ASPECTS.length]} />
+      ))}
+    </div>
+  );
+}
+
+function SkeletonColumn({
+  count, gapClass, startIndex,
+}: { count: number; gapClass: string; startIndex: number }) {
+  return (
+    <div className={`flex-1 flex flex-col ${gapClass} min-w-0`}>
+      {Array.from({ length: count }).map((_, i) => (
+        <SkeletonCard key={i} aspect={MASONRY_ASPECTS[(startIndex + i) % MASONRY_ASPECTS.length]} />
+      ))}
+    </div>
+  );
+}
+
+/* ── Section ──────────────────────────────────────────────────────── */
+export default function LiveResults({ items, loading, providers }: Props) {
+  // Don't render anything if not loading and zero results
+  if (!loading && items.length === 0) return null;
+
+  return (
+    <section className="mt-12 sm:mt-16">
+
+      {/* Section header */}
+      <div className="max-w-3xl mx-auto mb-5 sm:mb-6 px-1">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="relative flex h-2 w-2" aria-hidden="true">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 animate-ping" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-success">
+                Live · On sale now
+              </span>
+            </div>
+            <h3 className="text-lg sm:text-xl font-bold text-ink tracking-[-0.02em]">
+              Real deals from across the world
+            </h3>
+            <p className="text-xs sm:text-sm text-ink-2 mt-0.5">
+              {items.length > 0 ? `${items.length} hand-picked discounts ` : "Hand-picked discounts "}
+              from global stores, refreshed every few minutes. Prices in USD, shipping to Nigeria.
+            </p>
+          </div>
+          <a
+            href="https://serpapi.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:inline-flex items-center gap-1 text-[11px] text-ink-3 hover:text-ink-2 transition-colors shrink-0"
+          >
+            via SerpAPI <ArrowUpRight size={11} />
+          </a>
+        </div>
+      </div>
+
+      {/* Masonry — left-to-right column distribution, varying aspects */}
+      {loading ? (
+        <>
+          <div className="flex gap-3 sm:hidden">
+            <SkeletonColumn count={4} gapClass="gap-3" startIndex={0} />
+            <SkeletonColumn count={4} gapClass="gap-3" startIndex={100} />
+          </div>
+          <div className="hidden sm:flex lg:hidden gap-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonColumn key={i} count={3} gapClass="gap-3" startIndex={i * 100} />
+            ))}
+          </div>
+          <div className="hidden lg:flex gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <SkeletonColumn key={i} count={2} gapClass="gap-4" startIndex={i * 100} />
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex gap-3 sm:hidden">
+            {chunkLeftToRight(items, 2).map((col, i) => (
+              <LiveColumn key={i} items={col} gapClass="gap-3" startIndex={i * 100} />
+            ))}
+          </div>
+          <div className="hidden sm:flex lg:hidden gap-3">
+            {chunkLeftToRight(items, 3).map((col, i) => (
+              <LiveColumn key={i} items={col} gapClass="gap-3" startIndex={i * 100} />
+            ))}
+          </div>
+          <div className="hidden lg:flex gap-4">
+            {chunkLeftToRight(items, 4).map((col, i) => (
+              <LiveColumn key={i} items={col} gapClass="gap-4" startIndex={i * 100} />
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}

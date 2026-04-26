@@ -7,10 +7,13 @@ import SearchBar from "@/components/compare/SearchBar";
 import Image from "next/image";
 import PriceResults from "@/components/compare/PriceResults";
 import DupeCard from "@/components/compare/DupeCard";
+import LiveResults from "@/components/compare/LiveResults";
+import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/MasonryCard";
 import { formatNaira } from "@/lib/utils";
 import { trackClick } from "@/lib/trackClick";
-import type { SearchOutput } from "@/lib/search";
+import type { SearchOutput, DupeResult } from "@/lib/search";
 import type { SniffResult } from "@/app/api/sniff/route";
+import type { Deal } from "@/types";
 
 /** Mirrors the check in url-parser.ts — avoids importing server code here. */
 function looksLikeUrl(v: string): boolean {
@@ -29,6 +32,27 @@ function CompareContent() {
   const [loading, setLoading]         = useState(false);
   const [sniffResult, setSniffResult] = useState<SniffResult | null>(null);
   const [sniffLoading, setSniffLoading] = useState(false);
+  const [liveResults, setLiveResults]   = useState<Deal[]>([]);
+  const [liveLoading, setLiveLoading]   = useState(false);
+  const [liveProviders, setLiveProviders] = useState<string[]>([]);
+
+  /* ── Fetch live SerpAPI results in parallel with the internal search ── */
+  const fetchLive = useCallback(async (q: string) => {
+    if (!q.trim()) return;
+    setLiveLoading(true);
+    setLiveResults([]);
+    setLiveProviders([]);
+    try {
+      const res = await fetch(`/api/live-search?q=${encodeURIComponent(q)}&limit=12`);
+      const data = await res.json();
+      setLiveResults(Array.isArray(data.items) ? (data.items as Deal[]) : []);
+      setLiveProviders(Array.isArray(data.providers) ? (data.providers as string[]) : []);
+    } catch {
+      setLiveResults([]);
+    } finally {
+      setLiveLoading(false);
+    }
+  }, []);
 
   /* ── key-based direct lookup (from homepage cards) ─────────────────── */
   const fetchByKey = useCallback(async (key: string, displayQ: string) => {
@@ -74,6 +98,10 @@ function CompareContent() {
     const searchTerm = sniff?.ok && sniff.title ? sniff.title : rawUrl;
 
     setLoading(true);
+    // Fire live search in parallel — uses the sniffed title (real product name)
+    // rather than the raw URL, so SerpAPI gets a real query
+    fetchLive(searchTerm);
+
     try {
       const endpoint = sniff?.ok && sniff.title
         ? `/api/compare?q=${encodeURIComponent(searchTerm)}&mode=similar`
@@ -85,7 +113,7 @@ function CompareContent() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, fetchLive]);
 
   /* ── Text search ────────────────────────────────────────────────────── */
   const handleSearch = useCallback(async (q: string) => {
@@ -97,6 +125,10 @@ function CompareContent() {
     router.replace(`/compare?${params.toString()}`, { scroll: false });
     setLoading(true);
     setResult(null);
+
+    // Fire both calls in parallel
+    fetchLive(q);
+
     try {
       const res = await fetch(`/api/compare?q=${encodeURIComponent(q)}&mode=similar`);
       setResult(await res.json() as SearchOutput);
@@ -105,7 +137,7 @@ function CompareContent() {
     } finally {
       setLoading(false);
     }
-  }, [router, handleUrlSearch]);
+  }, [router, handleUrlSearch, fetchLive]);
 
   /* ── React to URL changes (initial load, back/forward) ─────────────── */
   useEffect(() => {
@@ -316,20 +348,33 @@ function CompareContent() {
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                {result.dupes.map((dupe, i) => (
-                  <DupeCard key={dupe.key} dupe={dupe} rank={i} query={query} mode="similar" />
-                ))}
-              </div>
+              {/* Varying-height masonry — same pattern as homepage / deals */}
+              <DupeMasonry dupes={result.dupes} query={query} />
+
+              {/* Live results — fresh from Google Shopping */}
+              <LiveResults
+                items={liveResults}
+                loading={liveLoading}
+                providers={liveProviders}
+              />
             </>
+          ) : (liveLoading || liveResults.length > 0) ? (
+            /* No internal dupes, but live SerpAPI has (or is loading) results. */
+            <LiveResults
+              items={liveResults}
+              loading={liveLoading}
+              providers={liveProviders}
+            />
           ) : (
+            /* Both internal and live came back empty. */
             <div className="text-center py-12">
               <div className="max-w-sm mx-auto">
                 <SearchX size={28} className="text-ink-3 mx-auto mb-3" strokeWidth={1.5} />
-                <p className="text-sm text-ink font-medium mb-1">No alternatives found</p>
+                <p className="text-sm text-ink font-medium mb-1">
+                  No alternatives found anywhere
+                </p>
                 <p className="text-xs text-ink-3">
-                  We couldn&apos;t find similar products at a lower price. Try a different
-                  product or a broader search like &quot;earbuds&quot; or &quot;laptop&quot;.
+                  Try a different product or a broader search like &quot;earbuds&quot; or &quot;laptop&quot;.
                 </p>
               </div>
             </div>
@@ -337,19 +382,87 @@ function CompareContent() {
         </div>
       )}
 
-      {/* ── Empty / no results ── */}
+      {/* ── Empty / no results ──
+           Three sub-states:
+           A) live is loading → show LiveResults skeletons, suppress empty copy
+           B) live has items   → show only LiveResults (with a small context note)
+           C) both empty       → show helpful "try a different search" guidance */}
       {!loading && result?.mode === "empty" && query && (
-        <div className="mt-16">
-          <div className="max-w-md mx-auto text-center mb-10">
-            <SearchX size={28} className="text-ink-3 mx-auto mb-3" strokeWidth={1.5} />
-            <h3 className="text-base font-medium text-ink mb-1">No matches for &ldquo;{query}&rdquo;</h3>
-            <p className="text-sm text-ink-3">
-              Try a broader or different search term — e.g. just the brand or category.
-            </p>
-          </div>
+        <div className="mt-12">
+          {(liveLoading || liveResults.length > 0) ? (
+            <>
+              <div className="max-w-3xl mx-auto mb-5 px-1 text-center sm:text-left">
+                <p className="text-[13px] text-ink-2">
+                  Nothing in our local index for &ldquo;{query}&rdquo; yet — here&apos;s what&apos;s live online:
+                </p>
+              </div>
+              <LiveResults
+                items={liveResults}
+                loading={liveLoading}
+                providers={liveProviders}
+              />
+            </>
+          ) : (
+            <div className="max-w-md mx-auto text-center py-12">
+              <SearchX size={28} className="text-ink-3 mx-auto mb-3" strokeWidth={1.5} />
+              <h3 className="text-base font-medium text-ink mb-1">
+                No matches for &ldquo;{query}&rdquo;
+              </h3>
+              <p className="text-sm text-ink-3">
+                Try a broader or different term — e.g. just the brand or category.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+/* ── Masonry layout for dupes ─────────────────────────────────────
+   Renders three column-distributed layouts (mobile/tablet/desktop)
+   so cards flow left-to-right with varied heights from cycled aspects. */
+function DupeColumn({
+  items, gapClass, startIndex, query,
+}: { items: DupeResult[]; gapClass: string; startIndex: number; query: string }) {
+  return (
+    <div className={`flex-1 flex flex-col ${gapClass} min-w-0`}>
+      {items.map((dupe, i) => (
+        <DupeCard
+          key={dupe.key}
+          dupe={dupe}
+          rank={startIndex + i}
+          query={query}
+          mode="similar"
+          aspect={MASONRY_ASPECTS[(startIndex + i) % MASONRY_ASPECTS.length]}
+        />
+      ))}
+    </div>
+  );
+}
+
+function DupeMasonry({ dupes, query }: { dupes: DupeResult[]; query: string }) {
+  const mobileCols  = chunkLeftToRight(dupes, 2);
+  const tabletCols  = chunkLeftToRight(dupes, 3);
+  const desktopCols = chunkLeftToRight(dupes, 4);
+  return (
+    <>
+      <div className="flex gap-3 sm:hidden">
+        {mobileCols.map((col, i) => (
+          <DupeColumn key={i} items={col} gapClass="gap-3" startIndex={i * 100} query={query} />
+        ))}
+      </div>
+      <div className="hidden sm:flex lg:hidden gap-3">
+        {tabletCols.map((col, i) => (
+          <DupeColumn key={i} items={col} gapClass="gap-3" startIndex={i * 100} query={query} />
+        ))}
+      </div>
+      <div className="hidden lg:flex gap-4">
+        {desktopCols.map((col, i) => (
+          <DupeColumn key={i} items={col} gapClass="gap-4" startIndex={i * 100} query={query} />
+        ))}
+      </div>
+    </>
   );
 }
 

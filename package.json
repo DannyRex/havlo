@@ -14,9 +14,10 @@
     "ai:embed": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/embed-deals.ts --all",
     "ai:embed:text": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/embed-deals.ts --text",
     "ai:embed:images": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/embed-deals.ts --images",
-    "ai:validate": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/validate-vector.ts",
     "ai:reindex": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/reindex.ts",
-    "ai:smoke": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/smoke-test-vector.ts"
+    "ingest": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-providers.ts",
+    "ingest:serpapi": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-providers.ts --provider=serpapi-shopping",
+    "ingest:scraped": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-scraped.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.0",

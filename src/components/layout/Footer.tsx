@@ -1,20 +1,13 @@
 import Link from "next/link";
 
+/* Only links to pages that actually exist. Contact + Press kit removed
+   per request. About removed (no page yet — easy to add back later). */
 const footerSections = [
   {
     title: "Product",
     links: [
-      { label: "Browse deals",      href: "/deals" },
-      { label: "Find for less",     href: "/compare" },
-      { label: "How it works",      href: "/#how" },
-    ],
-  },
-  {
-    title: "Company",
-    links: [
-      { label: "About",     href: "/about" },
-      { label: "Contact",   href: "/contact" },
-      { label: "Press kit", href: "/press" },
+      { label: "Browse deals",  href: "/deals" },
+      { label: "Find for less", href: "/compare" },
     ],
   },
   {
@@ -34,9 +27,9 @@ export default function Footer() {
     <footer className="border-t border-border bg-surface">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
 
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 mb-12">
+        <div className="grid gap-10 sm:grid-cols-3 mb-12">
           {/* Brand */}
-          <div className="sm:col-span-2 lg:col-span-1">
+          <div>
             <Link href="/" className="inline-flex items-center gap-2 mb-4 select-none" aria-label="Havlo home">
               <span
                 aria-hidden="true"
@@ -47,9 +40,15 @@ export default function Footer() {
               </span>
               <span className="text-[18px] font-bold tracking-[-0.03em] text-ink">havlo</span>
             </Link>
-            <p className="text-sm text-ink-2 leading-relaxed max-w-xs">
+            <p className="text-sm text-ink-2 leading-relaxed max-w-xs mb-4">
               Find similar products for less. Paste any link or search anything, we surface the cheaper alternatives.
             </p>
+            <a
+              href="mailto:hello@havlo.io"
+              className="text-sm text-ink-2 hover:text-ink transition-colors underline-offset-4 hover:underline"
+            >
+              hello@havlo.io
+            </a>
           </div>
 
           {/* Link columns */}

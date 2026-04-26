@@ -1,0 +1,15 @@
+/* Lazy Supabase client for provider modules.
+   Mirrors the pattern in src/lib/search/vector.ts. */
+
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+let _supa: SupabaseClient | null = null;
+
+export function getSupabaseAdmin(): SupabaseClient | null {
+  if (_supa) return _supa;
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  _supa = createClient(url, key, { auth: { persistSession: false } });
+  return _supa;
+}

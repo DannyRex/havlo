@@ -1,6 +1,3 @@
-"use client";
-
-import { useMemo } from "react";
 import Link from "next/link";
 import { deals } from "@/lib/data/deals";
 import type { Deal } from "@/types";
@@ -8,6 +5,38 @@ import MasonryCard, {
   MASONRY_ASPECTS,
   chunkLeftToRight,
 } from "@/components/deals/MasonryCard";
+
+/* Deterministic seed bucketed into 5-minute windows so the picks rotate
+   every 5 min. Server component renders pick this seed; page revalidates
+   every 300s + client `<RefreshOnInterval />` triggers a refetch — together
+   they give a "live" rotation without hydration mismatch. */
+const ROTATION_MS = 5 * 60 * 1000;
+
+function freshnessSeed(): number {
+  const bucket = Math.floor(Date.now() / ROTATION_MS).toString();
+  let h = 2166136261;
+  for (let i = 0; i < bucket.length; i++) {
+    h ^= bucket.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function seededShuffle<T>(items: T[], seed: number): T[] {
+  const arr = [...items];
+  let s = seed || 1;
+  for (let i = arr.length - 1; i > 0; i--) {
+    // mulberry32-style PRNG step
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    const r = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    const j = Math.floor(r * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 function MasonryColumn({
   items, gapClass, startIndex,
@@ -26,39 +55,44 @@ function MasonryColumn({
 }
 
 export default function TrendingDeals() {
-  const picks = useMemo(() => {
-    const filtered = deals
-      .filter(
-        (d) =>
-          d.discountPercent >= 15 &&
-          d.title.length >= 10 &&
-          d.title.length <= 70 &&
-          !d.title.includes("\\") &&
-          !(d.currency === "USD" && d.salePrice < 10),
-      )
-      .sort((a, b) => b.discountPercent - a.discountPercent);
+  /* Build the candidate pool by quality filter, then shuffle by 5-min seed.
+     Over-sample (top 60 by discount) then shuffle, so each 5-min rotation
+     has real variety — not just the same items rearranged. */
+  const seed = freshnessSeed();
+  const pool = deals
+    .filter(
+      (d) =>
+        d.discountPercent >= 15 &&
+        d.title.length >= 10 &&
+        d.title.length <= 70 &&
+        !d.title.includes("\\") &&
+        !(d.currency === "USD" && d.salePrice < 10),
+    )
+    .sort((a, b) => b.discountPercent - a.discountPercent)
+    .slice(0, 60);
 
-    const seen = new Set<string>();
-    const storeCount: Record<string, number> = {};
-    const out: Deal[] = [];
-    for (const d of filtered) {
-      if (out.length >= 16) break;
-      const sc = storeCount[d.storeId] ?? 0;
-      if (sc >= 4) continue;
-      const key = d.storeId + d.title.slice(0, 20);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      storeCount[d.storeId] = sc + 1;
-      out.push(d);
-    }
-    return out;
-  }, []);
+  const shuffled = seededShuffle(pool, seed);
 
-  const mobileCols  = useMemo(() => chunkLeftToRight(picks, 2), [picks]);
-  const tabletCols  = useMemo(() => chunkLeftToRight(picks, 3), [picks]);
-  const desktopCols = useMemo(() => chunkLeftToRight(picks, 4), [picks]);
+  // Dedupe + per-store cap for visual diversity, take 16
+  const seen = new Set<string>();
+  const storeCount: Record<string, number> = {};
+  const picks: Deal[] = [];
+  for (const d of shuffled) {
+    if (picks.length >= 16) break;
+    const sc = storeCount[d.storeId] ?? 0;
+    if (sc >= 4) continue;
+    const key = d.storeId + d.title.slice(0, 20);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    storeCount[d.storeId] = sc + 1;
+    picks.push(d);
+  }
 
   if (picks.length === 0) return null;
+
+  const mobileCols  = chunkLeftToRight(picks, 2);
+  const tabletCols  = chunkLeftToRight(picks, 3);
+  const desktopCols = chunkLeftToRight(picks, 4);
 
   return (
     <section className="py-12 sm:py-20 bg-bg">

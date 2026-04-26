@@ -35,8 +35,18 @@ const BRANDS = [
   "playstation", "xbox", "nintendo", "switch",
   "binatone", "qasa", "century", "saachi", "hyundai", "qlink",
   "nike", "adidas", "puma", "reebok", "asics", "newbalance", "converse",
-  "levis", "zara", "h&m", "uniqlo", "gucci", "prada",
-  "remington", "philips", "wahl",
+  "vans", "fila", "underarmour", "skechers",
+  "levis", "zara", "h&m", "uniqlo", "gucci", "prada", "louisvuitton",
+  "balenciaga", "fendi", "versace", "burberry", "coach", "michaelkors",
+  "tommy", "hilfiger", "calvinklein", "ck",
+  // Eyewear
+  "rayban", "oakley", "persol", "maui", "jim", "tomford", "carrera",
+  "warbyparker", "ditto",
+  // Beauty / personal care
+  "remington", "philips", "wahl", "braun", "oralb", "colgate",
+  "fenty", "maybelline", "loreal", "lancome", "mac",
+  // Watches
+  "rolex", "casio", "seiko", "fossil", "garmin", "fitbit",
 ];
 
 // Aliases / canonicalization
@@ -99,7 +109,7 @@ const MODEL_HINTS: Record<string, RegExp[]> = {
     /\biphone\s*(\d{1,2}(?:\s*(?:pro|plus|mini|max|pro\s*max))?)\b/i,
     /\bipad\s*(?:(pro|air|mini)\s*)?(\d{1,2})?\b/i,
     /\bmacbook\s*(?:(pro|air)\s*)?(\d{1,2})?\b/i,
-    /\bairpods\s*(?:(pro|max)\s*(\d)?)?\b/i,
+    /\bairpods?\s*(?:(pro|max)\s*(\d)?)?\b/i,
     /\bwatch\s*(?:series\s*)?(\d{1,2})\b/i,
   ],
   samsung: [
@@ -236,7 +246,7 @@ function findColor(norm: string): string | null {
   return m ? m[0].toLowerCase().replace(/\s+/g, "") : null;
 }
 
-export function tokensOf(s: string): string[] {
+function tokensOf(s: string): string[] {
   return stripPunct(s)
     .split(/\s+/)
     .filter((w) => w.length > 1 && !STOP.has(w));
@@ -269,39 +279,6 @@ export function buildSignature(title: string): ProductSignature {
   const key = parts.join("|");
 
   return { brand, model, storageGb, ramGb, inches, color, tokens, key, norm };
-}
-
-/** True if `query` signature is compatible with `cand` signature.
- *  - If query has brand, cand brand must match (or cand has no brand → reject; too risky).
- *  - If query has a model, the cand's normalized title must literally contain at least
- *    one substantive token of that model phrase.
- *  - Storage/inches must match exactly (within ±1 for inches). */
-export function signatureMatches(query: ProductSignature, cand: ProductSignature): boolean {
-  if (query.brand) {
-    if (!cand.brand) return false;
-    if (query.brand !== cand.brand) return false;
-  }
-  if (query.model) {
-    const qm = query.model.split(/\s+/).filter((t) => t.length > 1 && !STOP.has(t));
-    if (qm.length > 0) {
-      const overlap = qm.filter((t) => cand.norm.includes(t)).length;
-      // Require the strongest model token to appear in the candidate.
-      if (overlap === 0) return false;
-    }
-  }
-  if (query.storageGb && cand.storageGb && query.storageGb !== cand.storageGb) return false;
-  if (query.inches && cand.inches && Math.abs(query.inches - cand.inches) > 1) return false;
-  return true;
-}
-
-/** Token-level Jaccard similarity (0..1). */
-export function tokenJaccard(a: string[], b: string[]): number {
-  if (a.length === 0 || b.length === 0) return 0;
-  const sa = new Set(a);
-  const sb = new Set(b);
-  let inter = 0;
-  sa.forEach((t) => { if (sb.has(t)) inter++; });
-  return inter / (sa.size + sb.size - inter);
 }
 
 /* ── AI-EXTRACTED SIGNATURES (extracted.json) ── */

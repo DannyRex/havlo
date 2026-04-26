@@ -1,16 +1,54 @@
-"use client";
-
 import Link from "next/link";
 import { ArrowRight, TrendingDown } from "lucide-react";
-import { useMemo } from "react";
 import { deals } from "@/lib/data/deals";
 
-/* Pick three real product images for the visual — deterministic so SSR matches */
+/* 5-min seeded PRNG so the collage rotates with the rest of the page.
+   Same bucket pattern as TrendingDeals + TrendingSearches — keeps every
+   "live" element on the page in sync. */
+const ROTATION_MS = 5 * 60 * 1000;
+
+function freshnessSeed(): number {
+  const bucket = Math.floor(Date.now() / ROTATION_MS).toString();
+  let h = 2166136261;
+  for (let i = 0; i < bucket.length; i++) {
+    h ^= bucket.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function makeRng(seed: number) {
+  let s = seed || 1;
+  return () => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function seededShuffle<T>(items: T[], rng: () => number): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/* Pick three real product images, fresh every 5-min rotation.
+   Server-rendered → SSR and CSR see the same picks (no hydration mismatch). */
 function pickCollage() {
-  const candidates = deals
-    .filter((d) => d.imageUrl && d.discountPercent >= 20 && d.title.length < 60)
-    .sort((a, b) => a.id.localeCompare(b.id));
-  return candidates.slice(0, 3);
+  const candidates = deals.filter(
+    (d) =>
+      d.imageUrl &&
+      d.discountPercent >= 20 &&
+      d.title.length < 60,
+  );
+  if (candidates.length < 3) return candidates;
+  const rng = makeRng(freshnessSeed());
+  return seededShuffle(candidates, rng).slice(0, 3);
 }
 
 /* Reusable mini product card used in the collage */
@@ -54,7 +92,7 @@ function CollageCard({
 }
 
 export default function CTA() {
-  const collage = useMemo(pickCollage, []);
+  const collage = pickCollage();
 
   return (
     <section className="py-14 sm:py-24 bg-bg">
@@ -63,17 +101,8 @@ export default function CTA() {
         {/* Outer relative wrapper — does NOT clip, lets cards bleed past panel */}
         <div className="relative">
 
-          {/* Dark panel — clips its own glow, but cards live outside it */}
+          {/* Dark panel — clean, no decorative gradients */}
           <div className="relative overflow-hidden rounded-[28px] sm:rounded-[36px] bg-ink text-bg lg:min-h-[480px]">
-            {/* Subtle accent — bottom-left */}
-            <div
-              aria-hidden="true"
-              className="absolute -bottom-24 -left-24 w-[360px] h-[360px] rounded-full pointer-events-none"
-              style={{
-                background: "radial-gradient(closest-side, rgba(0,87,255,0.18), transparent 70%)",
-              }}
-            />
-
             {/* Left column lives in normal flow */}
             <div className="relative grid lg:grid-cols-2 items-center">
               <div className="px-6 py-12 sm:px-12 sm:py-16 lg:py-14 lg:pr-6">

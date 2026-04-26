@@ -12,11 +12,14 @@ export default function DupeCard({
   rank,
   query = "",
   mode = "similar",
+  aspect = "aspect-square",
 }: {
   dupe: DupeResult;
   rank: number;
   query?: string;
   mode?: string;
+  /** Image aspect class for masonry-style varying heights */
+  aspect?: string;
 }) {
   const hasSavings = dupe.savingsPercent > 0;
   const bestOffer = dupe.offers[0];
@@ -45,8 +48,8 @@ export default function DupeCard({
         </div>
       )}
 
-      {/* Image — square, edge-to-edge */}
-      <div className="relative w-full aspect-square overflow-hidden bg-white">
+      {/* Image — varied aspect for masonry feel */}
+      <div className={`relative w-full overflow-hidden bg-white ${aspect}`}>
         {dupe.imageUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img

@@ -1,56 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { search, searchByKey, findSimilar, findSimilarByUrl, isUrl } from "@/lib/search";
-import { vectorSearch, vectorFindSimilar, vectorFindSimilarByUrl } from "@/lib/search/vector";
+import { searchByKey } from "@/lib/search";
+import { pgFtsFindSimilar } from "@/lib/search/pg-fts";
 
-// Feature flag: "1" / "true" → use Phase 2 vector engine.
-// Defaults OFF so heuristic stays the safe path until vector is validated.
-const USE_VECTOR_SEARCH = /^(1|true|yes)$/i.test(process.env.USE_VECTOR_SEARCH ?? "");
+/* Phase 6e — pg-fts is the only engine for /compare's text search.
+   The old heuristic engine (BRANDS list, PRODUCT_TYPES regex, etc.)
+   has been deleted. URLs that hit this route directly without prior
+   sniffing fall through to pg-fts (which won't FTS-match them) → the
+   UI's live SerpAPI section takes over. */
+
+const headers = { "Cache-Control": "s-maxage=120, stale-while-revalidate=600" };
 
 export async function GET(req: NextRequest) {
-  const q    = req.nextUrl.searchParams.get("q")    ?? "";
-  const key  = req.nextUrl.searchParams.get("key")  ?? "";
-  const mode = req.nextUrl.searchParams.get("mode") ?? "";
+  const q   = req.nextUrl.searchParams.get("q")   ?? "";
+  const key = req.nextUrl.searchParams.get("key") ?? "";
 
-  // `key` lookup never benefits from vectors — skip straight to the cache lookup.
+  // Key-based direct lookup (legacy /compare?key= URLs)
   if (key) {
-    const result = searchByKey(key);
-    return NextResponse.json(result, {
-      headers: { "Cache-Control": "s-maxage=120, stale-while-revalidate=600" },
-    });
+    return NextResponse.json(searchByKey(key), { headers });
   }
 
-  if (!q.trim()) return NextResponse.json({ error: "Query required" }, { status: 400 });
+  if (!q.trim()) {
+    return NextResponse.json({ error: "Query required" }, { status: 400 });
+  }
 
   try {
-    // URL → Smart Switch
-    if (isUrl(q)) {
-      const result = USE_VECTOR_SEARCH
-        ? await vectorFindSimilarByUrl(q)
-        : findSimilarByUrl(q);
-      return NextResponse.json(result, {
-        headers: { "Cache-Control": "s-maxage=120, stale-while-revalidate=600" },
-      });
-    }
-
-    if (mode === "similar") {
-      const result = USE_VECTOR_SEARCH
-        ? await vectorFindSimilar(q)
-        : findSimilar(q);
-      return NextResponse.json(result, {
-        headers: { "Cache-Control": "s-maxage=120, stale-while-revalidate=600" },
-      });
-    }
-
-    const result = USE_VECTOR_SEARCH ? await vectorSearch(q) : search(q);
-    return NextResponse.json(result, {
-      headers: { "Cache-Control": "s-maxage=120, stale-while-revalidate=600" },
-    });
+    const result = await pgFtsFindSimilar(q);
+    return NextResponse.json(result, { headers });
   } catch (err) {
-    // Vector path can fail (Supabase down, OpenAI quota). Fall back to heuristic
-    // so the site never returns a 5xx for a search.
-    console.error("[/api/compare] vector path failed, falling back to heuristic:", err);
-    if (isUrl(q))             return NextResponse.json(findSimilarByUrl(q));
-    if (mode === "similar")   return NextResponse.json(findSimilar(q));
-    return NextResponse.json(search(q));
+    console.error("[/api/compare]", err);
+    return NextResponse.json(
+      { mode: "empty", query: q, suggestions: [] },
+      { headers },
+    );
   }
 }

@@ -1,4 +1,8 @@
-"use client";
+/* No "use client" — this module exports both a React component AND plain
+   utilities (chunkLeftToRight, MASONRY_ASPECTS). Client modules can't
+   re-export plain functions cleanly across the RSC boundary, so we keep
+   this as a server-renderable module. The component itself uses only
+   server-safe APIs (no hooks, no event handlers). */
 
 import {
   formatCompact,
