@@ -78,7 +78,7 @@ export default function Hero() {
             <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 animate-ping" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
           </span>
-          <span>18,432 comparisons in the last 24 hours</span>
+          <span>Live · scanning prices across 12+ stores</span>
         </div>
 
         {/* Headline — large, editorial, single tone.

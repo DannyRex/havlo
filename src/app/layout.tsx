@@ -57,7 +57,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} ${displayFont.variable} scroll-smooth`} suppressHydrationWarning>
-      <body className="min-h-screen flex flex-col antialiased font-sans pb-16 md:pb-0 bg-bg text-ink">
+      <body className="min-h-screen flex flex-col antialiased font-sans bg-bg text-ink">
         <ThemeProvider>
           <Navbar />
           <main className="flex-1">{children}</main>

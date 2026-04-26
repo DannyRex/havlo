@@ -5,6 +5,7 @@ import MasonryCard, {
   MASONRY_ASPECTS,
   chunkLeftToRight,
 } from "@/components/deals/MasonryCard";
+import AnimateIn from "@/components/ui/AnimateIn";
 
 /* Deterministic seed bucketed into 5-minute windows so picks rotate
    every 5 min. Server-rendered → no hydration mismatch. */
@@ -46,11 +47,12 @@ function MasonryColumn({
   return (
     <div className={`flex-1 flex flex-col ${gapClass} min-w-0`}>
       {items.map((d, i) => (
-        <MasonryCard
-          key={d.id}
-          deal={d}
-          aspect={MASONRY_ASPECTS[(startIndex + i) % MASONRY_ASPECTS.length]}
-        />
+        <AnimateIn key={d.id} delay={Math.min(i, 6) * 60}>
+          <MasonryCard
+            deal={d}
+            aspect={MASONRY_ASPECTS[(startIndex + i) % MASONRY_ASPECTS.length]}
+          />
+        </AnimateIn>
       ))}
     </div>
   );

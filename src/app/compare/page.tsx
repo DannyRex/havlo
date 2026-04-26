@@ -9,6 +9,7 @@ import PriceResults from "@/components/compare/PriceResults";
 import DupeCard from "@/components/compare/DupeCard";
 import LiveResults from "@/components/compare/LiveResults";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/MasonryCard";
+import AnimateIn from "@/components/ui/AnimateIn";
 import { formatNaira } from "@/lib/utils";
 import { trackClick } from "@/lib/trackClick";
 import { sniffToAnchor } from "@/lib/sniff-to-anchor";
@@ -498,14 +499,15 @@ function DupeColumn({
   return (
     <div className={`flex-1 flex flex-col ${gapClass} min-w-0`}>
       {items.map((dupe, i) => (
-        <DupeCard
-          key={dupe.key}
-          dupe={dupe}
-          rank={startIndex + i}
-          query={query}
-          mode="similar"
-          aspect={MASONRY_ASPECTS[(startIndex + i) % MASONRY_ASPECTS.length]}
-        />
+        <AnimateIn key={dupe.key} delay={Math.min(i, 6) * 60}>
+          <DupeCard
+            dupe={dupe}
+            rank={startIndex + i}
+            query={query}
+            mode="similar"
+            aspect={MASONRY_ASPECTS[(startIndex + i) % MASONRY_ASPECTS.length]}
+          />
+        </AnimateIn>
       ))}
     </div>
   );

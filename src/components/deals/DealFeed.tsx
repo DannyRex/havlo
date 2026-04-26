@@ -2,14 +2,19 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, X, SlidersHorizontal } from "lucide-react";
+import { Search, X, SlidersHorizontal, LayoutGrid, List } from "lucide-react";
 import CategoryNav from "./CategoryNav";
 import OriginToggle from "./OriginToggle";
+import ListCard from "./ListCard";
 import MasonryCard, {
   MASONRY_ASPECTS,
   chunkLeftToRight,
 } from "./MasonryCard";
+import AnimateIn from "@/components/ui/AnimateIn";
 import type { Deal, DiscountTier, OriginFilter, SortOption } from "@/types";
+
+type ViewMode = "grid" | "list";
+const VIEW_STORAGE_KEY = "havlo:deals:viewMode";
 
 const PAGE_SIZE = 24;
 
@@ -34,11 +39,12 @@ function Column({ items, gapClass, startIndex }: { items: Deal[]; gapClass: stri
   return (
     <div className={`flex-1 flex flex-col ${gapClass} min-w-0`}>
       {items.map((d, i) => (
-        <MasonryCard
-          key={d.id}
-          deal={d}
-          aspect={MASONRY_ASPECTS[(startIndex + i) % MASONRY_ASPECTS.length]}
-        />
+        <AnimateIn key={d.id} delay={Math.min(i, 6) * 50}>
+          <MasonryCard
+            deal={d}
+            aspect={MASONRY_ASPECTS[(startIndex + i) % MASONRY_ASPECTS.length]}
+          />
+        </AnimateIn>
       ))}
     </div>
   );
@@ -101,6 +107,23 @@ export default function DealFeed() {
   const [origin, setOrigin]     = useState<OriginFilter>(initialOrigin);
   const [originCounts, setOriginCounts] =
     useState<{ all: number; local: number; intl: number }>();
+
+  /* Mobile-only view-mode toggle (grid masonry vs list rows). Tablet +
+     desktop always show masonry — toggle UI is hidden via sm:hidden.
+     Default: grid. Persisted in localStorage so the user's choice
+     sticks across sessions. */
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(VIEW_STORAGE_KEY);
+    if (saved === "list" || saved === "grid") setViewMode(saved);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(VIEW_STORAGE_KEY, viewMode);
+  }, [viewMode]);
 
   const offsetRef = useRef(0);
   const router = useRouter();
@@ -270,12 +293,13 @@ export default function DealFeed() {
             ))}
           </div>
 
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             {!loading && (
               <span className="hidden sm:inline text-xs text-ink-3 tabular-nums">
                 {total.toLocaleString()} deals
               </span>
             )}
+
             <div className="relative">
               <select
                 value={sort}
@@ -290,6 +314,50 @@ export default function DealFeed() {
               <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-3 text-[10px]">▾</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Mobile-only view-mode toggle — its own row, right-aligned, just
+          above the items grid. Keeps the sticky filter bar uncluttered
+          (sort dropdown was getting pushed off-screen on narrow mobile
+          when the toggle lived inside the filter row). */}
+      <div className="flex items-center justify-between mb-3 sm:hidden">
+        {!loading && (
+          <span className="text-xs text-ink-3 tabular-nums">
+            {total.toLocaleString()} deals
+          </span>
+        )}
+        <div
+          role="group"
+          aria-label="View mode"
+          className="flex items-center gap-0.5 rounded-full bg-surface-2 border border-border p-0.5 ml-auto"
+        >
+          <button
+            type="button"
+            onClick={() => setViewMode("grid")}
+            aria-label="Grid view"
+            aria-pressed={viewMode === "grid"}
+            className={`p-1.5 rounded-full transition-colors ${
+              viewMode === "grid"
+                ? "bg-bg text-ink shadow-card"
+                : "text-ink-3 hover:text-ink-2"
+            }`}
+          >
+            <LayoutGrid size={14} strokeWidth={viewMode === "grid" ? 2.5 : 2} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("list")}
+            aria-label="List view"
+            aria-pressed={viewMode === "list"}
+            className={`p-1.5 rounded-full transition-colors ${
+              viewMode === "list"
+                ? "bg-bg text-ink shadow-card"
+                : "text-ink-3 hover:text-ink-2"
+            }`}
+          >
+            <List size={14} strokeWidth={viewMode === "list" ? 2.5 : 2} />
+          </button>
         </div>
       </div>
 
@@ -313,14 +381,26 @@ export default function DealFeed() {
         </>
       )}
 
-      {/* Masonry grid */}
+      {/* Masonry grid (tablet + desktop always; mobile when viewMode=grid)
+          OR list view on mobile when user toggled it. */}
       {!loading && items.length > 0 && (
         <>
-          <div className="flex gap-2 sm:hidden">
-            {mobileCols.map((col, i) => (
-              <Column key={i} items={col} gapClass="gap-2" startIndex={i * 100} />
-            ))}
-          </div>
+          {/* Mobile — list OR masonry depending on user preference */}
+          {viewMode === "list" ? (
+            <div className="flex flex-col gap-2 sm:hidden">
+              {items.map((d, i) => (
+                <AnimateIn key={d.id} delay={Math.min(i, 8) * 40}>
+                  <ListCard deal={d} />
+                </AnimateIn>
+              ))}
+            </div>
+          ) : (
+            <div className="flex gap-2 sm:hidden">
+              {mobileCols.map((col, i) => (
+                <Column key={i} items={col} gapClass="gap-2" startIndex={i * 100} />
+              ))}
+            </div>
+          )}
           <div className="hidden sm:flex lg:hidden gap-3">
             {tabletCols.map((col, i) => (
               <Column key={i} items={col} gapClass="gap-3" startIndex={i * 100} />
