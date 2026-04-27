@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Bricolage_Grotesque } from "next/font/google";
+import { Inter, Bricolage_Grotesque, Slackey } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -20,6 +20,16 @@ const displayFont = Bricolage_Grotesque({
   subsets: ["latin"],
   weight: ["500", "600", "700", "800"],
   variable: "--font-display",
+  display: "swap",
+});
+
+/* Logo wordmark — Slackey is the Havlo brand mark face. Casual,
+   friendly, distinctive. Loaded as a CSS variable so the Logo
+   component can reference it without prop-drilling. */
+const logoFont = Slackey({
+  subsets: ["latin"],
+  weight: ["400"],   // Slackey ships single weight
+  variable: "--font-logo",
   display: "swap",
 });
 
@@ -70,7 +80,7 @@ export default function RootLayout({
   const initialCountry = getServerCountry();
 
   return (
-    <html lang="en" className={`${inter.variable} ${displayFont.variable} scroll-smooth`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${displayFont.variable} ${logoFont.variable} scroll-smooth`} suppressHydrationWarning>
       <head>
         <meta name="commit" content={commitSha.slice(0, 7)} />
       </head>

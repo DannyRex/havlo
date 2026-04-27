@@ -1,17 +1,21 @@
 /* ──────────────────────────────────────────────────────────────────
-   Single source of truth for the Havlo brand mark in-app.
-   Replaces the inline wordmark previously hardcoded in Navbar, Footer,
-   and CTA components.
+   Havlo brand mark.
+
+   Wordmark-only — the blue square + geometric "h" mark was retired
+   in favor of a typographic identity. Slackey carries the personality;
+   the wordmark stays in `text-ink` so it adapts to both themes
+   without needing two SVG variants.
 
    Variants:
-     • <Logo />              — mark + wordmark (default)
-     • <Logo variant="mark" /> — square brand mark only (for favicons,
-                                  tight UI corners, mobile chip)
+     • <Logo />              — full wordmark (default)
+     • <Logo variant="mark" /> — single "h" for tight spaces (mobile
+                                 nav corners, app icon stand-ins).
+                                 Same Slackey letterform, no chrome.
    ────────────────────────────────────────────────────────────────── */
 
 interface LogoProps {
   variant?: "full" | "mark";
-  /** Height of the mark in px. Wordmark scales proportionally. Default 28. */
+  /** Visual height in px. Wordmark scales font-size from this. Default 28. */
   size?: number;
   className?: string;
 }
@@ -21,47 +25,41 @@ export default function Logo({
   size = 28,
   className = "",
 }: LogoProps) {
+  /* Slackey ships at a small visual size relative to its em-box, so we
+     scale font-size up roughly 1.4× the requested mark height to land
+     close to the previous logo's optical weight. */
+  const fontPx = Math.round(size * 1.4);
+
   if (variant === "mark") {
     return (
       <span
         aria-hidden="true"
-        className={`inline-flex items-center justify-center rounded-lg ${className}`}
+        className={`inline-flex items-center justify-center text-ink leading-none ${className}`}
         style={{
+          fontFamily: "var(--font-logo)",
+          fontSize: fontPx,
+          lineHeight: 1,
           width: size,
           height: size,
-          background: "#0057FF",
         }}
       >
-        <svg
-          viewBox="0 0 64 64"
-          fill="none"
-          width={size * 0.62}
-          height={size * 0.62}
-        >
-          <g fill="#FFFFFF">
-            <rect x="18" y="15" width="7" height="34" rx="1.5" />
-            <rect x="18" y="26" width="27" height="7" rx="1.5" />
-            <rect x="38" y="26" width="7" height="23" rx="1.5" />
-          </g>
-        </svg>
+        h
       </span>
     );
   }
 
-  // Full logo: mark + wordmark
-  const wordSize = Math.round(size * 0.64); // wordmark font size relative to mark
   return (
     <span
-      className={`inline-flex items-center gap-2 select-none ${className}`}
+      className={`inline-flex items-baseline select-none text-ink leading-none ${className}`}
       aria-label="Havlo"
+      style={{
+        fontFamily: "var(--font-logo)",
+        fontSize: fontPx,
+        lineHeight: 1,
+        letterSpacing: "-0.02em",
+      }}
     >
-      <Logo variant="mark" size={size} />
-      <span
-        className="font-bold tracking-[-0.03em] text-ink leading-none"
-        style={{ fontSize: wordSize, letterSpacing: "-0.04em" }}
-      >
-        havlo
-      </span>
+      havlo
     </span>
   );
 }
