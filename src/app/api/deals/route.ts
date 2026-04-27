@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
-import { filterDealsForCountry } from "@/lib/country";
+import { filterDealsForCountry, getCountry } from "@/lib/country";
 import type { OriginFilter, SortOption } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +22,11 @@ export async function GET(req: NextRequest) {
     const limit       = searchParams.get("limit")  ? parseInt(searchParams.get("limit")!,  10) : 24;
     const offset      = searchParams.get("offset") ? parseInt(searchParams.get("offset")!, 10) : 0;
 
-    const country = getServerCountry();
+    /* Country priority: URL param (when set) > cookie. The URL form
+       is what the client sends so the CDN cache key varies per country;
+       cookie fallback covers direct API consumers / curl. */
+    const countryParam = searchParams.get("country");
+    const country = countryParam ? getCountry(countryParam) : getServerCountry();
     const isNG = country.code === "ng";
     const provider = await getActiveBrowseProvider();
 

@@ -9,6 +9,7 @@ import ListCard from "./ListCard";
 import MasonryCard from "./MasonryCard";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "./masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
+import { useCountry } from "@/components/providers/CountryProvider";
 import type { Deal, DiscountTier, OriginFilter, SortOption } from "@/types";
 
 type ViewMode = "grid" | "list";
@@ -125,7 +126,13 @@ export default function DealFeed() {
 
   const offsetRef = useRef(0);
   const router = useRouter();
+  const { country } = useCountry();
 
+  /* Country goes into the URL so:
+       1. The CDN cache key differs per country (s-maxage was caching
+          the same response for every country before).
+       2. The fetch effect re-runs on country change because country
+          flows through buildParams. */
   const buildParams = useCallback((offset: number) => {
     const p = new URLSearchParams();
     if (category !== "all") p.set("category", category);
@@ -133,10 +140,11 @@ export default function DealFeed() {
     if (sort)               p.set("sort", sort);
     if (search)             p.set("search", search);
     if (origin !== "all")   p.set("origin", origin);
+    p.set("country", country.code);
     p.set("limit",  String(PAGE_SIZE));
     p.set("offset", String(offset));
     return p.toString();
-  }, [category, tier, sort, search, origin]);
+  }, [category, tier, sort, search, origin, country.code]);
 
   // Reset + first page on filter change
   useEffect(() => {
