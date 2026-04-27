@@ -1,27 +1,10 @@
-import Hero from "@/components/landing/Hero";
-import TrendingDeals from "@/components/landing/TrendingDeals";
-import TrendingSearches from "@/components/landing/TrendingSearches";
-import CategoryGrid from "@/components/landing/CategoryGrid";
-import StoreLogos from "@/components/landing/StoreLogos";
-import CTA from "@/components/landing/CTA";
-import RefreshOnInterval from "@/components/ui/RefreshOnInterval";
+/* Root redirect — sends users to /{their-country}/.
+   Reads the cookie if set; otherwise lands on the NG default. */
 
-/* Revalidate this page server-side every 5 min so the trending shuffle
-   surfaces fresh picks for every cached request. Combined with the
-   client-side <RefreshOnInterval /> below, users on the page also see
-   updates without manual reload. */
-export const revalidate = 300;
+import { redirect } from "next/navigation";
+import { getServerCountry } from "@/lib/country-server";
 
-export default function HomePage() {
-  return (
-    <>
-      <Hero />
-      <TrendingDeals />
-      <TrendingSearches />
-      <CategoryGrid />
-      <StoreLogos />
-      <CTA />
-      <RefreshOnInterval ms={300_000} />
-    </>
-  );
+export default function RootIndex() {
+  const country = getServerCountry();
+  redirect(`/${country.code}`);
 }
