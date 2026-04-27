@@ -104,7 +104,7 @@ export default async function TrendingDeals() {
   const storeCount: Record<string, number> = {};
   const picks: Deal[] = [];
 
-  function tryPush(d: Deal, perStoreCap = 4): boolean {
+  function tryPush(d: Deal, perStoreCap: number): boolean {
     const sc = storeCount[d.storeId] ?? 0;
     if (sc >= perStoreCap) return false;
     const key = d.storeId + d.title.slice(0, 20);
@@ -115,16 +115,30 @@ export default async function TrendingDeals() {
     return true;
   }
 
+  /* Per-store cap is computed dynamically per pool. The Nigerian retail
+     ecosystem is concentrated (Konga + Jumia + 3C Hub do most of the
+     volume), so a fixed cap of 4 throttled local picks to 8 even when
+     the pool had 60 items. We size the cap so the quota is reachable
+     given the pool's distinct-store count, with a sane lower floor of 4
+     for visual diversity. */
+  function distinctStoreCap(pool: Deal[], quota: number): number {
+    const stores = new Set(pool.map((d) => d.storeId)).size;
+    if (stores === 0) return 4;
+    return Math.max(4, Math.ceil(quota / stores));
+  }
+  const localCap = distinctStoreCap(localShuffled, LOCAL_QUOTA);
+  const intlCap  = distinctStoreCap(intlShuffled,  INTL_QUOTA);
+
   // Fill quotas from the dedicated pools first
   let localPicks = 0;
   let intlPicks  = 0;
   for (const d of localShuffled) {
     if (localPicks >= LOCAL_QUOTA) break;
-    if (tryPush(d)) localPicks++;
+    if (tryPush(d, localCap)) localPicks++;
   }
   for (const d of intlShuffled) {
     if (intlPicks >= INTL_QUOTA) break;
-    if (tryPush(d)) intlPicks++;
+    if (tryPush(d, intlCap)) intlPicks++;
   }
 
   /* Backfill from whichever side has more candidates if either pool
@@ -133,13 +147,13 @@ export default async function TrendingDeals() {
   if (picks.length < TARGET_TOTAL) {
     for (const d of localShuffled) {
       if (picks.length >= TARGET_TOTAL) break;
-      tryPush(d);
+      tryPush(d, localCap);
     }
   }
   if (picks.length < TARGET_TOTAL) {
     for (const d of intlShuffled) {
       if (picks.length >= TARGET_TOTAL) break;
-      tryPush(d);
+      tryPush(d, intlCap);
     }
   }
 

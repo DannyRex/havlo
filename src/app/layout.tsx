@@ -50,6 +50,14 @@ export const metadata: Metadata = {
   icons: { icon: "/favicon.ico" },
 };
 
+/* Build-time commit hash. Vercel injects VERCEL_GIT_COMMIT_SHA into the
+   build environment; we surface it as a meta tag so QA can confirm
+   which commit prod is actually serving without dashboard access. */
+const commitSha =
+  process.env.VERCEL_GIT_COMMIT_SHA ??
+  process.env.NEXT_PUBLIC_COMMIT_SHA ??
+  "dev";
+
 export default function RootLayout({
   children,
 }: {
@@ -57,6 +65,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} ${displayFont.variable} scroll-smooth`} suppressHydrationWarning>
+      <head>
+        <meta name="commit" content={commitSha.slice(0, 7)} />
+      </head>
       <body className="min-h-screen flex flex-col antialiased font-sans bg-bg text-ink">
         <ThemeProvider>
           <Navbar />
