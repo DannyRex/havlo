@@ -65,6 +65,17 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npm run ingest:scraped
 
+      # ── Konga affiliate ingestion (NG-only). Free once approved.
+      # Runs before SerpAPI so local NG catalog is fresh before the
+      # paid global-breadth pass. Skipped when KONGA_AFFILIATE_KEY isn't set.
+      - name: Ingest Konga affiliate deals → Supabase
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.KONGA_AFFILIATE_KEY != ''
+        env:
+          SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          KONGA_AFFILIATE_KEY:        ${{ secrets.KONGA_AFFILIATE_KEY }}
+        run: npm run ingest:konga
+
       # ── Live SerpAPI ingestion: 6 countries × 10 categories. Skipped
       # automatically when SERPAPI_KEY isn't set so devs can run the
       # workflow on a dry repo without burning API credits.

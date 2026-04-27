@@ -17,6 +17,7 @@
     "ai:reindex": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/reindex.ts",
     "ingest": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-providers.ts",
     "ingest:serpapi": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-providers.ts --provider=serpapi-shopping",
+    "ingest:konga":   "tsx --tsconfig tsconfig.scripts.json scripts/ingest-providers.ts --provider=konga-affiliate --country=ng",
     "ingest:scraped": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-scraped.ts"
   },
   "dependencies": {
