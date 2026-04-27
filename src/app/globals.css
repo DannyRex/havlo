@@ -69,15 +69,35 @@ body {
 }
 
 /* Brand wordmark gradient — theme-adapted metallic finish.
-   Light mode: gunmetal silver (dark, reads on white)
-   Dark mode:  bright chrome silver (light, reads on near-black)
-   Both use a vertical 3-stop sheen so the letterforms catch the
-   "metallic" highlight in the middle, mimicking polished metal. */
+
+   5-stop vertical gradient that mimics real chrome: dark at top and
+   bottom with a sharp bright highlight band across the middle. The
+   contrast between the highlight and the body is what makes the
+   gradient read as metal, not as a flat color.
+
+   Light mode: pewter / dark chrome — slate-800 body with a slate-300
+               highlight band. Very visible on white. */
 :root {
-  --logo-gradient: linear-gradient(180deg, #6B7280 0%, #1F2937 48%, #374151 100%);
+  --logo-gradient: linear-gradient(
+    180deg,
+    #475569 0%,
+    #1E293B 30%,
+    #CBD5E1 50%,
+    #1E293B 70%,
+    #475569 100%
+  );
 }
+/* Dark mode: bright chrome — light tones with a near-white highlight
+   peak. Reads as polished chrome on near-black. */
 .dark {
-  --logo-gradient: linear-gradient(180deg, #E5E7EB 0%, #FFFFFF 48%, #9CA3AF 100%);
+  --logo-gradient: linear-gradient(
+    180deg,
+    #94A3B8 0%,
+    #E5E7EB 30%,
+    #FFFFFF 50%,
+    #E5E7EB 70%,
+    #94A3B8 100%
+  );
 }
 .logo-metal {
   background-image:        var(--logo-gradient);
