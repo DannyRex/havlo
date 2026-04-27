@@ -5,7 +5,7 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import ThemeProvider from "@/components/ui/ThemeProvider";
 import { CountryProvider } from "@/components/providers/CountryProvider";
-import { getServerCountry } from "@/lib/country";
+import { getServerCountry } from "@/lib/country-server";
 
 const inter = Inter({
   subsets: ["latin"],

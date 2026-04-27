@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getActiveBrowseProvider } from "@/lib/providers";
-import { getServerCountry } from "@/lib/country";
+import { getServerCountry } from "@/lib/country-server";
 import type { Deal } from "@/types";
 import MasonryCard, {
   MASONRY_ASPECTS,

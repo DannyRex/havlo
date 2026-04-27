@@ -1,6 +1,5 @@
 /* ──────────────────────────────────────────────────────────────────
-   Country preference — single source of truth for which countries
-   Havlo supports + helpers to read the user's choice on the server.
+   Country preference — pure data + client-safe helpers.
 
    Contract:
      - Country code is ISO 3166-1 alpha-2 lowercase (matches SerpAPI's
@@ -8,10 +7,11 @@
      - Stored in a first-party cookie `havlo-country` (set client-side
        by CountryProvider).
      - Default is "ng" — Havlo is Nigeria-first.
-     - Server reads the cookie via getServerCountry() in RSC trees.
-   ────────────────────────────────────────────────────────────────── */
 
-import { cookies } from "next/headers";
+   Server-only helpers (cookie read on RSC) live in country-server.ts
+   so this file stays importable from client components without
+   poisoning the client bundle with next/headers.
+   ────────────────────────────────────────────────────────────────── */
 
 export const COUNTRY_COOKIE = "havlo-country";
 export const DEFAULT_COUNTRY = "ng";
@@ -52,15 +52,6 @@ const COUNTRY_BY_CODE = new Map(COUNTRIES.map((c) => [c.code, c]));
 export function getCountry(code: string | undefined | null): Country {
   if (!code) return COUNTRY_BY_CODE.get(DEFAULT_COUNTRY)!;
   return COUNTRY_BY_CODE.get(code.toLowerCase()) ?? COUNTRY_BY_CODE.get(DEFAULT_COUNTRY)!;
-}
-
-/* ── Server-side helpers ────────────────────────────────────────── */
-
-/** Read the user's country from the cookie in a Server Component.
-    Falls back to DEFAULT_COUNTRY when unset or unrecognised. */
-export function getServerCountry(): Country {
-  const raw = cookies().get(COUNTRY_COOKIE)?.value;
-  return getCountry(raw);
 }
 
 /* ── Currency formatting ────────────────────────────────────────── */
