@@ -25,12 +25,16 @@ const displayFont = Bricolage_Grotesque({
 
 /* Logo wordmark — Slackey is the Havlo brand mark face. Casual,
    friendly, distinctive. Loaded as a CSS variable so the Logo
-   component can reference it without prop-drilling. */
+   component can reference it without prop-drilling.
+
+   display: "block" (FOIT) instead of swap — eliminates the 100ms
+   font-swap layout twitch in the navbar. Slackey is small (~12KB)
+   so the brief invisibility is unnoticeable on normal connections. */
 const logoFont = Slackey({
   subsets: ["latin"],
   weight: ["400"],   // Slackey ships single weight
   variable: "--font-logo",
-  display: "swap",
+  display: "block",
 });
 
 const siteUrl = "https://havlo.io";
@@ -84,7 +88,7 @@ export default function RootLayout({
       <head>
         <meta name="commit" content={commitSha.slice(0, 7)} />
       </head>
-      <body className="min-h-screen flex flex-col antialiased font-sans bg-bg text-ink">
+      <body className="min-h-[100dvh] flex flex-col antialiased font-sans bg-bg text-ink">
         <ThemeProvider>
           <CountryProvider initialCode={initialCountry.code}>
             <Navbar />

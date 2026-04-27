@@ -49,8 +49,15 @@ export default function Navbar() {
 
   return (
     <>
-      {/* ── Top header (desktop + mobile) ─────────────────────────── */}
-      <header className="sticky top-0 z-40 bg-bg/85 backdrop-blur-xl border-b border-border">
+      {/* ── Top header (desktop + mobile) ──────────────────────────
+          - sticky + transform-gpu forces a compositing layer so iOS
+            Safari doesn't repaint the bar on every scroll frame
+          - backdrop-blur is heavy; only apply on sm+ where the GPU
+            cost is worth it. Mobile gets a solid 95% bg instead. */}
+      <header
+        className="sticky top-0 z-40 border-b border-border bg-bg/95 sm:bg-bg/85 sm:backdrop-blur-xl transform-gpu"
+        style={{ WebkitBackdropFilter: undefined }}
+      >
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
 
           {/* Left cluster — hamburger (mobile) + logo */}
