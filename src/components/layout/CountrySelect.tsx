@@ -116,7 +116,10 @@ export default function CountrySelect({ dropUp = false }: Props = {}) {
                     <span aria-hidden="true" className="text-lg leading-none">{c.flag}</span>
                     <span className="flex-1 truncate">{c.name}</span>
                     <span className="text-[11px] text-ink-3 tabular-nums">{c.currency}</span>
-                    {active && <Check size={14} className="text-brand" />}
+                    {/* Use text-ink so the check adapts to both themes —
+                        text-brand (#0057FF) was nearly invisible against
+                        the dark dropdown surface in dark mode. */}
+                    {active && <Check size={14} className="text-ink" />}
                   </button>
                 </li>
               );
