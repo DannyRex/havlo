@@ -17,6 +17,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
+import { wrapWithAffiliate } from "@/lib/affiliate";
+import { getServerCountry } from "@/lib/country-server";
 
 interface ResolvedRow {
   resolved_url: string;
@@ -119,24 +121,32 @@ export async function GET(req: NextRequest) {
   const target = req.nextUrl.searchParams.get("url");
   if (!target) return new NextResponse("Missing url", { status: 400 });
 
+  const country = getServerCountry();
+  const ctx = { country: country.code };
+
+  /* Final redirect helper — wraps the resolved URL with the right
+     affiliate tag (when any) right before sending the user out. The
+     wrap is the LAST step so it applies regardless of whether we
+     resolved a Google relay or had a direct URL to begin with. */
+  const sendOut = (url: string) =>
+    NextResponse.redirect(wrapWithAffiliate(url, ctx), 307);
+
   /* Direct merchant URLs pass through with a single redirect — no
-     resolution overhead. */
-  if (!isGoogleRelay(target)) {
-    return NextResponse.redirect(target, 307);
-  }
+     resolution overhead, but we still wrap with the affiliate tag. */
+  if (!isGoogleRelay(target)) return sendOut(target);
 
   /* Google relay — try cache first, then SerpAPI. */
   const cached = await readCache(target);
-  if (cached) return NextResponse.redirect(cached, 307);
+  if (cached) return sendOut(cached);
 
   const resolved = await resolveViaSerpApi(target);
   if (resolved) {
     // Fire-and-forget — don't block redirect on cache write
     void writeCache(target, resolved);
-    return NextResponse.redirect(resolved, 307);
+    return sendOut(resolved);
   }
 
   /* Last resort — send them to the Google relay rather than 500ing.
      They'll see a Google product page; not ideal but never broken. */
-  return NextResponse.redirect(target, 307);
+  return sendOut(target);
 }

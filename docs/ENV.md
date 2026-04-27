@@ -20,6 +20,43 @@ for production. GitHub Actions secrets must mirror the same names.
 | `KONGA_AFFILIATE_KEY` | `konga-affiliate` (NG retail) | **Pending approval — set once Konga issues key** |
 | `KONGA_AFFILIATE_API_BASE` | Override Konga base URL if their docs reveal a non-default endpoint | Optional |
 
+## Optional — affiliate / monetization (Phase 11a)
+
+Each var below activates one rule in `src/lib/affiliate.ts`. Unset =
+the rule no-ops; outbound URL passes through unchanged. Wired into
+every outbound click via `/api/go`.
+
+### Amazon Associates — one tag per marketplace
+
+| Var | Marketplace |
+|---|---|
+| `AMAZON_ASSOC_TAG_US` | amazon.com |
+| `AMAZON_ASSOC_TAG_UK` | amazon.co.uk |
+| `AMAZON_ASSOC_TAG_DE` | amazon.de |
+| `AMAZON_ASSOC_TAG_FR` | amazon.fr |
+| `AMAZON_ASSOC_TAG_IT` | amazon.it |
+| `AMAZON_ASSOC_TAG_ES` | amazon.es |
+| `AMAZON_ASSOC_TAG_CA` | amazon.ca |
+| `AMAZON_ASSOC_TAG_AU` | amazon.com.au |
+| `AMAZON_ASSOC_TAG_AE` | amazon.ae |
+| `AMAZON_ASSOC_TAG_SA` | amazon.sa |
+| `AMAZON_ASSOC_TAG_IN` | amazon.in |
+| `AMAZON_ASSOC_TAG_MX` | amazon.com.mx |
+| `AMAZON_ASSOC_TAG_BR` | amazon.com.br |
+| `AMAZON_ASSOC_TAG_ZA` | amazon.co.za |
+| `AMAZON_ASSOC_TAG_JP` | amazon.co.jp |
+| `AMAZON_ASSOC_TAG_SG` | amazon.sg |
+
+Tag format: `havlo-21` (varies per marketplace per Amazon's rules).
+
+### Other networks
+
+| Var | Network | Notes |
+|---|---|---|
+| `JUMIA_AFFILIATE_KEY` | Jumia Affiliate Programme | Apply at jumia.com.ng/affiliate-program |
+| `ALIEXPRESS_AFFILIATE_KEY` | AliExpress Affiliate Portal | URL converter API can replace this when wired |
+| `EBAY_PARTNER_CAMPAIGN_ID` | eBay Partner Network | Found in your EPN dashboard |
+
 ## Optional — UX integrations
 
 | Var | Used by |
