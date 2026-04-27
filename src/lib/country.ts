@@ -95,12 +95,36 @@ export function formatLocal(amount: number, country: Country): string {
    by storeId fragments since they ingest under multiple country
    contexts (Shein.com surfaces under "us", "uk", "de" etc.). */
 
-/* Stores that ship globally — appropriate to show under any country.
-   Match is case-insensitive substring on storeId or storeName. */
-const CROSS_BORDER_STORES = [
-  "shein", "temu", "aliexpress", "wish", "dhgate",
-  "banggood", "lightinthebox", "geekbuying",
+/* Default cross-border roster — stores that ship to most countries.
+   Per-country overrides in COUNTRY_CROSS_BORDER for cases where this
+   list is wrong for the local market (Shein is banned in India, etc.). */
+const DEFAULT_CROSS_BORDER = [
+  "aliexpress", "shein", "temu", "dhgate", "banggood", "lightinthebox", "geekbuying",
 ];
+
+/* Per-country cross-border allowlist. Determines which "international"
+   stores are appropriate for the country's audience.
+     - NG: Amazon (US/UK) + AliExpress + ASOS + Shein + Temu + DHgate
+           — what Nigerians actually use for cross-border shopping
+     - IN: Amazon Global only — Shein is banned in India (since 2020)
+     - US: Shein + Temu + AliExpress dominate; Wish declining
+     - UK / DE / AE / ZA: similar global mix */
+const COUNTRY_CROSS_BORDER: Record<string, string[]> = {
+  ng: ["amazon", "amazon.com", "amazon.co.uk", "aliexpress", "asos",
+       "shein", "temu", "dhgate", "ebay", "apple.com", "banggood"],
+  uk: ["aliexpress", "shein", "temu", "dhgate", "banggood"],
+  us: ["aliexpress", "shein", "temu", "dhgate"],
+  de: ["aliexpress", "shein", "temu", "dhgate", "banggood"],
+  ae: ["aliexpress", "shein", "temu", "amazon.com", "amazon.co.uk"],
+  // Shein officially banned in India since 2020. Import duties make
+  // most Western cross-border purchases impractical except Amazon Global.
+  in: ["aliexpress"],
+  za: ["aliexpress", "shein", "temu", "amazon.com"],
+};
+
+function crossBorderListFor(countryCode: string): string[] {
+  return COUNTRY_CROSS_BORDER[countryCode] ?? DEFAULT_CROSS_BORDER;
+}
 
 /* Stores that are NG-anchored — never appropriate outside Nigeria. */
 const NG_STORES = [
@@ -172,11 +196,14 @@ function matchesAny(haystackLc: string, needles: string[]): boolean {
   return needles.some((n) => haystackLc.includes(n));
 }
 
-/** True if the deal's store is one of the cross-border / global retailers. */
-export function isCrossBorderStore(d: DealLike): boolean {
+/** True if the deal's store is one of the cross-border / global retailers
+    appropriate for the given country audience. When countryCode is
+    omitted, uses the union of all per-country lists. */
+export function isCrossBorderStore(d: DealLike, countryCode?: string): boolean {
+  const list = countryCode ? crossBorderListFor(countryCode) : DEFAULT_CROSS_BORDER;
   const id   = lc(d.storeId);
   const name = lc(d.storeName);
-  return matchesAny(id, CROSS_BORDER_STORES) || matchesAny(name, CROSS_BORDER_STORES);
+  return matchesAny(id, list) || matchesAny(name, list);
 }
 
 /** True if the deal originates from an NG-anchored retailer. */
@@ -207,22 +234,36 @@ export function isStoreInCountry<T extends DealLike | OfferLike>(d: T, countryCo
 }
 
 /** Filter a deals list for the given country preference.
-    - For NG: return everything (no filter; quota handles the mix)
-    - For non-NG: drop NG-only stores; keep cross-border globals,
-      country-tagged matches, AND known country-roster stores
-      (Amazon UK / ASOS / Argos for UK, etc.). Untagged intl rows
-      from a foreign country tag are dropped. */
+    - For NG: drop nothing locally, but still trim cross-border noise
+      (Indian Flipkart shouldn't show on a Nigerian homepage)
+    - For non-NG: drop NG-only stores; keep country-appropriate
+      cross-border, country-tagged matches, and known country-roster
+      stores (Amazon UK / ASOS / Argos for UK, etc.). */
 export function filterDealsForCountry<T extends DealLike>(deals: T[], country: Country): T[] {
-  if (country.code === "ng") return deals;
   return deals.filter((d) => {
+    /* NG path: keep all NG-anchored stores + only country-appropriate
+       cross-border + Amazon. Drop foreign-country-anchored retailers
+       that Nigerians can't actually use (Flipkart, Tata CLiQ, Walmart). */
+    if (country.code === "ng") {
+      if (isNigerianStore(d)) return true;
+      if (isCrossBorderStore(d, "ng")) return true;
+      const tag = dealCountryTag(d);
+      // Untagged rows from the legacy intl pool — keep, broadly relevant
+      if (tag === null) return true;
+      // Tagged country:ng → keep (SerpAPI ingest)
+      if (tag === "ng") return true;
+      // Tagged for a foreign market — only keep if the store is known
+      // cross-border-friendly for Nigerians (e.g. tagged country:us
+      // but it's actually amazon.com which Nigerians use)
+      return isCrossBorderStore(d, "ng");
+    }
+
+    /* Non-NG path */
     if (isNigerianStore(d)) return false;
-    if (isCrossBorderStore(d)) return true;
+    if (isCrossBorderStore(d, country.code)) return true;
     if (isStoreInCountry(d, country.code)) return true;
     const tag = dealCountryTag(d);
     if (tag === country.code) return true;
-    /* For any other tagged country (e.g. country:de when user is uk),
-       drop. Untagged rows pass through — without a country tag we
-       can't be sure, but historically these have been broadly relevant. */
     if (tag === null) return true;
     return false;
   });
@@ -232,19 +273,24 @@ export function filterDealsForCountry<T extends DealLike>(deals: T[], country: C
     Same intent as filterDealsForCountry but reads isInternational
     instead of currency/tags. */
 export function isOfferAllowedForCountry<T extends OfferLike>(o: T, country: Country): boolean {
-  if (country.code === "ng") return true;
-
   const idLc   = lc(o.storeId);
   const nameLc = lc(o.storeName);
+  const xb     = crossBorderListFor(country.code);
 
-  // Cross-border globals — always allowed
-  if (matchesAny(idLc, CROSS_BORDER_STORES) || matchesAny(nameLc, CROSS_BORDER_STORES)) return true;
-  // Country-anchored retailers (Amazon UK, ASOS, etc. for UK users)
+  // NG: keep all NG retailers + country-appropriate cross-border
+  if (country.code === "ng") {
+    if (matchesAny(idLc, NG_STORES) || matchesAny(nameLc, NG_STORES)) return true;
+    if (matchesAny(idLc, xb) || matchesAny(nameLc, xb)) return true;
+    if (o.isInternational === false) return true;        // NGN-priced row
+    return matchesAny(idLc, xb) || matchesAny(nameLc, xb);
+  }
+
+  // Non-NG: cross-border per country + country-anchored retailers
+  if (matchesAny(idLc, xb) || matchesAny(nameLc, xb)) return true;
   if (isStoreInCountry(o, country.code)) return true;
 
-  // NG-anchored stores — never for non-NG
+  // NG-anchored stores never for non-NG
   if (matchesAny(idLc, NG_STORES) || matchesAny(nameLc, NG_STORES)) return false;
-  // is_international=false ⇒ stores.country='NG' at ingest time
   if (o.isInternational === false) return false;
 
   return true;

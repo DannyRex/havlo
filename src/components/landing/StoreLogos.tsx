@@ -11,25 +11,36 @@ interface StoreEntry {
   whiteLogo?: boolean;
 }
 
-/* Per-country marquee rosters. Order matters — first chips show first,
-   so put the country's flagship retailers up front, cross-border
-   (Shein/Temu/AliExpress) at the tail. */
+/* Per-country marquee rosters.
+
+   Cross-border tail is country-specific because shopping habits vary:
+     - Nigerians import from Amazon (US/UK), AliExpress, ASOS, Shein,
+       Temu, DHgate — proven shippers + payment routes that work
+     - Indians can't use Shein (banned in 2020); cross-border is mostly
+       Amazon Global + AliExpress due to import duties
+     - Americans rarely shop foreign retailers; cross-border = Shein +
+       Temu + AliExpress (the China direct-to-consumer trio)
+     - UK / DE / AE / ZA mirror the US pattern with regional tweaks */
 const ROSTERS: Record<string, StoreEntry[]> = {
   ng: [
+    // Local
     { name: "Jumia",      logo: "/logos/jumia.png" },
     { name: "Konga",      logo: "/logos/konga.png" },
     { name: "Slot",       logo: "/logos/slot.png" },
     { name: "3C Hub",     logo: "/logos/threechub.png", whiteLogo: true },
     { name: "Jiji",       logo: "/logos/jiji.png" },
     { name: "Spar",       logo: "/logos/spar.png" },
+    // Cross-border Nigerians actually use
     { name: "Amazon",     logo: "/logos/amazon.png" },
     { name: "AliExpress", logo: "/logos/aliexpress.png" },
     { name: "ASOS",       logo: "/logos/asos.png" },
-    { name: "DHgate",     logo: "/logos/dhgate.png" },
     { name: "SHEIN",      logo: "/logos/shein.png" },
     { name: "Temu",       logo: "/logos/temu.png" },
+    { name: "DHgate",     logo: "/logos/dhgate.png" },
+    { name: "eBay" },
   ],
   uk: [
+    // Local UK retailers
     { name: "Amazon UK",  logo: "/logos/amazon.png" },
     { name: "ASOS",       logo: "/logos/asos.png" },
     { name: "Argos" },
@@ -40,12 +51,14 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "M&S" },
     { name: "Very" },
     { name: "AO.com" },
+    // Cross-border UK shoppers actually use
     { name: "AliExpress", logo: "/logos/aliexpress.png" },
     { name: "SHEIN",      logo: "/logos/shein.png" },
     { name: "Temu",       logo: "/logos/temu.png" },
     { name: "DHgate",     logo: "/logos/dhgate.png" },
   ],
   us: [
+    // Local US retailers — americans rarely shop foreign
     { name: "Amazon",     logo: "/logos/amazon.png" },
     { name: "Walmart" },
     { name: "Best Buy" },
@@ -56,11 +69,13 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "Nordstrom" },
     { name: "Wayfair" },
     { name: "Etsy" },
-    { name: "AliExpress", logo: "/logos/aliexpress.png" },
+    // Cross-border that's mainstream in the US
     { name: "SHEIN",      logo: "/logos/shein.png" },
     { name: "Temu",       logo: "/logos/temu.png" },
+    { name: "AliExpress", logo: "/logos/aliexpress.png" },
   ],
   de: [
+    // Local DE retailers
     { name: "Amazon DE",  logo: "/logos/amazon.png" },
     { name: "MediaMarkt" },
     { name: "Saturn" },
@@ -69,11 +84,13 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "Idealo" },
     { name: "Lidl" },
     { name: "Cyberport" },
+    // Cross-border DE shoppers use
     { name: "AliExpress", logo: "/logos/aliexpress.png" },
     { name: "SHEIN",      logo: "/logos/shein.png" },
     { name: "Temu",       logo: "/logos/temu.png" },
   ],
   ae: [
+    // Local AE retailers
     { name: "Amazon AE",  logo: "/logos/amazon.png" },
     { name: "Noon" },
     { name: "Sharaf DG" },
@@ -82,11 +99,14 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "Centrepoint" },
     { name: "Namshi" },
     { name: "Ounass" },
+    // Cross-border — UAE residents import freely from Amazon US/UK
+    { name: "Amazon US",  logo: "/logos/amazon.png" },
     { name: "AliExpress", logo: "/logos/aliexpress.png" },
     { name: "SHEIN",      logo: "/logos/shein.png" },
     { name: "Temu",       logo: "/logos/temu.png" },
   ],
   in: [
+    // Local IN retailers — strong domestic ecosystem, less cross-border
     { name: "Amazon IN",  logo: "/logos/amazon.png" },
     { name: "Flipkart" },
     { name: "Myntra" },
@@ -95,17 +115,21 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "Nykaa" },
     { name: "Croma" },
     { name: "Reliance Digital" },
-    { name: "AliExpress", logo: "/logos/aliexpress.png" },
-    { name: "SHEIN",      logo: "/logos/shein.png" },
     { name: "Meesho" },
+    { name: "Snapdeal" },
+    // Cross-border — Shein BANNED in India since 2020. AliExpress works
+    // but import duties make most Western purchases impractical.
+    { name: "AliExpress", logo: "/logos/aliexpress.png" },
   ],
   za: [
+    // Local ZA retailers
     { name: "Takealot" },
     { name: "Makro" },
     { name: "Game" },
     { name: "Loot" },
     { name: "Yuppiechef" },
     { name: "Superbalist" },
+    // Cross-border — South Africans import via Amazon + China-direct
     { name: "Amazon",     logo: "/logos/amazon.png" },
     { name: "AliExpress", logo: "/logos/aliexpress.png" },
     { name: "SHEIN",      logo: "/logos/shein.png" },
