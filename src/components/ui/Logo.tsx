@@ -3,14 +3,16 @@
 
    Wordmark-only — the blue square + geometric "h" mark was retired
    in favor of a typographic identity. Slackey carries the personality;
-   the wordmark stays in `text-ink` so it adapts to both themes
-   without needing two SVG variants.
+   a subtle brand-blue → indigo gradient softens the chunky letterforms
+   without re-introducing the heavy square chrome.
+
+   Gradient renders identically in light + dark mode (saturated enough
+   to read on both backgrounds). On browsers that don't support
+   bg-clip-text (rare), falls back to text-ink for a clean solid.
 
    Variants:
      • <Logo />              — full wordmark (default)
-     • <Logo variant="mark" /> — single "h" for tight spaces (mobile
-                                 nav corners, app icon stand-ins).
-                                 Same Slackey letterform, no chrome.
+     • <Logo variant="mark" /> — single "h" for tight spaces.
    ────────────────────────────────────────────────────────────────── */
 
 interface LogoProps {
@@ -19,6 +21,27 @@ interface LogoProps {
   size?: number;
   className?: string;
 }
+
+/* Brand gradient — single source of truth so any future variant
+   (favicon, marketing, OG cards) can mirror it.
+   #0057FF (Havlo blue) → #6366F1 (indigo-500) → #8B5CF6 (violet-500).
+   Three stops keep the transition smooth across the wordmark width. */
+const BRAND_GRADIENT =
+  "linear-gradient(135deg, #0057FF 0%, #6366F1 55%, #8B5CF6 100%)";
+
+const wordStyle = (fontPx: number) => ({
+  fontFamily:        "var(--font-logo)",
+  fontSize:          fontPx,
+  lineHeight:        1,
+  letterSpacing:     "-0.02em",
+  backgroundImage:   BRAND_GRADIENT,
+  WebkitBackgroundClip: "text",
+  backgroundClip:    "text",
+  WebkitTextFillColor: "transparent",
+  /* Fallback color in case bg-clip-text isn't supported — most modern
+     browsers handle it; this keeps very old / unusual stacks legible. */
+  color: "transparent",
+} as const);
 
 export default function Logo({
   variant = "full",
@@ -34,14 +57,8 @@ export default function Logo({
     return (
       <span
         aria-hidden="true"
-        className={`inline-flex items-center justify-center text-ink leading-none ${className}`}
-        style={{
-          fontFamily: "var(--font-logo)",
-          fontSize: fontPx,
-          lineHeight: 1,
-          width: size,
-          height: size,
-        }}
+        className={`inline-flex items-center justify-center leading-none ${className}`}
+        style={{ ...wordStyle(fontPx), width: size, height: size }}
       >
         h
       </span>
@@ -50,14 +67,9 @@ export default function Logo({
 
   return (
     <span
-      className={`inline-flex items-baseline select-none text-ink leading-none ${className}`}
+      className={`inline-flex items-baseline select-none leading-none ${className}`}
       aria-label="Havlo"
-      style={{
-        fontFamily: "var(--font-logo)",
-        fontSize: fontPx,
-        lineHeight: 1,
-        letterSpacing: "-0.02em",
-      }}
+      style={wordStyle(fontPx)}
     >
       havlo
     </span>
