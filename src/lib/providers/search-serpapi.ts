@@ -145,13 +145,13 @@ function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | nu
 
   if (!saleNative || !url || !store || !title) return null;
 
-  /* Drop Google-relay URLs — they go to a Google Shopping product
-     page instead of the merchant. SerpAPI offers `serpapi_product_api`
-     to resolve to the merchant URL via a follow-up call (1 credit each)
-     — too expensive at ingest time for 60+ results per query. Instead
-     we surface only direct-merchant rows; the click-resolver in
-     /api/go can lift this restriction later if we want the breadth. */
-  if (isGoogleRelayUrl(url)) return null;
+  /* Google-relay URLs go through /api/go at click time so the user
+     lands on the merchant (resolver hits SerpAPI's product endpoint
+     once, caches in resolved_clicks for 30 days, then 307s).
+     Direct merchant URLs pass through unchanged — no overhead. */
+  const finalUrl = isGoogleRelayUrl(url)
+    ? `/api/go?url=${encodeURIComponent(url)}`
+    : url;
 
   // Skip non-deals: this is a *deals* page, not a generic product feed.
   // We require either an explicit old_price OR a SALE tag from Google.
@@ -189,7 +189,7 @@ function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | nu
     imageUrl: r.thumbnail,
     imageGradient: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
     imageEmoji: "🛍️",
-    url,
+    url: finalUrl,
     expiresAt: null,
     isHot: discountPercent >= 30,
     isFeatured: false,
