@@ -14,10 +14,16 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveSearchProviders, ProviderError } from "@/lib/providers";
+import { getServerCountry } from "@/lib/country-server";
+import { filterDealsForCountry } from "@/lib/country";
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
-  const countryCode = req.nextUrl.searchParams.get("country") ?? "ng";
+  /* Default countryCode from the user's cookie (set by CountryProvider).
+     Explicit ?country= still wins so the API can be called by tools that
+     want to override (e.g. server-to-server). */
+  const cookieCountry = getServerCountry();
+  const countryCode = req.nextUrl.searchParams.get("country") ?? cookieCountry.code;
   const limit = req.nextUrl.searchParams.get("limit")
     ? parseInt(req.nextUrl.searchParams.get("limit")!, 10)
     : 24;
@@ -136,9 +142,15 @@ export async function GET(req: NextRequest) {
         return !titleFam || titleFam === qFam;
       });
 
+  /* Country store filter — same pure helper used elsewhere. Drops
+     NG-anchored stores (Konga/Jumia/3C Hub) for non-NG users; keeps
+     country-tagged matches + cross-border globals (Shein, Temu,
+     AliExpress, Wish, DHgate). */
+  const countryFiltered = filterDealsForCountry(relevant, cookieCountry);
+
   return NextResponse.json(
     {
-      items: relevant.slice(0, limit),
+      items: countryFiltered.slice(0, limit),
       providers: providers.map((p) => p.id),
     },
     { headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=900" } },

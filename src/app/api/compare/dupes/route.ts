@@ -10,6 +10,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { pgFtsFindDupes } from "@/lib/search/pg-fts";
+import { getServerCountry } from "@/lib/country-server";
+import { isOfferAllowedForCountry } from "@/lib/country";
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
@@ -27,8 +29,19 @@ export async function GET(req: NextRequest) {
 
   try {
     const dupes = await pgFtsFindDupes(q, maxPriceNgn);
+    /* For non-NG users, drop dupe-offers from NG-anchored stores.
+       If a dupe loses all its offers we drop the dupe entirely. */
+    const country = getServerCountry();
+    const filteredDupes = country.code === "ng"
+      ? dupes
+      : dupes
+          .map((d) => ({
+            ...d,
+            offers: d.offers.filter((o) => isOfferAllowedForCountry(o, country)),
+          }))
+          .filter((d) => d.offers.length > 0);
     return NextResponse.json(
-      { dupes },
+      { dupes: filteredDupes },
       {
         headers: { "Cache-Control": "s-maxage=120, stale-while-revalidate=600" },
       },

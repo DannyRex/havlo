@@ -98,20 +98,72 @@ export function formatLocal(amount: number, country: Country): string {
 /* Stores that ship globally — appropriate to show under any country.
    Match is case-insensitive substring on storeId or storeName. */
 const CROSS_BORDER_STORES = [
-  "shein", "temu", "aliexpress", "wish", "dhgate", "banggood", "lightinthebox",
+  "shein", "temu", "aliexpress", "wish", "dhgate",
+  "banggood", "lightinthebox", "geekbuying",
 ];
 
 /* Stores that are NG-anchored — never appropriate outside Nigeria. */
 const NG_STORES = [
   "konga", "jumia", "3c-hub", "3chub", "3c hub",
   "slot", "pointek", "fouani", "zit-trading", "hayathub",
+  "ajebomarket", "kara", "obiwezy", "pricepally",
 ];
+
+/* Per-country anchored stores. The filter doesn't strictly require
+   these (untagged intl rows pass through too) but having them mapped
+   lets future code prioritize "real" country stores in ranking +
+   gives QA a clear list of who we expect to surface. Match is
+   substring on storeId/storeName. */
+export const COUNTRY_STORES: Record<string, string[]> = {
+  uk: [
+    "amazon.co.uk", "amazon-co-uk", "argos", "currys", "john lewis", "johnlewis",
+    "very", "asos", "boots", "next", "marks-spencer", "marks and spencer",
+    "selfridges", "ao.com", "ao-com", "screwfix", "wickes", "halfords",
+    "sports direct", "sportsdirect", "river island", "primark", "matalan",
+    "house of fraser", "debenhams", "tesco", "sainsbury", "ebay.co.uk",
+  ],
+  us: [
+    "amazon.com", "walmart", "best buy", "bestbuy", "target", "newegg",
+    "ebay", "home depot", "homedepot", "macy", "kohl", "costco", "bjs",
+    "nordstrom", "sephora", "ulta", "wayfair", "etsy", "lowes", "lowe's",
+    "staples", "gap", "old navy", "oldnavy", "nike", "adidas",
+  ],
+  de: [
+    "amazon.de", "mediamarkt", "media-markt", "saturn", "otto", "zalando",
+    "idealo", "notebooksbilliger", "alternate", "cyberport", "lidl",
+    "kaufland", "real.de", "tchibo",
+  ],
+  ae: [
+    "amazon.ae", "noon", "sharaf dg", "sharafdg", "carrefour.ae",
+    "lulu hypermarket", "luluhypermarket", "first cry", "firstcry.ae",
+    "centrepoint", "namshi", "ounass", "6thstreet",
+  ],
+  in: [
+    "amazon.in", "flipkart", "myntra", "ajio", "tata cliq", "tatacliq",
+    "snapdeal", "nykaa", "firstcry", "meesho", "croma", "reliance digital",
+    "reliancedigital", "vijay sales", "vijaysales", "shopclues",
+  ],
+  za: [
+    "takealot", "makro", "game", "loot.co.za", "loot", "wantitall",
+    "yuppiechef", "superbalist", "zando", "everyshop", "incredible connection",
+    "incredibleconnection", "checkers", "pick n pay", "picknpay",
+  ],
+};
 
 interface DealLike {
   storeId:    string;
   storeName:  string;
   currency:   string;
   tags:       string[];
+}
+
+/* Smaller shape for StoreOffer (in /compare anchor + dupe pipelines).
+   Tags + currency aren't reliable here (offer prices are normalised to
+   NGN for display) — we lean on isInternational instead. */
+export interface OfferLike {
+  storeId:          string;
+  storeName:        string;
+  isInternational?: boolean;
 }
 
 function lc(s: string): string { return s.toLowerCase(); }
@@ -145,19 +197,55 @@ export function dealCountryTag(d: DealLike): string | null {
   return tag ? lc(tag).slice("country:".length) : null;
 }
 
+/** True if the deal's store belongs to the country's known retail roster. */
+export function isStoreInCountry<T extends DealLike | OfferLike>(d: T, countryCode: string): boolean {
+  const list = COUNTRY_STORES[countryCode];
+  if (!list) return false;
+  const id   = lc(d.storeId);
+  const name = lc(d.storeName);
+  return matchesAny(id, list) || matchesAny(name, list);
+}
+
 /** Filter a deals list for the given country preference.
     - For NG: return everything (no filter; quota handles the mix)
-    - For non-NG: drop NG-only stores; keep country-tagged matches +
-      cross-border stores. Untagged intl rows are kept (better than
-      hiding them — most are still relevant globally). */
+    - For non-NG: drop NG-only stores; keep cross-border globals,
+      country-tagged matches, AND known country-roster stores
+      (Amazon UK / ASOS / Argos for UK, etc.). Untagged intl rows
+      from a foreign country tag are dropped. */
 export function filterDealsForCountry<T extends DealLike>(deals: T[], country: Country): T[] {
   if (country.code === "ng") return deals;
   return deals.filter((d) => {
     if (isNigerianStore(d)) return false;
     if (isCrossBorderStore(d)) return true;
+    if (isStoreInCountry(d, country.code)) return true;
     const tag = dealCountryTag(d);
     if (tag === country.code) return true;
-    if (tag === null) return true;       // untagged intl — keep, broadly relevant
-    return false;                         // tagged but for a different country
+    /* For any other tagged country (e.g. country:de when user is uk),
+       drop. Untagged rows pass through — without a country tag we
+       can't be sure, but historically these have been broadly relevant. */
+    if (tag === null) return true;
+    return false;
   });
+}
+
+/** Variant for StoreOffer-style rows (compare anchor + dupes pipeline).
+    Same intent as filterDealsForCountry but reads isInternational
+    instead of currency/tags. */
+export function isOfferAllowedForCountry<T extends OfferLike>(o: T, country: Country): boolean {
+  if (country.code === "ng") return true;
+
+  const idLc   = lc(o.storeId);
+  const nameLc = lc(o.storeName);
+
+  // Cross-border globals — always allowed
+  if (matchesAny(idLc, CROSS_BORDER_STORES) || matchesAny(nameLc, CROSS_BORDER_STORES)) return true;
+  // Country-anchored retailers (Amazon UK, ASOS, etc. for UK users)
+  if (isStoreInCountry(o, country.code)) return true;
+
+  // NG-anchored stores — never for non-NG
+  if (matchesAny(idLc, NG_STORES) || matchesAny(nameLc, NG_STORES)) return false;
+  // is_international=false ⇒ stores.country='NG' at ingest time
+  if (o.isInternational === false) return false;
+
+  return true;
 }
