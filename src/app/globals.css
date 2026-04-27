@@ -68,6 +68,25 @@ body {
     sans-serif;
 }
 
+/* Brand wordmark gradient — theme-adapted metallic finish.
+   Light mode: gunmetal silver (dark, reads on white)
+   Dark mode:  bright chrome silver (light, reads on near-black)
+   Both use a vertical 3-stop sheen so the letterforms catch the
+   "metallic" highlight in the middle, mimicking polished metal. */
+:root {
+  --logo-gradient: linear-gradient(180deg, #6B7280 0%, #1F2937 48%, #374151 100%);
+}
+.dark {
+  --logo-gradient: linear-gradient(180deg, #E5E7EB 0%, #FFFFFF 48%, #9CA3AF 100%);
+}
+.logo-metal {
+  background-image:        var(--logo-gradient);
+  -webkit-background-clip: text;
+  background-clip:         text;
+  -webkit-text-fill-color: transparent;
+  color:                   transparent;
+}
+
 h1, h2, h3, h4, h5, h6 {
   /* Bricolage Grotesque for all headers — sharper, more editorial
      than the body Inter. Loaded via next/font in app/layout.tsx. */
