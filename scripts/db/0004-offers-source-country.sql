@@ -37,7 +37,11 @@ CREATE INDEX IF NOT EXISTS offers_source_country_idx
   ON offers (source_country);
 
 -- Recreate the best-offers view to expose source_country to browse-db.
-CREATE OR REPLACE VIEW product_best_offers AS
+-- Postgres' CREATE OR REPLACE VIEW can only ADD trailing columns (and
+-- can't change their order), so we DROP first to add source_country in
+-- the same logical position as the other offer columns.
+DROP VIEW IF EXISTS product_best_offers;
+CREATE VIEW product_best_offers AS
 SELECT
   p.id                   AS product_id,
   p.title,

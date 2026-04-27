@@ -8,7 +8,7 @@ import Image from "next/image";
 import PriceResults from "@/components/compare/PriceResults";
 import DupeCard from "@/components/compare/DupeCard";
 import LiveResults from "@/components/compare/LiveResults";
-import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/MasonryCard";
+import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
 import { formatNaira } from "@/lib/utils";
 import { trackClick } from "@/lib/trackClick";

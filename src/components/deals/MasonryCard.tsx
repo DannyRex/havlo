@@ -1,8 +1,12 @@
-/* No "use client" — this module exports both a React component AND plain
-   utilities (chunkLeftToRight, MASONRY_ASPECTS). Client modules can't
-   re-export plain functions cleanly across the RSC boundary, so we keep
-   this as a server-renderable module. The component itself uses only
-   server-safe APIs (no hooks, no event handlers). */
+"use client";
+
+/* Country-aware product card.
+   Reads useCountry() so prices show in the user's preferred currency:
+     - NG user, USD-priced deal → primary $ + ≈ ₦ equivalent (existing behavior)
+     - UK user, USD-priced deal → primary £ + ≈ $ original
+     - UK user, NGN-priced deal → primary £ (converted) + ≈ ₦
+   Layout utilities (chunkLeftToRight, MASONRY_ASPECTS) live in
+   masonry-layout.ts so server components can still import them. */
 
 import {
   cleanTitle,
@@ -10,57 +14,77 @@ import {
   formatUSDPrice,
   savings,
   timeAgo,
-  usdToNgn,
 } from "@/lib/utils";
+import { useCountry } from "@/components/providers/CountryProvider";
+import {
+  USD_FX, formatLocal, type Country,
+} from "@/lib/country";
 import type { Deal } from "@/types";
-
-/** Aspect ratios that interleave nicely for the masonry feel */
-export const MASONRY_ASPECTS = [
-  "aspect-[3/4]",
-  "aspect-[2/3]",
-  "aspect-square",
-  "aspect-[4/5]",
-  "aspect-[3/4]",
-  "aspect-[2/3]",
-  "aspect-[4/5]",
-  "aspect-[5/6]",
-  "aspect-square",
-  "aspect-[3/4]",
-  "aspect-[2/3]",
-  "aspect-[4/5]",
-  "aspect-square",
-  "aspect-[3/4]",
-  "aspect-[5/6]",
-  "aspect-[2/3]",
-];
-
-/** Distribute items into N columns left-to-right (item 0 → col 0, item 1 → col 1, …) */
-export function chunkLeftToRight<T>(items: T[], cols: number): T[][] {
-  const buckets: T[][] = Array.from({ length: cols }, () => []);
-  items.forEach((it, i) => buckets[i % cols].push(it));
-  return buckets;
-}
 
 interface Props {
   deal: Deal;
   aspect: string;
-  /** Show the small INTL chip on USD-priced items */
+  /** Show the small INTL chip on items priced in a non-local currency */
   showOriginBadge?: boolean;
   /** Above-the-fold cards opt in to eager + high-priority image loading
       so the LCP pixel arrives without waiting for the lazy heuristic. */
   priority?: boolean;
 }
 
-export default function MasonryCard({ deal, aspect, showOriginBadge = true, priority = false }: Props) {
-  const isUSD = deal.currency === "USD";
-  const saved = savings(deal.originalPrice, deal.salePrice);
-  const cleanedTitle = cleanTitle(deal.title);
+/* Convert a Deal's native price into the user's preferred currency.
+   Handles three cases:
+     1. Deal currency already matches user currency → no conversion
+     2. Deal in USD, user not USD → multiply by USD_FX
+     3. Deal in NGN, user not NGN → divide by USD_FX[NGN], multiply by user's
+   Returns 0 when conversion is impossible (defensive — shouldn't happen). */
+function convertToUserCurrency(amount: number, dealCurrency: string, country: Country): number {
+  const dealCcy = dealCurrency as Country["currency"];
+  if (dealCcy === country.currency) return amount;
 
-  const priceFmt = isUSD ? formatUSDPrice(deal.salePrice)     : formatCompact(deal.salePrice);
-  const origFmt  = isUSD ? formatUSDPrice(deal.originalPrice) : formatCompact(deal.originalPrice);
-  const saveFmt  = saved > 0 ? (isUSD ? formatUSDPrice(saved) : formatCompact(saved)) : null;
-  const ngnEquivStr = isUSD ? `≈ ${formatCompact(usdToNgn(deal.salePrice))}` : null;
+  // Convert deal currency → USD as intermediate hop
+  const inUsd = dealCcy === "USD"
+    ? amount
+    : amount / (USD_FX[dealCcy] ?? 1);
+
+  // USD → user currency
+  return Math.round(inUsd * (USD_FX[country.currency] ?? 1));
+}
+
+export default function MasonryCard({ deal, aspect, showOriginBadge = true, priority = false }: Props) {
+  const { country } = useCountry();
+  const dealCcy = deal.currency as Country["currency"];
+  const sameCcy = dealCcy === country.currency;
+
+  const cleanedTitle = cleanTitle(deal.title);
+  const saved = savings(deal.originalPrice, deal.salePrice);
   const hasDiscount = deal.originalPrice > deal.salePrice && deal.discountPercent > 0;
+
+  /* Primary price = user's preferred currency.
+     Secondary price = original currency (only when different) so the
+     user can sanity-check against the source listing. */
+  const primarySale = sameCcy ? deal.salePrice : convertToUserCurrency(deal.salePrice, deal.currency, country);
+  const primaryOrig = sameCcy ? deal.originalPrice : convertToUserCurrency(deal.originalPrice, deal.currency, country);
+  const primarySaved = primaryOrig > primarySale ? primaryOrig - primarySale : 0;
+
+  const priceFmt = formatLocal(primarySale, country);
+  const origFmt  = formatLocal(primaryOrig, country);
+  const saveFmt  = primarySaved > 0 ? formatLocal(primarySaved, country) : null;
+
+  /* Secondary price (the original-currency hint) — small, italic, below the
+     primary line. Skipped when currency matches. NGN gets formatCompact for
+     the "₦47K" feel; USD gets formatUSDPrice; others use Intl. */
+  let secondaryStr: string | null = null;
+  if (!sameCcy) {
+    if (dealCcy === "NGN") secondaryStr = `≈ ${formatCompact(deal.salePrice)}`;
+    else if (dealCcy === "USD") secondaryStr = `≈ ${formatUSDPrice(deal.salePrice)}`;
+    else secondaryStr = `≈ ${formatLocal(deal.salePrice, { ...country, currency: dealCcy } as Country)}`;
+  }
+
+  /* "INTL" chip = the deal isn't from the user's country.
+     For NG users: USD-priced deals are intl (existing behavior).
+     For others: NGN-priced deals are intl (rare after country filter
+     removes NG stores), or any deal whose currency != user's. */
+  const showIntl = showOriginBadge && !sameCcy;
 
   return (
     <a
@@ -70,19 +94,12 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
       aria-label={`${cleanedTitle}, ${priceFmt} at ${deal.storeName}`}
       className="group block"
     >
-      {/* Image — varied aspect, edge-to-edge.
-          1px border so card edges (and therefore the masonry varying
-          heights) are visible in light mode where bg-surface-2 ≈ bg-bg
-          and most product photos are also white. */}
       <div className={`relative overflow-hidden rounded-xl sm:rounded-2xl bg-surface-2 border border-border ${aspect}`}>
         {deal.imageUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={deal.imageUrl}
             alt=""
-            /* `priority` is set on the first few above-the-fold cards so the
-               LCP image starts loading immediately instead of being deferred
-               by the browser's lazy heuristic. Everything else stays lazy. */
             loading={priority ? "eager" : "lazy"}
             fetchPriority={priority ? "high" : "auto"}
             decoding={priority ? "sync" : "async"}
@@ -115,8 +132,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
           </div>
         )}
 
-        {/* INTL tag */}
-        {showOriginBadge && isUSD && (
+        {showIntl && (
           <span
             className="absolute left-2 bottom-2 inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium text-white/95 backdrop-blur-sm"
             style={{ background: "rgba(0,0,0,0.55)" }}
@@ -126,10 +142,6 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
         )}
       </div>
 
-      {/* Caption.
-          Eyebrow priority: store name always shows in full (shrink-0).
-          Time-ago only renders on sm+ where there's room — on narrow
-          mobile cards, dropping it beats truncating "Konga" to "K...". */}
       <div className="pt-2 sm:pt-2.5 px-0.5">
         <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-ink-3 mb-0.5 sm:mb-1 leading-none min-w-0">
           <span className="font-medium text-ink-2 truncate">{deal.storeName}</span>
@@ -153,8 +165,8 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
           )}
         </div>
 
-        {ngnEquivStr && (
-          <p className="text-[10px] text-ink-3 mt-0.5">{ngnEquivStr}</p>
+        {secondaryStr && (
+          <p className="text-[10px] text-ink-3 mt-0.5">{secondaryStr}</p>
         )}
       </div>
     </a>

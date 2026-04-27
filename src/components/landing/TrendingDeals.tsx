@@ -3,10 +3,8 @@ import { getActiveBrowseProvider } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry } from "@/lib/country";
 import type { Deal } from "@/types";
-import MasonryCard, {
-  MASONRY_ASPECTS,
-  chunkLeftToRight,
-} from "@/components/deals/MasonryCard";
+import MasonryCard from "@/components/deals/MasonryCard";
+import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
 
 /* Deterministic seed bucketed into 5-minute windows so picks rotate

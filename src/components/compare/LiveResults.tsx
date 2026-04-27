@@ -7,7 +7,7 @@ import {
   formatCompact,
   usdToNgn,
 } from "@/lib/utils";
-import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/MasonryCard";
+import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import type { Deal } from "@/types";
 
 interface Props {

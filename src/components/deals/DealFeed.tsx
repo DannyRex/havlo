@@ -6,10 +6,8 @@ import { Search, X, SlidersHorizontal, LayoutGrid, List } from "lucide-react";
 import CategoryNav from "./CategoryNav";
 import OriginToggle from "./OriginToggle";
 import ListCard from "./ListCard";
-import MasonryCard, {
-  MASONRY_ASPECTS,
-  chunkLeftToRight,
-} from "./MasonryCard";
+import MasonryCard from "./MasonryCard";
+import { MASONRY_ASPECTS, chunkLeftToRight } from "./masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
 import type { Deal, DiscountTier, OriginFilter, SortOption } from "@/types";
 
