@@ -37,15 +37,9 @@ export default function Footer() {
             <Link href="/" className="inline-block mb-4" aria-label="Havlo home">
               <Logo size={28} />
             </Link>
-            <p className="text-sm text-ink-2 leading-relaxed max-w-xs mb-4">
+            <p className="text-sm text-ink-2 leading-relaxed max-w-xs">
               Find similar products for less. Paste any link or search anything, we surface the cheaper alternatives.
             </p>
-            <Link
-              href="/contact"
-              className="text-sm text-ink-2 hover:text-ink transition-colors underline-offset-4 hover:underline"
-            >
-              Contact us →
-            </Link>
           </div>
 
           {/* Link columns */}
@@ -76,7 +70,7 @@ export default function Footer() {
             <p className="text-xs text-ink-3 hidden md:block">
               Final prices, stock and shipping are set by each retailer.
             </p>
-            <CountrySelect />
+            <CountrySelect dropUp />
           </div>
         </div>
       </div>

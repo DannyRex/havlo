@@ -28,7 +28,13 @@ function stripCountryPrefix(pathname: string): string {
   return pathname === "/" ? "" : pathname;
 }
 
-export default function CountrySelect() {
+interface Props {
+  /** Open the menu upward instead of downward — for footer placements
+      where the menu would otherwise extend off the viewport bottom. */
+  dropUp?: boolean;
+}
+
+export default function CountrySelect({ dropUp = false }: Props = {}) {
   const { country, countries, setCountry } = useCountry();
   const router = useRouter();
   const pathname = usePathname();
@@ -70,7 +76,10 @@ export default function CountrySelect() {
         <div
           role="listbox"
           aria-label="Choose country"
-          className="absolute right-0 top-full mt-2 w-56 rounded-xl bg-bg border border-border shadow-2xl z-50 overflow-hidden"
+          className={cn(
+            "absolute right-0 w-56 rounded-xl bg-bg border border-border shadow-2xl z-50 overflow-hidden",
+            dropUp ? "bottom-full mb-2" : "top-full mt-2",
+          )}
         >
           <div className="px-3 py-2.5 border-b border-border flex items-center gap-2">
             <Globe size={14} className="text-ink-3" />
