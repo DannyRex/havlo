@@ -44,14 +44,22 @@ export function middleware(req: NextRequest) {
     return res;
   }
 
-  /* Case 2: bare country-scoped path (/deals, /compare) → redirect to
-     /{cookieCountry}/<rest>. Lets existing internal Links keep using
-     unprefixed hrefs while the URL stays canonical. */
+  /* Case 2: bare country-scoped path (/, /deals, /compare) → redirect
+     to /{cookieCountry}/<rest>. Lets existing internal Links keep using
+     unprefixed hrefs while the URL stays canonical.
+
+     IMPORTANT: 307 (temporary) NOT 308 (permanent). Browsers cache 308
+     forever — once a user redirects /deals → /ng/deals as 308, switching
+     country to UK and clicking /deals still routes to /ng/deals from
+     cache without re-checking middleware. 307 + the no-cache header
+     keeps the redirect dynamic. */
   if (COUNTRY_SCOPED.has(seg) && !GLOBAL_PAGES.has(seg)) {
     const cc = req.cookies.get(COUNTRY_COOKIE)?.value ?? "ng";
     const target = req.nextUrl.clone();
     target.pathname = `/${cc}${path === "/" ? "" : path}`;
-    return NextResponse.redirect(target, 308);
+    const res = NextResponse.redirect(target, 307);
+    res.headers.set("Cache-Control", "no-store");
+    return res;
   }
 
   return NextResponse.next();

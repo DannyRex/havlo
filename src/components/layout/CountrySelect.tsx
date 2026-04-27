@@ -68,7 +68,7 @@ export default function CountrySelect({ dropUp = false }: Props = {}) {
         className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-full text-sm font-medium text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors"
       >
         <span aria-hidden="true" className="text-base leading-none">{country.flag}</span>
-        <span className="hidden sm:inline text-[12px] uppercase tracking-wider">{country.code}</span>
+        <span className="hidden sm:inline text-[12px] tracking-wider">{country.code.toUpperCase()}</span>
         <ChevronDown size={14} className="text-ink-3" />
       </button>
 
