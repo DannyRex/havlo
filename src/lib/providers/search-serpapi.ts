@@ -123,6 +123,19 @@ function inferCategoryFromTitle(title: string): string | null {
   return null;
 }
 
+/* True if the URL points at Google's own Shopping product page rather
+   than the merchant. SerpAPI's `link` and `product_link` for sponsored
+   ads + many organic listings relay through Google — clicking lands
+   the user on a Google product card, not the actual store. */
+function isGoogleRelayUrl(u: string): boolean {
+  try {
+    const host = new URL(u).hostname.toLowerCase();
+    return host === "google.com" || host.endsWith(".google.com");
+  } catch {
+    return false;
+  }
+}
+
 function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | null {
   const saleNative = r.extracted_price;
   const originalNative = r.extracted_old_price;     // undefined ⇒ not on sale
@@ -131,6 +144,14 @@ function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | nu
   const title = r.title;
 
   if (!saleNative || !url || !store || !title) return null;
+
+  /* Drop Google-relay URLs — they go to a Google Shopping product
+     page instead of the merchant. SerpAPI offers `serpapi_product_api`
+     to resolve to the merchant URL via a follow-up call (1 credit each)
+     — too expensive at ingest time for 60+ results per query. Instead
+     we surface only direct-merchant rows; the click-resolver in
+     /api/go can lift this restriction later if we want the breadth. */
+  if (isGoogleRelayUrl(url)) return null;
 
   // Skip non-deals: this is a *deals* page, not a generic product feed.
   // We require either an explicit old_price OR a SALE tag from Google.
