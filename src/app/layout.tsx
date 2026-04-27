@@ -4,6 +4,8 @@ import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import ThemeProvider from "@/components/ui/ThemeProvider";
+import { CountryProvider } from "@/components/providers/CountryProvider";
+import { getServerCountry } from "@/lib/country";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -63,6 +65,10 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  /* Read country from cookie on the server so the first paint already
+     shows the user's flag/currency — no FOUC swap on hydration. */
+  const initialCountry = getServerCountry();
+
   return (
     <html lang="en" className={`${inter.variable} ${displayFont.variable} scroll-smooth`} suppressHydrationWarning>
       <head>
@@ -70,9 +76,11 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen flex flex-col antialiased font-sans bg-bg text-ink">
         <ThemeProvider>
-          <Navbar />
-          <main className="flex-1">{children}</main>
-          <Footer />
+          <CountryProvider initialCode={initialCountry.code}>
+            <Navbar />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </CountryProvider>
         </ThemeProvider>
       </body>
     </html>

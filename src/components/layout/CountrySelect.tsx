@@ -1,0 +1,94 @@
+"use client";
+
+/* Country selector — compact dropdown showing flag + currency code.
+   Lives in the header right cluster on desktop, and in the drawer on
+   mobile (CountrySelectMobile below).
+
+   No portal / no popover lib — small absolute-positioned panel that
+   handles outside-click + Escape close. Keyboard-accessible via the
+   <button> trigger; arrow-key list traversal can come later. */
+
+import { useEffect, useRef, useState } from "react";
+import { Check, ChevronDown, Globe } from "lucide-react";
+import { useCountry } from "@/components/providers/CountryProvider";
+import { cn } from "@/lib/utils";
+
+export default function CountrySelect() {
+  const { country, countries, setCountry } = useCountry();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClick(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`Country: ${country.name}. Change.`}
+        className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-full text-sm font-medium text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors"
+      >
+        <span aria-hidden="true" className="text-base leading-none">{country.flag}</span>
+        <span className="hidden sm:inline text-[12px] uppercase tracking-wider">{country.currency}</span>
+        <ChevronDown size={14} className="text-ink-3" />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label="Choose country"
+          className="absolute right-0 top-full mt-2 w-56 rounded-xl bg-bg border border-border shadow-2xl z-50 overflow-hidden"
+        >
+          <div className="px-3 py-2.5 border-b border-border flex items-center gap-2">
+            <Globe size={14} className="text-ink-3" />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3">
+              Shopping from
+            </span>
+          </div>
+          <ul className="py-1 max-h-80 overflow-y-auto">
+            {countries.map((c) => {
+              const active = c.code === country.code;
+              return (
+                <li key={c.code}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => { setCountry(c.code); setOpen(false); }}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left transition-colors",
+                      active
+                        ? "bg-surface-2 text-ink"
+                        : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+                    )}
+                  >
+                    <span aria-hidden="true" className="text-lg leading-none">{c.flag}</span>
+                    <span className="flex-1 truncate">{c.name}</span>
+                    <span className="text-[11px] text-ink-3 tabular-nums">{c.currency}</span>
+                    {active && <Check size={14} className="text-brand" />}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}

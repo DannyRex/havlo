@@ -7,6 +7,7 @@ import { Home, Tag, Search, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import Logo from "@/components/ui/Logo";
+import CountrySelect from "@/components/layout/CountrySelect";
 
 const navLinks = [
   { href: "/",        label: "Home",          Icon: Home   },
@@ -97,6 +98,7 @@ export default function Navbar() {
                 );
               })}
             </div>
+            <CountrySelect />
             <ThemeToggle />
           </div>
         </nav>

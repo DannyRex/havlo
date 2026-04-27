@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getActiveBrowseProvider } from "@/lib/providers";
+import { getServerCountry } from "@/lib/country";
 import type { Deal } from "@/types";
 import MasonryCard, {
   MASONRY_ASPECTS,
@@ -95,10 +96,19 @@ export default async function TrendingDeals() {
      Havlo is Nigeria-first, so the homepage should feel like a Nigerian
      marketplace with international deals as accent — not the other way
      around. Target ratio: ~70% local (NGN), 30% international (USD).
-     Caps below are computed from TARGET_TOTAL so the math stays obvious. */
+
+     For non-NG users (post Phase 10a country selector), we invert the
+     quota so the homepage leads with deals priced in their region's
+     currency. The data model is still bipartite (NG vs world) until the
+     per-country DB tag lands, so this is a coarse improvement — but
+     it's already much better than showing 11 NGN cards to a UK user. */
   const TARGET_TOTAL = 16;
-  const LOCAL_QUOTA  = Math.round(TARGET_TOTAL * 0.7); // 11
-  const INTL_QUOTA   = TARGET_TOTAL - LOCAL_QUOTA;     // 5
+  const country = getServerCountry();
+  const isNG = country.code === "ng";
+  const LOCAL_QUOTA = isNG
+    ? Math.round(TARGET_TOTAL * 0.7)   // 11 NGN
+    : Math.round(TARGET_TOTAL * 0.3);  // 5 NGN — non-NG users see mostly USD intl
+  const INTL_QUOTA  = TARGET_TOTAL - LOCAL_QUOTA;
 
   const seen = new Set<string>();
   const storeCount: Record<string, number> = {};
