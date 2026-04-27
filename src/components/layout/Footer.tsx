@@ -1,20 +1,17 @@
 import Link from "next/link";
 import Logo from "@/components/ui/Logo";
+import CountrySelect from "@/components/layout/CountrySelect";
 
-/* Only links to pages that actually exist. Contact + Press kit removed
-   per request. About removed (no page yet — easy to add back later). */
+/* Footer dedupe: Contact lives in the brand block (link below the
+   tagline), not in a separate "Company" column with one item. About /
+   Help land in the Company column when those pages exist. */
 const footerSections = [
   {
     title: "Product",
     links: [
       { label: "Browse deals",  href: "/deals" },
       { label: "Find for less", href: "/compare" },
-    ],
-  },
-  {
-    title: "Company",
-    links: [
-      { label: "Contact", href: "/contact" },
+      { label: "Contact",       href: "/contact" },
     ],
   },
   {
@@ -34,7 +31,7 @@ export default function Footer() {
     <footer className="border-t border-border bg-surface">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
 
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 mb-12">
+        <div className="grid gap-10 sm:grid-cols-3 mb-12">
           {/* Brand */}
           <div>
             <Link href="/" className="inline-block mb-4" aria-label="Havlo home">
@@ -75,9 +72,12 @@ export default function Footer() {
           <p className="text-xs text-ink-3">
             © {year} Havlo. Independent product discovery.
           </p>
-          <p className="text-xs text-ink-3">
-            Final prices, stock and shipping are set by each retailer.
-          </p>
+          <div className="flex items-center gap-4">
+            <p className="text-xs text-ink-3 hidden md:block">
+              Final prices, stock and shipping are set by each retailer.
+            </p>
+            <CountrySelect />
+          </div>
         </div>
       </div>
     </footer>

@@ -56,6 +56,21 @@ function dealToProductRow(d: Deal, signature: string) {
   };
 }
 
+/* Extract the country code from either:
+   1. The Deal.tags array (`country:xx` — set by SerpAPI provider)
+   2. The sourceQuery suffix (e.g. "phones:uk" — set by ingest CLI)
+   3. NGN-currency offers default to "ng" (scraper-sourced)
+   Returns null when no signal is available — the offer becomes "global"
+   from the country-filter's perspective (cross-border like Shein/Temu). */
+function inferSourceCountry(d: Deal, sourceQuery: string): string | null {
+  const tag = d.tags.find((t) => t.startsWith("country:"));
+  if (tag) return tag.slice("country:".length).toLowerCase();
+  const m = sourceQuery.match(/:([a-z]{2})$/i);
+  if (m) return m[1].toLowerCase();
+  if (d.currency === "NGN") return "ng";
+  return null;
+}
+
 function dealToOfferRow(d: Deal, productId: string, sourceProvider: string, sourceQuery: string) {
   return {
     product_id: productId,
@@ -68,6 +83,7 @@ function dealToOfferRow(d: Deal, productId: string, sourceProvider: string, sour
     in_stock: true,
     source_provider: sourceProvider,
     source_query: sourceQuery,
+    source_country: inferSourceCountry(d, sourceQuery),
     scraped_at: new Date().toISOString(),
   };
 }

@@ -83,3 +83,81 @@ export function formatLocal(amount: number, country: Country): string {
     maximumFractionDigits: country.currency === "USD" ? 2 : 0,
   }).format(amount);
 }
+
+/* ── Per-country store filtering ────────────────────────────────────
+   Goal: when a UK user lands on the homepage, they should see UK
+   retailers (Amazon UK, ASOS, Argos, Currys…) and a few cross-border
+   stores UK shoppers actually use (Shein, Temu, AliExpress) — NOT
+   Konga / Jumia / 3C Hub which they can't buy from.
+
+   The Deal.tags array carries `country:xx` for SerpAPI rows; native
+   NG scraper rows are NGN-currency. Cross-border stores are matched
+   by storeId fragments since they ingest under multiple country
+   contexts (Shein.com surfaces under "us", "uk", "de" etc.). */
+
+/* Stores that ship globally — appropriate to show under any country.
+   Match is case-insensitive substring on storeId or storeName. */
+const CROSS_BORDER_STORES = [
+  "shein", "temu", "aliexpress", "wish", "dhgate", "banggood", "lightinthebox",
+];
+
+/* Stores that are NG-anchored — never appropriate outside Nigeria. */
+const NG_STORES = [
+  "konga", "jumia", "3c-hub", "3chub", "3c hub",
+  "slot", "pointek", "fouani", "zit-trading", "hayathub",
+];
+
+interface DealLike {
+  storeId:    string;
+  storeName:  string;
+  currency:   string;
+  tags:       string[];
+}
+
+function lc(s: string): string { return s.toLowerCase(); }
+
+function matchesAny(haystackLc: string, needles: string[]): boolean {
+  return needles.some((n) => haystackLc.includes(n));
+}
+
+/** True if the deal's store is one of the cross-border / global retailers. */
+export function isCrossBorderStore(d: DealLike): boolean {
+  const id   = lc(d.storeId);
+  const name = lc(d.storeName);
+  return matchesAny(id, CROSS_BORDER_STORES) || matchesAny(name, CROSS_BORDER_STORES);
+}
+
+/** True if the deal originates from an NG-anchored retailer. */
+export function isNigerianStore(d: DealLike): boolean {
+  const id   = lc(d.storeId);
+  const name = lc(d.storeName);
+  if (matchesAny(id, NG_STORES) || matchesAny(name, NG_STORES)) return true;
+  // NGN-priced offers are NG by definition
+  if (d.currency === "NGN") return true;
+  // Tag-based country:ng signal
+  if (d.tags.some((t) => lc(t) === "country:ng")) return true;
+  return false;
+}
+
+/** Extract the country tag from Deal.tags, or null if not present. */
+export function dealCountryTag(d: DealLike): string | null {
+  const tag = d.tags.find((t) => lc(t).startsWith("country:"));
+  return tag ? lc(tag).slice("country:".length) : null;
+}
+
+/** Filter a deals list for the given country preference.
+    - For NG: return everything (no filter; quota handles the mix)
+    - For non-NG: drop NG-only stores; keep country-tagged matches +
+      cross-border stores. Untagged intl rows are kept (better than
+      hiding them — most are still relevant globally). */
+export function filterDealsForCountry<T extends DealLike>(deals: T[], country: Country): T[] {
+  if (country.code === "ng") return deals;
+  return deals.filter((d) => {
+    if (isNigerianStore(d)) return false;
+    if (isCrossBorderStore(d)) return true;
+    const tag = dealCountryTag(d);
+    if (tag === country.code) return true;
+    if (tag === null) return true;       // untagged intl — keep, broadly relevant
+    return false;                         // tagged but for a different country
+  });
+}

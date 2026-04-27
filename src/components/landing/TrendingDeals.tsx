@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
+import { filterDealsForCountry } from "@/lib/country";
 import type { Deal } from "@/types";
 import MasonryCard, {
   MASONRY_ASPECTS,
@@ -66,15 +67,9 @@ export default async function TrendingDeals() {
      → shuffle → per-store cap → take 16. */
   const provider = await getActiveBrowseProvider();
 
-  /* Fetch local + international pools SEPARATELY so the locality quota
-     can actually be honored. Earlier we sorted by discount across the
-     whole pool — international deals tend to carry larger discount %,
-     so the top 60 ended up mostly USD and the local quota under-filled.
-     Splitting upstream guarantees enough local candidates to draw from. */
-  const [localPool, intlPool] = await Promise.all([
-    provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "local" }),
-    provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "intl" }),
-  ]);
+  const TARGET_TOTAL = 16;
+  const country = getServerCountry();
+  const isNG = country.code === "ng";
 
   const qualityFilter = (d: Deal) =>
     d.title.length >= 10 &&
@@ -82,33 +77,55 @@ export default async function TrendingDeals() {
     !d.title.includes("\\") &&
     !(d.currency === "USD" && d.salePrice < 10);
 
-  const localQuality = localPool.filter(qualityFilter);
-  const intlQuality  = intlPool.filter(qualityFilter);
+  /* Country-aware composition.
 
-  if (localQuality.length + intlQuality.length === 0) return null;
+     NG (default): keep the 70/30 NGN/USD quota tuned for the
+     Nigeria-first experience.
 
-  // Independent seeded shuffles so each pool rotates its own picks
+     Non-NG (UK, US, DE, …): pool comes entirely from the intl side,
+     filtered to the user's country + cross-border globals (Shein,
+     Temu, AliExpress). NG-anchored stores (Konga, Jumia, 3C Hub) are
+     dropped entirely — a UK user can't buy from them. */
   const rng = makeRng(freshnessSeed());
-  const localShuffled = seededShuffle(localQuality.slice(0, 60), rng);
-  const intlShuffled  = seededShuffle(intlQuality.slice(0, 60), rng);
 
-  /* Dedupe + per-store cap + locality quota.
-     Havlo is Nigeria-first, so the homepage should feel like a Nigerian
-     marketplace with international deals as accent — not the other way
-     around. Target ratio: ~70% local (NGN), 30% international (USD).
+  /* For non-NG users, the "local" pool is empty/irrelevant and we
+     compose entirely from a single filtered pool. We fake the local
+     side as empty + treat the country-filtered intl pool as the only
+     source so the rest of the pipeline (stagger, render) works as-is. */
+  let localShuffled: Deal[];
+  let intlShuffled:  Deal[];
+  let LOCAL_QUOTA:   number;
+  let INTL_QUOTA:    number;
 
-     For non-NG users (post Phase 10a country selector), we invert the
-     quota so the homepage leads with deals priced in their region's
-     currency. The data model is still bipartite (NG vs world) until the
-     per-country DB tag lands, so this is a coarse improvement — but
-     it's already much better than showing 11 NGN cards to a UK user. */
-  const TARGET_TOTAL = 16;
-  const country = getServerCountry();
-  const isNG = country.code === "ng";
-  const LOCAL_QUOTA = isNG
-    ? Math.round(TARGET_TOTAL * 0.7)   // 11 NGN
-    : Math.round(TARGET_TOTAL * 0.3);  // 5 NGN — non-NG users see mostly USD intl
-  const INTL_QUOTA  = TARGET_TOTAL - LOCAL_QUOTA;
+  if (!isNG) {
+    const intlPoolRaw = await provider.fetchDeals({
+      sort: "discount", minDiscount: 15, origin: "intl",
+    });
+    const filtered = filterDealsForCountry(intlPoolRaw.filter(qualityFilter), country);
+    if (filtered.length === 0) return null;
+
+    localShuffled = [];
+    intlShuffled  = seededShuffle(filtered.slice(0, 80), rng);
+    LOCAL_QUOTA   = 0;
+    INTL_QUOTA    = TARGET_TOTAL;
+  } else {
+    const [localPool, intlPool] = await Promise.all([
+      provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "local" }),
+      provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "intl" }),
+    ]);
+
+    const localQuality = localPool.filter(qualityFilter);
+    const intlQuality  = intlPool.filter(qualityFilter);
+
+    if (localQuality.length + intlQuality.length === 0) return null;
+
+    localShuffled = seededShuffle(localQuality.slice(0, 60), rng);
+    intlShuffled  = seededShuffle(intlQuality.slice(0, 60), rng);
+
+    /* Target ratio: ~70% local (NGN), 30% international (USD). */
+    LOCAL_QUOTA = Math.round(TARGET_TOTAL * 0.7);  // 11 NGN
+    INTL_QUOTA  = TARGET_TOTAL - LOCAL_QUOTA;       // 5 USD
+  }
 
   const seen = new Set<string>();
   const storeCount: Record<string, number> = {};
