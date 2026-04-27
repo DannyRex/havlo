@@ -3,12 +3,22 @@ import { getServerCountry } from "@/lib/country-server";
 
 interface StoreEntry {
   name:       string;
-  /** Path under /public/logos. Optional — entries without a logo render
-      as a clean text-only chip so we don't ship a broken image. */
+  /** Path under /public/logos. Optional — overrides the domain-based
+      lookup when we want a specific bundled asset. */
   logo?:      string;
+  /** Retailer's primary domain. Used to fetch a real favicon via
+      Google's s2 service when no `logo` is bundled. Free, no API key. */
+  domain?:    string;
   /** White-on-transparent assets get inverted in light mode so they
       read on the white chip background. */
   whiteLogo?: boolean;
+}
+
+/* Build a Google favicon URL for a store's domain. Returns a 64x64 PNG
+   suitable for the marquee chip — visibly larger than a tab favicon
+   so logos read clearly even at small chip sizes. */
+function faviconUrl(domain: string): string {
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
 }
 
 /* Per-country marquee rosters.
@@ -23,114 +33,105 @@ interface StoreEntry {
      - UK / DE / AE / ZA mirror the US pattern with regional tweaks */
 const ROSTERS: Record<string, StoreEntry[]> = {
   ng: [
-    // Local
-    { name: "Jumia",      logo: "/logos/jumia.png" },
-    { name: "Konga",      logo: "/logos/konga.png" },
-    { name: "Slot",       logo: "/logos/slot.png" },
-    { name: "3C Hub",     logo: "/logos/threechub.png", whiteLogo: true },
-    { name: "Jiji",       logo: "/logos/jiji.png" },
-    { name: "Spar",       logo: "/logos/spar.png" },
-    // Cross-border Nigerians actually use
-    { name: "Amazon",     logo: "/logos/amazon.png" },
-    { name: "AliExpress", logo: "/logos/aliexpress.png" },
-    { name: "ASOS",       logo: "/logos/asos.png" },
-    { name: "SHEIN",      logo: "/logos/shein.png" },
-    { name: "Temu",       logo: "/logos/temu.png" },
-    { name: "DHgate",     logo: "/logos/dhgate.png" },
-    { name: "eBay" },
+    { name: "Jumia",      domain: "jumia.com.ng" },
+    { name: "Konga",      domain: "konga.com" },
+    { name: "Slot",       domain: "slot.ng" },
+    { name: "3C Hub",     domain: "3chub.com" },
+    { name: "Jiji",       domain: "jiji.ng" },
+    { name: "Spar",       domain: "sparng.com" },
+    { name: "Amazon",     domain: "amazon.com" },
+    { name: "AliExpress", domain: "aliexpress.com" },
+    { name: "ASOS",       domain: "asos.com" },
+    { name: "SHEIN",      domain: "shein.com" },
+    { name: "Temu",       domain: "temu.com" },
+    { name: "DHgate",     domain: "dhgate.com" },
+    { name: "eBay",       domain: "ebay.com" },
   ],
-  /* uk: roster removed from UI pending affiliate-program approvals.
-     Re-add when COUNTRIES roster + middleware re-enable "uk". */
+  /* uk: roster removed from UI pending affiliate-program approvals. */
   us: [
-    // Local US retailers — americans rarely shop foreign
-    { name: "Amazon",     logo: "/logos/amazon.png" },
-    { name: "Walmart" },
-    { name: "Best Buy" },
-    { name: "Target" },
-    { name: "eBay" },
-    { name: "Newegg" },
-    { name: "Costco" },
-    { name: "Nordstrom" },
-    { name: "Wayfair" },
-    { name: "Etsy" },
-    // Cross-border that's mainstream in the US
-    { name: "SHEIN",      logo: "/logos/shein.png" },
-    { name: "Temu",       logo: "/logos/temu.png" },
-    { name: "AliExpress", logo: "/logos/aliexpress.png" },
+    { name: "Amazon",     domain: "amazon.com" },
+    { name: "Walmart",    domain: "walmart.com" },
+    { name: "Best Buy",   domain: "bestbuy.com" },
+    { name: "Target",     domain: "target.com" },
+    { name: "eBay",       domain: "ebay.com" },
+    { name: "Newegg",     domain: "newegg.com" },
+    { name: "Costco",     domain: "costco.com" },
+    { name: "Nordstrom",  domain: "nordstrom.com" },
+    { name: "Wayfair",    domain: "wayfair.com" },
+    { name: "Etsy",       domain: "etsy.com" },
+    { name: "SHEIN",      domain: "shein.com" },
+    { name: "Temu",       domain: "temu.com" },
+    { name: "AliExpress", domain: "aliexpress.com" },
   ],
   de: [
-    // Local DE retailers
-    { name: "Amazon DE",  logo: "/logos/amazon.png" },
-    { name: "MediaMarkt" },
-    { name: "Saturn" },
-    { name: "Zalando" },
-    { name: "Otto" },
-    { name: "Idealo" },
-    { name: "Lidl" },
-    { name: "Cyberport" },
-    // Cross-border DE shoppers use
-    { name: "AliExpress", logo: "/logos/aliexpress.png" },
-    { name: "SHEIN",      logo: "/logos/shein.png" },
-    { name: "Temu",       logo: "/logos/temu.png" },
+    { name: "Amazon DE",  domain: "amazon.de" },
+    { name: "MediaMarkt", domain: "mediamarkt.de" },
+    { name: "Saturn",     domain: "saturn.de" },
+    { name: "Zalando",    domain: "zalando.de" },
+    { name: "Otto",       domain: "otto.de" },
+    { name: "Idealo",     domain: "idealo.de" },
+    { name: "Lidl",       domain: "lidl.de" },
+    { name: "Cyberport",  domain: "cyberport.de" },
+    { name: "AliExpress", domain: "aliexpress.com" },
+    { name: "SHEIN",      domain: "shein.com" },
+    { name: "Temu",       domain: "temu.com" },
   ],
   ae: [
-    // Local AE retailers
-    { name: "Amazon AE",  logo: "/logos/amazon.png" },
-    { name: "Noon" },
-    { name: "Sharaf DG" },
-    { name: "Carrefour" },
-    { name: "Lulu" },
-    { name: "Centrepoint" },
-    { name: "Namshi" },
-    { name: "Ounass" },
-    // Cross-border — UAE residents import freely from Amazon US/UK
-    { name: "Amazon US",  logo: "/logos/amazon.png" },
-    { name: "AliExpress", logo: "/logos/aliexpress.png" },
-    { name: "SHEIN",      logo: "/logos/shein.png" },
-    { name: "Temu",       logo: "/logos/temu.png" },
+    { name: "Amazon AE",  domain: "amazon.ae" },
+    { name: "Noon",       domain: "noon.com" },
+    { name: "Sharaf DG",  domain: "sharafdg.com" },
+    { name: "Carrefour",  domain: "carrefouruae.com" },
+    { name: "Lulu",       domain: "luluhypermarket.com" },
+    { name: "Centrepoint",domain: "centrepointstores.com" },
+    { name: "Namshi",     domain: "namshi.com" },
+    { name: "Ounass",     domain: "ounass.ae" },
+    { name: "Amazon US",  domain: "amazon.com" },
+    { name: "AliExpress", domain: "aliexpress.com" },
+    { name: "SHEIN",      domain: "shein.com" },
+    { name: "Temu",       domain: "temu.com" },
   ],
   in: [
-    // Local IN retailers — strong domestic ecosystem, less cross-border
-    { name: "Amazon IN",  logo: "/logos/amazon.png" },
-    { name: "Flipkart" },
-    { name: "Myntra" },
-    { name: "Ajio" },
-    { name: "Tata CLiQ" },
-    { name: "Nykaa" },
-    { name: "Croma" },
-    { name: "Reliance Digital" },
-    { name: "Meesho" },
-    { name: "Snapdeal" },
-    // Cross-border — Shein BANNED in India since 2020. AliExpress works
-    // but import duties make most Western purchases impractical.
-    { name: "AliExpress", logo: "/logos/aliexpress.png" },
+    { name: "Amazon IN",         domain: "amazon.in" },
+    { name: "Flipkart",          domain: "flipkart.com" },
+    { name: "Myntra",            domain: "myntra.com" },
+    { name: "Ajio",              domain: "ajio.com" },
+    { name: "Tata CLiQ",         domain: "tatacliq.com" },
+    { name: "Nykaa",             domain: "nykaa.com" },
+    { name: "Croma",             domain: "croma.com" },
+    { name: "Reliance Digital",  domain: "reliancedigital.in" },
+    { name: "Meesho",            domain: "meesho.com" },
+    { name: "Snapdeal",          domain: "snapdeal.com" },
+    { name: "AliExpress",        domain: "aliexpress.com" },
   ],
   za: [
-    // Local ZA retailers
-    { name: "Takealot" },
-    { name: "Makro" },
-    { name: "Game" },
-    { name: "Loot" },
-    { name: "Yuppiechef" },
-    { name: "Superbalist" },
-    // Cross-border — South Africans import via Amazon + China-direct
-    { name: "Amazon",     logo: "/logos/amazon.png" },
-    { name: "AliExpress", logo: "/logos/aliexpress.png" },
-    { name: "SHEIN",      logo: "/logos/shein.png" },
-    { name: "Temu",       logo: "/logos/temu.png" },
+    { name: "Takealot",   domain: "takealot.com" },
+    { name: "Makro",      domain: "makro.co.za" },
+    { name: "Game",       domain: "game.co.za" },
+    { name: "Loot",       domain: "loot.co.za" },
+    { name: "Yuppiechef", domain: "yuppiechef.com" },
+    { name: "Superbalist",domain: "superbalist.com" },
+    { name: "Amazon",     domain: "amazon.co.za" },
+    { name: "AliExpress", domain: "aliexpress.com" },
+    { name: "SHEIN",      domain: "shein.com" },
+    { name: "Temu",       domain: "temu.com" },
   ],
 };
 
 function Chip({ store, ariaHidden }: { store: StoreEntry; ariaHidden: boolean }) {
+  /* Resolve image source: bundled logo wins over domain-derived favicon.
+     Falls back to a letter chip if neither is configured. */
+  const src = store.logo ?? (store.domain ? faviconUrl(store.domain) : null);
+
   return (
     <div className="flex items-center gap-2.5 shrink-0 group cursor-default">
       <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-md overflow-hidden flex items-center justify-center bg-bg border border-border shrink-0">
-        {store.logo ? (
+        {src ? (
           <Image
-            src={store.logo}
+            src={src}
             alt={ariaHidden ? "" : store.name}
             width={32}
             height={32}
+            unoptimized={!store.logo} /* Google s2 already returns small PNGs; skip Next's optimizer */
             className={`w-5 h-5 sm:w-5 sm:h-5 object-contain grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300 ${
               store.whiteLogo ? "invert dark:invert-0" : ""
             }`}
