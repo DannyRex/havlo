@@ -10,7 +10,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
-const SUPPORTED = new Set(["ng", "us", "uk", "ae", "de", "in", "za"]);
+const SUPPORTED = new Set(["ng", "us", "ae", "de", "in", "za"]);
 const COUNTRY_COOKIE = "havlo-country";
 
 /* Pages that exist under /[country]/ and should be redirected to the

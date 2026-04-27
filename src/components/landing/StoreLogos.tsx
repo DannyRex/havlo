@@ -39,24 +39,8 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "DHgate",     logo: "/logos/dhgate.png" },
     { name: "eBay" },
   ],
-  uk: [
-    // Local UK retailers
-    { name: "Amazon UK",  logo: "/logos/amazon.png" },
-    { name: "ASOS",       logo: "/logos/asos.png" },
-    { name: "Argos" },
-    { name: "Currys" },
-    { name: "John Lewis" },
-    { name: "Boots" },
-    { name: "Next" },
-    { name: "M&S" },
-    { name: "Very" },
-    { name: "AO.com" },
-    // Cross-border UK shoppers actually use
-    { name: "AliExpress", logo: "/logos/aliexpress.png" },
-    { name: "SHEIN",      logo: "/logos/shein.png" },
-    { name: "Temu",       logo: "/logos/temu.png" },
-    { name: "DHgate",     logo: "/logos/dhgate.png" },
-  ],
+  /* uk: roster removed from UI pending affiliate-program approvals.
+     Re-add when COUNTRIES roster + middleware re-enable "uk". */
   us: [
     // Local US retailers — americans rarely shop foreign
     { name: "Amazon",     logo: "/logos/amazon.png" },

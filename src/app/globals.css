@@ -51,6 +51,23 @@ body {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
+/* Country flag emoji glyphs are regional-indicator pairs (e.g. 🇳🇬 = U+1F1F3
+   U+1F1EC). Many Linux/Windows browsers + Vercel's screenshot stack don't
+   ship a font with these glyphs, so flags render as boxes or two letters.
+   Force the OS-level emoji font ahead of Inter so the indicators always
+   resolve. Order matters — Apple ships Apple Color Emoji, MSFT ships
+   Segoe UI Emoji, Linux usually has Noto Color Emoji. */
+.flag-emoji {
+  font-family:
+    "Apple Color Emoji",
+    "Segoe UI Emoji",
+    "Noto Color Emoji",
+    "Twemoji Mozilla",
+    "EmojiOne Color",
+    "Android Emoji",
+    sans-serif;
+}
+
 h1, h2, h3, h4, h5, h6 {
   /* Bricolage Grotesque for all headers — sharper, more editorial
      than the body Inter. Loaded via next/font in app/layout.tsx. */

@@ -67,7 +67,11 @@ export default function CountrySelect({ dropUp = false }: Props = {}) {
         aria-label={`Country: ${country.name}. Change.`}
         className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-full text-sm font-medium text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors"
       >
-        <span aria-hidden="true" className="text-base leading-none" suppressHydrationWarning>
+        <span
+          aria-hidden="true"
+          className="text-base leading-none flag-emoji"
+          suppressHydrationWarning
+        >
           {country.flag}
         </span>
         <span
@@ -120,7 +124,7 @@ export default function CountrySelect({ dropUp = false }: Props = {}) {
                         : "text-ink-2 hover:bg-surface-2 hover:text-ink",
                     )}
                   >
-                    <span aria-hidden="true" className="text-lg leading-none">{c.flag}</span>
+                    <span aria-hidden="true" className="text-lg leading-none flag-emoji">{c.flag}</span>
                     <span className="flex-1 truncate">{c.name}</span>
                     <span className="text-[11px] text-ink-3 tabular-nums">{c.currency}</span>
                     {/* Use text-ink so the check adapts to both themes —
