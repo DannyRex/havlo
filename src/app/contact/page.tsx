@@ -53,6 +53,29 @@ export default function ContactPage() {
           </a>
           .
         </p>
+
+        {/* Retailer opt-out — defensive posture for scrape/listing
+            takedown requests. Keeps us in good standing with merchant
+            legal teams and gives us a clear "we comply" stance. */}
+        <section className="mt-12 pt-8 border-t border-border">
+          <h2 className="text-sm font-semibold text-ink mb-2">
+            Retailers · listing changes
+          </h2>
+          <p className="text-xs text-ink-3 leading-relaxed max-w-prose">
+            If you operate a store and want your listings excluded, updated,
+            or attributed differently, email{" "}
+            <a
+              href="mailto:hello@havlo.io?subject=Retailer%20listing%20request"
+              className="text-ink-2 hover:text-ink underline underline-offset-4"
+            >
+              hello@havlo.io
+            </a>{" "}
+            with your store name and the change requested. We honor takedown
+            and exclusion requests within 5 business days. Havlo links to
+            retailers, never resells; final price, stock, and shipping are
+            set by the merchant.
+          </p>
+        </section>
       </section>
     </main>
   );

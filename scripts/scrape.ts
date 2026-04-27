@@ -26,6 +26,7 @@ import { scrapeDHgate }     from "./scrapers/dhgate.js";
 import { scrapeAsos }       from "./scrapers/asos.js";
 import { scrapeAmazon }     from "./scrapers/amazon.js";
 import { scrapePopularSkus } from "./scrapers/popular-skus.js";
+import { isAllowedByRobots } from "./scrapers/robots.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -163,26 +164,42 @@ async function main() {
 
   const allDeals: RawDeal[] = [];
 
+  /* Each scraper declares the canonical URL it will hit. We check
+     robots.txt against that URL before invoking; disallowed scrapers
+     are skipped with a clear log line for the audit trail.
+
+     Set HAVLO_IGNORE_ROBOTS=1 to override (e.g. for one-off debugging
+     of a scraper whose target page changed but root robots.txt is
+     stale). NOT recommended in production crons. */
   const scrapers = [
     // Nigerian stores (en-NG context)
-    { name: "Jumia",      fn: () => scrapeJumia(page) },
-    { name: "3C Hub",     fn: () => scrapeThreeChub(page) },
-    { name: "Slot",       fn: () => scrapeSlot(page) },
-    { name: "Konga",      fn: () => scrapeKonga(page) },
-    { name: "Spar",       fn: () => scrapeSpar(page) },
-    { name: "Jiji",       fn: () => scrapeJiji(page) },
-    // Targeted multi-store SKU sweep — populates the search/compare feature with
-    // products that exist at 2+ Nigerian stores (the category-page scrapes above
-    // miss most popular SKUs).
-    { name: "Popular SKUs", fn: () => scrapePopularSkus(page) },
+    { name: "Jumia",      probe: "https://www.jumia.com.ng/mlp-flash-sales/",     fn: () => scrapeJumia(page) },
+    { name: "3C Hub",     probe: "https://3chub.com/",                            fn: () => scrapeThreeChub(page) },
+    { name: "Slot",       probe: "https://slot.ng/",                              fn: () => scrapeSlot(page) },
+    { name: "Konga",      probe: "https://www.konga.com/category/phones-tablets-5261", fn: () => scrapeKonga(page) },
+    { name: "Spar",       probe: "https://www.sparng.com/",                       fn: () => scrapeSpar(page) },
+    { name: "Jiji",       probe: "https://jiji.ng/",                              fn: () => scrapeJiji(page) },
+    { name: "Popular SKUs", probe: "https://www.konga.com/",                      fn: () => scrapePopularSkus(page) },
     // International stores (en-US stealth context)
-    { name: "AliExpress", fn: () => scrapeAliExpress(intlPage) },
-    { name: "DHgate",     fn: () => scrapeDHgate(intlPage) },
-    { name: "ASOS",       fn: () => scrapeAsos(intlPage) },    // fetch-based, no page needed
-    { name: "Amazon",     fn: () => scrapeAmazon(intlPage) },
+    { name: "AliExpress", probe: "https://www.aliexpress.com/",                   fn: () => scrapeAliExpress(intlPage) },
+    { name: "DHgate",     probe: "https://www.dhgate.com/",                       fn: () => scrapeDHgate(intlPage) },
+    { name: "ASOS",       probe: "https://www.asos.com/",                         fn: () => scrapeAsos(intlPage) },
+    { name: "Amazon",     probe: "https://www.amazon.com/",                       fn: () => scrapeAmazon(intlPage) },
   ];
 
-  for (const { name, fn } of scrapers) {
+  const ignoreRobots = process.env.HAVLO_IGNORE_ROBOTS === "1";
+
+  for (const { name, probe, fn } of scrapers) {
+    if (!ignoreRobots) {
+      const verdict = await isAllowedByRobots(probe);
+      if (!verdict.allowed) {
+        console.warn(`⊘ ${name} skipped: robots.txt blocks ${probe} (${verdict.reason})`);
+        continue;
+      }
+      if (verdict.crawlDelayMs && verdict.crawlDelayMs > 1000) {
+        console.log(`◷ ${name} requests crawl-delay ${verdict.crawlDelayMs}ms — honoring`);
+      }
+    }
     try {
       const deals = await fn();
       allDeals.push(...deals);
