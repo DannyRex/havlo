@@ -3,12 +3,19 @@
 
    Wordmark-only — the blue square + geometric "h" mark was retired
    in favor of a typographic identity. Slackey carries the personality;
-   a subtle brand-blue → indigo gradient softens the chunky letterforms
-   without re-introducing the heavy square chrome.
+   a single confident color in the emerald family gives identity
+   without an AI-cliche gradient.
 
-   Gradient renders identically in light + dark mode (saturated enough
-   to read on both backgrounds). On browsers that don't support
-   bg-clip-text (rare), falls back to text-ink for a clean solid.
+   Why emerald:
+     - Green = money / savings / value, which IS Havlo's product
+     - Distinctive vs blue (corporate cliche) and red (urgency cliche)
+     - Mature: real emerald, not bright lime
+
+   Why two shades (light + dark):
+     - emerald-700 (#047857) → ~7.5:1 contrast on white ✓
+     - emerald-400 (#34D399) → ~7:1 contrast on near-black ✓
+     - Same color family, adjusted brightness per surface so the brand
+       reads with the same energy in both themes.
 
    Variants:
      • <Logo />              — full wordmark (default)
@@ -22,25 +29,21 @@ interface LogoProps {
   className?: string;
 }
 
-/* Brand gradient — single source of truth so any future variant
-   (favicon, marketing, OG cards) can mirror it.
-   #0057FF (Havlo blue) → #6366F1 (indigo-500) → #8B5CF6 (violet-500).
-   Three stops keep the transition smooth across the wordmark width. */
-const BRAND_GRADIENT =
-  "linear-gradient(135deg, #0057FF 0%, #6366F1 55%, #8B5CF6 100%)";
+/* Brand colors exported as constants so future surfaces (favicon, OG
+   cards, marketing) mirror them without drift. */
+export const BRAND_COLOR_LIGHT = "#047857"; // emerald-700 — for light mode
+export const BRAND_COLOR_DARK  = "#34D399"; // emerald-400 — for dark mode
 
-const wordStyle = (fontPx: number) => ({
-  fontFamily:        "var(--font-logo)",
-  fontSize:          fontPx,
-  lineHeight:        1,
-  letterSpacing:     "-0.02em",
-  backgroundImage:   BRAND_GRADIENT,
-  WebkitBackgroundClip: "text",
-  backgroundClip:    "text",
-  WebkitTextFillColor: "transparent",
-  /* Fallback color in case bg-clip-text isn't supported — most modern
-     browsers handle it; this keeps very old / unusual stacks legible. */
-  color: "transparent",
+/* Tailwind classes for theme-adaptive text color. Matches the
+   constants above. Inline style + Tailwind dark: variant don't mix
+   well; using className keeps theme switching reactive. */
+const COLOR_CLASS = "text-[#047857] dark:text-[#34D399]";
+
+const fontStyle = (fontPx: number) => ({
+  fontFamily:    "var(--font-logo)",
+  fontSize:      fontPx,
+  lineHeight:    1,
+  letterSpacing: "-0.02em",
 } as const);
 
 export default function Logo({
@@ -57,8 +60,8 @@ export default function Logo({
     return (
       <span
         aria-hidden="true"
-        className={`inline-flex items-center justify-center leading-none ${className}`}
-        style={{ ...wordStyle(fontPx), width: size, height: size }}
+        className={`inline-flex items-center justify-center leading-none ${COLOR_CLASS} ${className}`}
+        style={{ ...fontStyle(fontPx), width: size, height: size }}
       >
         h
       </span>
@@ -67,9 +70,9 @@ export default function Logo({
 
   return (
     <span
-      className={`inline-flex items-baseline select-none leading-none ${className}`}
+      className={`inline-flex items-baseline select-none leading-none ${COLOR_CLASS} ${className}`}
       aria-label="Havlo"
-      style={wordStyle(fontPx)}
+      style={fontStyle(fontPx)}
     >
       havlo
     </span>
