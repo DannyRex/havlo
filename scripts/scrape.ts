@@ -180,7 +180,13 @@ async function main() {
      stale). NOT recommended in production crons. */
   const scrapers = [
     // Nigerian stores (en-NG context)
-    { name: "Jumia",      probe: "https://www.jumia.com.ng/mlp-flash-sales/",     fn: () => scrapeJumia(page) },
+    /* Jumia disabled — their Cloudflare bot challenge defeats both
+       plain fetch (403) and Playwright-stealth (challenge page in HTML).
+       Real fix: use Jumia's official Affiliate Programme feed (apply
+       at jumia.com.ng/affiliate-program — fast approval). Keeping the
+       scraper code in scrapers/jumia.ts for if/when we either get a
+       residential-proxy provider OR need it as fallback. */
+    // { name: "Jumia",      probe: "https://www.jumia.com.ng/mlp-flash-sales/",     fn: () => scrapeJumia(page) },
     { name: "3C Hub",     probe: "https://3chub.com/",                            fn: () => scrapeThreeChub(page) },
     { name: "Slot",       probe: "https://slot.ng/",                              fn: () => scrapeSlot(page) },
     { name: "Konga",      probe: "https://www.konga.com/category/phones-tablets-5261", fn: () => scrapeKonga(page) },

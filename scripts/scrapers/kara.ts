@@ -34,16 +34,22 @@ export async function scrapeKara(page: Page): Promise<RawDeal[]> {
 
   for (const { url, cat } of KARA_COLLECTIONS) {
     try {
-      /* networkidle + selector wait — Kara is a Next.js SPA, products
-         render after a client-side API call. domcontentloaded fires too
-         early. */
-      await page.goto(url, { waitUntil: "networkidle", timeout: 35000 });
+      /* Use `load` not `networkidle`. Kara polls APIs forever (analytics,
+         live inventory) so networkidle never resolves and the 35s timeout
+         fires for every category. `load` waits for window.onload then we
+         poll for product links explicitly. */
       try {
-        await page.waitForSelector("a[href*='/product']", { timeout: 8000 });
+        await page.goto(url, { waitUntil: "load", timeout: 20000 });
       } catch {
-        // No products selector — page might be category landing or empty
+        console.warn(`    Kara ${url}: load timeout — skipping`);
+        continue;
       }
-      await page.waitForTimeout(1500);
+      try {
+        await page.waitForSelector("a[href*='/product']", { timeout: 6000 });
+      } catch {
+        // Page rendered but no product links — empty category or layout shift
+      }
+      await page.waitForTimeout(1000);
 
       /* SPA pages don't follow Magento link conventions — anchor on
          any product-link pattern + walk up to find a container with ₦. */

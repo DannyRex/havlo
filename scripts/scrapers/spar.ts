@@ -30,23 +30,57 @@ export async function scrapeSpar(page: Page): Promise<RawDeal[]> {
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 25000 });
       await page.waitForTimeout(2000);
 
+      /* Generic walk-up-DOM pattern (same as 3C Hub). Anchor on any
+         /product/ link, walk up to find a container with ₦, extract
+         title + min/max prices. Robust against unknown WooCommerce
+         theme variations. */
       const items = await page.$$eval(
-        ".product, li.product, .product-small",
-        (cards) =>
-          cards.slice(0, 30).map((card) => {
-            const titleEl  = card.querySelector("h2, h3, .name, .product-title");
-            const origEl   = card.querySelector("del .amount, del bdi, del");
-            const saleEl   = card.querySelector("ins .amount, ins bdi, ins, .price .amount");
-            const linkEl   = card.querySelector("a");
+        "a[href*='/product/'], a[href*='/shop/'], .product a",
+        (links) => {
+          const seen = new Set<string>();
+          const results: Array<{ title: string; saleText: string; origText: string; href: string }> = [];
 
-            return {
-              title:    titleEl?.textContent?.trim() ?? "",
-              origText: origEl?.textContent?.trim() ?? "",
-              saleText: saleEl?.textContent?.trim() ?? "",
-              href:     linkEl?.getAttribute("href") ?? "",
-            };
-          })
+          for (const link of links) {
+            const href = link.getAttribute("href") ?? "";
+            if (!href || seen.has(href)) continue;
+            seen.add(href);
+
+            let container: Element | null = link.parentElement;
+            for (let i = 0; i < 8; i++) {
+              if (!container) break;
+              const text = container.textContent ?? "";
+              if (text.includes("₦")) {
+                const fullText = text.replace(/\s+/g, " ").trim();
+                const prices = [...fullText.matchAll(/₦([\d,]+)/g)]
+                  .map((m) => parseInt(m[1].replace(/,/g, ""), 10))
+                  .filter((n) => n > 0);
+
+                const salePrice     = prices.length > 0 ? Math.min(...prices) : 0;
+                const originalPrice = prices.length > 1 ? Math.max(...prices) : salePrice;
+
+                const heading = container.querySelector("h2, h3, h4, .name, .product-title, [class*='title']");
+                const title = (heading?.textContent ?? link.textContent ?? "")
+                  .replace(/\s+/g, " ").trim().slice(0, 100);
+
+                if (title && salePrice > 0) {
+                  results.push({
+                    title,
+                    saleText: String(salePrice),
+                    origText: originalPrice > salePrice ? String(originalPrice) : "",
+                    href,
+                  });
+                }
+                break;
+              }
+              container = container.parentElement;
+            }
+          }
+          return results;
+        },
       );
+
+      const slug = url.split("sparnigeria.com/")[1]?.split("?")[0] ?? "page";
+      console.log(`    Spar ${slug}: ${items.length} items`);
 
       for (const item of items) {
         if (!item.title || !item.href) continue;
