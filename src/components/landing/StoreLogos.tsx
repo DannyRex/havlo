@@ -45,7 +45,7 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "3C Hub",     domain: "3chub.com" },
     { name: "Obiwezy",    domain: "obiwezy.com" },
     { name: "PayPorte",   domain: "payporte.com" },
-    { name: "Spar",       domain: "sparng.com" },
+    { name: "Spar",       domain: "sparnigeria.com" },
     // Cross-border, in NG-shopper preference order
     { name: "Temu",       domain: "temu.com" },
     { name: "AliExpress", domain: "aliexpress.com" },

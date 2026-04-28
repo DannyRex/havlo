@@ -33,12 +33,17 @@ export async function scrapeObiwezy(page: Page): Promise<RawDeal[]> {
 
   for (const { url, cat } of OBIWEZY_COLLECTIONS) {
     try {
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-      await page.waitForTimeout(2500);
+      /* Wait for client-side render — Obiwezy is an SPA-style site. */
+      await page.goto(url, { waitUntil: "networkidle", timeout: 35000 });
+      try {
+        await page.waitForSelector("a[href*='/product'], a[href*='/p/']", { timeout: 8000 });
+      } catch {
+        // empty / not loaded
+      }
+      await page.waitForTimeout(1500);
 
-      /* Anchor on /product/ links, walk up to find ₦. */
       const items = await page.$$eval(
-        "a[href*='/product/'], a[href*='/p/']",
+        "a[href*='/product'], a[href*='/p/'], a[href*='/shop/']",
         (links) => {
           const seen = new Set<string>();
           const results: Array<{

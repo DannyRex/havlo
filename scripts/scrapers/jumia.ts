@@ -83,19 +83,14 @@ function extractDealsFromHtml(html: string, pageNum: number): RawDeal[] {
   return deals;
 }
 
-export async function scrapeJumia(_page: Page): Promise<RawDeal[]> {
+export async function scrapeJumia(page: Page): Promise<RawDeal[]> {
   const deals: RawDeal[] = [];
   const seenUrls = new Set<string>();
 
-  console.log("  → Jumia (fetch)...");
-
-  const headers = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-NG,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Cache-Control": "no-cache",
-  };
+  /* Switched from plain fetch() to Playwright. Jumia's Cloudflare layer
+     started 403'ing every fetch UA in early 2026 — Playwright with
+     stealth (configured at the orchestrator level) gets through. */
+  console.log("  → Jumia (Playwright)...");
 
   /* Flash sales + broad category sweep. Goal: capture every category
      where Jumia surfaces deals. Page counts tuned per category — high
@@ -138,16 +133,14 @@ export async function scrapeJumia(_page: Page): Promise<RawDeal[]> {
 
   for (const { url, label } of pages) {
     try {
-      const res = await fetch(url, { headers });
+      /* Playwright + the stealth plugin (configured at the orchestrator
+         level) gets past Cloudflare's UA fingerprint check that was
+         403'ing every plain fetch UA in the previous version. */
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+      await page.waitForTimeout(1500);
 
-      if (!res.ok) {
-        console.warn(`    Jumia ${label}: HTTP ${res.status}`);
-        continue;
-      }
+      const html = await page.content();
 
-      const html = await res.text();
-
-      // Detect Cloudflare challenge
       if (html.includes("Just a moment") || html.includes("cf-browser-verification")) {
         console.warn(`    Jumia ${label}: Cloudflare challenge — skipping`);
         continue;
@@ -165,8 +158,8 @@ export async function scrapeJumia(_page: Page): Promise<RawDeal[]> {
 
       console.log(`    Jumia ${label}: ${newCount} deals`);
 
-      // Polite delay
-      await new Promise((r) => setTimeout(r, 800));
+      // Polite delay between page loads
+      await page.waitForTimeout(800);
     } catch (err) {
       console.warn(`    Jumia ${label} error: ${err}`);
     }

@@ -1,30 +1,29 @@
 import { Page } from "playwright";
 import { RawDeal, resolveCategory, parseNaira } from "./types.js";
 
-/* Kara (kara.com.ng) — strong NG electronics + mobile retailer.
-   Site uses Magento; product cards live under .product-item, prices
-   in .price-final_price / .price-old. Generic walk-up-DOM-find-price
-   fallback handles layout drift. */
+/* Kara (kara.com.ng) — Next.js / React SPA. Products load
+   client-side via API calls after hydration, so we have to wait for
+   React to populate the DOM (waitUntil networkidle + waitForSelector
+   for any product link).
+
+   URL structure verified 2026-04: paths are FLAT (e.g. /mobile-phones,
+   /laptops) — no /electronics/<sub> nesting. The www subdomain 301-
+   redirects to the apex; we use apex directly. */
 const KARA_COLLECTIONS = [
-  // Electronics + tech
-  { url: "https://www.kara.com.ng/electronics",            cat: "electronics" },
-  { url: "https://www.kara.com.ng/electronics/mobile-phones-1", cat: "phones" },
-  { url: "https://www.kara.com.ng/electronics/computers-laptops", cat: "computing" },
-  { url: "https://www.kara.com.ng/electronics/televisions", cat: "televisions" },
-  { url: "https://www.kara.com.ng/electronics/home-audio",  cat: "audio" },
-  { url: "https://www.kara.com.ng/electronics/cameras-photo", cat: "electronics" },
-  { url: "https://www.kara.com.ng/electronics/gaming",      cat: "gaming" },
-  { url: "https://www.kara.com.ng/electronics/wearable-technology", cat: "electronics" },
-  // Appliances
-  { url: "https://www.kara.com.ng/home-appliances",         cat: "appliances" },
-  { url: "https://www.kara.com.ng/home-appliances/refrigerators", cat: "appliances" },
-  { url: "https://www.kara.com.ng/home-appliances/washing-machines", cat: "appliances" },
-  // Home + lifestyle
-  { url: "https://www.kara.com.ng/home-kitchen",            cat: "home" },
-  { url: "https://www.kara.com.ng/health-beauty",           cat: "beauty" },
-  { url: "https://www.kara.com.ng/fashion",                 cat: "fashion" },
-  // Deals/sale page (catches everything on promo)
-  { url: "https://www.kara.com.ng/sale",                    cat: "electronics" },
+  { url: "https://kara.com.ng/mobile-phones",     cat: "phones" },
+  { url: "https://kara.com.ng/laptops",           cat: "computing" },
+  { url: "https://kara.com.ng/tablets",           cat: "phones" },
+  { url: "https://kara.com.ng/televisions",       cat: "televisions" },
+  { url: "https://kara.com.ng/home-audio",        cat: "audio" },
+  { url: "https://kara.com.ng/cameras",           cat: "electronics" },
+  { url: "https://kara.com.ng/gaming",            cat: "gaming" },
+  { url: "https://kara.com.ng/smartwatch",        cat: "electronics" },
+  { url: "https://kara.com.ng/refrigerator",      cat: "appliances" },
+  { url: "https://kara.com.ng/washing-machine",   cat: "appliances" },
+  { url: "https://kara.com.ng/air-conditioner",   cat: "appliances" },
+  { url: "https://kara.com.ng/kitchen-appliances",cat: "appliances" },
+  { url: "https://kara.com.ng/health-and-beauty", cat: "beauty" },
+  { url: "https://kara.com.ng/sale",              cat: "electronics" },
 ];
 
 export async function scrapeKara(page: Page): Promise<RawDeal[]> {
@@ -35,14 +34,21 @@ export async function scrapeKara(page: Page): Promise<RawDeal[]> {
 
   for (const { url, cat } of KARA_COLLECTIONS) {
     try {
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-      await page.waitForTimeout(2000);
+      /* networkidle + selector wait — Kara is a Next.js SPA, products
+         render after a client-side API call. domcontentloaded fires too
+         early. */
+      await page.goto(url, { waitUntil: "networkidle", timeout: 35000 });
+      try {
+        await page.waitForSelector("a[href*='/product']", { timeout: 8000 });
+      } catch {
+        // No products selector — page might be category landing or empty
+      }
+      await page.waitForTimeout(1500);
 
-      /* Magento: anchor on a.product-item-link first, fall back to
-         walking up from any product link. Same generic pattern as
-         3C Hub — finds container with ₦, extracts title + prices. */
+      /* SPA pages don't follow Magento link conventions — anchor on
+         any product-link pattern + walk up to find a container with ₦. */
       const items = await page.$$eval(
-        "a.product-item-link, .product-item a[href*='.html'], a[href*='/product/']",
+        "a[href*='/product'], a[href^='/'][class*='card'], a[href^='/'][class*='Card']",
         (links) => {
           const seen = new Set<string>();
           const results: Array<{
@@ -100,7 +106,7 @@ export async function scrapeKara(page: Page): Promise<RawDeal[]> {
       for (const item of items) {
         const fullUrl = item.href.startsWith("http")
           ? item.href
-          : `https://www.kara.com.ng${item.href.startsWith("/") ? "" : "/"}${item.href}`;
+          : `https://kara.com.ng${item.href.startsWith("/") ? "" : "/"}${item.href}`;
         if (seenUrls.has(fullUrl)) continue;
         seenUrls.add(fullUrl);
 

@@ -28,7 +28,8 @@ import { scrapeAmazon }     from "./scrapers/amazon.js";
 import { scrapePopularSkus } from "./scrapers/popular-skus.js";
 import { scrapeKara }       from "./scrapers/kara.js";
 import { scrapeObiwezy }    from "./scrapers/obiwezy.js";
-import { scrapePayPorte }   from "./scrapers/payporte.js";
+/* scrapePayPorte intentionally not imported — their robots.txt
+   site-wide disallow rules us out. */
 import { isAllowedByRobots } from "./scrapers/robots.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -183,9 +184,12 @@ async function main() {
     { name: "3C Hub",     probe: "https://3chub.com/",                            fn: () => scrapeThreeChub(page) },
     { name: "Slot",       probe: "https://slot.ng/",                              fn: () => scrapeSlot(page) },
     { name: "Konga",      probe: "https://www.konga.com/category/phones-tablets-5261", fn: () => scrapeKonga(page) },
-    { name: "Kara",       probe: "https://www.kara.com.ng/electronics",           fn: () => scrapeKara(page) },
+    { name: "Kara",       probe: "https://kara.com.ng/mobile-phones",             fn: () => scrapeKara(page) },
     { name: "Obiwezy",    probe: "https://obiwezy.com/category/phones",           fn: () => scrapeObiwezy(page) },
-    { name: "PayPorte",   probe: "https://www.payporte.com/women",                fn: () => scrapePayPorte(page) },
+    /* PayPorte excluded — their robots.txt has a site-wide Disallow.
+       We honor it (per the disclaimer commitment + scrapers/robots.ts
+       check). To re-enable: get explicit permission from PayPorte +
+       relax their robots.txt for our user-agent (HavloBot). */
     { name: "Spar",       probe: "https://www.sparng.com/",                       fn: () => scrapeSpar(page) },
     { name: "Jiji",       probe: "https://jiji.ng/",                              fn: () => scrapeJiji(page) },
     { name: "Popular SKUs", probe: "https://www.konga.com/",                      fn: () => scrapePopularSkus(page) },
