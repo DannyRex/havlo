@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { wrapWithAffiliate } from "@/lib/affiliate";
+import { convertAliexpressUrl, aliexpressApiActive } from "@/lib/aliexpress-converter";
 import { getServerCountry } from "@/lib/country-server";
 
 interface ResolvedRow {
@@ -124,6 +125,15 @@ export async function GET(req: NextRequest) {
   const country = getServerCountry();
   const ctx = { country: country.code };
 
+  /* AliExpress: prefer the official API converter (proper attribution,
+     full commission rates) over the ?aff_short_key= fallback. Falls
+     back gracefully if the API call fails or credentials aren't set. */
+  function isAliexpress(u: string): boolean {
+    try {
+      return /(^|\.)aliexpress\.(com|us)$/i.test(new URL(u).host);
+    } catch { return false; }
+  }
+
   /* Final redirect helper — wraps the resolved URL with the right
      affiliate tag (when any) right before sending the user out. The
      wrap is the LAST step so it applies regardless of whether we
@@ -131,9 +141,17 @@ export async function GET(req: NextRequest) {
   const sendOut = (url: string) =>
     NextResponse.redirect(wrapWithAffiliate(url, ctx), 307);
 
-  /* Direct merchant URLs pass through with a single redirect — no
-     resolution overhead, but we still wrap with the affiliate tag. */
-  if (!isGoogleRelay(target)) return sendOut(target);
+  /* Direct merchant URLs pass through with a single redirect — but
+     AliExpress URLs go through the API converter first when active,
+     producing a proper s.click.aliexpress.com tracking link. */
+  if (!isGoogleRelay(target)) {
+    if (isAliexpress(target) && aliexpressApiActive()) {
+      const tracked = await convertAliexpressUrl(target);
+      if (tracked) return NextResponse.redirect(tracked, 307);
+      // API call failed → fall through to wrapWithAffiliate fallback
+    }
+    return sendOut(target);
+  }
 
   /* Google relay — try cache first, then SerpAPI. */
   const cached = await readCache(target);

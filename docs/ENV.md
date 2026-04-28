@@ -54,7 +54,9 @@ Tag format: `havlo-21` (varies per marketplace per Amazon's rules).
 | Var | Network | Notes |
 |---|---|---|
 | `JUMIA_AFFILIATE_KEY` | Jumia Affiliate Programme | Apply at jumia.com.ng/affiliate-program |
-| `ALIEXPRESS_AFFILIATE_KEY` | AliExpress Affiliate Portal | URL converter API can replace this when wired |
+| `ALIEXPRESS_AFFILIATE_KEY` | AliExpress Affiliate Portal | Tracking ID name (e.g. `havlo`). Used by the fallback `?aff_short_key=` URL pattern. |
+| `ALIEXPRESS_APP_KEY` | AliExpress Open Platform Developer | App Key from open.aliexpress.com console. Enables proper API attribution via `aliexpress.affiliate.link.generate`. |
+| `ALIEXPRESS_APP_SECRET` | AliExpress Open Platform Developer | App Secret. **NEVER commit. Rotate immediately if leaked.** |
 | `EBAY_PARTNER_CAMPAIGN_ID` | eBay Partner Network | Found in your EPN dashboard |
 
 ## Optional — UX integrations
