@@ -7,10 +7,20 @@ export async function scrapeSpar(page: Page): Promise<RawDeal[]> {
 
   console.log("  → Spar Nigeria...");
 
+  /* Broader Spar coverage. Spar NG is a hypermarket — sells well
+     beyond groceries. Covers all WooCommerce category slugs we've
+     verified surface deals. */
   const pages = [
-    { url: "https://www.spar.com.ng/specials/",      cat: "supermarket" },
+    { url: "https://www.spar.com.ng/specials/",                       cat: "supermarket" },
     { url: "https://www.spar.com.ng/product-category/food-cupboard/", cat: "supermarket" },
     { url: "https://www.spar.com.ng/product-category/beverages/",     cat: "supermarket" },
+    { url: "https://www.spar.com.ng/product-category/dairy/",         cat: "supermarket" },
+    { url: "https://www.spar.com.ng/product-category/fresh-frozen/",  cat: "supermarket" },
+    { url: "https://www.spar.com.ng/product-category/household/",     cat: "home" },
+    { url: "https://www.spar.com.ng/product-category/health-beauty/", cat: "beauty" },
+    { url: "https://www.spar.com.ng/product-category/baby-care/",     cat: "home" },
+    { url: "https://www.spar.com.ng/product-category/electronics/",   cat: "electronics" },
+    { url: "https://www.spar.com.ng/product-category/home-living/",   cat: "home" },
   ];
 
   for (const { url, cat } of pages) {

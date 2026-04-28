@@ -17,19 +17,32 @@ function inferCategoryFromTitle(title: string): string {
 
 // Konga confirmed selector: article (40 items)
 // Text format: "- X%TITLE₦SALE₦ORIGINALSame Day..."
+/* Broad sweep — every Konga department where deals appear. Konga's
+   internal slugs are a `<name>-<numeric_id>` format, fragile if they
+   re-id; tested as of 2026-04 build. Page counts tuned per dept. */
 const KONGA_BASE = [
-  { slug: "phones-tablets-5261",        cat: "phones",      pages: 3 },
-  { slug: "televisions-2713",           cat: "televisions", pages: 2 },
-  { slug: "home-appliances-4181",       cat: "appliances",  pages: 2 },
-  { slug: "computing-5263",             cat: "computing",   pages: 2 },
-  { slug: "home-kitchen-4186",          cat: "home",        pages: 2 },
-  { slug: "fashion-4191",               cat: "fashion",     pages: 2 },
-  { slug: "audio-headphones-2709",      cat: "audio",       pages: 1 },
-  { slug: "gaming-5411",                cat: "gaming",      pages: 1 },
-  { slug: "cameras-2699",               cat: "electronics", pages: 1 },
-  { slug: "generators-inverters-4183",  cat: "electronics", pages: 1 },
-  { slug: "health-beauty-personal-care-4180", cat: "beauty", pages: 2 },
-  { slug: "baby-products-4187",         cat: "home",        pages: 1 },
+  { slug: "phones-tablets-5261",              cat: "phones",      pages: 4 },
+  { slug: "televisions-2713",                 cat: "televisions", pages: 2 },
+  { slug: "home-appliances-4181",             cat: "appliances",  pages: 3 },
+  { slug: "computing-5263",                   cat: "computing",   pages: 3 },
+  { slug: "home-kitchen-4186",                cat: "home",        pages: 3 },
+  { slug: "fashion-4191",                     cat: "fashion",     pages: 4 },
+  { slug: "audio-headphones-2709",            cat: "audio",       pages: 2 },
+  { slug: "gaming-5411",                      cat: "gaming",      pages: 2 },
+  { slug: "cameras-2699",                     cat: "electronics", pages: 1 },
+  { slug: "generators-inverters-4183",        cat: "electronics", pages: 1 },
+  { slug: "health-beauty-personal-care-4180", cat: "beauty",      pages: 3 },
+  { slug: "baby-products-4187",               cat: "home",        pages: 2 },
+  /* Newly added — broader coverage of Konga deal-bearing departments */
+  { slug: "automotive-4189",                  cat: "automotive",  pages: 2 },
+  { slug: "books-music-movies-4190",          cat: "books",       pages: 1 },
+  { slug: "groceries-4192",                   cat: "groceries",   pages: 1 },
+  { slug: "office-products-4193",             cat: "home",        pages: 1 },
+  { slug: "garden-outdoors-4194",             cat: "garden",      pages: 1 },
+  { slug: "pet-supplies-4195",                cat: "pets",        pages: 1 },
+  { slug: "musical-instruments-4196",         cat: "music",       pages: 1 },
+  { slug: "industrial-scientific-4197",       cat: "industrial",  pages: 1 },
+  { slug: "sports-outdoors-4198",             cat: "sports",      pages: 2 },
 ];
 
 const KONGA_PAGES = KONGA_BASE.flatMap(({ slug, cat, pages }) =>

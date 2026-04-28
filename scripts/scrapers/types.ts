@@ -32,6 +32,20 @@ export const CATEGORY_MAP: Record<string, { category: string; slug: string; emoj
   "sports":        { category: "Sports",            slug: "sports",      emoji: "⚽", gradient: "linear-gradient(135deg, #1a1a1a 0%, #434343 100%)" },
   "gaming":        { category: "Gaming",            slug: "gaming",      emoji: "🎮", gradient: "linear-gradient(135deg, #000428 0%, #004e92 100%)" },
   "supermarket":   { category: "Supermarket",       slug: "home",        emoji: "🛒", gradient: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)" },
+  /* Newly added — broader category coverage from the expanded scrapes.
+     Map to existing slugs where they're conceptually adjacent (shoes →
+     fashion, watches → fashion, bags → fashion) so the /deals filter
+     bar doesn't sprout 10 extra category chips overnight. */
+  "automotive":    { category: "Automotive",        slug: "automotive",  emoji: "🚗", gradient: "linear-gradient(135deg, #232526 0%, #414345 100%)" },
+  "books":         { category: "Books",             slug: "books",       emoji: "📚", gradient: "linear-gradient(135deg, #d3cce3 0%, #e9e4f0 100%)" },
+  "music":         { category: "Music",             slug: "music",       emoji: "🎵", gradient: "linear-gradient(135deg, #614385 0%, #516395 100%)" },
+  "garden":        { category: "Garden & Outdoor",  slug: "garden",      emoji: "🌿", gradient: "linear-gradient(135deg, #134e5e 0%, #71b280 100%)" },
+  "industrial":    { category: "Industrial",        slug: "industrial",  emoji: "🔧", gradient: "linear-gradient(135deg, #485563 0%, #29323c 100%)" },
+  "pets":          { category: "Pet Supplies",      slug: "pets",        emoji: "🐾", gradient: "linear-gradient(135deg, #ff9966 0%, #ff5e62 100%)" },
+  "watches":       { category: "Fashion",           slug: "fashion",     emoji: "⌚", gradient: "linear-gradient(135deg, #f953c6 0%, #b91d73 100%)" },
+  "shoes":         { category: "Fashion",           slug: "fashion",     emoji: "👟", gradient: "linear-gradient(135deg, #f953c6 0%, #b91d73 100%)" },
+  "bags":          { category: "Fashion",           slug: "fashion",     emoji: "👜", gradient: "linear-gradient(135deg, #f953c6 0%, #b91d73 100%)" },
+  "groceries":     { category: "Supermarket",       slug: "home",        emoji: "🛒", gradient: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)" },
   "default":       { category: "Electronics",       slug: "electronics", emoji: "🛍️", gradient: "linear-gradient(135deg, #141e30 0%, #243b55 100%)" },
 };
 

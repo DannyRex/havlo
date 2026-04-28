@@ -1,13 +1,23 @@
 import { Page } from "playwright";
 import { RawDeal, resolveCategory, parseNaira } from "./types.js";
 
+/* Broader Jiji coverage. Skipped: jobs, real-estate, vehicles,
+   services, animals — those are classified-style listings without
+   structured deals data. Everything else where Jiji surfaces priced
+   product listings is included. */
 const JIJI_PAGES = [
-  { url: "https://jiji.ng/nigeria/phones-and-tablets",  cat: "phones" },
-  { url: "https://jiji.ng/nigeria/electronics",          cat: "electronics" },
-  { url: "https://jiji.ng/nigeria/computers",            cat: "computing" },
-  { url: "https://jiji.ng/nigeria/fashion",              cat: "fashion" },
-  { url: "https://jiji.ng/nigeria/tv-audio-video",       cat: "electronics" },
-  { url: "https://jiji.ng/nigeria/games-consoles",       cat: "gaming" },
+  { url: "https://jiji.ng/nigeria/phones-and-tablets",     cat: "phones" },
+  { url: "https://jiji.ng/nigeria/electronics",            cat: "electronics" },
+  { url: "https://jiji.ng/nigeria/computers",              cat: "computing" },
+  { url: "https://jiji.ng/nigeria/fashion",                cat: "fashion" },
+  { url: "https://jiji.ng/nigeria/tv-audio-video",         cat: "electronics" },
+  { url: "https://jiji.ng/nigeria/games-consoles",         cat: "gaming" },
+  { url: "https://jiji.ng/nigeria/home-furniture-appliances", cat: "appliances" },
+  { url: "https://jiji.ng/nigeria/health-and-beauty",      cat: "beauty" },
+  { url: "https://jiji.ng/nigeria/babies-and-kids",        cat: "home" },
+  { url: "https://jiji.ng/nigeria/sports-arts-and-outdoors", cat: "sports" },
+  { url: "https://jiji.ng/nigeria/repair-and-construction",cat: "industrial" },
+  { url: "https://jiji.ng/nigeria/agriculture-and-food",   cat: "groceries" },
 ];
 
 export async function scrapeJiji(page: Page): Promise<RawDeal[]> {

@@ -26,6 +26,9 @@ import { scrapeDHgate }     from "./scrapers/dhgate.js";
 import { scrapeAsos }       from "./scrapers/asos.js";
 import { scrapeAmazon }     from "./scrapers/amazon.js";
 import { scrapePopularSkus } from "./scrapers/popular-skus.js";
+import { scrapeKara }       from "./scrapers/kara.js";
+import { scrapeObiwezy }    from "./scrapers/obiwezy.js";
+import { scrapePayPorte }   from "./scrapers/payporte.js";
 import { isAllowedByRobots } from "./scrapers/robots.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -38,6 +41,9 @@ const STORE_STYLES: Record<string, string> = {
   threechub: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
   spar:      "linear-gradient(135deg, #22c55e 0%, #15803d 100%)",
   jiji:      "linear-gradient(135deg, #10b981 0%, #047857 100%)",
+  kara:      "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+  obiwezy:   "linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)",
+  payporte:  "linear-gradient(135deg, #ec4899 0%, #be185d 100%)",
 };
 
 function generateDealId(index: number): string {
@@ -177,6 +183,9 @@ async function main() {
     { name: "3C Hub",     probe: "https://3chub.com/",                            fn: () => scrapeThreeChub(page) },
     { name: "Slot",       probe: "https://slot.ng/",                              fn: () => scrapeSlot(page) },
     { name: "Konga",      probe: "https://www.konga.com/category/phones-tablets-5261", fn: () => scrapeKonga(page) },
+    { name: "Kara",       probe: "https://www.kara.com.ng/electronics",           fn: () => scrapeKara(page) },
+    { name: "Obiwezy",    probe: "https://obiwezy.com/category/phones",           fn: () => scrapeObiwezy(page) },
+    { name: "PayPorte",   probe: "https://www.payporte.com/women",                fn: () => scrapePayPorte(page) },
     { name: "Spar",       probe: "https://www.sparng.com/",                       fn: () => scrapeSpar(page) },
     { name: "Jiji",       probe: "https://jiji.ng/",                              fn: () => scrapeJiji(page) },
     { name: "Popular SKUs", probe: "https://www.konga.com/",                      fn: () => scrapePopularSkus(page) },

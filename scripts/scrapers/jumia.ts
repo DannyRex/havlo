@@ -97,20 +97,33 @@ export async function scrapeJumia(_page: Page): Promise<RawDeal[]> {
     "Cache-Control": "no-cache",
   };
 
-  // Flash sales + multi-page category coverage. Jumia exposes ?page=N reliably.
+  /* Flash sales + broad category sweep. Goal: capture every category
+     where Jumia surfaces deals. Page counts tuned per category — high
+     for hot categories (phones/fashion/electronics), light for niche
+     ones. Total ~36 page fetches per cron run, well within budget. */
   const categoryBase: Array<{ slug: string; label: string; pages: number }> = [
-    { slug: "phones-tablets",  label: "phones",      pages: 4 },
-    { slug: "computing",       label: "computing",   pages: 3 },
-    { slug: "electronics",     label: "electronics", pages: 3 },
-    { slug: "televisions",     label: "televisions", pages: 2 },
-    { slug: "appliances",      label: "appliances",  pages: 2 },
-    { slug: "fashion",         label: "fashion",     pages: 3 },
-    { slug: "health-beauty",   label: "beauty",      pages: 2 },
-    { slug: "sporting-goods",  label: "sports",      pages: 1 },
-    { slug: "gaming",          label: "gaming",      pages: 1 },
-    { slug: "groceries",       label: "groceries",   pages: 1 },
-    { slug: "baby-products",   label: "baby",        pages: 1 },
-    { slug: "home-office",     label: "home",        pages: 2 },
+    { slug: "phones-tablets",       label: "phones",      pages: 4 },
+    { slug: "computing",            label: "computing",   pages: 3 },
+    { slug: "electronics",          label: "electronics", pages: 3 },
+    { slug: "televisions",          label: "televisions", pages: 2 },
+    { slug: "appliances",           label: "appliances",  pages: 2 },
+    { slug: "fashion",              label: "fashion",     pages: 4 },
+    { slug: "health-beauty",        label: "beauty",      pages: 3 },
+    { slug: "sporting-goods",       label: "sports",      pages: 2 },
+    { slug: "gaming",               label: "gaming",      pages: 2 },
+    { slug: "groceries",            label: "groceries",   pages: 2 },
+    { slug: "baby-products",        label: "baby",        pages: 2 },
+    { slug: "home-office",          label: "home",        pages: 3 },
+    /* Newly added — every Jumia top-level dept that runs deals */
+    { slug: "automotive",           label: "automotive",  pages: 2 },
+    { slug: "books",                label: "books",       pages: 1 },
+    { slug: "musical-instruments",  label: "music",       pages: 1 },
+    { slug: "garden-outdoors",      label: "garden",      pages: 1 },
+    { slug: "industrial-scientific",label: "industrial",  pages: 1 },
+    { slug: "pet-supplies",         label: "pets",        pages: 1 },
+    { slug: "watches",              label: "watches",     pages: 1 },
+    { slug: "shoes",                label: "shoes",       pages: 2 },
+    { slug: "bags-luggage",         label: "bags",        pages: 1 },
   ];
 
   const pages = [
