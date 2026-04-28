@@ -132,7 +132,7 @@ function crossBorderListFor(countryCode: string): string[] {
 const NG_STORES = [
   "konga", "jumia", "3c-hub", "3chub", "3c hub",
   "slot", "pointek", "fouani", "zit-trading", "hayathub",
-  "ajebomarket", "kara", "obiwezy", "pricepally",
+  "ajebomarket", "kara", "obiwezy", "pricepally", "payporte",
 ];
 
 /* Per-country anchored stores. The filter doesn't strictly require

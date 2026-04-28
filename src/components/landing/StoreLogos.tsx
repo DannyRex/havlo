@@ -32,18 +32,26 @@ function faviconUrl(domain: string): string {
        Temu + AliExpress (the China direct-to-consumer trio)
      - UK / DE / AE / ZA mirror the US pattern with regional tweaks */
 const ROSTERS: Record<string, StoreEntry[]> = {
+  /* NG roster — order tracks actual NG shopping volume:
+     local first (Jumia is #1 by a clear margin), then cross-border
+     ordered by NG-shopper preference (Temu surging, AliExpress
+     long-favorite, Shein for fashion, Amazon for everything else). */
   ng: [
     { name: "Jumia",      domain: "jumia.com.ng" },
     { name: "Konga",      domain: "konga.com" },
-    { name: "Slot",       domain: "slot.ng" },
-    { name: "3C Hub",     domain: "3chub.com" },
     { name: "Jiji",       domain: "jiji.ng" },
+    { name: "Slot",       domain: "slot.ng" },
+    { name: "Kara",       domain: "kara.com.ng" },
+    { name: "3C Hub",     domain: "3chub.com" },
+    { name: "Obiwezy",    domain: "obiwezy.com" },
+    { name: "PayPorte",   domain: "payporte.com" },
     { name: "Spar",       domain: "sparng.com" },
-    { name: "Amazon",     domain: "amazon.com" },
-    { name: "AliExpress", domain: "aliexpress.com" },
-    { name: "ASOS",       domain: "asos.com" },
-    { name: "SHEIN",      domain: "shein.com" },
+    // Cross-border, in NG-shopper preference order
     { name: "Temu",       domain: "temu.com" },
+    { name: "AliExpress", domain: "aliexpress.com" },
+    { name: "SHEIN",      domain: "shein.com" },
+    { name: "Amazon",     domain: "amazon.com" },
+    { name: "ASOS",       domain: "asos.com" },
     { name: "DHgate",     domain: "dhgate.com" },
     { name: "eBay",       domain: "ebay.com" },
   ],
