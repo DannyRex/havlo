@@ -98,8 +98,10 @@ async function callConverter(sourceUrl: string): Promise<string | null> {
   const params: Record<string, string> = {
     app_key:              appKey,
     method:               "aliexpress.affiliate.link.generate",
-    timestamp:            Date.now().toString(),
-    sign_method:          "sha256",
+    /* AliExpress requires timestamp in their format: YYYY-MM-DD HH:mm:ss
+       in GMT+8 (China time). Plain Date.now() gets rejected. */
+    timestamp:            new Date().toISOString().replace("T", " ").replace(/\.\d+Z$/, ""),
+    sign_method:          "hmac-sha256",
     format:               "json",
     v:                    "2.0",
     /* Method-specific */
@@ -133,7 +135,18 @@ async function callConverter(sourceUrl: string): Promise<string | null> {
   }
 
   if (data.error_response) {
-    console.warn("[aliexpress-converter]", data.error_response);
+    /* Verbose: log the full error so we can diagnose sign method,
+       method name, permission, etc. Visible in Vercel function logs. */
+    console.warn("[aliexpress-converter] error_response:", JSON.stringify(data.error_response));
+    return null;
+  }
+
+  const respCode = data.aliexpress_affiliate_link_generate_response?.resp_result?.resp_code;
+  if (respCode != null && respCode !== 200) {
+    console.warn(
+      "[aliexpress-converter] resp_result error:",
+      JSON.stringify(data.aliexpress_affiliate_link_generate_response?.resp_result),
+    );
     return null;
   }
 
@@ -143,6 +156,12 @@ async function callConverter(sourceUrl: string): Promise<string | null> {
     ?.promotion_links?.promotion_link?.[0]
     ?.promotion_link;
 
+  if (!link) {
+    console.warn(
+      "[aliexpress-converter] no link in response:",
+      JSON.stringify(data).slice(0, 500),
+    );
+  }
   return link ?? null;
 }
 
