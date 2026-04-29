@@ -64,18 +64,35 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  /* Randomized chip set. Initial pick on mount via lazy initializer.
-     Every subsequent transition from "input has content" → "input is
-     empty" re-picks a fresh set, so clearing the field always feels
-     like a new prompt. Chips stay stable while the user is typing or
-     after a search to avoid flicker on rerender. */
+  /* Randomized chip set with three refresh triggers:
+       1. Initial pick on mount (lazy useState initializer)
+       2. Re-pick on every empty-input transition (clear/backspace-all)
+       3. Auto-rotate every 7s while chips are visible (input empty)
+     The auto-rotate stops when the input has content so we don't burn
+     CPU updating hidden state. */
   const [chips, setChips] = useState(() => pickRandom(SUGGESTIONS_POOL, 6));
   const prevValue = useRef(initialQuery);
+
+  /* Re-pick on transition non-empty → empty. */
   useEffect(() => {
     if (prevValue.current && !value) {
       setChips(pickRandom(SUGGESTIONS_POOL, 6));
     }
     prevValue.current = value;
+  }, [value]);
+
+  /* Auto-rotate while chips are visible. 7s feels alive without
+     being fidgety. Reduces if user has prefers-reduced-motion. */
+  useEffect(() => {
+    if (value.trim()) return;
+    const reduceMotion =
+      typeof window !== "undefined"
+      && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) return;
+    const id = setInterval(() => {
+      setChips(pickRandom(SUGGESTIONS_POOL, 6));
+    }, 7000);
+    return () => clearInterval(id);
   }, [value]);
 
   useEffect(() => { setValue(initialQuery); }, [initialQuery]);
@@ -246,10 +263,13 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
           <span className="text-xs text-ink-3 self-center mr-1">Try:</span>
           {chips.map((s) => (
             <button
+              /* keying on the chip text makes React mount a new node when
+                 the value changes — which lets the fade-in CSS replay on
+                 every rotation. animate-fade-in is defined globally. */
               key={s}
               type="button"
               onClick={() => { setValue(s); submit(s); }}
-              className="px-3 py-1.5 rounded-full text-xs text-ink-2 hover:text-ink bg-surface-2 hover:bg-surface border border-border hover:border-border-strong transition-colors"
+              className="px-3 py-1.5 rounded-full text-xs text-ink-2 hover:text-ink bg-surface-2 hover:bg-surface border border-border hover:border-border-strong transition-colors animate-fade-in"
             >
               {s}
             </button>
