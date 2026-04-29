@@ -40,9 +40,11 @@ export interface Country {
 export const COUNTRIES: Country[] = [
   { code: "ng", name: "Nigeria",        flag: "🇳🇬", currency: "NGN", symbol: "₦", serpGl: "ng" },
   { code: "us", name: "United States",  flag: "🇺🇸", currency: "USD", symbol: "$", serpGl: "us" },
-  /* UK roster removed pending affiliate-program approvals — re-add the
-     row above when Awin / Amazon UK Associates are wired so the URL,
-     middleware, sitemap and store logos all light up together. */
+  /* UK is supported in the UI + data filter, but doesn't monetize yet
+     (no Amazon UK Associates, no Awin, no UK-specific affiliate keys
+     wired). Outbound clicks to UK retailers fall through /api/go's
+     wrapper unchanged → user reaches the merchant, no commission. */
+  { code: "uk", name: "United Kingdom", flag: "🇬🇧", currency: "GBP", symbol: "£", serpGl: "uk" },
   { code: "ae", name: "UAE",            flag: "🇦🇪", currency: "AED", symbol: "د.إ", serpGl: "ae" },
   { code: "de", name: "Germany",        flag: "🇩🇪", currency: "EUR", symbol: "€", serpGl: "de" },
   { code: "in", name: "India",          flag: "🇮🇳", currency: "INR", symbol: "₹", serpGl: "in" },
@@ -114,7 +116,7 @@ const DEFAULT_CROSS_BORDER = [
 const COUNTRY_CROSS_BORDER: Record<string, string[]> = {
   ng: ["amazon", "amazon.com", "amazon.co.uk", "aliexpress", "asos",
        "shein", "temu", "dhgate", "ebay", "apple.com", "banggood"],
-  // uk: removed from UI for now — see COUNTRIES roster
+  uk: ["aliexpress", "shein", "temu", "dhgate", "banggood"],
   us: ["aliexpress", "shein", "temu", "dhgate"],
   de: ["aliexpress", "shein", "temu", "dhgate", "banggood"],
   ae: ["aliexpress", "shein", "temu", "amazon.com", "amazon.co.uk"],
@@ -141,12 +143,13 @@ const NG_STORES = [
    gives QA a clear list of who we expect to surface. Match is
    substring on storeId/storeName. */
 export const COUNTRY_STORES: Record<string, string[]> = {
-  /* uk: roster preserved here behind the scenes — re-enable in COUNTRIES
-     roster + this map when affiliate programs land. Old list:
-       amazon.co.uk, argos, currys, john lewis, very, asos, boots, next,
-       m&s, selfridges, ao.com, screwfix, wickes, halfords, sports direct,
-       river island, primark, matalan, house of fraser, debenhams,
-       tesco, sainsbury, ebay.co.uk */
+  uk: [
+    "amazon.co.uk", "amazon-co-uk", "argos", "currys", "john lewis", "johnlewis",
+    "very", "asos", "boots", "next", "marks-spencer", "marks and spencer",
+    "selfridges", "ao.com", "ao-com", "screwfix", "wickes", "halfords",
+    "sports direct", "sportsdirect", "river island", "primark", "matalan",
+    "house of fraser", "debenhams", "tesco", "sainsbury", "ebay.co.uk",
+  ],
   us: [
     "amazon.com", "walmart", "best buy", "bestbuy", "target", "newegg",
     "ebay", "home depot", "homedepot", "macy", "kohl", "costco", "bjs",

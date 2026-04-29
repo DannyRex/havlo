@@ -55,7 +55,24 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "DHgate",     domain: "dhgate.com" },
     { name: "eBay",       domain: "ebay.com" },
   ],
-  /* uk: roster removed from UI pending affiliate-program approvals. */
+  uk: [
+    // Local UK retailers
+    { name: "Amazon UK",  domain: "amazon.co.uk" },
+    { name: "ASOS",       domain: "asos.com" },
+    { name: "Argos",      domain: "argos.co.uk" },
+    { name: "Currys",     domain: "currys.co.uk" },
+    { name: "John Lewis", domain: "johnlewis.com" },
+    { name: "Boots",      domain: "boots.com" },
+    { name: "Next",       domain: "next.co.uk" },
+    { name: "M&S",        domain: "marksandspencer.com" },
+    { name: "Very",       domain: "very.co.uk" },
+    { name: "AO.com",     domain: "ao.com" },
+    // Cross-border UK shoppers actually use
+    { name: "AliExpress", domain: "aliexpress.com" },
+    { name: "SHEIN",      domain: "shein.com" },
+    { name: "Temu",       domain: "temu.com" },
+    { name: "DHgate",     domain: "dhgate.com" },
+  ],
   us: [
     { name: "Amazon",     domain: "amazon.com" },
     { name: "Walmart",    domain: "walmart.com" },
