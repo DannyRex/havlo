@@ -11,10 +11,45 @@ interface Props {
   loading: boolean;
 }
 
-const SUGGESTIONS = [
-  "iPhone 15 Pro Max", "Galaxy A06", "Hisense 50 inch TV",
-  "PlayStation 5", "MacBook Pro M3", "AirPods Pro",
+/* Pool of recognizable, high-intent search terms across every
+   category Havlo covers. Random 6 picked per page load → users
+   see fresh chips between visits, same chips while they're on
+   the page. */
+const SUGGESTIONS_POOL = [
+  // Phones — Apple
+  "iPhone 16 Pro Max", "iPhone 15", "iPhone 15 Pro Max", "iPad Pro M4", "iPad Air",
+  // Phones — Android
+  "Galaxy S24 Ultra", "Galaxy A15", "Pixel 9 Pro", "Tecno Camon 30",
+  "Infinix Hot 50", "Redmi Note 14",
+  // Computing
+  "MacBook Pro M4", "MacBook Air M3", "HP Pavilion 15", "Dell XPS 13",
+  "Lenovo IdeaPad 3", "ASUS ROG laptop",
+  // TVs + Electronics
+  "Hisense 50 inch TV", "Samsung 55 inch TV", "LG OLED TV", "Sony Bravia",
+  "Smart projector",
+  // Audio
+  "AirPods Pro 2", "AirPods Max", "Sony WH-1000XM5", "Bose QuietComfort",
+  "JBL Charge 5", "Marshall Stanmore", "Beats Studio Pro",
+  // Gaming
+  "PlayStation 5", "Xbox Series X", "Nintendo Switch OLED", "Steam Deck",
+  // Appliances
+  "Hisense fridge", "LG washing machine", "Air fryer", "Microwave oven",
+  // Beauty + lifestyle
+  "Apple Watch Series 10", "Garmin Forerunner", "Hair dryer", "Electric trimmer",
+  // Fashion
+  "Nike Air Force 1", "Adidas Samba", "Yeezy Slides",
 ];
+
+/* Fisher–Yates shuffle, returns first N. Pure function so the lazy
+   useState initializer below can call it safely. */
+function pickRandom<T>(arr: T[], n: number): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a.slice(0, n);
+}
 
 function looksLikeUrl(v: string): boolean {
   const t = v.trim();
@@ -28,6 +63,11 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
   const [highlighted, setHighlighted] = useState(-1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  /* Randomized chip set — picked once on mount via lazy initializer
+     so the same chips persist while the user is on the page (no
+     flicker on every render) but rotate fresh on next visit. */
+  const [chips] = useState(() => pickRandom(SUGGESTIONS_POOL, 6));
 
   useEffect(() => { setValue(initialQuery); }, [initialQuery]);
 
@@ -188,10 +228,14 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
           : "Paste a Jumia, Amazon, or AliExpress link, or search by name."}
       </p>
 
-      {!initialQuery && suggestions.length === 0 && (
+      {/* Show chips whenever the live input is empty, regardless of
+          whether initialQuery was set. Clearing the field returns the
+          chips. (Old condition checked initialQuery, which stays set
+          even after clear, so chips never came back.) */}
+      {!value.trim() && suggestions.length === 0 && (
         <div className="mt-5 flex flex-wrap justify-center gap-2 px-2">
           <span className="text-xs text-ink-3 self-center mr-1">Try:</span>
-          {SUGGESTIONS.map((s) => (
+          {chips.map((s) => (
             <button
               key={s}
               type="button"
