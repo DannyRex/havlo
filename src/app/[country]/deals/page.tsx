@@ -1,23 +1,55 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import DealFeed from "@/components/deals/DealFeed";
+import JsonLd from "@/components/seo/JsonLd";
+import { getCountry } from "@/lib/country";
+import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  // Title template in app/layout.tsx already appends "· Havlo" — don't double up
-  title: "Deals worth checking today",
-  description:
-    "Browse fresh price drops and standout offers from stores Nigerians already shop. Filter fast and find the deals worth opening.",
-  openGraph: {
-    title: "Deals worth checking today · Havlo",
-    description:
-      "Browse fresh price drops and standout offers from stores Nigerians already shop.",
-  },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: { country: string };
+}): Promise<Metadata> {
+  const country = getCountry(params.country);
+  const url = `${SITE_URL}/${country.code}/deals`;
+  const title = `Deals worth checking today in ${country.name}`;
+  const description = `Fresh price drops + standout offers across the stores you already shop in ${country.name}. Filter by category, brand, and discount.`;
 
-export default function DealsPage() {
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: url,
+      languages: buildHreflangAlternates("deals"),
+    },
+    openGraph: {
+      title:       `${title} · Havlo`,
+      description,
+      url,
+      type:        "website",
+    },
+    twitter: {
+      card:        "summary_large_image",
+      title:       `${title} · Havlo`,
+      description,
+    },
+  };
+}
+
+export default function DealsPage({ params }: { params: { country: string } }) {
+  const country = getCountry(params.country);
+  const breadcrumb = buildBreadcrumbList([
+    { name: "Havlo",      url: `${SITE_URL}/${country.code}` },
+    { name: country.name, url: `${SITE_URL}/${country.code}` },
+    { name: "Deals",      url: `${SITE_URL}/${country.code}/deals` },
+  ]);
+
   return (
-    <Suspense>
-      <DealFeed />
-    </Suspense>
+    <>
+      <JsonLd data={breadcrumb} />
+      <Suspense>
+        <DealFeed />
+      </Suspense>
+    </>
   );
 }

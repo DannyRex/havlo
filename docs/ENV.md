@@ -65,6 +65,17 @@ Tag format: `havlo-21` (varies per marketplace per Amazon's rules).
 |---|---|
 | `NEXT_PUBLIC_CONTACT_FORM_URL` | `/contact` form POST target (Formspree etc.). When unset, form falls back to `mailto:hello@havlo.io`. |
 
+## Optional — SEO verification
+
+Plug the codes Google + Bing give you on their respective consoles
+so the matching `<meta>` tag renders in `<head>`. Both are public-
+facing so the `NEXT_PUBLIC_` prefix is fine.
+
+| Var | Where to get it |
+|---|---|
+| `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | Google Search Console → Settings → Ownership verification → HTML tag method → copy the `content="..."` value |
+| `NEXT_PUBLIC_BING_SITE_VERIFICATION` | Bing Webmaster Tools → Site verification → meta tag method → copy the `content="..."` value |
+
 ## Vercel-injected (do not set manually)
 
 | Var | What it is |

@@ -1,16 +1,57 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/seo/JsonLd";
+import { getCountry } from "@/lib/country";
+import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Find similar products for less",
-  description:
-    "Paste a product link or search anything. Havlo finds cheaper alternatives across 12+ Nigerian and global stores.",
-  openGraph: {
-    title: "Find similar products for less · Havlo",
-    description:
-      "Paste a product link or search anything. Havlo finds cheaper alternatives across 12+ Nigerian and global stores.",
-  },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: { country: string };
+}): Promise<Metadata> {
+  const country = getCountry(params.country);
+  const url = `${SITE_URL}/${country.code}/compare`;
+  const title = `Find products for less in ${country.name}`;
+  const description = `Paste any product link or search by name — Havlo surfaces cheaper alternatives across local + global stores in ${country.name}. Free, no signup.`;
 
-export default function CompareLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: url,
+      languages: buildHreflangAlternates("compare"),
+    },
+    openGraph: {
+      title:       `${title} · Havlo`,
+      description,
+      url,
+      type:        "website",
+    },
+    twitter: {
+      card:        "summary_large_image",
+      title:       `${title} · Havlo`,
+      description,
+    },
+  };
+}
+
+export default function CompareLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: { country: string };
+}) {
+  const country = getCountry(params.country);
+  const breadcrumb = buildBreadcrumbList([
+    { name: "Havlo",          url: `${SITE_URL}/${country.code}` },
+    { name: country.name,     url: `${SITE_URL}/${country.code}` },
+    { name: "Find for less",  url: `${SITE_URL}/${country.code}/compare` },
+  ]);
+
+  return (
+    <>
+      <JsonLd data={breadcrumb} />
+      {children}
+    </>
+  );
 }
