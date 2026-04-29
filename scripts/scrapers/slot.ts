@@ -3,14 +3,18 @@ import { RawDeal, resolveCategory, parseNaira } from "./types.js";
 
 // Confirmed selector: [class*='item'][class*='product'] (60 cards per page)
 // Card text format: "TITLE₦PRICE Quick View Wishlist"  (or "TITLE₦ORIG₦SALE Quick View...")
+/* Page counts trimmed to 1 across the board. Last run: page 2+ of
+   every Slot category produced 0 deals (60 cards loaded but the
+   selector matched nothing — Slot's pagination loads cached / non-
+   discounted SKUs after page 1). One page each is the right budget. */
 const SLOT_BASE = [
-  { slug: "smartphones",          cat: "phones",      pages: 4 },
-  { slug: "laptops",              cat: "computing",   pages: 3 },
-  { slug: "tablets",              cat: "phones",      pages: 2 },
-  { slug: "smart-watches-bands",  cat: "electronics", pages: 2 },
-  { slug: "earphones-headphones", cat: "audio",       pages: 2 },
-  { slug: "televisions",          cat: "electronics", pages: 2 },
-  { slug: "gaming",               cat: "gaming",      pages: 2 },
+  { slug: "smartphones",          cat: "phones",      pages: 1 },
+  { slug: "laptops",              cat: "computing",   pages: 1 },
+  { slug: "tablets",              cat: "phones",      pages: 1 },
+  { slug: "smart-watches-bands",  cat: "electronics", pages: 1 },
+  { slug: "earphones-headphones", cat: "audio",       pages: 1 },
+  { slug: "televisions",          cat: "electronics", pages: 1 },
+  { slug: "gaming",               cat: "gaming",      pages: 1 },
   { slug: "networking",           cat: "electronics", pages: 1 },
   { slug: "power-solutions",      cat: "electronics", pages: 1 },
   { slug: "speakers",             cat: "audio",       pages: 1 },

@@ -38,18 +38,20 @@ export async function scrapeKara(page: Page): Promise<RawDeal[]> {
          live inventory) so networkidle never resolves and the 35s timeout
          fires for every category. `load` waits for window.onload then we
          poll for product links explicitly. */
+      /* Aggressive timeouts — Kara was eating ~6 min of total scrape
+         budget on networkidle/load timeouts that produced 0 deals
+         either way. Fail-fast and move on. */
       try {
-        await page.goto(url, { waitUntil: "load", timeout: 20000 });
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 8000 });
       } catch {
         console.warn(`    Kara ${url}: load timeout — skipping`);
         continue;
       }
       try {
-        await page.waitForSelector("a[href*='/product']", { timeout: 6000 });
+        await page.waitForSelector("a[href*='/product']", { timeout: 4000 });
       } catch {
-        // Page rendered but no product links — empty category or layout shift
+        // Empty category or selector mismatch — fall through, will return 0
       }
-      await page.waitForTimeout(1000);
 
       /* SPA pages don't follow Magento link conventions — anchor on
          any product-link pattern + walk up to find a container with ₦. */
