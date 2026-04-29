@@ -52,7 +52,18 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/data/deals.ts
           git commit -m "chore: refresh deals [$(date '+%Y-%m-%d')]"
-          git push
+          # Scrape can take 15-25 min; main may have moved during the run
+          # (manual commits, other automations). Rebase + retry once on
+          # push rejection so we don't lose the data refresh.
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "✓ Push succeeded on attempt $attempt"
+              break
+            fi
+            echo "✗ Push rejected (attempt $attempt). Rebasing onto remote main…"
+            git fetch origin main
+            git rebase origin/main
+          done
 
       # ── Ingestion: pushes the refreshed deals.ts into Supabase so the
       # app's DB-backed providers serve fresh rows immediately. Both steps
