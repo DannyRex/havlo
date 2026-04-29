@@ -1,57 +1,38 @@
 /* Next.js 14 Apple touch icon — served at /apple-icon.
-   180x180 PNG, used when users add Havlo to their iOS home screen.
-   Refreshed to the new brand: dark slate backplate, white Slackey
-   "h" centered. */
+   180x180 PNG used when users add Havlo to iOS home screen.
+   Mirrors /icon — chunky white "h" on dark gradient. */
 
 import { ImageResponse } from "next/og";
 
-export const size = { width: 180, height: 180 };
+export const size        = { width: 180, height: 180 };
 export const contentType = "image/png";
-export const runtime = "edge";
+export const runtime     = "edge";
 
-const SLACKEY_TTF =
-  "https://fonts.gstatic.com/s/slackey/v23/40lqgKE2qhgWdpHDCwXHk5_g7Q.ttf";
-
-async function loadSlackey(): Promise<ArrayBuffer | null> {
-  try {
-    const res = await fetch(SLACKEY_TTF);
-    if (!res.ok) return null;
-    return await res.arrayBuffer();
-  } catch {
-    return null;
-  }
-}
-
-export default async function AppleIcon() {
-  const slackey = await loadSlackey();
-
+export default function AppleIcon() {
   return new ImageResponse(
     (
       <div
         style={{
           width: "100%",
           height: "100%",
-          background: "#0F172A", // slate-900 — premium dark backplate
-          /* iOS auto-rounds the corners, but a hint helps the splash. */
+          backgroundImage:
+            "linear-gradient(135deg, #2D2D2D 0%, #1A1A1A 60%, #0E0E0E 100%)",
+          /* iOS auto-rounds the corners but a hint helps the splash. */
           borderRadius: 40,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "#FFFFFF",
-          fontSize: 140,
-          fontFamily: slackey ? "Slackey" : "system-ui",
-          lineHeight: 1,
-          paddingTop: 18, // optical centering
         }}
       >
-        h
+        <svg width="120" height="120" viewBox="0 0 64 64">
+          <g fill="#FFFFFF">
+            <rect x="14" y="10" width="9"  height="44" rx="2.5" />
+            <rect x="14" y="26" width="36" height="9"  rx="2.5" />
+            <rect x="41" y="26" width="9"  height="28" rx="2.5" />
+          </g>
+        </svg>
       </div>
     ),
-    {
-      ...size,
-      fonts: slackey
-        ? [{ name: "Slackey", data: slackey, style: "normal", weight: 400 }]
-        : undefined,
-    },
+    size,
   );
 }

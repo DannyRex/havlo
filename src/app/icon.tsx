@@ -1,66 +1,47 @@
 /* Next.js 14 generated favicon — served at /icon.
-   Updated to match the new brand: dark slate backplate, white Slackey
-   "h" centered. The blue square + geometric h was retired with the
-   logo refresh. Returns a 32x32 PNG at request time, cached at the
-   edge by Vercel.
+   Geometric chunky "h" on a dark gradient backdrop. Matches the
+   refreshed brand mark (dark slate body + white letterform).
 
-   At 32px, Slackey's swash detail mostly disappears — the favicon
-   reads as a confident bold letter on dark slate, which is what we
-   want for tiny tab-strip visibility. */
+   Returns a 32x32 PNG at request time, cached at the edge. */
 
 import { ImageResponse } from "next/og";
 
-export const size = { width: 32, height: 32 };
+export const size        = { width: 32, height: 32 };
 export const contentType = "image/png";
-export const runtime = "edge";
+export const runtime     = "edge";
 
-/* Load Slackey TTF at request time so Satori can render the wordmark
-   letterform. URL is the stable Google Fonts CDN path; if Google
-   bumps it we catch + fall back to a system bold via try/catch in
-   the handler. */
-const SLACKEY_TTF =
-  "https://fonts.gstatic.com/s/slackey/v23/40lqgKE2qhgWdpHDCwXHk5_g7Q.ttf";
-
-async function loadSlackey(): Promise<ArrayBuffer | null> {
-  try {
-    const res = await fetch(SLACKEY_TTF);
-    if (!res.ok) return null;
-    return await res.arrayBuffer();
-  } catch {
-    return null;
-  }
-}
-
-export default async function Icon() {
-  const slackey = await loadSlackey();
-
+export default function Icon() {
   return new ImageResponse(
     (
       <div
         style={{
           width: "100%",
           height: "100%",
-          background: "#0F172A", // slate-900 — premium dark backplate
+          /* Dark backdrop with a subtle diagonal sheen (lighter top-
+             right → darker bottom-left). Same character as the
+             user-provided reference. */
+          backgroundImage:
+            "linear-gradient(135deg, #2D2D2D 0%, #1A1A1A 60%, #0E0E0E 100%)",
           borderRadius: 7,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "#FFFFFF",
-          fontSize: 26,
-          fontFamily: slackey ? "Slackey" : "system-ui",
-          lineHeight: 1,
-          // Nudge optical centering — Slackey's "h" has a tall ascender
-          paddingTop: 4,
         }}
       >
-        h
+        {/* Geometric "h" — two vertical strokes + horizontal connector.
+            Rounded corners (rx=2.5) match the chunky-but-soft look. */}
+        <svg width="22" height="22" viewBox="0 0 64 64">
+          <g fill="#FFFFFF">
+            {/* Left stroke — full height */}
+            <rect x="14" y="10" width="9"  height="44" rx="2.5" />
+            {/* Crossbar */}
+            <rect x="14" y="26" width="36" height="9"  rx="2.5" />
+            {/* Right stroke — half height */}
+            <rect x="41" y="26" width="9"  height="28" rx="2.5" />
+          </g>
+        </svg>
       </div>
     ),
-    {
-      ...size,
-      fonts: slackey
-        ? [{ name: "Slackey", data: slackey, style: "normal", weight: 400 }]
-        : undefined,
-    },
+    size,
   );
 }
