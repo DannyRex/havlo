@@ -70,6 +70,17 @@ export default function Footer() {
             <p className="text-xs text-ink-3 hidden md:block">
               Final prices, stock and shipping are set by each retailer.
             </p>
+            {/* TEMP: Sovrn Commerce site-verification link. Click once
+                to satisfy their onboarding step 4 (Get a click).
+                REMOVE this after Sovrn confirms verification. */}
+            <a
+              href="https://sovrn.co/i1u0afm"
+              target="_blank"
+              rel="noopener noreferrer sponsored"
+              className="text-[11px] text-ink-3 hover:text-ink transition-colors underline-offset-4 hover:underline"
+            >
+              Featured deal
+            </a>
             <CountrySelect dropUp />
           </div>
         </div>
