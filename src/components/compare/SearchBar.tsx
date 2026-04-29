@@ -64,10 +64,19 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  /* Randomized chip set — picked once on mount via lazy initializer
-     so the same chips persist while the user is on the page (no
-     flicker on every render) but rotate fresh on next visit. */
-  const [chips] = useState(() => pickRandom(SUGGESTIONS_POOL, 6));
+  /* Randomized chip set. Initial pick on mount via lazy initializer.
+     Every subsequent transition from "input has content" → "input is
+     empty" re-picks a fresh set, so clearing the field always feels
+     like a new prompt. Chips stay stable while the user is typing or
+     after a search to avoid flicker on rerender. */
+  const [chips, setChips] = useState(() => pickRandom(SUGGESTIONS_POOL, 6));
+  const prevValue = useRef(initialQuery);
+  useEffect(() => {
+    if (prevValue.current && !value) {
+      setChips(pickRandom(SUGGESTIONS_POOL, 6));
+    }
+    prevValue.current = value;
+  }, [value]);
 
   useEffect(() => { setValue(initialQuery); }, [initialQuery]);
 
