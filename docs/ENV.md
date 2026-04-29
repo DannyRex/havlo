@@ -76,6 +76,14 @@ facing so the `NEXT_PUBLIC_` prefix is fine.
 | `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | Google Search Console → Settings → Ownership verification → HTML tag method → copy the `content="..."` value |
 | `NEXT_PUBLIC_BING_SITE_VERIFICATION` | Bing Webmaster Tools → Site verification → meta tag method → copy the `content="..."` value |
 
+## Optional — Analytics + IndexNow
+
+| Var | What it does |
+|---|---|
+| `NEXT_PUBLIC_GA_ID` | GA4 Measurement ID (`G-XXXXXXX`). Set + redeploy → GoogleAnalytics component auto-renders the gtag.js init. No-op when unset. |
+| `INDEXNOW_KEY` | IndexNow key from bing.com/indexnow. Required to ping search engines about changed URLs. **Also**: create `public/<KEY>.txt` with the key as the file's content for ownership verification. |
+| `INDEXNOW_TRIGGER_SECRET` | Optional shared-secret. When set, callers of `/api/indexnow` must include `X-Trigger-Secret: <value>` header. Prevents random POSTs from spamming IndexNow on your behalf. |
+
 ## Vercel-injected (do not set manually)
 
 | Var | What it is |
