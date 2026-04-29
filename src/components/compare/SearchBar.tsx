@@ -91,7 +91,7 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
     if (reduceMotion) return;
     const id = setInterval(() => {
       setChips(pickRandom(SUGGESTIONS_POOL, 6));
-    }, 7000);
+    }, 5000);
     return () => clearInterval(id);
   }, [value]);
 
