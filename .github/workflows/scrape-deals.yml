@@ -76,6 +76,20 @@ jobs:
           KONGA_AFFILIATE_KEY:        ${{ secrets.KONGA_AFFILIATE_KEY }}
         run: npm run ingest:konga
 
+      # ── AliExpress Affiliate API ingestion (global cross-border).
+      # Free via AliExpress Open Platform — gives us the cross-border
+      # catalog SerpAPI's gl=ng was missing. Runs over every category
+      # × default countries. Skipped when AliExpress credentials
+      # aren't set.
+      - name: Ingest AliExpress affiliate deals → Supabase
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.ALIEXPRESS_APP_KEY != '' && env.ALIEXPRESS_APP_SECRET != ''
+        env:
+          SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ALIEXPRESS_APP_KEY:         ${{ secrets.ALIEXPRESS_APP_KEY }}
+          ALIEXPRESS_APP_SECRET:      ${{ secrets.ALIEXPRESS_APP_SECRET }}
+        run: npm run ingest:aliexpress
+
       # ── Live SerpAPI ingestion: 6 countries × 10 categories. Skipped
       # automatically when SERPAPI_KEY isn't set so devs can run the
       # workflow on a dry repo without burning API credits.

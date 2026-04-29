@@ -81,14 +81,15 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
     prevValue.current = value;
   }, [value]);
 
-  /* Auto-rotate while chips are visible. 7s feels alive without
-     being fidgety. Reduces if user has prefers-reduced-motion. */
+  /* Auto-rotate while chips are visible. 5s. Runs unconditionally —
+     the prefers-reduced-motion guard was overzealous (that media
+     query targets vestibular-issue animations like spin/parallax,
+     not periodic content swaps). The fade-in CSS on each chip is
+     gentle enough; users who really want zero animation can disable
+     it via the chip's own animate-fade-in class which respects
+     motion-reduce: at the Tailwind level. */
   useEffect(() => {
     if (value.trim()) return;
-    const reduceMotion =
-      typeof window !== "undefined"
-      && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (reduceMotion) return;
     const id = setInterval(() => {
       setChips(pickRandom(SUGGESTIONS_POOL, 6));
     }, 5000);

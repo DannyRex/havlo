@@ -22,16 +22,19 @@ import { dbBrowseProvider, dbHasProducts } from "./browse-db";
 import { serpapiSearchProvider } from "./search-serpapi";
 import { pgFtsSearchProvider } from "./search-pgfts";
 import { kongaSearchProvider } from "./search-konga";
+import { aliexpressSearchProvider } from "./search-aliexpress";
 
 /* Order matters for parallel fan-out:
      - pg-fts hits our own DB (free, fast — local truth)
      - Konga affiliate hits NG retail catalog (free once approved)
+     - AliExpress affiliate API hits global cross-border catalog (free)
      - SerpAPI hits Google Shopping live ($, slower — global breadth)
    All run in parallel; results are URL-deduped at the route layer.
    Each provider's isActive() controls whether it joins the fan-out. */
 const SEARCH_PROVIDERS: SearchProvider[] = [
   pgFtsSearchProvider,
   kongaSearchProvider,
+  aliexpressSearchProvider,
   serpapiSearchProvider,
 ];
 
