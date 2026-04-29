@@ -65,13 +65,23 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
 
   /* Randomized chip set with three refresh triggers:
-       1. Initial pick on mount (lazy useState initializer)
+       1. Initial pick on first client render (post-hydration)
        2. Re-pick on every empty-input transition (clear/backspace-all)
-       3. Auto-rotate every 7s while chips are visible (input empty)
-     The auto-rotate stops when the input has content so we don't burn
-     CPU updating hidden state. */
-  const [chips, setChips] = useState(() => pickRandom(SUGGESTIONS_POOL, 6));
+       3. Auto-rotate every 5s while chips are visible (input empty)
+
+     IMPORTANT: initial state is the deterministic first-6 of the pool,
+     NOT a random pick. A lazy initializer with Math.random() runs both
+     on the server (during SSR) and on the client (during hydration),
+     producing different chips on each side → hydration mismatch error.
+     We render the deterministic 6 for SSR + first hydration paint,
+     then swap to random in the post-mount effect below. */
+  const [chips, setChips] = useState<string[]>(() => SUGGESTIONS_POOL.slice(0, 6));
   const prevValue = useRef(initialQuery);
+
+  /* Initial random pick — runs only on client, after hydration. */
+  useEffect(() => {
+    setChips(pickRandom(SUGGESTIONS_POOL, 6));
+  }, []);
 
   /* Re-pick on transition non-empty → empty. */
   useEffect(() => {
