@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Instagram } from "lucide-react";
 import Logo from "@/components/ui/Logo";
 import CountrySelect from "@/components/layout/CountrySelect";
 
@@ -40,6 +41,16 @@ export default function Footer() {
             <p className="text-sm text-ink-2 leading-relaxed max-w-xs">
               Find similar products for less. Paste any link or search anything, we surface the cheaper alternatives.
             </p>
+            <a
+              href="https://instagram.com/havlo.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Follow Havlo on Instagram (@havlo.io)"
+              className="mt-4 inline-flex items-center gap-2 text-sm text-ink-2 hover:text-ink transition-colors"
+            >
+              <Instagram size={16} aria-hidden="true" />
+              <span>@havlo.io</span>
+            </a>
           </div>
 
           {/* Link columns */}
