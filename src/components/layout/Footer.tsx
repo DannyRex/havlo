@@ -72,7 +72,19 @@ export default function Footer() {
           ))}
         </div>
 
-        <div className="pt-6 border-t border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        {/* FTC affiliate disclosure — required by Amazon Associates
+            and good practice for any monetized site. Plain language,
+            clearly visible, persistent across all pages. */}
+        <div className="pt-6 border-t border-border mb-6">
+          <p className="text-xs text-ink-3 leading-relaxed max-w-3xl">
+            <span className="font-semibold text-ink-2">Affiliate disclosure:</span>{" "}
+            Havlo earns commissions on qualifying purchases through some of our links,
+            at no extra cost to you. As an Amazon Associate we earn from qualifying
+            purchases. This is how we keep Havlo independent and free to use.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <p className="text-xs text-ink-3">
             © {year} Havlo. Independent product discovery.
           </p>
