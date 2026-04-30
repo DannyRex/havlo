@@ -8,6 +8,7 @@ import { CountryProvider } from "@/components/providers/CountryProvider";
 import { getServerCountry } from "@/lib/country-server";
 import JsonLd from "@/components/seo/JsonLd";
 import GoogleAnalytics from "@/components/seo/GoogleAnalytics";
+import Skimlinks from "@/components/seo/Skimlinks";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/seo";
 
 const inter = Inter({
@@ -142,6 +143,9 @@ export default function RootLayout({
         </ThemeProvider>
         {/* GA4 — no-op until NEXT_PUBLIC_GA_ID is set in env */}
         <GoogleAnalytics />
+        {/* Skimlinks affiliate auto-monetization — no-op until
+            NEXT_PUBLIC_SKIMLINKS_ID is set in env */}
+        <Skimlinks />
       </body>
     </html>
   );
