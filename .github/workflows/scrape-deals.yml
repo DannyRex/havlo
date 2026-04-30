@@ -17,6 +17,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
 
+    # Job-level env mapping. Secrets MUST be lifted here (not just per
+    # step) because GitHub Actions evaluates step-level `if:` before
+    # the step's own env block is applied — so referencing
+    # env.SECRET_X in a step's if always returns empty string when
+    # the env is only declared on that same step.
+    #
+    # With job-level env, every step (including their if conditions)
+    # can read env.SECRET_X reliably.
+    env:
+      SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      KONGA_AFFILIATE_KEY:        ${{ secrets.KONGA_AFFILIATE_KEY }}
+      ALIEXPRESS_APP_KEY:         ${{ secrets.ALIEXPRESS_APP_KEY }}
+      ALIEXPRESS_APP_SECRET:      ${{ secrets.ALIEXPRESS_APP_SECRET }}
+      SERPAPI_KEY:                ${{ secrets.SERPAPI_KEY }}
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -66,39 +82,24 @@ jobs:
           done
 
       # ── Ingestion: pushes the refreshed deals.ts into Supabase so the
-      # app's DB-backed providers serve fresh rows immediately. Both steps
-      # are gated on Supabase secrets being present so the workflow doesn't
-      # fail on forks or environments without DB access.
+      # app's DB-backed providers serve fresh rows immediately. All env
+      # vars come from the job-level env block above — no per-step
+      # mappings needed.
       - name: Ingest scraped deals → Supabase
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
-        env:
-          SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npm run ingest:scraped
 
       # ── Konga affiliate ingestion (NG-only). Free once approved.
-      # Runs before SerpAPI so local NG catalog is fresh before the
-      # paid global-breadth pass. Skipped when KONGA_AFFILIATE_KEY isn't set.
+      # Skipped when KONGA_AFFILIATE_KEY isn't set.
       - name: Ingest Konga affiliate deals → Supabase
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.KONGA_AFFILIATE_KEY != ''
-        env:
-          SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          KONGA_AFFILIATE_KEY:        ${{ secrets.KONGA_AFFILIATE_KEY }}
         run: npm run ingest:konga
 
       # ── AliExpress Affiliate API ingestion (global cross-border).
-      # Free via AliExpress Open Platform — gives us the cross-border
-      # catalog SerpAPI's gl=ng was missing. Runs over every category
-      # × default countries. Skipped when AliExpress credentials
-      # aren't set.
+      # Free via AliExpress Open Platform. Skipped when AliExpress
+      # credentials aren't set.
       - name: Ingest AliExpress affiliate deals → Supabase
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.ALIEXPRESS_APP_KEY != '' && env.ALIEXPRESS_APP_SECRET != ''
-        env:
-          SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          ALIEXPRESS_APP_KEY:         ${{ secrets.ALIEXPRESS_APP_KEY }}
-          ALIEXPRESS_APP_SECRET:      ${{ secrets.ALIEXPRESS_APP_SECRET }}
         run: npm run ingest:aliexpress
 
       # ── Live SerpAPI ingestion: 6 countries × 10 categories. Skipped
@@ -106,8 +107,4 @@ jobs:
       # workflow on a dry repo without burning API credits.
       - name: Ingest SerpAPI live deals → Supabase
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != ''
-        env:
-          SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SERPAPI_KEY:                ${{ secrets.SERPAPI_KEY }}
         run: npm run ingest
