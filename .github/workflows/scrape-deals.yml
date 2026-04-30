@@ -81,6 +81,25 @@ jobs:
             git rebase origin/main
           done
 
+      # ── Diagnostic: prints LENGTHS (never values) of every secret-
+      # backed env var so we can see exactly what the runner has
+      # populated. If a length shows 0, that secret is missing or
+      # empty in repo Settings → Secrets and variables → Actions →
+      # Repository secrets. If lengths are nonzero but the conditional
+      # ingest steps below still skip, the `env.X` evaluation in
+      # step-level `if:` is the bug — switch those `if:` conditions
+      # to use the `secrets` context directly.
+      - name: Debug — env presence check
+        run: |
+          echo "::group::Env presence (lengths only — no values leaked)"
+          echo "SUPABASE_URL=${#SUPABASE_URL}"
+          echo "SUPABASE_SERVICE_ROLE_KEY=${#SUPABASE_SERVICE_ROLE_KEY}"
+          echo "KONGA_AFFILIATE_KEY=${#KONGA_AFFILIATE_KEY}"
+          echo "ALIEXPRESS_APP_KEY=${#ALIEXPRESS_APP_KEY}"
+          echo "ALIEXPRESS_APP_SECRET=${#ALIEXPRESS_APP_SECRET}"
+          echo "SERPAPI_KEY=${#SERPAPI_KEY}"
+          echo "::endgroup::"
+
       # ── Ingestion: pushes the refreshed deals.ts into Supabase so the
       # app's DB-backed providers serve fresh rows immediately. All env
       # vars come from the job-level env block above — no per-step
