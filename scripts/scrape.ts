@@ -200,10 +200,20 @@ async function main() {
     { name: "Jiji",       probe: "https://jiji.ng/",                              fn: () => scrapeJiji(page) },
     { name: "Popular SKUs", probe: "https://www.konga.com/",                      fn: () => scrapePopularSkus(page) },
     // International stores (en-US stealth context)
-    { name: "AliExpress", probe: "https://www.aliexpress.com/",                   fn: () => scrapeAliExpress(intlPage) },
+    /* AliExpress scraper disabled — anti-bot wall (Cloudflare). Real
+       AliExpress catalog comes from the Open Platform API ingest, run
+       in a separate workflow step (npm run ingest:aliexpress) once
+       ALIEXPRESS_APP_KEY/SECRET are set. */
+    // { name: "AliExpress", probe: "https://www.aliexpress.com/",                   fn: () => scrapeAliExpress(intlPage) },
     { name: "DHgate",     probe: "https://www.dhgate.com/",                       fn: () => scrapeDHgate(intlPage) },
     { name: "ASOS",       probe: "https://www.asos.com/",                         fn: () => scrapeAsos(intlPage) },
-    { name: "Amazon",     probe: "https://www.amazon.com/",                       fn: () => scrapeAmazon(intlPage) },
+    /* Amazon scraper disabled — deal-page selector + URL token rotated
+       and the scraper now returns 0 cards on every URL. Real fix:
+       Amazon Product Advertising API (PAAPI), unlocks once Associates
+       hits 3 sales in 180 days. Until then, AliExpress API ingest
+       covers the cross-border gap (~10K+ products vs Amazon's prior
+       ~196). Scraper code preserved at scripts/scrapers/amazon.ts. */
+    // { name: "Amazon",     probe: "https://www.amazon.com/",                       fn: () => scrapeAmazon(intlPage) },
   ];
 
   const ignoreRobots = process.env.HAVLO_IGNORE_ROBOTS === "1";
