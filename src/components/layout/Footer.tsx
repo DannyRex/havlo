@@ -46,10 +46,9 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Follow Havlo on Instagram (@havlo.io)"
-              className="mt-4 inline-flex items-center gap-2 text-sm text-ink-2 hover:text-ink transition-colors"
+              className="mt-4 inline-flex items-center justify-center text-ink-2 hover:text-ink transition-colors"
             >
-              <Instagram size={16} aria-hidden="true" />
-              <span>@havlo.io</span>
+              <Instagram size={24} strokeWidth={1.75} aria-hidden="true" />
             </a>
           </div>
 
