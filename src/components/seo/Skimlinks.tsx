@@ -1,36 +1,43 @@
-/* Skimlinks affiliate auto-monetization — gated on NEXT_PUBLIC_SKIMLINKS_ID
-   so it stays completely invisible until the env var is populated. No-op
-   render means no script tag, no network calls, zero perf cost pre-launch.
+"use client";
 
-   How Skimlinks works:
-     The script walks the DOM after load, finds links to any of their
-     ~48,500 supported retailers, and silently rewrites them with our
-     affiliate parameters. Zero per-merchant work — every "go" link to a
-     supported retailer becomes monetized automatically.
+/* Skimlinks affiliate auto-monetization — gated on
+   NEXT_PUBLIC_SKIMLINKS_ID AND on the user's cookie consent.
+   Renders nothing until both are true.
 
-   Why lazyOnload (not afterInteractive):
-     Skimlinks is non-critical revenue plumbing — link rewriting can wait
-     until the browser is idle. lazyOnload schedules via
-     requestIdleCallback so it never competes with first-paint or
-     interactivity work.
+   Why client-side gating: Skimlinks rewrites links and drops
+   tracking cookies the moment its script loads. That counts as
+   non-essential tracking under GDPR / ePrivacy, so loading the
+   script before consent is not compliant in EU markets (UK, DE).
+   Subscribing to the consent state keeps Skimlinks dormant until
+   the user accepts.
 
-   Why env-driven:
-     Keeps the publisher ID out of the repo (it's not a secret per se,
-     but treating it like config means dev/preview environments don't
-     accidentally fire affiliate scripts and skew Skimlinks dashboard
-     stats).
+   How Skimlinks works once active:
+     The script walks the DOM after load, finds links to any of
+     their ~48,500 supported retailers, and silently rewrites them
+     with our affiliate parameters. Zero per-merchant work.
 
-   Setup:
-     Set NEXT_PUBLIC_SKIMLINKS_ID=302355X1790351 in Vercel envs (the
-     numeric publisher ID Skimlinks shows you in the install snippet,
-     between "/js/" and ".skimlinks.js"). No further code change needed.
+   Why lazyOnload: link rewriting can wait until the browser is
+   idle. lazyOnload schedules via requestIdleCallback so it never
+   competes with first-paint or interactivity work.
+
+   Setup: NEXT_PUBLIC_SKIMLINKS_ID=302355X1790351 in Vercel envs.
 */
 
 import Script from "next/script";
+import { useEffect, useState } from "react";
+import { readConsent, onConsentChange, type ConsentState } from "./CookieConsent";
 
 export default function Skimlinks() {
   const id = process.env.NEXT_PUBLIC_SKIMLINKS_ID;
+  const [consent, setConsent] = useState<ConsentState | null>(null);
+
+  useEffect(() => {
+    setConsent(readConsent());
+    return onConsentChange(setConsent);
+  }, []);
+
   if (!id) return null;
+  if (consent !== "accepted") return null;
 
   return (
     <Script

@@ -1,19 +1,36 @@
-/* Google Analytics 4 — gated on NEXT_PUBLIC_GA_ID so it stays
-   completely invisible until the env var is populated. No-op render
-   means no script tag, no network calls, zero perf impact pre-launch.
+"use client";
 
-   We use Next.js's <Script> with strategy="afterInteractive" so GA
-   doesn't block first paint or interactivity. Standard GA4 install.
+/* Google Analytics 4 — gated on NEXT_PUBLIC_GA_ID AND on the user's
+   cookie consent. Renders nothing until both are true:
+     1. The env var is set (otherwise the install is a no-op pre-launch)
+     2. The visitor has accepted cookies via the consent banner
 
-   Once you set NEXT_PUBLIC_GA_ID=G-XXXXXXX in Vercel + redeploy, this
-   component renders the GA4 init + page-view tracking automatically.
-   No further code change needed. */
+   Why client-side gating: GA must not fire any network requests
+   before the user opts in (GDPR / ePrivacy). Server-rendering the
+   gtag init script would fire on first paint regardless of consent.
+   By converting to a client component that subscribes to the
+   consent state, scripts only mount after the Accept click.
+
+   Once NEXT_PUBLIC_GA_ID is set in Vercel and the user accepts,
+   this component renders the standard GA4 init + page-view
+   tracking. No further code change needed.
+*/
 
 import Script from "next/script";
+import { useEffect, useState } from "react";
+import { readConsent, onConsentChange, type ConsentState } from "./CookieConsent";
 
 export default function GoogleAnalytics() {
   const gaId = process.env.NEXT_PUBLIC_GA_ID;
+  const [consent, setConsent] = useState<ConsentState | null>(null);
+
+  useEffect(() => {
+    setConsent(readConsent());
+    return onConsentChange(setConsent);
+  }, []);
+
   if (!gaId) return null;
+  if (consent !== "accepted") return null;
 
   return (
     <>
@@ -28,8 +45,6 @@ export default function GoogleAnalytics() {
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
           gtag('config', '${gaId}', {
-            /* Respect privacy by default; revisit when EU users need
-               consent banner integration. */
             anonymize_ip: true,
           });
         `}

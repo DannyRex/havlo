@@ -9,6 +9,7 @@ import { getServerCountry } from "@/lib/country-server";
 import JsonLd from "@/components/seo/JsonLd";
 import GoogleAnalytics from "@/components/seo/GoogleAnalytics";
 import Skimlinks from "@/components/seo/Skimlinks";
+import CookieConsent from "@/components/seo/CookieConsent";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/seo";
 
 const inter = Inter({
@@ -143,11 +144,16 @@ export default function RootLayout({
             <Footer />
           </CountryProvider>
         </ThemeProvider>
-        {/* GA4 — no-op until NEXT_PUBLIC_GA_ID is set in env */}
+        {/* GA4 — no-op until NEXT_PUBLIC_GA_ID is set in env AND the
+            visitor accepts cookies via the consent banner below */}
         <GoogleAnalytics />
         {/* Skimlinks affiliate auto-monetization — no-op until
-            NEXT_PUBLIC_SKIMLINKS_ID is set in env */}
+            NEXT_PUBLIC_SKIMLINKS_ID is set in env AND the visitor
+            accepts cookies */}
         <Skimlinks />
+        {/* Cookie consent banner — renders only on first visit (or
+            after localStorage is cleared). Gates GA4 + Skimlinks. */}
+        <CookieConsent />
       </body>
     </html>
   );
