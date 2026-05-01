@@ -74,7 +74,9 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Havlo · Find similar products for less",
     description: "Paste a link, get cheaper alternatives in seconds.",
-    site: "@havlo_io",  // placeholder — update when you claim the X handle
+    /* `site` intentionally omitted until the X / Twitter handle is
+       claimed. Pointing to a non-existent @handle generates broken
+       attribution links in Twitter share cards and hurts share UX. */
   },
   icons: { icon: "/favicon.ico" },
   robots: {
