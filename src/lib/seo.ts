@@ -42,8 +42,11 @@ export const organizationJsonLd = {
   logo:         `${SITE_URL}/icon`,
   description:  "Independent price-comparison and product-discovery platform serving shoppers in Nigeria and globally.",
   sameAs: [
-    /* Add real social URLs as accounts come online — Google reads
-       these for entity verification + sitelinks. */
+    /* Verified social accounts. Google reads these for entity
+       verification + sitelinks; helps unlock the knowledge-panel
+       social row in branded search results. Add new accounts as
+       they're claimed (X, TikTok, LinkedIn, etc.). */
+    "https://instagram.com/havlo_io",
   ],
   contactPoint: {
     "@type":     "ContactPoint",
