@@ -28,23 +28,32 @@ const ICON_FOR: Record<string, IconComp> = {
 const browsable = categories.filter((c) => c.slug !== "all");
 
 export default async function CategoryGrid() {
-  /* Counts MUST match what /deals?category=X actually shows. Previously
-     used provider.getCategoryCounts() which counted globally (no country
-     filter), so a Nigerian visitor would see "Phones · 32 deals" then
-     click in and find only 8 NG-relevant phone deals. Mismatch = trust
-     erosion (especially bad for partnership prospects evaluating the
-     site).
+  /* Counts MUST match what /deals?category=X actually shows. The deals
+     API (src/app/api/deals/route.ts) applies TWO filters that we need
+     to mirror exactly here, otherwise the homepage tile says "20" and
+     the user clicks in to find "12":
 
-     Fix: compute counts the same way DealFeed renders rows. Fetch all
-     deals via the active provider, then apply filterDealsForCountry
-     (the helper /deals also uses), then bucket by category. Guarantees
-     count(homepage) == count(/deals?category=X) for the same country.
+       1. Default minDiscount=5  — /deals hides items with <5% off so
+          the feed reads as "deals", not a generic catalog.
+       2. effectiveOrigin="intl" for non-NG users  — Konga/Jumia/3C Hub
+          aren't shoppable from UK/US/etc., so the deals API forces
+          origin to "intl" for those visitors.
+
+     We replicate both filters here, then run filterDealsForCountry
+     (the same country gate /deals applies), then bucket by category.
+     Result: count(homepage tile) === count(/deals?category=X) for
+     every country and every category.
 
      Cost: one extra Supabase query (or in-memory iteration for static),
      amortized via the page-level revalidate=300 on the country home. */
   const country = getServerCountry();
+  const isNG = country.code === "ng";
   const provider = await getActiveBrowseProvider();
-  const allDeals = await provider.fetchDeals({});
+
+  const allDeals = await provider.fetchDeals({
+    minDiscount: 5,
+    origin: isNG ? "all" : "intl",
+  });
   const visible = filterDealsForCountry(allDeals, country);
 
   const counts: Record<string, number> = {};
