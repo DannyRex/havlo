@@ -50,11 +50,16 @@ const ROSTERS: Record<string, StoreEntry[]> = {
      long-favorite, Shein for fashion, Amazon for everything else). */
   ng: [
     { name: "Jumia",      domain: "jumia.com.ng" },
-    { name: "Konga",      domain: "konga.com" },
+    /* Konga, 3C Hub, eBay overridden with Clearbit's brand-logo API
+       because the favicon services were returning wrong / generic
+       icons for these specific domains. Clearbit returns proper
+       brand marks at 128px PNG. Fallback to favicon if Clearbit
+       ever 404s on a domain. */
+    { name: "Konga",      domain: "konga.com",   logo: "https://logo.clearbit.com/konga.com" },
     { name: "Jiji",       domain: "jiji.ng" },
     { name: "Slot",       domain: "slot.ng" },
     { name: "Kara",       domain: "kara.com.ng" },
-    { name: "3C Hub",     domain: "3chub.com" },
+    { name: "3C Hub",     domain: "3chub.com",   logo: "https://logo.clearbit.com/3chub.com" },
     { name: "Obiwezy",    domain: "obiwezy.com" },
     { name: "PayPorte",   domain: "payporte.com" },
     { name: "Spar",       domain: "sparnigeria.com" },
@@ -65,7 +70,7 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "Amazon",     domain: "amazon.com" },
     { name: "ASOS",       domain: "asos.com" },
     { name: "DHgate",     domain: "dhgate.com" },
-    { name: "eBay",       domain: "ebay.com" },
+    { name: "eBay",       domain: "ebay.com",    logo: "https://logo.clearbit.com/ebay.com" },
   ],
   uk: [
     // Local UK retailers
@@ -90,7 +95,7 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "Walmart",    domain: "walmart.com" },
     { name: "Best Buy",   domain: "bestbuy.com" },
     { name: "Target",     domain: "target.com" },
-    { name: "eBay",       domain: "ebay.com" },
+    { name: "eBay",       domain: "ebay.com",    logo: "https://logo.clearbit.com/ebay.com" },
     { name: "Newegg",     domain: "newegg.com" },
     { name: "Costco",     domain: "costco.com" },
     { name: "Nordstrom",  domain: "nordstrom.com" },
@@ -155,9 +160,18 @@ const ROSTERS: Record<string, StoreEntry[]> = {
 };
 
 function Chip({ store, ariaHidden }: { store: StoreEntry; ariaHidden: boolean }) {
-  /* Resolve image source: bundled logo wins over domain-derived favicon.
-     Falls back to a letter chip if neither is configured. */
+  /* Resolve image source: bundled or override logo wins over the
+     domain-derived favicon. Falls back to a letter chip if neither
+     is configured. */
   const src = store.logo ?? (store.domain ? faviconUrl(store.domain) : null);
+
+  /* Skip Next's image optimizer for any remote URL (DDG favicon
+     fallback OR an explicit remote `logo` override like Clearbit).
+     Optimization is only safe + valuable for locally-bundled assets
+     under /public/logos. Remote-URL optimization would also require
+     whitelisting each host in next.config — more friction than it's
+     worth for 32px chips. */
+  const isRemote = src?.startsWith("http") ?? false;
 
   return (
     <div className="flex items-center gap-2.5 shrink-0 group cursor-default">
@@ -168,7 +182,7 @@ function Chip({ store, ariaHidden }: { store: StoreEntry; ariaHidden: boolean })
             alt={ariaHidden ? "" : store.name}
             width={32}
             height={32}
-            unoptimized={!store.logo} /* Google s2 already returns small PNGs; skip Next's optimizer */
+            unoptimized={isRemote}
             className={`w-5 h-5 sm:w-5 sm:h-5 object-contain grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300 ${
               store.whiteLogo ? "invert dark:invert-0" : ""
             }`}
