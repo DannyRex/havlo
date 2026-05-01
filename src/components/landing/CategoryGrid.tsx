@@ -28,38 +28,48 @@ const ICON_FOR: Record<string, IconComp> = {
 const browsable = categories.filter((c) => c.slug !== "all");
 
 export default async function CategoryGrid() {
-  /* Counts MUST match what /deals?category=X actually shows. The deals
-     API (src/app/api/deals/route.ts) applies TWO filters that we need
-     to mirror exactly here, otherwise the homepage tile says "20" and
-     the user clicks in to find "12":
+  /* Counts MUST match what /deals?category=X actually shows.
 
-       1. Default minDiscount=5  — /deals hides items with <5% off so
-          the feed reads as "deals", not a generic catalog.
-       2. effectiveOrigin="intl" for non-NG users  — Konga/Jumia/3C Hub
-          aren't shoppable from UK/US/etc., so the deals API forces
-          origin to "intl" for those visitors.
+     Three filters /deals applies that we need to mirror:
+       1. minDiscount=5 default (hide <5% off)
+       2. effectiveOrigin="intl" for non-NG users (drop Konga/Jumia/etc.)
+       3. filterDealsForCountry country gate
 
-     We replicate both filters here, then run filterDealsForCountry
-     (the same country gate /deals applies), then bucket by category.
-     Result: count(homepage tile) === count(/deals?category=X) for
-     every country and every category.
+     PLUS the subtle one that bit us: the DB provider's fetchDeals has
+     a .limit(500) cap. If we fetch ALL deals globally and bucket by
+     category client-side, that 500-cap is split across all categories
+     and undercounts each one. The /deals page doesn't have this
+     problem because it always queries per-category, so the 500 cap
+     applies per category not globally.
 
-     Cost: one extra Supabase query (or in-memory iteration for static),
-     amortized via the page-level revalidate=300 on the country home. */
+     Fix: fan out one fetch per browsable category in parallel, with
+     the same filters /api/deals applies, then count each category's
+     filtered length. Each fetch hits the 500 cap independently which
+     is way above any realistic single-category inventory size, so
+     counts now match what /deals returns as its `total` field.
+
+     Cost: ~10 parallel Supabase queries. With revalidate=300 on the
+     country home page, that's ~120 queries/hour worst case — trivial. */
   const country = getServerCountry();
   const isNG = country.code === "ng";
   const provider = await getActiveBrowseProvider();
+  const origin = isNG ? "all" : "intl";
 
-  const allDeals = await provider.fetchDeals({
-    minDiscount: 5,
-    origin: isNG ? "all" : "intl",
-  });
-  const visible = filterDealsForCountry(allDeals, country);
+  const slugs = browsable.map((c) => c.slug);
+  const perCategory = await Promise.all(
+    slugs.map((slug) =>
+      provider.fetchDeals({
+        categorySlug: slug,
+        minDiscount: 5,
+        origin,
+      }),
+    ),
+  );
 
   const counts: Record<string, number> = {};
-  for (const d of visible) {
-    if (!d.categorySlug) continue;
-    counts[d.categorySlug] = (counts[d.categorySlug] ?? 0) + 1;
+  for (let i = 0; i < slugs.length; i++) {
+    const visible = filterDealsForCountry(perCategory[i], country);
+    counts[slugs[i]] = visible.length;
   }
 
   return (
