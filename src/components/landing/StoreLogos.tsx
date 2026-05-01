@@ -1,37 +1,5 @@
-import Image from "next/image";
 import { getServerCountry } from "@/lib/country-server";
-
-interface StoreEntry {
-  name:       string;
-  /** Path under /public/logos. Optional — overrides the domain-based
-      lookup when we want a specific bundled asset. */
-  logo?:      string;
-  /** Retailer's primary domain. Used to fetch a real favicon via
-      Google's s2 service when no `logo` is bundled. Free, no API key. */
-  domain?:    string;
-  /** White-on-transparent assets get inverted in light mode so they
-      read on the white chip background. */
-  whiteLogo?: boolean;
-}
-
-/* Resolve a favicon URL for a store's domain.
-
-   We use DuckDuckGo's favicon service rather than Google's s2 because
-   it actually crawls each domain for <link rel="icon"> tags and
-   apple-touch-icon meta — which catches retailers that serve icons
-   from non-standard paths (Shopify-hosted stores like 3chub.com,
-   most NG retailers, anything not at /favicon.ico). Google's s2
-   only checks /favicon.ico and returns a generic globe when missing,
-   which made our marquee look half-broken.
-
-   Service: https://icons.duckduckgo.com/ip3/{domain}.ico
-   - Free, no API key, no rate limit issues
-   - Returns a transparent fallback if no icon found (better than
-     globe icon)
-   - Stable since 2018, run by DDG infra */
-function faviconUrl(domain: string): string {
-  return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
-}
+import { StoreLogoChip, type StoreEntry } from "./StoreLogoChip";
 
 /* Per-country marquee rosters.
 
@@ -50,17 +18,16 @@ const ROSTERS: Record<string, StoreEntry[]> = {
      long-favorite, Shein for fashion, Amazon for everything else). */
   ng: [
     { name: "Jumia",      domain: "jumia.com.ng" },
-    /* Konga, 3C Hub, eBay overridden with Clearbit's brand-logo API
-       because the favicon services were returning wrong / generic
-       icons for these specific domains. Clearbit returns proper
-       brand marks at 128px PNG. Fallback to favicon if Clearbit
-       ever 404s on a domain. */
-    { name: "Konga",      domain: "konga.com",   logo: "https://logo.clearbit.com/konga.com" },
+    { name: "Konga",      domain: "konga.com" },
     { name: "Jiji",       domain: "jiji.ng" },
     { name: "Slot",       domain: "slot.ng" },
     { name: "Kara",       domain: "kara.com.ng" },
-    { name: "3C Hub",     domain: "3chub.com",   logo: "https://logo.clearbit.com/3chub.com" },
+    { name: "3C Hub",     domain: "3chub.com" },
     { name: "Obiwezy",    domain: "obiwezy.com" },
+    /* PayPorte: scraper is disabled (robots.txt) but they're still
+       part of the NG retail landscape and worth showing. icon.horse
+       + the StoreLogoChip onError fallback will render a clean "P"
+       letter chip if the favicon returns broken / wrong. */
     { name: "PayPorte",   domain: "payporte.com" },
     { name: "Spar",       domain: "sparnigeria.com" },
     // Cross-border, in NG-shopper preference order
@@ -70,7 +37,7 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "Amazon",     domain: "amazon.com" },
     { name: "ASOS",       domain: "asos.com" },
     { name: "DHgate",     domain: "dhgate.com" },
-    { name: "eBay",       domain: "ebay.com",    logo: "https://logo.clearbit.com/ebay.com" },
+    { name: "eBay",       domain: "ebay.com" },
   ],
   uk: [
     // Local UK retailers
@@ -95,7 +62,7 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "Walmart",    domain: "walmart.com" },
     { name: "Best Buy",   domain: "bestbuy.com" },
     { name: "Target",     domain: "target.com" },
-    { name: "eBay",       domain: "ebay.com",    logo: "https://logo.clearbit.com/ebay.com" },
+    { name: "eBay",       domain: "ebay.com" },
     { name: "Newegg",     domain: "newegg.com" },
     { name: "Costco",     domain: "costco.com" },
     { name: "Nordstrom",  domain: "nordstrom.com" },
@@ -159,57 +126,24 @@ const ROSTERS: Record<string, StoreEntry[]> = {
   ],
 };
 
-function Chip({ store, ariaHidden }: { store: StoreEntry; ariaHidden: boolean }) {
-  /* Resolve image source: bundled or override logo wins over the
-     domain-derived favicon. Falls back to a letter chip if neither
-     is configured. */
-  const src = store.logo ?? (store.domain ? faviconUrl(store.domain) : null);
-
-  /* Skip Next's image optimizer for any remote URL (DDG favicon
-     fallback OR an explicit remote `logo` override like Clearbit).
-     Optimization is only safe + valuable for locally-bundled assets
-     under /public/logos. Remote-URL optimization would also require
-     whitelisting each host in next.config — more friction than it's
-     worth for 32px chips. */
-  const isRemote = src?.startsWith("http") ?? false;
-
-  return (
-    <div className="flex items-center gap-2.5 shrink-0 group cursor-default">
-      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-md overflow-hidden flex items-center justify-center bg-bg border border-border shrink-0">
-        {src ? (
-          <Image
-            src={src}
-            alt={ariaHidden ? "" : store.name}
-            width={32}
-            height={32}
-            unoptimized={isRemote}
-            className={`w-5 h-5 sm:w-5 sm:h-5 object-contain grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300 ${
-              store.whiteLogo ? "invert dark:invert-0" : ""
-            }`}
-          />
-        ) : (
-          /* Logo-less fallback — first letter in a clean styled chip.
-             Looks intentional rather than a broken-image placeholder. */
-          <span
-            aria-hidden="true"
-            className="text-[11px] sm:text-xs font-bold text-ink-3 group-hover:text-ink transition-colors"
-          >
-            {store.name.charAt(0).toUpperCase()}
-          </span>
-        )}
-      </div>
-      <span className="text-sm sm:text-base font-semibold text-ink-3 group-hover:text-ink transition-colors duration-300 whitespace-nowrap tracking-[-0.01em]">
-        {store.name}
-      </span>
-    </div>
-  );
+/* Public helper: how many stores does Havlo cover for the given
+   country? Used by the Hero trust pill to show an accurate, honest
+   "scanning prices across N stores" count that matches the marquee
+   the user actually sees below. Defaults to NG roster when the
+   country code is unknown. */
+export function getStoreCountForCountry(countryCode: string): number {
+  return (ROSTERS[countryCode] ?? ROSTERS.ng).length;
 }
 
 function Track({ stores, ariaHidden = false }: { stores: StoreEntry[]; ariaHidden?: boolean }) {
   return (
     <div className="flex items-center gap-8 sm:gap-14 px-4 sm:px-7 shrink-0" aria-hidden={ariaHidden}>
       {stores.map((store) => (
-        <Chip key={store.name + (ariaHidden ? "-clone" : "")} store={store} ariaHidden={ariaHidden} />
+        <StoreLogoChip
+          key={store.name + (ariaHidden ? "-clone" : "")}
+          store={store}
+          ariaHidden={ariaHidden}
+        />
       ))}
     </div>
   );

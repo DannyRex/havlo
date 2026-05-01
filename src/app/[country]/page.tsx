@@ -4,7 +4,7 @@ import Hero from "@/components/landing/Hero";
 import TrendingDeals from "@/components/landing/TrendingDeals";
 import TrendingSearches from "@/components/landing/TrendingSearches";
 import CategoryGrid from "@/components/landing/CategoryGrid";
-import StoreLogos from "@/components/landing/StoreLogos";
+import StoreLogos, { getStoreCountForCountry } from "@/components/landing/StoreLogos";
 import CTA from "@/components/landing/CTA";
 import RefreshOnInterval from "@/components/ui/RefreshOnInterval";
 import JsonLd from "@/components/seo/JsonLd";
@@ -63,10 +63,15 @@ export default function HomePage({ params }: { params: { country: string } }) {
     { name: country.name, url: `${SITE_URL}/${country.code}` },
   ]);
 
+  /* Pass the user's country store count to the Hero so the trust
+     pill ("scanning prices across N stores") matches the marquee
+     rendered below. Same source of truth, no drift. */
+  const storeCount = getStoreCountForCountry(country.code);
+
   return (
     <>
       <JsonLd data={breadcrumb} />
-      <Hero />
+      <Hero storeCount={storeCount} />
       <TrendingDeals />
       <TrendingSearches />
       <CategoryGrid />

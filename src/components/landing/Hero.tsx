@@ -24,7 +24,14 @@ const CATEGORIES: CatItem[] = [
   { label: "Furniture",  q: "furniture",   Icon: FurnitureIcon },
 ];
 
-export default function Hero() {
+interface Props {
+  /** Number of stores in the user's country marquee. Drives the trust
+      pill copy so the displayed count matches the marquee below
+      instead of being a hardcoded "12+" guess. */
+  storeCount: number;
+}
+
+export default function Hero({ storeCount }: Props) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
@@ -78,7 +85,7 @@ export default function Hero() {
             <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 animate-ping" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
           </span>
-          <span>Live · scanning prices across 12+ stores</span>
+          <span>Live · scanning prices across {storeCount} stores</span>
         </div>
 
         {/* Headline — large, editorial, single tone.
