@@ -6,20 +6,19 @@
    image-error fallback.
 
    Two-layer logo strategy:
-     1. Try the resolved src (explicit override OR icon.horse favicon)
+     1. Try the resolved src (explicit override OR Google s2 favicon)
      2. On load failure, swap to a clean letter chip with the store's
         first character — looks intentional rather than a broken image
-   icon.horse already has its OWN service-level fallback that returns
-   a styled letter icon when no favicon is found, so the component-
-   level fallback here is a backup for network errors / CORS / DNS
-   failures only. Defense in depth.
 
-   Service choice: icon.horse over Google s2 / DuckDuckGo because
-   it's the only one we tested that handles the long tail (Shopify-
-   hosted NG retailers like 3chub, defunct domains, etc.) without
-   returning generic globe placeholders. Clearbit logo API was
-   tried and abandoned — HubSpot has restricted the public endpoint
-   since acquiring them. */
+   Service choice: Google's s2 favicon service. It's been the
+   battle-tested default and renders correct logos for the vast
+   majority of stores in our rosters. We tried switching to DDG
+   then icon.horse; both regressed icons for stores that were
+   already working on s2. Lesson: don't replace something that's
+   working for the long tail to fix one outlier. For specific
+   stores where s2 returns wrong / generic icons, override via
+   StoreEntry.logo with a Clearbit / icon.horse / static-asset
+   URL at the call site instead of changing the global default. */
 
 import Image from "next/image";
 import { useState } from "react";
@@ -38,9 +37,10 @@ export interface StoreEntry {
   whiteLogo?: boolean;
 }
 
-/** Build an icon.horse favicon URL for a store's domain. */
+/** Build a Google s2 favicon URL for a store's domain. Returns a
+    64×64 PNG suitable for the marquee chip. Free, no API key, stable. */
 function faviconUrl(domain: string): string {
-  return `https://icon.horse/icon/${domain}`;
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
 }
 
 export function StoreLogoChip({
