@@ -14,11 +14,23 @@ interface StoreEntry {
   whiteLogo?: boolean;
 }
 
-/* Build a Google favicon URL for a store's domain. Returns a 64x64 PNG
-   suitable for the marquee chip — visibly larger than a tab favicon
-   so logos read clearly even at small chip sizes. */
+/* Resolve a favicon URL for a store's domain.
+
+   We use DuckDuckGo's favicon service rather than Google's s2 because
+   it actually crawls each domain for <link rel="icon"> tags and
+   apple-touch-icon meta — which catches retailers that serve icons
+   from non-standard paths (Shopify-hosted stores like 3chub.com,
+   most NG retailers, anything not at /favicon.ico). Google's s2
+   only checks /favicon.ico and returns a generic globe when missing,
+   which made our marquee look half-broken.
+
+   Service: https://icons.duckduckgo.com/ip3/{domain}.ico
+   - Free, no API key, no rate limit issues
+   - Returns a transparent fallback if no icon found (better than
+     globe icon)
+   - Stable since 2018, run by DDG infra */
 function faviconUrl(domain: string): string {
-  return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+  return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
 }
 
 /* Per-country marquee rosters.

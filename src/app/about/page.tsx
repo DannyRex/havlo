@@ -57,7 +57,7 @@ export default function AboutPage() {
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-lg leading-relaxed">
             Havlo is an independent price comparison platform built for
-            shoppers in emerging markets — starting in Nigeria, expanding
+            shoppers in emerging markets, starting in Nigeria and expanding
             across Africa, the Middle East, Europe, and the Americas. Paste
             any product link or search anything, and we surface cheaper
             alternatives across the world&apos;s biggest stores.
@@ -77,7 +77,7 @@ export default function AboutPage() {
               five tabs and price-checking manually.
             </p>
             <p>
-              We started Havlo to fix that — a single search box where you
+              We started Havlo to fix that. A single search box where you
               can paste any product link or describe what you want, and
               instantly see who has it cheapest, including cross-border
               options. No accounts, no paywalls, no clutter.
@@ -111,7 +111,7 @@ export default function AboutPage() {
               <span>
                 <strong className="text-ink">You buy direct.</strong> Click
                 through to the retailer with the best price. Havlo never
-                resells — final purchase, payment, and delivery happen with
+                resells. Final purchase, payment, and delivery happen with
                 the merchant.
               </span>
             </li>
@@ -122,13 +122,13 @@ export default function AboutPage() {
             and skeptical users will look for. Be transparent, plain. */}
         <section className="mb-12">
           <h2 className="text-xl sm:text-2xl font-bold text-ink tracking-[-0.02em] mb-3">
-            How we make money — without bias
+            How we make money, without bias
           </h2>
           <div className="space-y-3.5 text-ink-2 text-[15px] leading-relaxed">
             <p>
               Havlo is free to use and will stay free. We earn a small
               commission when you click through to a retailer and complete a
-              purchase — at no extra cost to you. This is the same model used
+              purchase, at no extra cost to you. This is the same model used
               by every major comparison and review site (Skyscanner,
               Wirecutter, NerdWallet).
             </p>
@@ -164,39 +164,32 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* Founder */}
+        {/* Get in touch — kept lightweight after removing the founder
+            section. Partnership prospects and retailers still need a
+            clear contact path; the email + contact form CTAs cover that
+            without the personal founder content. */}
         <section className="mb-12">
           <h2 className="text-xl sm:text-2xl font-bold text-ink tracking-[-0.02em] mb-3">
-            Who&apos;s behind it
+            Get in touch
           </h2>
-          <div className="space-y-3.5 text-ink-2 text-[15px] leading-relaxed">
-            <p>
-              Havlo was founded by{" "}
-              <strong className="text-ink">Daniel Ekum</strong> in 2026,
-              built independently from Nigeria. The product is what we&apos;re
-              focused on right now — not raising venture capital or scaling
-              for an exit. A clean, useful tool for finding better prices,
-              owned and operated by people who use it themselves.
-            </p>
-            <p>
-              For partnership inquiries, retailer integrations, press, or
-              anything else, reach us at{" "}
-              <a
-                href="mailto:hello@havlo.io"
-                className="text-ink underline underline-offset-4 decoration-ink/40 hover:decoration-ink"
-              >
-                hello@havlo.io
-              </a>{" "}
-              or via{" "}
-              <Link
-                href="/contact"
-                className="text-ink underline underline-offset-4 decoration-ink/40 hover:decoration-ink"
-              >
-                the contact form
-              </Link>
-              .
-            </p>
-          </div>
+          <p className="text-ink-2 text-[15px] leading-relaxed">
+            For partnership inquiries, retailer integrations, press, or
+            anything else, reach us at{" "}
+            <a
+              href="mailto:hello@havlo.io"
+              className="text-ink underline underline-offset-4 decoration-ink/40 hover:decoration-ink"
+            >
+              hello@havlo.io
+            </a>{" "}
+            or via{" "}
+            <Link
+              href="/contact"
+              className="text-ink underline underline-offset-4 decoration-ink/40 hover:decoration-ink"
+            >
+              the contact form
+            </Link>
+            .
+          </p>
         </section>
 
         {/* CTA */}

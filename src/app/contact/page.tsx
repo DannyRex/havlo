@@ -12,10 +12,10 @@ import ContactForm from "@/components/contact/ContactForm";
 export const metadata: Metadata = {
   title: "Contact",
   description:
-    "Questions, partnerships, or feedback? Send us a note — we read every message.",
+    "Questions, partnerships, or feedback? Send us a note. We read every message.",
   openGraph: {
     title: "Contact · Havlo",
-    description: "Get in touch — questions, partnerships, feedback.",
+    description: "Get in touch with questions, partnerships, or feedback.",
     url: "/contact",
     type: "website",
   },

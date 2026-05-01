@@ -13,7 +13,7 @@ const sections = [
     title: "How we source listings",
     paragraphs: [
       "Havlo combines public catalog data from multiple sources: official retailer affiliate feeds where available, third-party search APIs (Google Shopping via SerpAPI), and lightweight scrapers for retailers that don't expose a feed. We collect only the structured data needed for price comparison: titles, prices, discount percentages, store name, and product image URLs we link to (we do not host product photos).",
-      "We respect retailer robots.txt directives and reasonable rate limits. We honor takedown and exclusion requests within 5 business days — retailers can email hello@havlo.io to remove or update their listings.",
+      "We respect retailer robots.txt directives and reasonable rate limits. We honor takedown and exclusion requests within 5 business days. Retailers can email hello@havlo.io to remove or update their listings.",
     ],
   },
   {

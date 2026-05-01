@@ -11,7 +11,7 @@ export async function generateMetadata({
   const country = getCountry(params.country);
   const url = `${SITE_URL}/${country.code}/compare`;
   const title = `Find products for less in ${country.name}`;
-  const description = `Paste any product link or search by name — Havlo surfaces cheaper alternatives across local + global stores in ${country.name}. Free, no signup.`;
+  const description = `Paste any product link or search by name. Havlo surfaces cheaper alternatives across local + global stores in ${country.name}. Free, no signup.`;
 
   return {
     title,
