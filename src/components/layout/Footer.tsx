@@ -51,10 +51,10 @@ export default function Footer() {
               Find similar products for less. Paste any link or search anything, we surface the cheaper alternatives.
             </p>
             <a
-              href="https://instagram.com/havlo_io"
+              href="https://instagram.com/havlo.io"
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Follow Havlo on Instagram (@havlo_io)"
+              aria-label="Follow Havlo on Instagram (@havlo.io)"
               className="mt-4 inline-flex items-center justify-center text-ink-2 hover:text-ink transition-colors"
             >
               <Instagram size={24} strokeWidth={1.75} aria-hidden="true" />

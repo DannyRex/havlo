@@ -46,7 +46,7 @@ export const organizationJsonLd = {
        verification + sitelinks; helps unlock the knowledge-panel
        social row in branded search results. Add new accounts as
        they're claimed (X, TikTok, LinkedIn, etc.). */
-    "https://instagram.com/havlo_io",
+    "https://instagram.com/havlo.io",
   ],
   contactPoint: {
     "@type":     "ContactPoint",
