@@ -26,15 +26,20 @@ import { useState } from "react";
 export interface StoreEntry {
   name:       string;
   /** Path under /public/logos OR a full https URL. Optional, overrides
-      the domain-based icon.horse lookup when we want a specific asset
+      the domain-based favicon lookup when we want a specific asset
       (e.g. for stores where the favicon is wrong or missing). */
   logo?:      string;
-  /** Retailer's primary domain. Used to build an icon.horse URL when
-      no `logo` override is set. */
+  /** Retailer's primary domain. Used to build a Google s2 favicon URL
+      when no `logo` override is set. */
   domain?:    string;
   /** White-on-transparent assets get inverted in light mode so they
       read on the white chip background. */
   whiteLogo?: boolean;
+  /** Wide horizontal wordmark logos (3chub, Marks & Spencer, etc.)
+      need a wider chip + different sizing so the wordmark stays
+      readable. Without this, object-contain shrinks them to a few
+      pixels tall in the standard square chip. */
+  wideLogo?:  boolean;
 }
 
 /** Build a Google s2 favicon URL for a store's domain. Returns a
@@ -56,21 +61,31 @@ export function StoreLogoChip({
   const isRemote = src?.startsWith("http") ?? false;
   const showLetter = !src || imgFailed;
 
+  /* Wide wordmark logos get a horizontally larger chip so the brand
+     mark stays readable. Square favicon-style icons keep the standard
+     square chip. */
+  const chipSize = store.wideLogo
+    ? "w-16 h-7 sm:w-20 sm:h-8"
+    : "w-7 h-7 sm:w-8 sm:h-8";
+  const imgSize = store.wideLogo
+    ? "w-14 h-5 sm:w-[68px] sm:h-6"
+    : "w-5 h-5 sm:w-5 sm:h-5";
+
   return (
     <div className="flex items-center gap-2.5 shrink-0 group cursor-default">
-      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-md overflow-hidden flex items-center justify-center bg-bg border border-border shrink-0">
+      <div className={`${chipSize} rounded-md overflow-hidden flex items-center justify-center bg-bg border border-border shrink-0`}>
         {!showLetter && src ? (
           <Image
             src={src}
             alt={ariaHidden ? "" : store.name}
-            width={32}
+            width={store.wideLogo ? 80 : 32}
             height={32}
             /* Skip optimizer for any remote URL so we don't have to
                whitelist hosts in next.config. Local /public/logos
                assets keep optimization. */
             unoptimized={isRemote}
             onError={() => setImgFailed(true)}
-            className={`w-5 h-5 sm:w-5 sm:h-5 object-contain grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300 ${
+            className={`${imgSize} object-contain grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300 ${
               store.whiteLogo ? "invert dark:invert-0" : ""
             }`}
           />

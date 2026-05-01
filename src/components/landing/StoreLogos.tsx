@@ -22,7 +22,13 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "Jiji",       domain: "jiji.ng" },
     { name: "Slot",       domain: "slot.ng" },
     { name: "Kara",       domain: "kara.com.ng" },
-    { name: "3C Hub",     domain: "3chub.com" },
+    /* 3C Hub: their site has no favicon.ico / apple-touch-icon, so
+       Google s2 returns nothing usable. Bundled their wordmark from
+       the homepage header (downloaded to /public/logos/3chub.png)
+       so it's permanent and doesn't depend on Shopify CDN URLs that
+       rotate. wideLogo=true tells the chip to render with object-
+       contain at full chip width so the wordmark stays readable. */
+    { name: "3C Hub",     domain: "3chub.com", logo: "/logos/3chub.png", wideLogo: true },
     { name: "Obiwezy",    domain: "obiwezy.com" },
     /* PayPorte: scraper is disabled (robots.txt) but they're still
        part of the NG retail landscape and worth showing. icon.horse
