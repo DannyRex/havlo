@@ -208,6 +208,16 @@ export const serpapiSearchProvider: SearchProvider = {
   name: "SerpAPI Google Shopping",
 
   isActive() {
+    /* Kill switch: SERPAPI_DISABLED=true forces this provider off even
+       when SERPAPI_KEY is present. Use case: credits exhausted and we
+       don't want to pay right now, but we don't want to delete the
+       integration either. Flipping the env var back (or removing it)
+       re-enables on next deploy.
+
+       Why a kill switch instead of just unsetting SERPAPI_KEY: keeps
+       the key in Vercel envs so it's not lost. Many ops accidentally
+       lose API keys when they "temporarily" remove them. */
+    if (process.env.SERPAPI_DISABLED === "true") return false;
     return Boolean(process.env.SERPAPI_KEY?.trim());
   },
 

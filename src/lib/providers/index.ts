@@ -25,12 +25,19 @@ import { kongaSearchProvider } from "./search-konga";
 import { aliexpressSearchProvider } from "./search-aliexpress";
 
 /* Order matters for parallel fan-out:
-     - pg-fts hits our own DB (free, fast — local truth)
+     - pg-fts hits our own DB (free, fast, local truth)
      - Konga affiliate hits NG retail catalog (free once approved)
      - AliExpress affiliate API hits global cross-border catalog (free)
-     - SerpAPI hits Google Shopping live ($, slower — global breadth)
+     - SerpAPI hits Google Shopping live ($, slower, global breadth)
+
    All run in parallel; results are URL-deduped at the route layer.
-   Each provider's isActive() controls whether it joins the fan-out. */
+   Each provider's isActive() controls whether it joins the fan-out.
+
+   SerpAPI kill switch: set SERPAPI_DISABLED=true in env to keep the
+   integration in code but stop firing requests (e.g. credits paused).
+   Search continues to work via the other providers + the internal
+   /api/compare endpoint that uses pgFts on our scraped product
+   catalog (unaffected by SerpAPI status). */
 const SEARCH_PROVIDERS: SearchProvider[] = [
   pgFtsSearchProvider,
   kongaSearchProvider,

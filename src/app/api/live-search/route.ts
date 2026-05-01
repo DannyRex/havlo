@@ -34,12 +34,13 @@ export async function GET(req: NextRequest) {
 
   const providers = getActiveSearchProviders();
   if (providers.length === 0) {
-    // No live search configured — return empty, not an error.
-    // Caller can fall back to internal search.
+    /* No live providers active. Return empty cleanly — internal
+       /api/compare (pgFts on our scraped catalog) is the primary
+       search path and is unaffected. UI should fall back to that. */
     return NextResponse.json({
       items: [],
       providers: [],
-      note: "No live search providers configured. Set SERPAPI_KEY to activate.",
+      note: "Live search providers inactive. Internal search remains available via /api/compare.",
     });
   }
 
