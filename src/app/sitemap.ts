@@ -34,8 +34,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     alternates:     { languages: buildHreflangAlternates("compare") },
   }));
 
-  /* Global routes — country-independent, no hreflang variants. */
+  /* Global routes — country-independent, no hreflang variants. About
+     gets a higher priority (0.6) than legal pages because partnership
+     prospects + branded queries ("havlo about", "havlo founder") land
+     here, and we want it indexed quickly. */
   const globalRoutes: MetadataRoute.Sitemap = [
+    { url: `${SITE_URL}/about`,           priority: 0.6, changeFrequency: "monthly", lastModified: now },
     { url: `${SITE_URL}/contact`,         priority: 0.4, changeFrequency: "yearly",  lastModified: now },
     { url: `${SITE_URL}/privacy-policy`,  priority: 0.3, changeFrequency: "monthly", lastModified: now },
     { url: `${SITE_URL}/terms-of-use`,    priority: 0.3, changeFrequency: "monthly", lastModified: now },

@@ -3,18 +3,23 @@ import { Instagram } from "lucide-react";
 import Logo from "@/components/ui/Logo";
 import CountrySelect from "@/components/layout/CountrySelect";
 
-/* Two-column footer: Product (functional links) and Legal (compliance
-   pages). Contact intentionally lives in the Product column rather
-   than its own one-item "Company" column — looks more balanced and
-   matches user mental model (people scan Product first). When About /
-   Help pages exist, add a third column rather than splitting Product. */
+/* Three-nav-column footer: Product (functional), Company (about /
+   contact / brand-trust), Legal (compliance pages). About lives in
+   Company because partnership prospects and curious users look there
+   first when evaluating "is this a real, trustworthy site." */
 const footerSections = [
   {
     title: "Product",
     links: [
       { label: "Browse deals",  href: "/deals" },
       { label: "Find for less", href: "/compare" },
-      { label: "Contact",       href: "/contact" },
+    ],
+  },
+  {
+    title: "Company",
+    links: [
+      { label: "About",   href: "/about" },
+      { label: "Contact", href: "/contact" },
     ],
   },
   {
@@ -34,7 +39,9 @@ export default function Footer() {
     <footer className="border-t border-border bg-surface">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
 
-        <div className="grid gap-10 sm:grid-cols-3 mb-12">
+        {/* Brand + 3 nav columns. Stack on mobile, 2x2 on tablet (brand
+            takes full width on its own row at sm), 4 across at lg. */}
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 mb-12">
           {/* Brand */}
           <div>
             <Link href="/" className="inline-block mb-4" aria-label="Havlo home">

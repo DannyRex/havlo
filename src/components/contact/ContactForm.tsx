@@ -120,7 +120,7 @@ export default function ContactForm({ endpoint }: Props) {
           autoComplete="name"
           maxLength={120}
           className="w-full px-3.5 py-2.5 rounded-xl bg-surface border border-border text-ink placeholder:text-ink-3 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand/60 transition-shadow"
-          placeholder="Adaeze Okafor"
+          placeholder="Full name"
         />
       </div>
 
