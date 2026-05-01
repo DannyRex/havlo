@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { categories } from "@/lib/data/categories";
 import { getActiveBrowseProvider } from "@/lib/providers";
+import { getServerCountry } from "@/lib/country-server";
+import { filterDealsForCountry } from "@/lib/country";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
   BeautyIcon, SportsIcon, EarbudsIcon, AppliancesIcon, ElectronicsIcon,
@@ -26,11 +28,30 @@ const ICON_FOR: Record<string, IconComp> = {
 const browsable = categories.filter((c) => c.slug !== "all");
 
 export default async function CategoryGrid() {
-  /* Live counts from the active browse provider. Falls back to the
-     hardcoded value in categories.ts if the count is zero (e.g. category
-     hasn't been ingested yet) so empty cards don't read as broken. */
+  /* Counts MUST match what /deals?category=X actually shows. Previously
+     used provider.getCategoryCounts() which counted globally (no country
+     filter), so a Nigerian visitor would see "Phones · 32 deals" then
+     click in and find only 8 NG-relevant phone deals. Mismatch = trust
+     erosion (especially bad for partnership prospects evaluating the
+     site).
+
+     Fix: compute counts the same way DealFeed renders rows. Fetch all
+     deals via the active provider, then apply filterDealsForCountry
+     (the helper /deals also uses), then bucket by category. Guarantees
+     count(homepage) == count(/deals?category=X) for the same country.
+
+     Cost: one extra Supabase query (or in-memory iteration for static),
+     amortized via the page-level revalidate=300 on the country home. */
+  const country = getServerCountry();
   const provider = await getActiveBrowseProvider();
-  const counts = await provider.getCategoryCounts();
+  const allDeals = await provider.fetchDeals({});
+  const visible = filterDealsForCountry(allDeals, country);
+
+  const counts: Record<string, number> = {};
+  for (const d of visible) {
+    if (!d.categorySlug) continue;
+    counts[d.categorySlug] = (counts[d.categorySlug] ?? 0) + 1;
+  }
 
   return (
     <section className="py-12 sm:py-20 bg-bg">
@@ -62,7 +83,13 @@ export default async function CategoryGrid() {
         >
           {browsable.map((cat) => {
             const Icon = ICON_FOR[cat.slug];
-            const count = counts[cat.slug] ?? cat.dealCount;
+            /* Real count from country-filtered fetch above. No fallback
+               to the hardcoded categories.ts value — that value was
+               fictional placeholder data and showing it caused the
+               original mismatch (clicking through revealed real-but-
+               smaller numbers). 0 is honest; the tile is still
+               clickable and the deals page handles empty state. */
+            const count = counts[cat.slug] ?? 0;
             return (
               <Link
                 key={cat.id}
