@@ -49,8 +49,15 @@ export default function ListCard({ deal }: Props) {
             className="w-full h-full object-contain p-1.5 group-hover:scale-[1.04] transition-transform duration-300 motion-reduce:group-hover:scale-100"
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-3xl bg-surface-2" aria-hidden="true">
-            {deal.imageEmoji}
+          /* Gradient + emoji fallback — same treatment as MasonryCard. */
+          <div
+            className="absolute inset-0 flex items-center justify-center text-3xl"
+            style={{ background: deal.imageGradient }}
+            aria-hidden="true"
+          >
+            <span className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.25)]">
+              {deal.imageEmoji}
+            </span>
           </div>
         )}
 

@@ -52,6 +52,11 @@ interface CuratedProduct {
   /** Visual treatment fallback when there's no imageUrl. */
   imageGradient: string;
   imageEmoji:    string;
+  /** Optional: real product photo URL. We use Wikipedia / Wikimedia
+      Commons URLs since they're stable, accessible, no bot detection,
+      and the images are CC-licensed. When omitted, the card renders
+      the gradient + emoji fallback instead. */
+  imageUrl?:    string;
   /** Mark a few flagship items as featured / hot to surface them
       prominently in TrendingDeals + the "hot" view filters. */
   isFeatured?: boolean;
@@ -71,6 +76,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 1199,
     imageGradient: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
     imageEmoji: "📱",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/IPhone_15_Pro_Max_Vector.svg/400px-IPhone_15_Pro_Max_Vector.svg.png",
     isFeatured: true,
   },
   {
@@ -84,6 +90,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 1299,
     imageGradient: "linear-gradient(135deg, #6b7280 0%, #1f2937 100%)",
     imageEmoji: "📱",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Samsung_Galaxy_S24%2C_Sperrbildschirm.JPG/400px-Samsung_Galaxy_S24%2C_Sperrbildschirm.JPG",
   },
 
   /* ── Computing ── */
@@ -98,6 +105,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 1099,
     imageGradient: "linear-gradient(135deg, #cbd5e1 0%, #64748b 100%)",
     imageEmoji: "💻",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Macbook_Air_15_inch_-_2_%28blurred%29.jpg/400px-Macbook_Air_15_inch_-_2_%28blurred%29.jpg",
     isFeatured: true,
   },
   {
@@ -150,6 +158,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 549,
     imageGradient: "linear-gradient(135deg, #475569 0%, #1e293b 100%)",
     imageEmoji: "🎧",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Apple_airpods_max_1.jpg/400px-Apple_airpods_max_1.jpg",
   },
   {
     slug: "sony-wh-1000xm5",
@@ -188,6 +197,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 499,
     imageGradient: "linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%)",
     imageEmoji: "🎮",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Black_and_white_Playstation_5_base_edition_with_controller.png/400px-Black_and_white_Playstation_5_base_edition_with_controller.png",
     isFeatured: true,
   },
   {
@@ -201,6 +211,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 349,
     imageGradient: "linear-gradient(135deg, #ef4444 0%, #1e3a8a 100%)",
     imageEmoji: "🎮",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Nintendo_Switch_%E2%80%93_OLED-Modell%2C_Konsole_und_Dock_20230506.png/400px-Nintendo_Switch_%E2%80%93_OLED-Modell%2C_Konsole_und_Dock_20230506.png",
   },
 
   /* ── Electronics ── */
@@ -298,6 +309,9 @@ function expandProduct(product: CuratedProduct): Deal[] {
       salePrice: product.salePriceUsd,
       discountPercent,
       currency: "USD",
+      /* Real product photo when available; cards fall through to the
+         imageGradient + imageEmoji combination otherwise. */
+      imageUrl: product.imageUrl,
       imageGradient: product.imageGradient,
       imageEmoji: product.imageEmoji,
       url,

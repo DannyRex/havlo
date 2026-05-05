@@ -106,11 +106,17 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05] motion-reduce:group-hover:scale-100"
           />
         ) : (
+          /* No image URL — render the deal's gradient as background +
+             the category emoji centered. Looks intentional and premium
+             rather than a blank grey card. */
           <div
-            className="absolute inset-0 flex items-center justify-center text-5xl"
+            className="absolute inset-0 flex items-center justify-center text-5xl sm:text-6xl"
+            style={{ background: deal.imageGradient }}
             aria-hidden="true"
           >
-            {deal.imageEmoji}
+            <span className="drop-shadow-[0_2px_8px_rgba(0,0,0,0.25)]">
+              {deal.imageEmoji}
+            </span>
           </div>
         )}
 
