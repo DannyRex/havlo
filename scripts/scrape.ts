@@ -207,13 +207,26 @@ async function main() {
     // { name: "AliExpress", probe: "https://www.aliexpress.com/",                   fn: () => scrapeAliExpress(intlPage) },
     { name: "DHgate",     probe: "https://www.dhgate.com/",                       fn: () => scrapeDHgate(intlPage) },
     { name: "ASOS",       probe: "https://www.asos.com/",                         fn: () => scrapeAsos(intlPage) },
-    /* Amazon scraper disabled — deal-page selector + URL token rotated
-       and the scraper now returns 0 cards on every URL. Real fix:
-       Amazon Product Advertising API (PAAPI), unlocks once Associates
-       hits 3 sales in 180 days. Until then, AliExpress API ingest
-       covers the cross-border gap (~10K+ products vs Amazon's prior
-       ~196). Scraper code preserved at scripts/scrapers/amazon.ts. */
-    // { name: "Amazon",     probe: "https://www.amazon.com/",                       fn: () => scrapeAmazon(intlPage) },
+    /* Amazon scraper — opt-in via AMAZON_SCRAPER_ENABLED=true.
+       Default off: Amazon's bot defenses block ~50%+ of runs and
+       polluted the logs / produced 0-deal cron runs. With the env
+       flag we can flip it on for marketplaces / time windows when
+       it's working without auto-crashing every cron.
+
+       When enabled, scrapes US + UK + DE in sequence (AE + IN
+       skipped — sparse best-sellers, low payoff vs ban risk).
+       Each marketplace returns its own RawDeal[] tagged with the
+       right storeId / country code so /api/go picks up the matching
+       affiliate tag (AMAZON_ASSOC_TAG_US/UK/DE). The curated
+       Amazon catalog (src/lib/data/curated-amazon.ts) provides the
+       baseline regardless of scraper state. */
+    ...(process.env.AMAZON_SCRAPER_ENABLED === "true"
+      ? [
+          { name: "Amazon US", probe: "https://www.amazon.com/",     fn: () => scrapeAmazon(intlPage, "us") },
+          { name: "Amazon UK", probe: "https://www.amazon.co.uk/",   fn: () => scrapeAmazon(intlPage, "uk") },
+          { name: "Amazon DE", probe: "https://www.amazon.de/",      fn: () => scrapeAmazon(intlPage, "de") },
+        ]
+      : []),
   ];
 
   const ignoreRobots = process.env.HAVLO_IGNORE_ROBOTS === "1";
