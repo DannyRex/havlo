@@ -5,6 +5,30 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/* Build the click-through URL for a deal. ALWAYS routes the user
+   through /api/go so:
+     1. wrapWithAffiliate appends the right ?tag= for Amazon, ?subId=
+        for Konga, ?aff_short_key= for AliExpress, etc.
+     2. AliExpress URLs get converted to s.click.aliexpress.com via
+        the converter at click time
+     3. Future analytics (which deal got clicked, from which surface)
+        attribute correctly
+
+   Without this wrap, cards would link directly to amazon.com /
+   konga.com / etc. and the affiliate tags would never get applied
+   — which is exactly the bug we just shipped on the curated Amazon
+   catalog. The /api/go route is the affiliate chokepoint and must
+   be in every deal click path. */
+export function getClickThroughUrl(item: { url: string; id?: string }): string {
+  /* Already wrapped (legacy SerpAPI rows, AliExpress converter
+     output, anything else that pre-encoded). Don't double-wrap. */
+  if (item.url.startsWith("/api/go")) return item.url;
+
+  const params = new URLSearchParams({ url: item.url });
+  if (item.id) params.set("id", item.id);
+  return `/api/go?${params.toString()}`;
+}
+
 export function formatNaira(amount: number): string {
   return new Intl.NumberFormat("en-NG", {
     style: "currency",

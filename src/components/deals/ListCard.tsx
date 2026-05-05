@@ -10,6 +10,7 @@ import {
   cleanTitle,
   formatCompact,
   formatUSDPrice,
+  getClickThroughUrl,
   savings,
   timeAgo,
   usdToNgn,
@@ -68,7 +69,9 @@ export default function ListCard({ deal }: Props) {
 
   return (
     <a
-      href={deal.url}
+      /* Routes through /api/go for affiliate tag wrapping — same
+         reason as MasonryCard. */
+      href={getClickThroughUrl(deal)}
       target="_blank"
       rel="noopener noreferrer sponsored"
       aria-label={`${cleanedTitle}, ${priceFmt} at ${deal.storeName}`}

@@ -10,7 +10,7 @@ import DupeCard from "@/components/compare/DupeCard";
 import LiveResults from "@/components/compare/LiveResults";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
-import { formatNaira } from "@/lib/utils";
+import { formatNaira, getClickThroughUrl } from "@/lib/utils";
 import { trackClick } from "@/lib/trackClick";
 import { sniffToAnchor } from "@/lib/sniff-to-anchor";
 import type { SearchOutput, DupeResult } from "@/lib/search";
@@ -324,7 +324,7 @@ function CompareContent() {
                       {result.anchor.offers.slice(0, 4).map((offer, i) => (
                         <a
                           key={`${offer.storeId}-${offer.price}`}
-                          href={offer.url}
+                          href={getClickThroughUrl({ url: offer.url, id: `${result.anchor.key}-${offer.storeId}` })}
                           target="_blank"
                           rel="noopener noreferrer sponsored"
                           onClick={() => trackClick(result.anchor.key, query, i, "similar-anchor")}

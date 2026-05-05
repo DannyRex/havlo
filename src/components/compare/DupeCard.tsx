@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { TrendingDown, ExternalLink, Plane, ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { formatNaira } from "@/lib/utils";
+import { formatNaira, getClickThroughUrl } from "@/lib/utils";
 import { trackClick } from "@/lib/trackClick";
 import type { DupeResult } from "@/lib/search";
 
@@ -91,7 +91,7 @@ export default function DupeCard({
         {/* Primary store CTA — best (cheapest) offer prominent */}
         {bestOffer && (
           <a
-            href={bestOffer.url}
+            href={getClickThroughUrl({ url: bestOffer.url, id: `${dupe.key}-${bestOffer.storeId}` })}
             target="_blank"
             rel="noopener noreferrer sponsored"
             onClick={() => trackClick(dupe.key, query, rank, mode)}
@@ -134,7 +134,7 @@ export default function DupeCard({
                 {visibleOffers.slice(1).map((offer) => (
                   <a
                     key={`${offer.storeId}-${offer.price}`}
-                    href={offer.url}
+                    href={getClickThroughUrl({ url: offer.url, id: `${dupe.key}-${offer.storeId}` })}
                     target="_blank"
                     rel="noopener noreferrer sponsored"
                     onClick={() => trackClick(dupe.key, query, rank, mode)}

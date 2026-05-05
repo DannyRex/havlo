@@ -5,6 +5,7 @@ import {
   formatUSDPrice,
   savings,
   formatCompact,
+  getClickThroughUrl,
   usdToNgn,
 } from "@/lib/utils";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
@@ -39,7 +40,11 @@ function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
 
   return (
     <a
-      href={deal.url}
+      /* /api/go applies wrapWithAffiliate so the right ?tag= /
+         ?subId= / ?aff_short_key= gets appended for the matching
+         retailer. Without this wrap, none of our wired affiliate
+         programs ever earn commission. */
+      href={getClickThroughUrl(deal)}
       target="_blank"
       rel="noopener noreferrer sponsored"
       aria-label={`${deal.title}, ${priceFmt} at ${deal.storeName}`}

@@ -13,6 +13,7 @@ import {
   cleanTitle,
   formatCompact,
   formatUSDPrice,
+  getClickThroughUrl,
   savings,
   timeAgo,
 } from "@/lib/utils";
@@ -124,7 +125,11 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
 
   return (
     <a
-      href={deal.url}
+      /* Routes through /api/go so wrapWithAffiliate appends the right
+         ?tag= for Amazon, ?subId= for Konga, etc. before sending the
+         user to the merchant. Without this wrap, the affiliate tags
+         the project has wired up never actually fire. */
+      href={getClickThroughUrl(deal)}
       target="_blank"
       rel="noopener noreferrer sponsored"
       aria-label={`${cleanedTitle}, ${priceFmt} at ${deal.storeName}`}
