@@ -174,6 +174,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 399,
     imageGradient: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
     imageEmoji: "🎧",
+    imageUrl: "/products/sony-wh-1000xm5.jpg",
   },
   {
     slug: "bose-quietcomfort-ultra",
@@ -186,6 +187,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 429,
     imageGradient: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
     imageEmoji: "🎧",
+    imageUrl: "/products/bose-quietcomfort-ultra.jpg",
   },
 
   /* ── Gaming ── */
@@ -214,7 +216,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 349,
     imageGradient: "linear-gradient(135deg, #ef4444 0%, #1e3a8a 100%)",
     imageEmoji: "🎮",
-    imageUrl: "/products/nintendo-switch-oled.png",
+    imageUrl: "/products/nintendo-switch-oled.jpg",
   },
 
   /* ── Electronics ── */
@@ -242,6 +244,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 199,
     imageGradient: "linear-gradient(135deg, #475569 0%, #1e293b 100%)",
     imageEmoji: "📚",
+    imageUrl: "/products/kindle-paperwhite.jpg",
   },
 
   /* ── Appliances ── */
@@ -256,6 +259,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 749,
     imageGradient: "linear-gradient(135deg, #fbbf24 0%, #b45309 100%)",
     imageEmoji: "🧹",
+    imageUrl: "/products/dyson-v15-detect.jpg",
   },
   {
     slug: "ninja-foodi-air-fryer",
@@ -268,6 +272,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 199,
     imageGradient: "linear-gradient(135deg, #1f2937 0%, #475569 100%)",
     imageEmoji: "🍳",
+    imageUrl: "/products/ninja-foodi-air-fryer.jpg",
   },
 ];
 
