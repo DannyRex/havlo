@@ -76,7 +76,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 1199,
     imageGradient: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
     imageEmoji: "📱",
-    imageUrl: "/products/iphone-15-pro-max.jpg",
+    imageUrl: "https://m.media-amazon.com/images/I/81UKVHM77GL._AC_SL1500_.jpg",
     isFeatured: true,
   },
   {
@@ -90,7 +90,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 1299,
     imageGradient: "linear-gradient(135deg, #6b7280 0%, #1f2937 100%)",
     imageEmoji: "📱",
-    imageUrl: "/products/galaxy-s24-ultra.jpg",
+    imageUrl: "https://m.media-amazon.com/images/I/51A-Q4eMBxL._AC_SL1000_.jpg",
   },
 
   /* ── Computing ── */
@@ -105,7 +105,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 1099,
     imageGradient: "linear-gradient(135deg, #cbd5e1 0%, #64748b 100%)",
     imageEmoji: "💻",
-    imageUrl: "/products/macbook-air-m3-13.jpg",
+    imageUrl: "https://m.media-amazon.com/images/I/71-D1xCuVwL._AC_SL1500_.jpg",
     isFeatured: true,
   },
   {
@@ -119,7 +119,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 599,
     imageGradient: "linear-gradient(135deg, #94a3b8 0%, #475569 100%)",
     imageEmoji: "💻",
-    imageUrl: "/products/ipad-air-m2.jpg",
+    imageUrl: "https://m.media-amazon.com/images/I/41meTpiX+8L._AC_.jpg",
   },
   {
     slug: "dell-xps-13",
@@ -132,7 +132,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 1399,
     imageGradient: "linear-gradient(135deg, #475569 0%, #1e293b 100%)",
     imageEmoji: "💻",
-    imageUrl: "/products/dell-xps-13.jpg",
+    imageUrl: "https://m.media-amazon.com/images/I/71ZktZ8Wn8L._AC_SL1500_.jpg",
   },
 
   /* ── Audio ── */
@@ -147,7 +147,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 249,
     imageGradient: "linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%)",
     imageEmoji: "🎧",
-    imageUrl: "/products/airpods-pro-2.jpg",
+    imageUrl: "https://m.media-amazon.com/images/I/51NRGHU2NoL._AC_SL1500_.jpg",
     isFeatured: true,
   },
   {
@@ -161,7 +161,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 549,
     imageGradient: "linear-gradient(135deg, #475569 0%, #1e293b 100%)",
     imageEmoji: "🎧",
-    imageUrl: "/products/airpods-max.jpg",
+    imageUrl: "https://m.media-amazon.com/images/I/71umw2cCkOL._AC_SL1500_.jpg",
   },
   {
     slug: "sony-wh-1000xm5",
@@ -174,7 +174,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 399,
     imageGradient: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
     imageEmoji: "🎧",
-    imageUrl: "/products/sony-wh-1000xm5.jpg",
+    imageUrl: "https://m.media-amazon.com/images/I/61vJtKbAssL._AC_SL1500_.jpg",
   },
   {
     slug: "bose-quietcomfort-ultra",
@@ -187,7 +187,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 429,
     imageGradient: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
     imageEmoji: "🎧",
-    imageUrl: "/products/bose-quietcomfort-ultra.jpg",
+    imageUrl: "https://m.media-amazon.com/images/I/61z+9dMt9vL._AC_SL1500_.jpg",
   },
 
   /* ── Gaming ── */
@@ -202,7 +202,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 499,
     imageGradient: "linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%)",
     imageEmoji: "🎮",
-    imageUrl: "/products/playstation-5-slim.png",
+    imageUrl: "https://m.media-amazon.com/images/I/51tSjJJl82L._SL1500_.jpg",
     isFeatured: true,
   },
   {
@@ -216,7 +216,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 349,
     imageGradient: "linear-gradient(135deg, #ef4444 0%, #1e3a8a 100%)",
     imageEmoji: "🎮",
-    imageUrl: "/products/nintendo-switch-oled.jpg",
+    imageUrl: "https://m.media-amazon.com/images/I/61nqNujSF2L._SL1330_.jpg",
   },
 
   /* ── Electronics ── */
@@ -231,7 +231,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 399,
     imageGradient: "linear-gradient(135deg, #94a3b8 0%, #1e293b 100%)",
     imageEmoji: "⌚",
-    imageUrl: "/products/apple-watch-series-10.jpg",
+    imageUrl: "https://m.media-amazon.com/images/I/6105jZyXyPL._AC_SL1500_.jpg",
   },
   {
     slug: "kindle-paperwhite",
@@ -244,7 +244,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 199,
     imageGradient: "linear-gradient(135deg, #475569 0%, #1e293b 100%)",
     imageEmoji: "📚",
-    imageUrl: "/products/kindle-paperwhite.jpg",
+    imageUrl: "https://m.media-amazon.com/images/I/61lwtlaSiNL._AC_SL1000_.jpg",
   },
 
   /* ── Appliances ── */
@@ -259,7 +259,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 749,
     imageGradient: "linear-gradient(135deg, #fbbf24 0%, #b45309 100%)",
     imageEmoji: "🧹",
-    imageUrl: "/products/dyson-v15-detect.jpg",
+    imageUrl: "https://m.media-amazon.com/images/I/51d7OAeDG9L._SL1000_.jpg",
   },
   {
     slug: "ninja-foodi-air-fryer",
@@ -272,7 +272,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 199,
     imageGradient: "linear-gradient(135deg, #1f2937 0%, #475569 100%)",
     imageEmoji: "🍳",
-    imageUrl: "/products/ninja-foodi-air-fryer.jpg",
+    imageUrl: "https://m.media-amazon.com/images/I/61xMRA3NY4L._AC_SL1500_.jpg",
   },
 ];
 
