@@ -53,6 +53,39 @@ function rowToDeal(r: BestOfferRow): Deal {
   };
 }
 
+/* True if the deal's stored URL is a usable merchant URL.
+
+   Why this check exists: SerpAPI ingest stored some offers with URLs
+   like "/api/go?url=https://www.google.com/search?...&prds=..." where
+   the underlying URL is Google Shopping. /api/go was supposed to
+   resolve those to the actual merchant URL via SerpAPI's product
+   endpoint at click time. With SerpAPI disabled (SERPAPI_DISABLED=true),
+   the resolver returns null and /api/go's fallback redirects the user
+   to the Google page itself — useless. Filter these offers from the
+   feed entirely until SerpAPI is re-enabled or the rows are cleaned up
+   in a follow-up migration. */
+function isUsableMerchantUrl(url: string): boolean {
+  /* Internal /api/go redirect — peek at the underlying URL and reject
+     when it points at Google. */
+  if (url.startsWith("/api/go?url=")) {
+    try {
+      const encoded = url.slice("/api/go?url=".length).split("&")[0];
+      const inner   = decodeURIComponent(encoded);
+      const host    = new URL(inner).hostname.toLowerCase();
+      return host !== "google.com" && !host.endsWith(".google.com");
+    } catch {
+      return true; // malformed → keep, /api/go can still handle it
+    }
+  }
+  /* Direct Google URL (shouldn't appear in the DB but defend anyway). */
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host !== "google.com" && !host.endsWith(".google.com");
+  } catch {
+    return true;
+  }
+}
+
 /* Map our SortOption → SQL order column + direction */
 function sortToOrder(s: SortOption | undefined): { col: string; asc: boolean } {
   switch (s) {
@@ -112,7 +145,12 @@ export const dbBrowseProvider: BrowseProvider = {
       console.warn("[browse-db] query error:", error.message);
       return [];
     }
-    return (data as BestOfferRow[]).map(rowToDeal);
+    /* Drop offers whose URL points at Google Shopping (legacy SerpAPI
+       ingest residue). Without SerpAPI to resolve, those clicks land
+       the user on a Google search page — broken UX. */
+    return (data as BestOfferRow[])
+      .filter((r) => isUsableMerchantUrl(r.url))
+      .map(rowToDeal);
   },
 
   async getCategoryCounts(): Promise<Record<string, number>> {

@@ -164,7 +164,13 @@ export async function GET(req: NextRequest) {
     return sendOut(resolved);
   }
 
-  /* Last resort — send them to the Google relay rather than 500ing.
-     They'll see a Google product page; not ideal but never broken. */
-  return sendOut(target);
+  /* Last resort — Google relay we couldn't resolve. Used to 307 to
+     the Google URL itself but that lands the user on a Google
+     Shopping search page which feels broken (they expected to
+     reach a merchant). Send them to the homepage with a deal-
+     unavailable indicator so the UX is at least sensible. The
+     country-aware redirect picks the right /{country}/ root. */
+  const home = new URL(`${req.nextUrl.origin}/${country.code}`);
+  home.searchParams.set("deal_unavailable", "1");
+  return NextResponse.redirect(home, 307);
 }

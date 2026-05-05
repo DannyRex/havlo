@@ -23,6 +23,28 @@ function applyOriginFilter(items: Deal[], origin: BrowseQuery["origin"]): Deal[]
   return items;
 }
 
+/* Drop deals whose stored URL is a Google Shopping relay (legacy
+   SerpAPI ingest residue). With SerpAPI disabled the relay can't
+   be resolved at click time, so those deals dump users on a Google
+   search page. Same filter logic as browse-db.ts. */
+function isUsableMerchantUrl(url: string): boolean {
+  if (url.startsWith("/api/go?url=")) {
+    try {
+      const encoded = url.slice("/api/go?url=".length).split("&")[0];
+      const host    = new URL(decodeURIComponent(encoded)).hostname.toLowerCase();
+      return host !== "google.com" && !host.endsWith(".google.com");
+    } catch {
+      return true;
+    }
+  }
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host !== "google.com" && !host.endsWith(".google.com");
+  } catch {
+    return true;
+  }
+}
+
 export const staticBrowseProvider: BrowseProvider = {
   id: "static-scraped",
   name: "Static (scraped data)",
@@ -38,10 +60,15 @@ export const staticBrowseProvider: BrowseProvider = {
       sort: q.sort,
       search: q.search,
     });
+    /* Drop unusable Google-relay URLs before any other transform.
+       Defense in depth — the static dataset shouldn't contain these
+       (it comes from scrapers, not SerpAPI), but filter anyway so
+       this provider's contract matches browse-db. */
+    const usable = base.filter((d) => isUsableMerchantUrl(d.url));
     /* Origin filter applied here because @/lib/data/deals#getDeals
        doesn't know about it. Caller (TrendingDeals etc.) relies on this
        to honor the local / intl quota split. */
-    return applyOriginFilter(base, q.origin);
+    return applyOriginFilter(usable, q.origin);
   },
 
   async getOriginCounts(q): Promise<OriginCounts> {
