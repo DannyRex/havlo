@@ -5,7 +5,7 @@
 import type { BrowseProvider, BrowseQuery, OriginCounts } from "./types";
 import type { Deal, OriginFilter, SortOption } from "@/types";
 import { getSupabaseAdmin } from "./db-client";
-import { getCuratedDeals } from "./curated-helper";
+import { getCuratedDeals, sortDeals } from "./curated-helper";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 
 interface BestOfferRow {
@@ -156,12 +156,12 @@ export const dbBrowseProvider: BrowseProvider = {
     const fromDb = (data as BestOfferRow[])
       .filter((r) => isUsableMerchantUrl(r.url))
       .map(rowToDeal);
-    /* Merge curated Amazon catalog so it surfaces alongside the
-       ingested data. See curated-helper for the filter contract.
-       Curated front-loads so it appears in the first page of feeds
-       that don't apply an explicit sort. */
+    /* Merge curated Amazon catalog with the ingested data, then
+       re-apply the requested sort to the combined array. Lets
+       curated entries compete on the same sort criteria as scraped
+       data instead of always front-loading the feed. */
     const curated = getCuratedDeals(q);
-    return [...curated, ...fromDb];
+    return sortDeals([...fromDb, ...curated], q.sort);
   },
 
   async getCategoryCounts(): Promise<Record<string, number>> {

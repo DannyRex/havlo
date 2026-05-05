@@ -76,7 +76,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 1199,
     imageGradient: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
     imageEmoji: "📱",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/IPhone_15_Pro_Max_Vector.svg?width=500",
+    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/IPhone_15_Pro_Max.jpeg?width=500",
     isFeatured: true,
   },
   {

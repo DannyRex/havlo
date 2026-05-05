@@ -9,7 +9,7 @@
 import type { BrowseProvider, BrowseQuery, OriginCounts } from "./types";
 import { getDeals } from "@/lib/data/deals";
 import { deals } from "@/lib/data/deals";
-import { getCuratedDeals } from "./curated-helper";
+import { getCuratedDeals, sortDeals } from "./curated-helper";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 import type { Deal } from "@/types";
 
@@ -71,13 +71,12 @@ export const staticBrowseProvider: BrowseProvider = {
        doesn't know about it. Caller (TrendingDeals etc.) relies on this
        to honor the local / intl quota split. */
     const filtered = applyOriginFilter(usable, q.origin);
-    /* Merge curated Amazon catalog so it surfaces alongside the
-       scraped data. Curated entries front-load the array so they
-       show up in the first page of any feed sort that doesn't
-       explicitly reorder (newest-first will still beat them in
-       date sorts though, since curated postedAt is fresh). */
+    /* Merge curated Amazon catalog with the scraped data, then
+       re-apply the requested sort to the combined array. This keeps
+       curated entries from artificially ranking first — they
+       compete on the same sort criteria as scraped items. */
     const curated = getCuratedDeals(q);
-    return [...curated, ...filtered];
+    return sortDeals([...filtered, ...curated], q.sort);
   },
 
   async getOriginCounts(q): Promise<OriginCounts> {

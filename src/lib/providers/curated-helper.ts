@@ -13,8 +13,44 @@
    so country gating still works correctly. */
 
 import type { BrowseQuery } from "./types";
-import type { Deal, OriginFilter } from "@/types";
+import type { Deal, OriginFilter, SortOption } from "@/types";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
+
+/* Sort a Deal[] by the BrowseQuery's sort option. Used to apply the
+   user's requested order across the COMBINED set of native + curated
+   deals so curated entries don't artificially float to the top.
+
+   Why this matters: if we just concatenated `[...curated, ...native]`,
+   the homepage and /deals pages would always show Amazon products
+   first regardless of sort choice — feels like paid promotion and
+   undermines trust. Re-sorting the combined array lets curated
+   entries rank naturally (a 25%-off MacBook ranks ahead of a 5%-off
+   scraped item under the discount sort, but behind a 60%-off
+   scraped one — same rules for everyone). */
+export function sortDeals(deals: Deal[], sort: SortOption | undefined): Deal[] {
+  const sorted = [...deals];
+  switch (sort) {
+    case "price_asc":
+      sorted.sort((a, b) => a.salePrice - b.salePrice);
+      break;
+    case "price_desc":
+      sorted.sort((a, b) => b.salePrice - a.salePrice);
+      break;
+    case "discount":
+      sorted.sort((a, b) => b.discountPercent - a.discountPercent);
+      break;
+    case "popular":
+      sorted.sort((a, b) => b.clicks - a.clicks);
+      break;
+    case "newest":
+    default:
+      sorted.sort(
+        (a, b) =>
+          new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime(),
+      );
+  }
+  return sorted;
+}
 
 export function getCuratedDeals(q: BrowseQuery): Deal[] {
   let result: Deal[] = [...curatedAmazonDeals];
