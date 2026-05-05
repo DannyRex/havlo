@@ -76,7 +76,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 1199,
     imageGradient: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
     imageEmoji: "📱",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/IPhone_15_Pro_Max.jpeg?width=500",
+    imageUrl: "/products/iphone-15-pro-max.jpg",
     isFeatured: true,
   },
   {
@@ -90,7 +90,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 1299,
     imageGradient: "linear-gradient(135deg, #6b7280 0%, #1f2937 100%)",
     imageEmoji: "📱",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Samsung_Galaxy_S24%2C_Sperrbildschirm.JPG?width=500",
+    imageUrl: "/products/galaxy-s24-ultra.jpg",
   },
 
   /* ── Computing ── */
@@ -105,7 +105,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 1099,
     imageGradient: "linear-gradient(135deg, #cbd5e1 0%, #64748b 100%)",
     imageEmoji: "💻",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Macbook_Air_15_inch_-_2_%28blurred%29.jpg?width=500",
+    imageUrl: "/products/macbook-air-m3-13.jpg",
     isFeatured: true,
   },
   {
@@ -119,6 +119,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 599,
     imageGradient: "linear-gradient(135deg, #94a3b8 0%, #475569 100%)",
     imageEmoji: "💻",
+    imageUrl: "/products/ipad-air-m2.jpg",
   },
   {
     slug: "dell-xps-13",
@@ -131,6 +132,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 1399,
     imageGradient: "linear-gradient(135deg, #475569 0%, #1e293b 100%)",
     imageEmoji: "💻",
+    imageUrl: "/products/dell-xps-13.jpg",
   },
 
   /* ── Audio ── */
@@ -145,6 +147,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 249,
     imageGradient: "linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%)",
     imageEmoji: "🎧",
+    imageUrl: "/products/airpods-pro-2.jpg",
     isFeatured: true,
   },
   {
@@ -158,7 +161,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 549,
     imageGradient: "linear-gradient(135deg, #475569 0%, #1e293b 100%)",
     imageEmoji: "🎧",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Apple_airpods_max_1.jpg?width=500",
+    imageUrl: "/products/airpods-max.jpg",
   },
   {
     slug: "sony-wh-1000xm5",
@@ -197,7 +200,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 499,
     imageGradient: "linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%)",
     imageEmoji: "🎮",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Black_and_white_Playstation_5_base_edition_with_controller.png?width=500",
+    imageUrl: "/products/playstation-5-slim.png",
     isFeatured: true,
   },
   {
@@ -211,7 +214,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 349,
     imageGradient: "linear-gradient(135deg, #ef4444 0%, #1e3a8a 100%)",
     imageEmoji: "🎮",
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Nintendo_Switch_%E2%80%93_OLED-Modell%2C_Konsole_und_Dock_20230506.png?width=500",
+    imageUrl: "/products/nintendo-switch-oled.png",
   },
 
   /* ── Electronics ── */
@@ -226,6 +229,7 @@ const PRODUCTS: CuratedProduct[] = [
     originalPriceUsd: 399,
     imageGradient: "linear-gradient(135deg, #94a3b8 0%, #1e293b 100%)",
     imageEmoji: "⌚",
+    imageUrl: "/products/apple-watch-series-10.jpg",
   },
   {
     slug: "kindle-paperwhite",
