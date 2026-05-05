@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { categories } from "@/lib/data/categories";
 import { COUNTRIES } from "@/lib/country";
 import { SITE_URL, buildHreflangAlternates } from "@/lib/seo";
+import { posts } from "@/lib/blog/posts";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
@@ -40,11 +41,23 @@ export default function sitemap(): MetadataRoute.Sitemap {
      here, and we want it indexed quickly. */
   const globalRoutes: MetadataRoute.Sitemap = [
     { url: `${SITE_URL}/about`,           priority: 0.6, changeFrequency: "monthly", lastModified: now },
+    { url: `${SITE_URL}/blog`,            priority: 0.7, changeFrequency: "weekly",  lastModified: now },
     { url: `${SITE_URL}/contact`,         priority: 0.4, changeFrequency: "yearly",  lastModified: now },
     { url: `${SITE_URL}/privacy-policy`,  priority: 0.3, changeFrequency: "monthly", lastModified: now },
     { url: `${SITE_URL}/terms-of-use`,    priority: 0.3, changeFrequency: "monthly", lastModified: now },
     { url: `${SITE_URL}/disclaimer`,      priority: 0.3, changeFrequency: "monthly", lastModified: now },
   ];
+
+  /* Blog post URLs — high priority since they target commercial-intent
+     queries and we want Google to crawl/rank them quickly. lastModified
+     uses the post's own publishedAt rather than `now` so unchanged
+     posts don't get treated as updated each time the sitemap rebuilds. */
+  const blogPostRoutes: MetadataRoute.Sitemap = posts.map((post) => ({
+    url:             `${SITE_URL}/blog/${post.slug}`,
+    priority:        0.7,
+    changeFrequency: "monthly",
+    lastModified:    new Date(post.publishedAt),
+  }));
 
   /* Category routes — country-scoped + hreflang. Each category surfaces
      the same product taxonomy across all 6 countries. */
@@ -66,5 +79,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       })),
   );
 
-  return [...homepages, ...dealsPages, ...comparePages, ...globalRoutes, ...categoryRoutes];
+  return [
+    ...homepages,
+    ...dealsPages,
+    ...comparePages,
+    ...globalRoutes,
+    ...blogPostRoutes,
+    ...categoryRoutes,
+  ];
 }

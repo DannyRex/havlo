@@ -5,6 +5,7 @@ import TrendingDeals from "@/components/landing/TrendingDeals";
 import TrendingSearches from "@/components/landing/TrendingSearches";
 import CategoryGrid from "@/components/landing/CategoryGrid";
 import StoreLogos, { getStoreCountForCountry } from "@/components/landing/StoreLogos";
+import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import CTA from "@/components/landing/CTA";
 import RefreshOnInterval from "@/components/ui/RefreshOnInterval";
 import JsonLd from "@/components/seo/JsonLd";
@@ -76,6 +77,7 @@ export default function HomePage({ params }: { params: { country: string } }) {
       <TrendingSearches />
       <CategoryGrid />
       <StoreLogos />
+      <NewsletterStrip />
       <CTA />
       <RefreshOnInterval ms={300_000} />
     </>
