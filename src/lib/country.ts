@@ -179,10 +179,76 @@ export const COUNTRY_STORES: Record<string, string[]> = {
 };
 
 interface DealLike {
+  /** Optional. Used by dedupeCuratedAmazon to identify curated entries
+      via their `amazon-{marketplace}-{slug}` id pattern. */
+  id?:        string;
   storeId:    string;
   storeName:  string;
   currency:   string;
   tags:       string[];
+}
+
+/* Per-country preferred Amazon marketplace. Drives the dedupe step in
+   filterDealsForCountry: the curated Amazon catalog generates one
+   entry per marketplace (5 per product), and without dedupe a NG user
+   sees the same iPhone listed 5x at the same USD price across US, UK,
+   DE, AE, IN. We pick ONE marketplace per user country and drop the
+   rest.
+
+   Mapping logic:
+     - NG / ZA: prefer US (most cross-border traffic from these markets
+       routes to amazon.com per the affiliate.ts marketplace data)
+     - All others: prefer their own marketplace */
+const PREFERRED_AMAZON_MARKETPLACE: Record<string, string> = {
+  ng: "us",
+  us: "us",
+  uk: "uk",
+  de: "de",
+  ae: "ae",
+  in: "in",
+  za: "us",
+};
+
+/* Collapse curated-Amazon duplicates to one entry per product.
+   Curated catalog ids follow the pattern `amazon-{marketplace}-{slug}`
+   (e.g. `amazon-us-iphone-15-pro-max`). Identifies entries by id
+   pattern so non-curated Amazon deals (from scraper or future PAAPI
+   ingest) pass through untouched. */
+function dedupeCuratedAmazon<T extends DealLike>(
+  deals: T[],
+  country: Country,
+): T[] {
+  const preferred = PREFERRED_AMAZON_MARKETPLACE[country.code] ?? "us";
+  const result: T[] = [];
+  const seenSlugs = new Set<string>();
+
+  /* Pass 1: emit non-curated-Amazon as-is, plus curated entries at the
+     preferred marketplace. Tracks slugs we've already kept. */
+  for (const d of deals) {
+    const m = d.id?.match(/^amazon-(us|uk|de|ae|in)-(.+)$/);
+    if (!m) {
+      result.push(d);
+      continue;
+    }
+    if (m[1] === preferred) {
+      result.push(d);
+      seenSlugs.add(m[2]);
+    }
+  }
+
+  /* Pass 2: defensive fallback. If for any reason a product wasn't
+     emitted in the preferred marketplace (shouldn't happen since the
+     curated catalog has all 5), grab the first available marketplace
+     so the product still appears once. */
+  for (const d of deals) {
+    const m = d.id?.match(/^amazon-(us|uk|de|ae|in)-(.+)$/);
+    if (!m) continue;
+    if (seenSlugs.has(m[2])) continue;
+    result.push(d);
+    seenSlugs.add(m[2]);
+  }
+
+  return result;
 }
 
 /* Smaller shape for StoreOffer (in /compare anchor + dupe pipelines).
@@ -244,7 +310,7 @@ export function isStoreInCountry<T extends DealLike | OfferLike>(d: T, countryCo
       cross-border, country-tagged matches, and known country-roster
       stores (Amazon UK / ASOS / Argos for UK, etc.). */
 export function filterDealsForCountry<T extends DealLike>(deals: T[], country: Country): T[] {
-  return deals.filter((d) => {
+  const countryFiltered = deals.filter((d) => {
     /* NG path: keep all NG-anchored stores + only country-appropriate
        cross-border + Amazon. Drop foreign-country-anchored retailers
        that Nigerians can't actually use (Flipkart, Tata CLiQ, Walmart). */
@@ -271,6 +337,12 @@ export function filterDealsForCountry<T extends DealLike>(deals: T[], country: C
     if (tag === null) return true;
     return false;
   });
+
+  /* Final pass: collapse curated-Amazon entries to one per product
+     based on the user's preferred marketplace. Without this the INTL
+     tab shows the same item 5x at the same USD price (one per
+     marketplace), which reads as duplicate junk. */
+  return dedupeCuratedAmazon(countryFiltered, country);
 }
 
 /** Variant for StoreOffer-style rows (compare anchor + dupes pipeline).
