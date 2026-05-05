@@ -9,6 +9,8 @@
 import type { BrowseProvider, BrowseQuery, OriginCounts } from "./types";
 import { getDeals } from "@/lib/data/deals";
 import { deals } from "@/lib/data/deals";
+import { getCuratedDeals } from "./curated-helper";
+import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 import type { Deal } from "@/types";
 
 /* USD currency is our locality signal — matches the rest of the app
@@ -68,7 +70,14 @@ export const staticBrowseProvider: BrowseProvider = {
     /* Origin filter applied here because @/lib/data/deals#getDeals
        doesn't know about it. Caller (TrendingDeals etc.) relies on this
        to honor the local / intl quota split. */
-    return applyOriginFilter(usable, q.origin);
+    const filtered = applyOriginFilter(usable, q.origin);
+    /* Merge curated Amazon catalog so it surfaces alongside the
+       scraped data. Curated entries front-load the array so they
+       show up in the first page of any feed sort that doesn't
+       explicitly reorder (newest-first will still beat them in
+       date sorts though, since curated postedAt is fresh). */
+    const curated = getCuratedDeals(q);
+    return [...curated, ...filtered];
   },
 
   async getOriginCounts(q): Promise<OriginCounts> {
@@ -77,17 +86,27 @@ export const staticBrowseProvider: BrowseProvider = {
       minDiscount: q.minDiscount,
       search: q.search,
     });
+    /* Include curated in counts so the origin toggle reflects what
+       actually renders in the feed. Same filter chain as fetchDeals. */
+    const curated = getCuratedDeals({ ...q, origin: "all" });
+    const combined = [...base, ...curated];
     let local = 0;
     let intl  = 0;
-    for (const d of base) {
+    for (const d of combined) {
       if (isIntl(d)) intl++; else local++;
     }
-    return { all: base.length, local, intl };
+    return { all: combined.length, local, intl };
   },
 
   async getCategoryCounts(): Promise<Record<string, number>> {
     const counts: Record<string, number> = {};
     for (const d of deals) {
+      if (!d.categorySlug) continue;
+      counts[d.categorySlug] = (counts[d.categorySlug] ?? 0) + 1;
+    }
+    /* Add curated to category counts. Each curated row counts once
+       per marketplace expansion (since each is a distinct deal). */
+    for (const d of curatedAmazonDeals) {
       if (!d.categorySlug) continue;
       counts[d.categorySlug] = (counts[d.categorySlug] ?? 0) + 1;
     }

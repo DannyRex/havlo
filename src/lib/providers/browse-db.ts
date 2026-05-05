@@ -5,6 +5,8 @@
 import type { BrowseProvider, BrowseQuery, OriginCounts } from "./types";
 import type { Deal, OriginFilter, SortOption } from "@/types";
 import { getSupabaseAdmin } from "./db-client";
+import { getCuratedDeals } from "./curated-helper";
+import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 
 interface BestOfferRow {
   product_id: string;
@@ -143,24 +145,41 @@ export const dbBrowseProvider: BrowseProvider = {
     const { data, error } = await query;
     if (error) {
       console.warn("[browse-db] query error:", error.message);
-      return [];
+      /* Even on a DB query failure, surface the curated catalog so
+         the homepage isn't completely empty. Better than a blank
+         page when Supabase is briefly unavailable. */
+      return getCuratedDeals(q);
     }
     /* Drop offers whose URL points at Google Shopping (legacy SerpAPI
        ingest residue). Without SerpAPI to resolve, those clicks land
        the user on a Google search page — broken UX. */
-    return (data as BestOfferRow[])
+    const fromDb = (data as BestOfferRow[])
       .filter((r) => isUsableMerchantUrl(r.url))
       .map(rowToDeal);
+    /* Merge curated Amazon catalog so it surfaces alongside the
+       ingested data. See curated-helper for the filter contract.
+       Curated front-loads so it appears in the first page of feeds
+       that don't apply an explicit sort. */
+    const curated = getCuratedDeals(q);
+    return [...curated, ...fromDb];
   },
 
   async getCategoryCounts(): Promise<Record<string, number>> {
     const supa = getSupabaseAdmin();
-    if (!supa) return {};
+    const counts: Record<string, number> = {};
+
+    /* Always include curated in counts so the homepage tile reflects
+       what actually surfaces in the feed below. */
+    for (const d of curatedAmazonDeals) {
+      if (!d.categorySlug) continue;
+      counts[d.categorySlug] = (counts[d.categorySlug] ?? 0) + 1;
+    }
+
+    if (!supa) return counts;
     const { data, error } = await supa
       .from("products")
       .select("category_slug");
-    if (error || !data) return {};
-    const counts: Record<string, number> = {};
+    if (error || !data) return counts;
     for (const r of data as Array<{ category_slug: string | null }>) {
       if (!r.category_slug) continue;
       counts[r.category_slug] = (counts[r.category_slug] ?? 0) + 1;
