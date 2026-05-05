@@ -12,8 +12,8 @@
    search, origin). filterDealsForCountry runs downstream of this
    so country gating still works correctly. */
 
-import type { BrowseQuery, OriginFilter } from "./types";
-import type { Deal } from "@/types";
+import type { BrowseQuery } from "./types";
+import type { Deal, OriginFilter } from "@/types";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 
 export function getCuratedDeals(q: BrowseQuery): Deal[] {
