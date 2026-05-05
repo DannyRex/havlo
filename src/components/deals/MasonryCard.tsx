@@ -8,6 +8,7 @@
    Layout utilities (chunkLeftToRight, MASONRY_ASPECTS) live in
    masonry-layout.ts so server components can still import them. */
 
+import { useState } from "react";
 import {
   cleanTitle,
   formatCompact,
@@ -48,6 +49,41 @@ function convertToUserCurrency(amount: number, dealCurrency: string, country: Co
 
   // USD → user currency
   return Math.round(inUsd * (USD_FX[country.currency] ?? 1));
+}
+
+/* Resilient image renderer. Tries the deal's imageUrl; on load
+   failure (DNS, 404, CORS, deleted file), swaps to the gradient +
+   emoji fallback so users never see a broken image icon. */
+function ResilientImage({ deal, priority }: { deal: Deal; priority: boolean }) {
+  const [failed, setFailed] = useState(false);
+  const showFallback = !deal.imageUrl || failed;
+
+  if (showFallback) {
+    return (
+      <div
+        className="absolute inset-0 flex items-center justify-center text-5xl sm:text-6xl"
+        style={{ background: deal.imageGradient }}
+        aria-hidden="true"
+      >
+        <span className="drop-shadow-[0_2px_8px_rgba(0,0,0,0.25)]">
+          {deal.imageEmoji}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src={deal.imageUrl}
+      alt=""
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : "auto"}
+      decoding={priority ? "sync" : "async"}
+      onError={() => setFailed(true)}
+      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05] motion-reduce:group-hover:scale-100"
+    />
+  );
 }
 
 export default function MasonryCard({ deal, aspect, showOriginBadge = true, priority = false }: Props) {
@@ -95,30 +131,12 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
       className="group block"
     >
       <div className={`relative overflow-hidden rounded-xl sm:rounded-2xl bg-surface-2 border border-border ${aspect}`}>
-        {deal.imageUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={deal.imageUrl}
-            alt=""
-            loading={priority ? "eager" : "lazy"}
-            fetchPriority={priority ? "high" : "auto"}
-            decoding={priority ? "sync" : "async"}
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05] motion-reduce:group-hover:scale-100"
-          />
-        ) : (
-          /* No image URL — render the deal's gradient as background +
-             the category emoji centered. Looks intentional and premium
-             rather than a blank grey card. */
-          <div
-            className="absolute inset-0 flex items-center justify-center text-5xl sm:text-6xl"
-            style={{ background: deal.imageGradient }}
-            aria-hidden="true"
-          >
-            <span className="drop-shadow-[0_2px_8px_rgba(0,0,0,0.25)]">
-              {deal.imageEmoji}
-            </span>
-          </div>
-        )}
+        <ResilientImage deal={deal} priority={priority} />
+        {/* When the image fails to load (CDN block, deleted file, network),
+            we swap to the gradient + emoji at runtime via state in
+            ResilientImage below. Users never see a broken image icon —
+            either the real photo loads, or they see a clean intentional
+            fallback card. Same defense-in-depth pattern as StoreLogoChip. */}
 
         {/* Discount badge — perfect circle, top-right */}
         {hasDiscount && (

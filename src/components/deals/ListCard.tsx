@@ -1,8 +1,11 @@
+"use client";
+
 /* List-style card used on /deals when the user toggles "list view"
    on mobile. Image left, all text on the right, more info per row
    than the masonry grid. Better for buying-intent scanning, worse
    for casual visual browsing — that's why it's a user choice. */
 
+import { useState } from "react";
 import {
   cleanTitle,
   formatCompact,
@@ -12,6 +15,39 @@ import {
   usdToNgn,
 } from "@/lib/utils";
 import type { Deal } from "@/types";
+
+/* Same onError fallback pattern as MasonryCard's ResilientImage —
+   when the image fails to load, swap to the gradient + emoji
+   fallback so users never see a broken image icon. */
+function ResilientThumb({ deal }: { deal: Deal }) {
+  const [failed, setFailed] = useState(false);
+  const showFallback = !deal.imageUrl || failed;
+
+  if (showFallback) {
+    return (
+      <div
+        className="absolute inset-0 flex items-center justify-center text-3xl"
+        style={{ background: deal.imageGradient }}
+        aria-hidden="true"
+      >
+        <span className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.25)]">
+          {deal.imageEmoji}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src={deal.imageUrl}
+      alt=""
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="w-full h-full object-contain p-1.5 group-hover:scale-[1.04] transition-transform duration-300 motion-reduce:group-hover:scale-100"
+    />
+  );
+}
 
 interface Props {
   deal: Deal;
@@ -40,26 +76,7 @@ export default function ListCard({ deal }: Props) {
     >
       {/* Image — square thumbnail on the left */}
       <div className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-white border border-border">
-        {deal.imageUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={deal.imageUrl}
-            alt=""
-            loading="lazy"
-            className="w-full h-full object-contain p-1.5 group-hover:scale-[1.04] transition-transform duration-300 motion-reduce:group-hover:scale-100"
-          />
-        ) : (
-          /* Gradient + emoji fallback — same treatment as MasonryCard. */
-          <div
-            className="absolute inset-0 flex items-center justify-center text-3xl"
-            style={{ background: deal.imageGradient }}
-            aria-hidden="true"
-          >
-            <span className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.25)]">
-              {deal.imageEmoji}
-            </span>
-          </div>
-        )}
+        <ResilientThumb deal={deal} />
 
         {/* Discount badge — perfect circle, top-right of the thumbnail */}
         {hasDiscount && (
