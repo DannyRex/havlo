@@ -8,6 +8,7 @@ import Image from "next/image";
 import PriceResults from "@/components/compare/PriceResults";
 import DupeCard from "@/components/compare/DupeCard";
 import LiveResults from "@/components/compare/LiveResults";
+import EmptySearchState from "@/components/empty/EmptySearchState";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
 import { formatNaira, getClickThroughUrl } from "@/lib/utils";
@@ -482,16 +483,10 @@ function CompareContent() {
                 </p>
               </div>
             ) : (
-              <div className="max-w-md mx-auto text-center py-12">
-                <SearchX size={28} className="text-ink-3 mx-auto mb-3" strokeWidth={1.5} />
-                <h3 className="text-base font-medium text-ink mb-1">
-                  No matches anywhere for &ldquo;{displayQuery}&rdquo;
-                  <span className="text-ink-3"> · </span>
-                </h3>
-                <p className="text-sm text-ink-3">
-                  Try a broader or different term, like just the brand or category.
-                </p>
-              </div>
+              /* Layered recovery — URL paste / notify-me / browse.
+                 Same component used on /deals so the empty UX is
+                 consistent across surfaces. */
+              <EmptySearchState query={displayQuery} source="compare" />
             )}
           </div>
         );

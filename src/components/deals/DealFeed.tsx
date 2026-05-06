@@ -9,6 +9,7 @@ import ListCard from "./ListCard";
 import MasonryCard from "./MasonryCard";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "./masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
+import EmptySearchState from "@/components/empty/EmptySearchState";
 import { useCountry } from "@/components/providers/CountryProvider";
 import type { Deal, DiscountTier, OriginFilter, SortOption } from "@/types";
 
@@ -427,24 +428,32 @@ export default function DealFeed() {
         </>
       )}
 
-      {/* Empty state */}
+      {/* Empty state — layered recovery (URL paste, notify-me, browse).
+          When the user has an active search query, lean into the
+          recovery options. When the empty result is purely from filter
+          combos (no search, just filters), keep the lighter "reset
+          filters" affordance — the recovery flow doesn't fit there. */}
       {!loading && items.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <Search size={32} className="text-ink-3 mb-3" strokeWidth={1.5} />
-          <h3 className="text-base font-medium text-ink mb-1">No deals match those filters</h3>
-          <p className="text-sm text-ink-3 mb-5 max-w-sm">
-            Try a broader keyword or reset your filters to bring more offers back.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setCategory("all"); setTier("all"); setSearch(""); setOrigin("all");
-            }}
-            className="btn-secondary"
-          >
-            Reset filters
-          </button>
-        </div>
+        search.trim() ? (
+          <EmptySearchState query={search.trim()} source="deals" />
+        ) : (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <Search size={32} className="text-ink-3 mb-3" strokeWidth={1.5} />
+            <h3 className="text-base font-medium text-ink mb-1">No deals match those filters</h3>
+            <p className="text-sm text-ink-3 mb-5 max-w-sm">
+              Try fewer filters, or browse a different category.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setCategory("all"); setTier("all"); setSearch(""); setOrigin("all");
+              }}
+              className="btn-secondary"
+            >
+              Reset filters
+            </button>
+          </div>
+        )
       )}
 
       {/* Sentinel */}
