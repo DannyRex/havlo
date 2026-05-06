@@ -382,26 +382,45 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   let html = "";
   let fetchFailed = false;
   try {
-    /* Social-bot User-Agent. Amazon (and most retailers) explicitly
-       allow facebookexternalhit / Twitterbot / LinkedInBot to crawl
-       product pages so social-media link unfurling works. Generic
-       Chrome UAs hit the same anti-bot wall the scraper does and
-       return a captcha page or 503. Switching to a social bot UA
-       is the difference between getting the og:image / title / price
-       extracted vs falling through to the URL-slug-only fallback. */
-    const res = await fetch(parsedUrl.toString(), {
-      headers: {
-        "User-Agent":
-          "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-      },
-      signal: AbortSignal.timeout(8_000),
-      redirect: "follow",
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    /* Multi-UA fallback chain. Different anti-bot vendors whitelist
+       different social-media crawlers:
+         - facebookexternalhit: works on Amazon, Shopify, most Magento,
+           Cloudflare default rules
+         - WhatsApp/2:          works on Akamai-protected sites
+                                (next.co.uk, john lewis, some banks)
+         - Twitterbot/1.0:      strong on US-centric sites
+         - LinkedInBot/1.0:     last resort, narrow but distinctive UA
+
+       Try them in priority order. Stop at the first that returns 2xx.
+       Total worst-case latency = sum of failed timeouts (caps at ~5s
+       per attempt). For the 90% common case (facebookexternalhit
+       works), latency is unchanged. */
+    const uaChain = [
+      "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+      "WhatsApp/2.23.20.0 A",
+      "Twitterbot/1.0",
+      "LinkedInBot/1.0 (compatible; Mozilla/5.0; +https://www.linkedin.com)",
+    ];
+    let res: Response | null = null;
+    for (const ua of uaChain) {
+      try {
+        const r = await fetch(parsedUrl.toString(), {
+          headers: {
+            "User-Agent": ua,
+            Accept:
+              "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "no-cache",
+          },
+          signal: AbortSignal.timeout(5_000),
+          redirect: "follow",
+        });
+        if (r.ok) { res = r; break; }
+      } catch {
+        // timeout / network — try next UA
+      }
+    }
+    if (!res) throw new Error("All UAs blocked");
     // Only read the <head> section — saves bandwidth, reduces parse time.
     // Stream and cut off after </head> or 64 KB, whichever comes first.
     const reader = res.body?.getReader();
@@ -454,25 +473,46 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         { headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=3600" } },
       );
     }
-    /* No usable slug title either — return ok:false but still surface
-       any ASIN / marketplace / image we managed to extract from the
-       URL. The compare page can still render a basic anchor. */
+    /* All bot UAs blocked AND slug yields nothing useful (opaque IDs
+       like next.co.uk's /style/su800903/y02937).
+
+       Rather than returning a hard error, surface a graceful fallback:
+       store name from hostname + a generic title + favicon as the
+       image. The user still sees "we recognise this is a Next.co.uk
+       product, here's the link, click through to view it" instead of
+       a "page blocked" wall. ok:true so the compare page renders the
+       anchor card with cheaper-alternatives logic running on the title. */
+    const hostname = parsedUrl.hostname.replace(/^www\./, "");
+    const faviconImage = `https://www.google.com/s2/favicons?domain=${hostname}&sz=128`;
     return NextResponse.json<SniffResult>(
       {
-        ok: !!asin,  // ASIN alone is enough to identify the product
+        ok: !!asin || !!store,
         url: rawUrl,
         store,
         rawTitle: "",
-        title: asin ? `Amazon product ${asin}` : "",
+        title: asin
+          ? `Amazon product ${asin}`
+          : store
+            ? `Product on ${store}`
+            : "External product",
         brand: null,
-        imageUrl: fallbackImage,
+        imageUrl: fallbackImage ?? faviconImage,
         price: null,
         currency: null,
         asin,
         marketplace,
-        error: asin ? undefined : "Page blocked — could not extract product details",
+        error: !asin && !store
+          ? "Page blocked — could not extract product details"
+          : undefined,
       },
-      { headers: { "Cache-Control": asin ? "s-maxage=300, stale-while-revalidate=3600" : "no-store" } },
+      {
+        headers: {
+          "Cache-Control":
+            (asin || store)
+              ? "s-maxage=300, stale-while-revalidate=3600"
+              : "no-store",
+        },
+      },
     );
   }
 
