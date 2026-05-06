@@ -120,10 +120,22 @@ async function resolveViaSerpApi(googleUrl: string): Promise<string | null> {
 
 export async function GET(req: NextRequest) {
   const target = req.nextUrl.searchParams.get("url");
-  if (!target) return new NextResponse("Missing url", { status: 400 });
-
   const country = getServerCountry();
   const ctx = { country: country.code };
+
+  /* Missing url param: redirect home instead of returning a plain-text
+     "Missing url" body. Chrome was interpreting the text/plain
+     response as a download attachment with the filename "go.txt"
+     (derived from the route name) instead of rendering inline.
+     Bug surfaced for users when a deal card somehow had an empty
+     url field. The empty-string param hit the early return and
+     downloaded a junk file. */
+  if (!target) {
+    return NextResponse.redirect(
+      new URL(`/${country.code}`, req.nextUrl.origin),
+      307,
+    );
+  }
 
   /* AliExpress: prefer the official API converter (proper attribution,
      full commission rates) over the ?aff_short_key= fallback. Falls
