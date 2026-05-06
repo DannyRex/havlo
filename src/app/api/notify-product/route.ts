@@ -33,7 +33,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid request body" }, { status: 400 });
   }
 
-  const query   = body.query?.trim().slice(0, MAX_QUERY_LEN);
+  /* Lowercase BOTH email and query so the (email, query) unique index
+     dedups across casing. "iPhone 15 Pro" and "iphone 15 pro" should
+     count as the same demand signal — different casing is a typo
+     story, not different products. */
+  const query   = body.query?.trim().slice(0, MAX_QUERY_LEN).toLowerCase();
   const email   = body.email?.trim().toLowerCase();
   const country = body.country?.trim().toLowerCase() ?? null;
   const source  = body.source?.trim() || "unknown";
@@ -66,6 +70,15 @@ export async function POST(req: NextRequest) {
     if (/relation .* does not exist/i.test(error.message)) {
       console.warn("[notify-product] table not yet migrated:", error.message);
       return NextResponse.json({ ok: true, note: "Table pending migration" });
+    }
+    /* Constraint-mismatch is a config bug worth flagging loudly so it
+       gets fixed instead of silently dropping signups. */
+    if (/no unique or exclusion constraint/i.test(error.message)) {
+      console.error("[notify-product] index/constraint mismatch:", error.message);
+      return NextResponse.json(
+        { ok: false, error: "Server config issue. We've been alerted." },
+        { status: 500 },
+      );
     }
     console.error("[notify-product] insert error:", error.message);
     return NextResponse.json({ ok: false, error: "Could not save request" }, { status: 500 });

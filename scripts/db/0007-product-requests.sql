@@ -24,11 +24,21 @@ create table if not exists product_requests (
   created_at  timestamptz not null default now()
 );
 
+-- Plain-column unique index (NOT functional). Supabase's PostgREST
+-- `onConflict: "email,query"` parameter resolves to PostgreSQL's
+-- ON CONFLICT (email, query), which only matches a unique index on
+-- those literal columns. A functional index like (lower(email),
+-- lower(query)) is treated as a different index and the upsert fails
+-- with 'no unique constraint matching the ON CONFLICT specification'.
+-- Casing is normalised in the API layer (both email and query are
+-- lowercased before insert) so the plain index gives correct dedup.
 create unique index if not exists product_requests_email_query_idx
-  on product_requests (lower(email), lower(query));
+  on product_requests (email, query);
 
+-- Lookup index for the catalog-demand leaderboard query (group by
+-- lower(query) to count requests per term).
 create index if not exists product_requests_query_idx
-  on product_requests (lower(query));
+  on product_requests (query);
 
 create index if not exists product_requests_pending_idx
   on product_requests (created_at desc)
