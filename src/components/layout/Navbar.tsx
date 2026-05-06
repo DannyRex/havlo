@@ -3,31 +3,31 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, Tag, Search, BookOpen, Info, Coins, Menu, X } from "lucide-react";
+import { Home, Tag, Search, Info, Coins, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import Logo from "@/components/ui/Logo";
 import CountrySelect from "@/components/layout/CountrySelect";
 
-/* Mobile drawer navigation. Includes ALL primary destinations so
-   the drawer doubles as a sitemap on phones. Desktop nav only
-   surfaces the most-clicked items (filtered below) — Blog + About
-   remain reachable via the footer for desktop visitors. */
+/* Mobile drawer navigation. Primary navigational destinations;
+   Blog lives in the footer only (reference content, less frequently
+   clicked than the deal-finding actions). About kept in the drawer
+   because partnership prospects + curious users look for it after
+   first impression. */
 const navLinks = [
   { href: "/",         label: "Home",          Icon: Home     },
   { href: "/deals",    label: "Deals",         Icon: Tag      },
   { href: "/compare",  label: "Find for less", Icon: Search   },
   { href: "/cashback", label: "Cashback",      Icon: Coins    },
-  { href: "/blog",     label: "Blog",          Icon: BookOpen },
   { href: "/about",    label: "About",         Icon: Info     },
 ];
 
-/* Desktop top nav: Deals + Find for less + Cashback + Blog. Logo
-   serves as Home; About lives in the footer (less frequently
-   clicked on desktop). Cashback gets desktop placement because
-   it's a primary value-prop / acquisition driver, not just a
-   reference page like About. */
-const DESKTOP_LINK_HREFS = new Set(["/deals", "/compare", "/cashback", "/blog"]);
+/* Desktop top nav: Deals + Find for less + Cashback. Logo serves
+   as Home; About + Blog live in the footer for desktop visitors
+   (reference content rather than primary actions). Cashback gets
+   desktop placement because it's a primary value-prop / acquisition
+   driver. */
+const DESKTOP_LINK_HREFS = new Set(["/deals", "/compare", "/cashback"]);
 const desktopLinks = navLinks.filter((l) => DESKTOP_LINK_HREFS.has(l.href));
 
 export default function Navbar() {
