@@ -120,7 +120,7 @@ export default function EmptySearchState({ query, source, browseHref }: Props) {
           }
         </h3>
         <p className="text-sm text-ink-3 leading-relaxed">
-          Three ways forward — pick whichever fits.
+          Three ways forward. Pick whichever fits.
         </p>
       </div>
 
