@@ -35,10 +35,10 @@ const RATES: Record<string, CashbackRate> = {
   "amazon-ae":        { percent: 2, storeLabel: "Amazon AE" },
   "amazon-in":        { percent: 2, storeLabel: "Amazon IN" },
 
-  /* Konga — pending approval. Will activate once KONGA_AFFILIATE_KEY
-     env var is set + we have confirmed gross rate from their partner
-     team. Placeholder 3% reflects typical NG affiliate rates. */
-  "konga":            { percent: 3, storeLabel: "Konga" },
+  /* Konga — affiliate is live but the gross commission rate
+     doesn't leave enough margin to share with users while keeping
+     payout + fraud reserve viable. Re-evaluate when their tier
+     structure changes or when category-specific overrides land. */
 
   /* AliExpress — high gross rates (5-50% by category) so we can
      afford a more generous user share. Activates with

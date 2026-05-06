@@ -32,7 +32,7 @@ export async function generateMetadata({
   const country = getCountry(params.country);
   const url = `${SITE_URL}/${country.code}/cashback`;
   const title = `Cashback · Havlo ${country.name}`;
-  const description = `Earn cashback when you shop through Havlo. Up to 4% back on Amazon, AliExpress, Konga, and more. Coming soon to ${country.name}.`;
+  const description = `Earn cashback when you shop through Havlo. Up to 4% back on Amazon, AliExpress, and more. Coming soon to ${country.name}.`;
   return {
     title,
     description,
