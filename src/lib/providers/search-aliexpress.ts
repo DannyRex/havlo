@@ -3,9 +3,18 @@
 
    STATUS: Active when ALIEXPRESS_APP_KEY + ALIEXPRESS_APP_SECRET set.
 
-   Endpoint: aliexpress.affiliate.product.search
+   Endpoint: aliexpress.affiliate.hotproduct.query
    Docs:     https://openservice.aliexpress.com/doc/doc.htm
-             #/api?cid=29&path=aliexpress.affiliate.product.search
+             #/api?cid=29&path=aliexpress.affiliate.hotproduct.query
+
+   Why hotproduct.query (not product.search):
+     AliExpress's affiliate API has tiered method authorisation.
+     product.search lives in the Premium tier (separate approval
+     gate); hotproduct.query is in the Advanced tier we have today.
+     They take identical inputs and return the same product shape.
+     Better still, hotproduct.query is curated to trending /
+     high-velocity items, so the results we surface skip the
+     long-tail dropshipping noise and lean toward genuine deals.
 
    Why this exists:
      SerpAPI's Google Shopping had near-zero AliExpress coverage,
@@ -27,8 +36,8 @@
      AliExpress is global — we don't fan out per country at search
      time. Instead we query once + tag with the user's country in
      the response so per-country filtering on the UI side stays
-     accurate. ship_to_country can be passed via SearchQuery to
-     restrict products to those that ship to a given market.
+     accurate. country can be passed via SearchQuery to bias
+     results to products that ship to a given market.
    ────────────────────────────────────────────────────────────────── */
 
 import crypto from "crypto";
@@ -79,8 +88,8 @@ interface AliexProduct {
   lastest_volume?:           number;     // sales count
 }
 
-interface AliexSearchResponse {
-  aliexpress_affiliate_product_search_response?: {
+interface AliexHotProductResponse {
+  aliexpress_affiliate_hotproduct_query_response?: {
     resp_result?: {
       result?: {
         products?: { product?: AliexProduct[] };
@@ -201,7 +210,7 @@ export const aliexpressSearchProvider: SearchProvider = {
 
     const params: Record<string, string> = {
       app_key:           appKey,
-      method:            "aliexpress.affiliate.product.search",
+      method:            "aliexpress.affiliate.hotproduct.query",
       timestamp:         new Date().toISOString().replace("T", " ").replace(/\.\d+Z$/, ""),
       sign_method:       "hmac-sha256",
       format:            "json",
@@ -213,13 +222,16 @@ export const aliexpressSearchProvider: SearchProvider = {
       page_size:         String(limit),
       target_currency:   "USD",
       target_language:   "EN",
-      ship_to_country:   country.toUpperCase(),
+      /* hotproduct.query uses `country` (not `ship_to_country`) for
+         the ship-to bias parameter. Lowercase per docs. */
+      country:           country.toLowerCase(),
+      /* SALE_PRICE_ASC keeps the cheapest hot items at the top — same
+         intent as the SerpAPI provider's price-asc default. The
+         min_sale_price floor prevents $0.50 keychains from poisoning
+         deal lists; the per-category USD floor in mapToDeal() catches
+         the rest. */
       sort:              "SALE_PRICE_ASC",
-      /* Surface "good deal" rows preferentially. Filter to discount
-         >= 10% to align with the rest of Havlo's catalog (SerpAPI
-         path also requires sale-tag or old_price). */
       min_sale_price:    "1",
-      promotion_status:  "promotion_only",
     };
     params.sign = signParams(params, appSecret);
 
@@ -246,7 +258,7 @@ export const aliexpressSearchProvider: SearchProvider = {
       );
     }
 
-    const data = (await res.json()) as AliexSearchResponse;
+    const data = (await res.json()) as AliexHotProductResponse;
     if (data.error_response) {
       throw new ProviderError(
         this.id,
@@ -254,16 +266,16 @@ export const aliexpressSearchProvider: SearchProvider = {
       );
     }
 
-    const respCode = data.aliexpress_affiliate_product_search_response?.resp_result?.resp_code;
+    const respCode = data.aliexpress_affiliate_hotproduct_query_response?.resp_result?.resp_code;
     if (respCode != null && respCode !== 200) {
       throw new ProviderError(
         this.id,
-        `AliExpress resp_code ${respCode}: ${data.aliexpress_affiliate_product_search_response?.resp_result?.resp_msg ?? ""}`,
+        `AliExpress resp_code ${respCode}: ${data.aliexpress_affiliate_hotproduct_query_response?.resp_result?.resp_msg ?? ""}`,
       );
     }
 
     const products = data
-      .aliexpress_affiliate_product_search_response
+      .aliexpress_affiliate_hotproduct_query_response
       ?.resp_result?.result
       ?.products?.product
       ?? [];
