@@ -1276,6 +1276,290 @@ export const posts: BlogPost[] = [
       </>
     ),
   },
+
+  {
+    slug:        "authentic-skincare-nigeria-2026",
+    title:       "Where to Buy Authentic Skincare in Nigeria 2026",
+    description: "Counterfeit skincare floods Lagos markets. Here is where authentic CeraVe, Cetaphil, Olay, and La Roche-Posay actually live, plus how to verify before you pay.",
+    publishedAt: "2026-05-06",
+    readMinutes: 5,
+    tags:        ["beauty", "nigeria", "buying-guide"],
+    countries:   ["ng"],
+    body: (
+      <>
+        <p>
+          Counterfeit skincare is more pervasive in Nigeria than fake
+          tech. Knockoff CeraVe, fake Cetaphil, and counterfeit Olay
+          flood Computer Village, Balogun Market, and a worrying share
+          of Konga and Jumia third-party listings. The packaging is
+          increasingly hard to tell apart visually, but the formula
+          inside ranges from useless to actively harmful.
+        </p>
+        <p>
+          Authentic flagship skincare costs <strong>₦15,000 to ₦55,000</strong>
+          for a typical 200-500ml bottle. Anything dramatically below
+          that range deserves close scrutiny before you put it on
+          your face.
+        </p>
+
+        <h2>Where authentic skincare lives in Nigeria</h2>
+        <ul>
+          <li>
+            <strong>Justrhys</strong> is the most reliable specialist
+            retailer for authentic Western skincare in Lagos. They
+            source directly from authorized distributors and have
+            verifiable supplier relationships. Higher prices than
+            Konga, but trustworthy.
+          </li>
+          <li>
+            <strong>BeautyHub Lagos</strong> stocks authorized stock for
+            CeraVe, Cetaphil, La Roche-Posay, and several Korean
+            brands. Their physical store in Lekki lets you inspect
+            packaging in person.
+          </li>
+          <li>
+            <strong>iShoperz</strong> imports verified authentic stock
+            from authorized US/UK distributors. Pricing is at the top
+            end (₦5-10K above local averages) but the authentication
+            confidence justifies it for sensitive-skin buyers.
+          </li>
+          <li>
+            <strong>Sephora Nigeria</strong> has a limited Lagos
+            presence but their stock is uniformly authentic. Best for
+            premium brands (Drunk Elephant, Sunday Riley, Tatcha) where
+            the counterfeit risk is highest.
+          </li>
+          <li>
+            <strong>Konga and Jumia (verified sellers only)</strong>:
+            filter ruthlessly. Stick to sellers with 1,000+ ratings
+            and at least 95% positive feedback. Avoid any seller
+            offering Western flagship products at 30%+ below the
+            market rate.
+          </li>
+        </ul>
+
+        <h2>How to verify before you pay</h2>
+        <ul>
+          <li>
+            <strong>Batch code lookup.</strong> Most major skincare
+            brands have batch-code verification tools. CheckCosmetic.net
+            covers most Western brands. Enter the batch code (printed
+            on the bottle base or carton) and the tool returns the
+            manufacturing date and authenticity status.
+          </li>
+          <li>
+            <strong>Packaging quality.</strong> Authentic skincare uses
+            high-quality printing with sharp text and consistent ink
+            coverage. Counterfeits often have slight font differences,
+            blurry safety warnings, or color registration issues on
+            the box.
+          </li>
+          <li>
+            <strong>Seal integrity.</strong> Genuine bottles are
+            factory-sealed with a secure inner seal under the cap. Any
+            sign of tampering or a missing seal is a red flag.
+          </li>
+          <li>
+            <strong>Texture and smell test.</strong> Counterfeit
+            formulations often smell strongly of alcohol or have
+            visibly separated layers. Authentic CeraVe and Cetaphil
+            have a mild scent and consistent texture throughout.
+          </li>
+          <li>
+            <strong>Brand websites for ingredient lists.</strong>{" "}
+            Check the back-of-bottle ingredients against the brand&apos;s
+            official ingredient list on their website. Counterfeits
+            sometimes simplify or substitute ingredients with cheaper
+            alternatives.
+          </li>
+        </ul>
+
+        <h2>Brands most counterfeited in Nigeria</h2>
+        <p>
+          The risk varies by brand. Most counterfeited:
+        </p>
+        <ul>
+          <li>
+            <strong>CeraVe</strong> (especially the Moisturizing Cream
+            and Hydrating Cleanser). The high market demand makes this
+            the most-faked brand in Lagos.
+          </li>
+          <li>
+            <strong>Cetaphil</strong> (Gentle Skin Cleanser). Similar
+            volume issue.
+          </li>
+          <li>
+            <strong>Olay</strong> (Total Effects, Regenerist serums).
+            Mass-market visibility makes it a counterfeit magnet.
+          </li>
+          <li>
+            <strong>The Ordinary</strong> (Niacinamide, Hyaluronic Acid).
+            Simple branding makes counterfeits easier to produce.
+          </li>
+        </ul>
+        <p>
+          Lower counterfeit risk: La Roche-Posay (more limited
+          distribution), Drunk Elephant (premium pricing), Korean and
+          Japanese brands (less brand recognition for counterfeit
+          producers to target).
+        </p>
+
+        <h2>Cross-border math</h2>
+        <p>
+          Cult Beauty UK and Lookfantastic ship to Nigeria with
+          guaranteed authenticity. Total delivered cost runs 15-25%
+          above local authorized retailer prices once shipping and
+          customs are factored in. Worth it for high-value purchases
+          (₦25K+) where authenticity matters most. Not worth it for
+          single sub-₦15K items where shipping consumes the savings.
+        </p>
+
+        <h2>How we update this</h2>
+        <p>
+          Havlo refreshes beauty pricing across all NG retailers daily.
+          For current real-time pricing, search by brand or product on
+          the home page or browse the Beauty category.
+        </p>
+      </>
+    ),
+  },
+
+  {
+    slug:        "best-55-inch-tv-deals-nigeria-2026",
+    title:       "Best 55-inch TV Deals in Nigeria 2026: Hisense vs Samsung vs LG",
+    description: "55-inch TV pricing across Konga, Jumia, Slot, Hisense Nigeria, and Samsung stores. Plus the voltage and warranty tradeoffs that matter in Lagos.",
+    publishedAt: "2026-05-06",
+    readMinutes: 5,
+    tags:        ["electronics", "nigeria", "buying-guide"],
+    countries:   ["ng"],
+    body: (
+      <>
+        <p>
+          55 inches is the sweet spot for Nigerian living rooms. Big
+          enough to feel cinematic, small enough to fit most apartment
+          walls, and the price-per-inch curve is most favourable here
+          versus 65-inch and above. Pricing across NG retailers ranges
+          from <strong>₦280,000 to ₦1.4M</strong> for a current-model
+          55-inch TV depending on panel technology and brand.
+        </p>
+
+        <h2>Where to buy in Nigeria</h2>
+        <ul>
+          <li>
+            <strong>Hisense Nigeria</strong> stocks the Hisense range
+            with full local warranty. Their U6, U7, and U8 series
+            dominate the value-to-quality curve in Nigeria for 4K
+            QLED and Mini-LED.
+          </li>
+          <li>
+            <strong>Samsung Nigeria</strong> (and authorized stores
+            like Samsung Plaza Lagos) stocks Crystal UHD, QLED, and
+            Neo QLED with regional warranty. Premium pricing, premium
+            service.
+          </li>
+          <li>
+            <strong>Konga</strong> aggregates all major brands plus
+            their own warehoused units. Wide selection. Check the
+            seller details: stick with verified Konga Express or Konga
+            Plus for warranty handling.
+          </li>
+          <li>
+            <strong>Jumia</strong> matches Konga on most SKUs.
+            Particularly aggressive during Jumia Anniversary,
+            Black Friday, and end-of-year promotions.
+          </li>
+          <li>
+            <strong>Slot</strong> stocks select TV models alongside
+            their phone catalog, mostly mid-range Samsung and Hisense
+            at consistent pricing.
+          </li>
+          <li>
+            <strong>ShopInverse</strong> consistently runs sharp
+            pricing on appliances and TVs, particularly on the Hisense
+            U6 and U7 lines.
+          </li>
+        </ul>
+
+        <h2>Brand recommendations by use case</h2>
+        <p>
+          <strong>Hisense U6 / U7 series</strong>: the value champion
+          in Nigeria. Real local warranty, Hisense-Nigeria service
+          centers, decent panel quality at half the Samsung QLED
+          price. The U7 with Mini-LED is the sweet spot for buyers
+          who want bright, vivid output without paying QLED premium.
+        </p>
+        <p>
+          <strong>Samsung Crystal UHD / QLED</strong>: the premium
+          pick. Better motion handling, more accurate color, longer
+          panel life. Pay 50-80% more than equivalent Hisense for the
+          ecosystem polish (SmartThings, Samsung TV Plus, Bixby).
+        </p>
+        <p>
+          <strong>LG OLED (B series, C series)</strong>: the picture-
+          quality king. Perfect blacks, infinite contrast, the
+          reference for movie watching. Pricing in NG runs ₦1.1M+ for
+          55-inch C series. Worth it only if you watch film/TV in a
+          dim room and notice differences.
+        </p>
+        <p>
+          <strong>Sony Bravia (X series)</strong>: limited NG
+          distribution but strong picture processing. Hard to find
+          authorized Sony Nigeria stock; mostly imported via Konga
+          third-party sellers. Pay attention to warranty terms.
+        </p>
+
+        <h2>Voltage and stability considerations</h2>
+        <p>
+          NEPA / electricity stability is the single most important
+          factor most TV buyers ignore. Voltage spikes during
+          unexpected restoration of supply have killed more new TVs in
+          Lagos than any other cause.
+        </p>
+        <p>
+          Two non-negotiable additions to any TV purchase in Nigeria:
+        </p>
+        <ul>
+          <li>
+            <strong>Voltage stabilizer</strong> rated for at least
+            500W (₦15-30K). Sukam, Sollatek, or APC are reliable
+            brands. Plug TV into stabilizer, stabilizer into wall.
+            Saves you from voltage spike damage during NEPA restoration.
+          </li>
+          <li>
+            <strong>Surge protector</strong> for the antenna/satellite
+            feed. Lightning travelling through your DStv or aerial cable
+            is a real (and common) failure mode. ₦5-10K from any decent
+            electronics shop.
+          </li>
+        </ul>
+
+        <h2>Cross-border math</h2>
+        <p>
+          Amazon UK has 55-inch Samsung and Hisense at GBP prices that
+          sometimes work out cheaper delivered to Lagos than local
+          authorized stock, but the math rarely makes sense for TVs
+          specifically. Reasons:
+        </p>
+        <ul>
+          <li>Shipping costs scale aggressively with size and weight</li>
+          <li>Customs duty on TVs is among the higher tariff bands</li>
+          <li>UK TVs use 50Hz refresh; some content requires 60Hz</li>
+          <li>Warranty service is fully on you for imported units</li>
+        </ul>
+        <p>
+          Bottom line: buy locally for TVs. The 10-20% savings from
+          cross-border isn&apos;t worth the warranty and logistics risk.
+        </p>
+
+        <h2>How we update this</h2>
+        <p>
+          Havlo refreshes TV pricing across all NG retailers daily. For
+          current real-time pricing on any model, search by brand on the
+          home page or browse the Electronics category.
+        </p>
+      </>
+    ),
+  },
 ];
 
 /** Lookup helper for the dynamic [slug] route. */
