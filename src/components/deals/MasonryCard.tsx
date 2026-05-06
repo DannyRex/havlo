@@ -174,7 +174,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
             card since the whole thing is a link to /api/go. */}
         {cashback && (
           <span
-            title={`Earn ${cashback.percent}% cashback when you buy through Havlo. Coming soon — join the waitlist on the Cashback page.`}
+            title={`Earn ${cashback.percent}% cashback when you shop through Havlo. Coming soon. Join the waitlist on the Cashback page.`}
             className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-white shadow-sm"
             style={{ background: "rgba(16, 185, 129, 0.95)" }}
           >
