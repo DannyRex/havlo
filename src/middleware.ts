@@ -15,8 +15,14 @@ const COUNTRY_COOKIE = "havlo-country";
 
 /* Pages that exist under /[country]/ and should be redirected to the
    user's country prefix when accessed bare (e.g. /deals → /uk/deals).
-   Anything not in this list passes through untouched. */
-const COUNTRY_SCOPED = new Set(["", "deals", "compare"]);
+   Anything not in this list passes through untouched.
+
+   blog + cashback added because the navbar links to bare /blog and
+   /cashback for cleanliness — middleware handles the country prefix
+   so internal Links don't have to be country-aware. The legacy
+   /blog page-level redirect is now redundant but kept so old
+   Google-indexed /blog/{slug} URLs also work via that route. */
+const COUNTRY_SCOPED = new Set(["", "deals", "compare", "blog", "cashback"]);
 
 /* Pages that exist OUTSIDE /[country]/ — global, no redirect. */
 const GLOBAL_PAGES = new Set([

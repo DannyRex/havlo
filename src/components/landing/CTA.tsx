@@ -134,7 +134,7 @@ export default function CTA() {
                 </h2>
 
                 <p className="text-white/70 text-[15px] sm:text-lg leading-relaxed max-w-md mb-8">
-                  Paste a product link or search anything. Havlo finds cheaper alternatives across the world&apos;s biggest stores in seconds.
+                  Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-3">

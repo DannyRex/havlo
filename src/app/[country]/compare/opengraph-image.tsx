@@ -72,8 +72,8 @@ export default function CompareOG() {
               lineHeight: 1.4,
             }}
           >
-            Paste a product link or search anything. Cheaper alternatives
-            across local + global stores in seconds.
+            Paste a link or search anything. Cheaper alternatives across
+            the stores you already know.
           </div>
         </div>
 

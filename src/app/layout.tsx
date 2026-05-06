@@ -66,7 +66,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     title: "Havlo · Find similar products for less",
-    description: "Paste a link, get cheaper alternatives in seconds.",
+    description: "Paste a link or search anything. Cheaper alternatives across stores you already know.",
     url: siteUrl,
     siteName: "Havlo",
     locale: "en_NG",
@@ -74,7 +74,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Havlo · Find similar products for less",
-    description: "Paste a link, get cheaper alternatives in seconds.",
+    description: "Paste a link or search anything. Cheaper alternatives across stores you already know.",
     /* `site` intentionally omitted until the X / Twitter handle is
        claimed. Pointing to a non-existent @handle generates broken
        attribution links in Twitter share cards and hurts share UX. */

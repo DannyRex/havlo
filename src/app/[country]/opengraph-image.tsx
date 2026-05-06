@@ -79,8 +79,8 @@ export default function HomeOG() {
               lineHeight: 1.4,
             }}
           >
-            Paste any product link. Havlo finds cheaper alternatives across the
-            world&apos;s biggest stores in seconds.
+            Paste a link or search anything. Havlo finds cheaper alternatives
+            across the stores you already know.
           </div>
         </div>
 
