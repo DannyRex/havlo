@@ -187,7 +187,7 @@ export default function EmptySearchState({ query, source, browseHref }: Props) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-ink leading-snug">
-                  Tell us when you find it
+                  Tell me when you find it
                 </p>
                 <p className="text-[13px] text-ink-2 mt-0.5 leading-relaxed">
                   Drop your email and we&apos;ll ping you when this shows up.
