@@ -28,7 +28,50 @@ export interface SniffResult {
   imageUrl: string | null;
   price: number | null;
   currency: string | null;
+  /** Amazon ASIN if the URL was an Amazon product page. Useful for
+      future PAAPI lookups + as a stable identifier in compare flows. */
+  asin?: string | null;
+  /** Marketplace inferred from hostname (us / uk / de / ae / in).
+      Drives the right affiliate tag at click-through time. */
+  marketplace?: string | null;
   error?: string;
+}
+
+/* Extract Amazon ASIN from a URL pathname.
+   Patterns: /dp/ASIN, /gp/product/ASIN, /product/ASIN
+   ASINs are exactly 10 alphanumeric chars (uppercase A-Z + digits). */
+function extractAsin(url: URL): string | null {
+  const m = url.pathname.match(/\/(?:dp|gp\/product|product)\/([A-Z0-9]{10})(?:[/?]|$)/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
+/* Amazon's hostname → marketplace code mapping. */
+function detectAmazonMarketplace(hostname: string): string | null {
+  const h = hostname.replace(/^www\./, "").toLowerCase();
+  if (h === "amazon.com")    return "us";
+  if (h === "amazon.co.uk")  return "uk";
+  if (h === "amazon.de")     return "de";
+  if (h === "amazon.ae")     return "ae";
+  if (h === "amazon.in")     return "in";
+  if (h === "amazon.ca")     return "ca";
+  if (h === "amazon.com.au") return "au";
+  if (h === "amazon.co.jp")  return "jp";
+  return null;
+}
+
+/* ASIN-based image URL fallback. Amazon serves canonical product
+   images via this pattern for ASINs that have a registered main
+   image (most do). The path maps the ASIN → image regardless of
+   the marketplace's TLD; the same product image works across US,
+   UK, DE, etc. since it's tied to ASIN not country.
+
+   Note: not every ASIN resolves successfully here. The card-render
+   onError fallback (in MasonryCard / DupeCard) catches the 0-byte
+   placeholder response and swaps to gradient + emoji, so worst
+   case is the existing "no image" UX. Best case (most products):
+   we get a real product photo. */
+function buildAmazonImageFromAsin(asin: string): string {
+  return `https://images-na.ssl-images-amazon.com/images/P/${asin}.01._SL500_.jpg`;
 }
 
 /* ── Store name map ───────────────────────────────────────────────────── */
@@ -235,10 +278,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   let html = "";
   let fetchFailed = false;
   try {
+    /* Social-bot User-Agent. Amazon (and most retailers) explicitly
+       allow facebookexternalhit / Twitterbot / LinkedInBot to crawl
+       product pages so social-media link unfurling works. Generic
+       Chrome UAs hit the same anti-bot wall the scraper does and
+       return a captcha page or 503. Switching to a social bot UA
+       is the difference between getting the og:image / title / price
+       extracted vs falling through to the URL-slug-only fallback. */
     const res = await fetch(parsedUrl.toString(), {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
         Accept:
           "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
@@ -277,27 +327,40 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   //   → "Samsung Galaxy A06 128GB Blue"
   if (fetchFailed || !html) {
     const slugTitle = extractTitleFromSlug(parsedUrl);
+    /* ASIN + marketplace recovery from URL even when the page fetch
+       failed. ASIN is the stable identifier; marketplace drives the
+       affiliate tag at click time. Build a best-effort image URL
+       from the ASIN so the card has SOMETHING to render instead of
+       always falling to the gradient. */
+    const asin = extractAsin(parsedUrl);
+    const marketplace = detectAmazonMarketplace(parsedUrl.hostname);
+    const fallbackImage = asin ? buildAmazonImageFromAsin(asin) : null;
     if (slugTitle) {
       const { title, brand } = await normalizeTitle(slugTitle, store);
       return NextResponse.json<SniffResult>(
-        { ok: true, url: rawUrl, store, rawTitle: slugTitle, title, brand, imageUrl: null, price: null, currency: null },
+        { ok: true, url: rawUrl, store, rawTitle: slugTitle, title, brand, imageUrl: fallbackImage, price: null, currency: null, asin, marketplace },
         { headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=3600" } },
       );
     }
+    /* No usable slug title either — return ok:false but still surface
+       any ASIN / marketplace / image we managed to extract from the
+       URL. The compare page can still render a basic anchor. */
     return NextResponse.json<SniffResult>(
       {
-        ok: false,
+        ok: !!asin,  // ASIN alone is enough to identify the product
         url: rawUrl,
         store,
         rawTitle: "",
-        title: "",
+        title: asin ? `Amazon product ${asin}` : "",
         brand: null,
-        imageUrl: null,
+        imageUrl: fallbackImage,
         price: null,
         currency: null,
-        error: "Page blocked — could not extract product details",
+        asin,
+        marketplace,
+        error: asin ? undefined : "Page blocked — could not extract product details",
       },
-      { headers: { "Cache-Control": "no-store" } },
+      { headers: { "Cache-Control": asin ? "s-maxage=300, stale-while-revalidate=3600" : "no-store" } },
     );
   }
 
@@ -309,25 +372,35 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     extractPageTitle(html) ??
     "";
 
+  /* ASIN + marketplace are extracted from the URL even on success,
+     so the response always carries them when present. */
+  const asin = extractAsin(parsedUrl);
+  const marketplace = detectAmazonMarketplace(parsedUrl.hostname);
+
   const imageUrl =
     extractMeta(html, "og:image") ??
     extractMeta(html, "twitter:image") ??
-    null;
+    /* Last-resort image: ASIN-based URL. Used when the social-bot
+       UA fetch succeeds but the page didn't expose og:image (rare
+       but seen on some Amazon variants). */
+    (asin ? buildAmazonImageFromAsin(asin) : null);
 
   const { price, currency } = extractPrice(html);
 
   if (!rawTitle) {
     return NextResponse.json<SniffResult>({
-      ok: false,
+      ok: !!asin,
       url: rawUrl,
       store,
       rawTitle: "",
-      title: "",
+      title: asin ? `Amazon product ${asin}` : "",
       brand: null,
       imageUrl,
       price,
       currency,
-      error: "No product title found in page metadata",
+      asin,
+      marketplace,
+      error: asin ? undefined : "No product title found in page metadata",
     });
   }
 
@@ -335,7 +408,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const { title, brand } = await normalizeTitle(rawTitle, store);
 
   return NextResponse.json<SniffResult>(
-    { ok: true, url: rawUrl, store, rawTitle, title, brand, imageUrl, price, currency },
+    { ok: true, url: rawUrl, store, rawTitle, title, brand, imageUrl, price, currency, asin, marketplace },
     { headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=3600" } },
   );
 }
