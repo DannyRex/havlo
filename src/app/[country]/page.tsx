@@ -29,7 +29,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const country = getCountry(params.country);
   const title = `Find similar products for less in ${country.name}`;
-  const description = `Compare prices across local + global stores in ${country.name}. Paste any product link or search anything. Havlo surfaces cheaper alternatives in seconds.`;
+  const description = `Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know in ${country.name}.`;
   const url = `${SITE_URL}/${country.code}`;
 
   return {

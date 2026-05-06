@@ -108,7 +108,7 @@ export default function Hero({ storeCount }: Props) {
           className="text-ink-2 text-[15px] sm:text-lg leading-relaxed mb-8 sm:mb-10 max-w-xl mx-auto animate-fade-up px-2"
           style={{ animationDelay: "80ms" }}
         >
-          Paste any product link or search anything. We surface cheaper alternatives across the world&apos;s biggest stores.
+          Paste a link or search anything. We find cheaper alternatives across stores you already know.
         </p>
 
         {/* Composer — mobile-optimised */}

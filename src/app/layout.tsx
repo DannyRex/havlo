@@ -51,7 +51,7 @@ export const metadata: Metadata = {
     template: "%s · Havlo",
   },
   description:
-    "Paste any product link or search anything. Havlo finds cheaper alternatives across the world's biggest stores in Nigeria, US, UAE, Germany, India, and South Africa.",
+    "Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know in Nigeria, US, UK, UAE, Germany, India, and South Africa.",
   keywords: [
     "price comparison", "find alternatives", "dupes", "find similar products",
     "deals", "discount finder", "shopping search", "cheap alternatives",

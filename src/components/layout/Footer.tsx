@@ -49,7 +49,7 @@ export default function Footer() {
               <Logo size={28} />
             </Link>
             <p className="text-sm text-ink-2 leading-relaxed max-w-xs">
-              Find similar products for less. Paste any link or search anything, we surface the cheaper alternatives.
+              Find similar products for less. Paste a link or search anything, we find cheaper alternatives across the stores you already know.
             </p>
             <a
               href="https://instagram.com/havlo.io"

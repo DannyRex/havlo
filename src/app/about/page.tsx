@@ -59,8 +59,8 @@ export default function AboutPage() {
             Havlo is an independent price comparison platform built for
             shoppers in emerging markets, starting in Nigeria and expanding
             across Africa, the Middle East, Europe, and the Americas. Paste
-            any product link or search anything, and we surface cheaper
-            alternatives across the world&apos;s biggest stores.
+            a link or search anything, and we find cheaper alternatives
+            across the stores you already know.
           </p>
         </header>
 
