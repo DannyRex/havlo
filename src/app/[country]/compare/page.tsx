@@ -237,7 +237,7 @@ function CompareContent() {
               </>
             ) : (
               <p className="text-sm text-amber-300/80">
-                We couldn&apos;t read this page. Searching for similar products instead.
+                We couldn&apos;t read this page. Try searching by product name instead.
               </p>
             )}
           </div>
