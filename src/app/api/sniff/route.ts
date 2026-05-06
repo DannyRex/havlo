@@ -502,7 +502,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         asin,
         marketplace,
         error: !asin && !store
-          ? "Page blocked — could not extract product details"
+          ? "We couldn't read this page's details."
           : undefined,
       },
       {
