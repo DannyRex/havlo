@@ -16,6 +16,68 @@ import type { BrowseQuery } from "./types";
 import type { Deal, OriginFilter, SortOption } from "@/types";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 
+/* Classify a deal by storeId for monetization weighting + curation
+   buckets. Match all Amazon marketplace variants (`amazon`,
+   `amazon-co-uk-...-seller`, `amazon-de-...`, etc.) under one bucket. */
+export function classifyDeal(d: Deal): "amazon" | "aliexpress" | "local" {
+  const id = d.storeId.toLowerCase();
+  if (id === "amazon" || id.startsWith("amazon-")) return "amazon";
+  if (id === "aliexpress")                          return "aliexpress";
+  return "local";
+}
+
+/* Relevance score = discount + recency decay + monetization nudge.
+
+   Why additive (not multiplicative) on the monetization side: a
+   purely multiplicative boost (× 1.4 for Amazon) would push a 20%-off
+   Amazon item ahead of a 25%-off Konga item, which feels like
+   paid promotion. A small additive nudge keeps the discount the
+   primary signal while letting Amazon/AliExpress break ties in their
+   favour — they earn us commission, so when the deals are similar,
+   prefer the monetised one.
+
+   Recency: linear decay from full-credit at 0 days to zero at 30 days,
+   capped at 20 points so it never overwhelms a strong discount. Items
+   older than 30 days score recency=0; their discount carries them. */
+function relevanceScore(d: Deal): number {
+  const discount = d.discountPercent ?? 0;
+
+  const days = Math.max(0, (Date.now() - new Date(d.postedAt).getTime()) / 86_400_000);
+  const recency = Math.max(0, (30 - days) / 30) * 20;
+
+  const bucket = classifyDeal(d);
+  const monetizationBoost = bucket === "amazon" ? 8
+                          : bucket === "aliexpress" ? 5
+                          : 0;
+
+  return discount + recency + monetizationBoost;
+}
+
+/* Single-pass anti-clustering: walk the sorted list; whenever a card
+   shares storeId with the previous one, swap it with the next non-
+   matching card. Minimises rank disruption — a strongly-scored item
+   never moves more than a few slots, so the relevance order is
+   preserved while runs of the same store get broken up.
+
+   This solves the symptom on /deals where 'newest' sort showed runs
+   of one store at a time (because ingestion writes timestamps per-
+   store-batch). With relevance sort, the runs come from sort-tied
+   items; this pass interleaves them. */
+export function spaceByStore(deals: Deal[]): Deal[] {
+  const result = [...deals];
+  for (let i = 1; i < result.length; i++) {
+    if (result[i].storeId !== result[i - 1].storeId) continue;
+    /* Find next item with a different store and swap it into position i. */
+    for (let j = i + 1; j < result.length; j++) {
+      if (result[j].storeId !== result[i - 1].storeId) {
+        [result[i], result[j]] = [result[j], result[i]];
+        break;
+      }
+    }
+  }
+  return result;
+}
+
 /* Sort a Deal[] by the BrowseQuery's sort option. Used to apply the
    user's requested order across the COMBINED set of native + curated
    deals so curated entries don't artificially float to the top.
@@ -32,24 +94,29 @@ export function sortDeals(deals: Deal[], sort: SortOption | undefined): Deal[] {
   switch (sort) {
     case "price_asc":
       sorted.sort((a, b) => a.salePrice - b.salePrice);
-      break;
+      return sorted;
     case "price_desc":
       sorted.sort((a, b) => b.salePrice - a.salePrice);
-      break;
+      return sorted;
     case "discount":
       sorted.sort((a, b) => b.discountPercent - a.discountPercent);
-      break;
+      return sorted;
     case "popular":
       sorted.sort((a, b) => b.clicks - a.clicks);
-      break;
+      return sorted;
     case "newest":
-    default:
       sorted.sort(
-        (a, b) =>
-          new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime(),
+        (a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime(),
       );
+      return sorted;
+    case "relevance":
+    default:
+      /* Score → sort desc → space-by-store. The store-spacing pass
+         runs LAST so it sees the final ranked order and minimises
+         disruption when re-arranging adjacent duplicates. */
+      sorted.sort((a, b) => relevanceScore(b) - relevanceScore(a));
+      return spaceByStore(sorted);
   }
-  return sorted;
 }
 
 export function getCuratedDeals(q: BrowseQuery): Deal[] {

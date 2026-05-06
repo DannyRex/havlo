@@ -25,8 +25,15 @@ const TIERS: { value: DiscountTier; label: string }[] = [
   { value: "50",  label: "50%+" },
 ];
 
+/* Default = "relevance": a composite ranker that blends discount,
+   recency, and a small monetization boost (Amazon + AliExpress nudged
+   up because that's where commission flows from), then a one-pass
+   store-spacer so no two consecutive cards share a storeId. Solves
+   the "runs of one store" problem that pure 'newest' produced because
+   ingestion writes timestamps per-store-batch. */
 const SORTS: { value: SortOption; label: string }[] = [
-  { value: "newest",     label: "Newest" },
+  { value: "relevance",  label: "Relevance" },
+  { value: "newest",     label: "Latest" },
   { value: "discount",   label: "Top discount" },
   { value: "popular",    label: "Most popular" },
   { value: "price_asc",  label: "Price: low → high" },
@@ -70,7 +77,7 @@ function SkeletonColumn({ count, gapClass, startIndex }: { count: number; gapCla
 /* Whitelist of valid filter values from the URL — defends against
    junk params (e.g. /deals?tier=DROP%20TABLE) silently breaking state. */
 const VALID_TIERS = new Set<DiscountTier>(["all", "10", "20", "30", "50"]);
-const VALID_SORTS = new Set<SortOption>(["newest", "discount", "popular", "price_asc", "price_desc"]);
+const VALID_SORTS = new Set<SortOption>(["relevance", "newest", "discount", "popular", "price_asc", "price_desc"]);
 const VALID_ORIGINS = new Set<OriginFilter>(["all", "local", "intl"]);
 
 export default function DealFeed() {
@@ -83,10 +90,10 @@ export default function DealFeed() {
   const initialTier = VALID_TIERS.has(initialTierRaw as DiscountTier)
     ? (initialTierRaw as DiscountTier)
     : "all";
-  const initialSortRaw = searchParams.get("sort") ?? "newest";
+  const initialSortRaw = searchParams.get("sort") ?? "relevance";
   const initialSort = VALID_SORTS.has(initialSortRaw as SortOption)
     ? (initialSortRaw as SortOption)
-    : "newest";
+    : "relevance";
   const initialSearch = searchParams.get("search") ?? "";
   const initialOriginRaw = searchParams.get("origin") ?? "all";
   const initialOrigin = VALID_ORIGINS.has(initialOriginRaw as OriginFilter)
@@ -184,7 +191,7 @@ export default function DealFeed() {
     const params = new URLSearchParams();
     if (category !== "all") params.set("category", category);
     if (tier !== "all")     params.set("minDiscount", tier);
-    if (sort !== "newest")  params.set("sort", sort);
+    if (sort !== "relevance") params.set("sort", sort);
     if (search.trim())      params.set("search", search.trim());
     if (origin !== "all")   params.set("origin", origin);
 

@@ -88,15 +88,23 @@ function isUsableMerchantUrl(url: string): boolean {
   }
 }
 
-/* Map our SortOption → SQL order column + direction */
+/* Map our SortOption → SQL order column + direction.
+
+   `relevance` is a composite ranker computed in JS after fetch
+   (curated-helper.ts → sortDeals). For the SQL pre-fetch, order by
+   discount_percent DESC so the in-memory ranker gets the highest-
+   quality candidates first within the 500-row LIMIT — keeps
+   relevance-sorted views biased toward strong deals even when the
+   underlying table grows past the cap. */
 function sortToOrder(s: SortOption | undefined): { col: string; asc: boolean } {
   switch (s) {
     case "discount":   return { col: "discount_percent", asc: false };
     case "price_asc":  return { col: "current_price",    asc: true };
     case "price_desc": return { col: "current_price",    asc: false };
     case "popular":    return { col: "scraped_at",       asc: false };  // placeholder until popularity tracked
-    case "newest":
-    default:           return { col: "scraped_at",       asc: false };
+    case "newest":     return { col: "scraped_at",       asc: false };
+    case "relevance":
+    default:           return { col: "discount_percent", asc: false };
   }
 }
 

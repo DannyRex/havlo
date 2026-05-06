@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
        the default /deals view feels like deals, not a generic catalog.
        Users who explicitly want "any" can still pass minDiscount=0. */
     const minDiscount = searchParams.get("minDiscount") ?? "5";
-    const sort        = (searchParams.get("sort") as SortOption) ?? "newest";
+    const sort        = (searchParams.get("sort") as SortOption) ?? "relevance";
     const search      = searchParams.get("search")      ?? undefined;
     const originParam = searchParams.get("origin") as OriginFilter | null;
     const origin      = originParam === "local" || originParam === "intl" ? originParam : "all";

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry } from "@/lib/country";
+import { classifyDeal, spaceByStore } from "@/lib/providers/curated-helper";
 import type { Deal } from "@/types";
 import MasonryCard from "@/components/deals/MasonryCard";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
@@ -65,7 +66,6 @@ export default async function TrendingDeals() {
      → shuffle → per-store cap → take 16. */
   const provider = await getActiveBrowseProvider();
 
-  const TARGET_TOTAL = 16;
   const country = getServerCountry();
   const isNG = country.code === "ng";
 
@@ -75,55 +75,66 @@ export default async function TrendingDeals() {
     !d.title.includes("\\") &&
     !(d.currency === "USD" && d.salePrice < 10);
 
-  /* Country-aware composition.
+  /* Composition is now bucket-based, not origin-based.
 
-     NG (default): keep the 70/30 NGN/USD quota tuned for the
-     Nigeria-first experience.
+     Buckets:
+       local      → everything that isn't Amazon or AliExpress.
+                    For NG: Konga, Jumia, 3C Hub, Slot, etc.
+                    For non-NG: country-native stores (Currys, ASOS,
+                    Best Buy, Walmart, John Lewis, …).
+       amazon     → all amazon-* marketplaces (.com, .co.uk, .de, .ae,
+                    .in). The biggest commission stream we have.
+       aliexpress → just the one storeId. Cross-border tail.
 
-     Non-NG (UK, US, DE, …): pool comes entirely from the intl side,
-     filtered to the user's country + cross-border globals (Shein,
-     Temu, AliExpress). NG-anchored stores (Konga, Jumia, 3C Hub) are
-     dropped entirely — a UK user can't buy from them. */
+     Target mix: 50% local, ~37.5% Amazon, ~12.5% AliExpress (8 / 6 / 2
+     of 16). Reasoning:
+       • 50% local keeps the homepage feeling rooted in stores the
+         visitor already trusts and can buy from same-day.
+       • 50% combined Amazon + AliExpress maximises monetised clicks
+         since those are the affiliate networks Havlo actively earns
+         from. Amazon gets the larger slice (higher commission per
+         click + higher cart values + faster delivery via local FBA);
+         AliExpress gets the tail slot for cross-border discovery.
+
+     If a bucket is thin at the current rotation window, the cascade
+     backfills from the others — never showing fewer than 16 cards. */
+  const TARGET_TOTAL = 16;
+  const Q_LOCAL      = 8;
+  const Q_AMAZON     = 6;
+  const Q_ALIEXPRESS = 2;
+
   const rng = makeRng(freshnessSeed());
 
-  /* For non-NG users, the "local" pool is empty/irrelevant and we
-     compose entirely from a single filtered pool. We fake the local
-     side as empty + treat the country-filtered intl pool as the only
-     source so the rest of the pipeline (stagger, render) works as-is. */
-  let localShuffled: Deal[];
-  let intlShuffled:  Deal[];
-  let LOCAL_QUOTA:   number;
-  let INTL_QUOTA:    number;
-
+  /* Build the candidate pool. NG users get both local NGN + intl USD
+     pools merged; non-NG users only see intl filtered to their country. */
+  let pool: Deal[];
   if (!isNG) {
-    const intlPoolRaw = await provider.fetchDeals({
+    const raw = await provider.fetchDeals({
       sort: "discount", minDiscount: 15, origin: "intl",
     });
-    const filtered = filterDealsForCountry(intlPoolRaw.filter(qualityFilter), country);
-    if (filtered.length === 0) return null;
-
-    localShuffled = [];
-    intlShuffled  = seededShuffle(filtered.slice(0, 80), rng);
-    LOCAL_QUOTA   = 0;
-    INTL_QUOTA    = TARGET_TOTAL;
+    pool = filterDealsForCountry(raw.filter(qualityFilter), country);
   } else {
     const [localPool, intlPool] = await Promise.all([
       provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "local" }),
       provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "intl" }),
     ]);
-
-    const localQuality = localPool.filter(qualityFilter);
-    const intlQuality  = intlPool.filter(qualityFilter);
-
-    if (localQuality.length + intlQuality.length === 0) return null;
-
-    localShuffled = seededShuffle(localQuality.slice(0, 60), rng);
-    intlShuffled  = seededShuffle(intlQuality.slice(0, 60), rng);
-
-    /* Target ratio: ~70% local (NGN), 30% international (USD). */
-    LOCAL_QUOTA = Math.round(TARGET_TOTAL * 0.7);  // 11 NGN
-    INTL_QUOTA  = TARGET_TOTAL - LOCAL_QUOTA;       // 5 USD
+    pool = [
+      ...localPool.filter(qualityFilter),
+      ...intlPool.filter(qualityFilter),
+    ];
   }
+
+  if (pool.length === 0) return null;
+
+  /* Bucket the pool by classification, then shuffle each bucket
+     within the rotation window so picks rotate every 5 min. */
+  const bucketed: Record<"local" | "amazon" | "aliexpress", Deal[]> = {
+    local: [], amazon: [], aliexpress: [],
+  };
+  for (const d of pool) bucketed[classifyDeal(d)].push(d);
+  bucketed.local      = seededShuffle(bucketed.local,      rng);
+  bucketed.amazon     = seededShuffle(bucketed.amazon,     rng);
+  bucketed.aliexpress = seededShuffle(bucketed.aliexpress, rng);
 
   const seen = new Set<string>();
   const storeCount: Record<string, number> = {};
@@ -140,105 +151,56 @@ export default async function TrendingDeals() {
     return true;
   }
 
-  /* Per-store cap is computed dynamically per pool. The Nigerian retail
-     ecosystem is concentrated (Konga + Jumia + 3C Hub do most of the
-     volume), so a fixed cap of 4 throttled local picks to 8 even when
-     the pool had 60 items. We size the cap so the quota is reachable
-     given the pool's distinct-store count, with a sane lower floor of 4
-     for visual diversity. */
-  function distinctStoreCap(pool: Deal[], quota: number): number {
+  /* Per-store cap. Local bucket is many-store (Konga, Jumia, 3C Hub,
+     ASOS, Currys, …) so we size cap = quota / distinct-stores with a
+     floor of 3 so a thin pool still fills up. Amazon needs a higher
+     cap (3-4) because each marketplace counts as its own storeId
+     even though they share commission economics. AliExpress only
+     has one storeId so its cap is the full quota. */
+  function distinctStoreCap(pool: Deal[], quota: number, floor = 3): number {
     const stores = new Set(pool.map((d) => d.storeId)).size;
-    if (stores === 0) return 4;
-    return Math.max(4, Math.ceil(quota / stores));
+    if (stores === 0) return floor;
+    return Math.max(floor, Math.ceil(quota / stores));
   }
-  const localCap = distinctStoreCap(localShuffled, LOCAL_QUOTA);
-  const intlCap  = distinctStoreCap(intlShuffled,  INTL_QUOTA);
+  const capLocal      = distinctStoreCap(bucketed.local,      Q_LOCAL);
+  const capAmazon     = Math.max(3, distinctStoreCap(bucketed.amazon, Q_AMAZON, 3));
+  const capAliExpress = Q_ALIEXPRESS;
 
-  // Fill quotas from the dedicated pools first
-  let localPicks = 0;
-  let intlPicks  = 0;
-  for (const d of localShuffled) {
-    if (localPicks >= LOCAL_QUOTA) break;
-    if (tryPush(d, localCap)) localPicks++;
-  }
-  for (const d of intlShuffled) {
-    if (intlPicks >= INTL_QUOTA) break;
-    if (tryPush(d, intlCap)) intlPicks++;
-  }
-
-  /* Backfill from whichever side has more candidates if either pool
-     under-filled (e.g. local pool too thin at this rotation window).
-     Prefer local backfill so the homepage stays Naira-leaning. */
-  if (picks.length < TARGET_TOTAL) {
-    for (const d of localShuffled) {
-      if (picks.length >= TARGET_TOTAL) break;
-      tryPush(d, localCap);
+  function fill(bucket: Deal[], quota: number, cap: number): number {
+    let added = 0;
+    for (const d of bucket) {
+      if (added >= quota) break;
+      if (tryPush(d, cap)) added++;
     }
+    return added;
   }
+
+  fill(bucketed.local,      Q_LOCAL,      capLocal);
+  fill(bucketed.amazon,     Q_AMAZON,     capAmazon);
+  fill(bucketed.aliexpress, Q_ALIEXPRESS, capAliExpress);
+
+  /* Backfill cascade — ordered by what we'd rather show if a bucket
+     under-filled. Local first (trust + same-day delivery), then Amazon
+     (highest commission), then AliExpress. Use a generous per-store
+     cap during backfill so a thin pool can still reach 16. */
   if (picks.length < TARGET_TOTAL) {
-    for (const d of intlShuffled) {
+    for (const bucket of [bucketed.local, bucketed.amazon, bucketed.aliexpress]) {
+      for (const d of bucket) {
+        if (picks.length >= TARGET_TOTAL) break;
+        tryPush(d, 4);
+      }
       if (picks.length >= TARGET_TOTAL) break;
-      tryPush(d, intlCap);
     }
   }
 
   if (picks.length === 0) return null;
 
-  /* Stagger local + international so the grid feels mixed instead of
-     "Nigerian section on top, world below". Build the order row-by-row
-     for the desktop 4-column layout, with a per-row phase rotation so
-     an intl in column 0 of one row doesn't put another intl in column 0
-     of the next row. The same array is reused for the 2- and 3-column
-     viewports — they end up well-mixed too because intl cards are
-     distributed throughout the sequence rather than grouped. */
-  function staggerByOrigin(items: Deal[]): Deal[] {
-    const local = items.filter((d) => d.currency !== "USD");
-    const intl  = items.filter((d) => d.currency === "USD");
-    if (local.length === 0 || intl.length === 0) return items;
-
-    const cols  = 4; // optimize for desktop; sub-optimal cases remain mixed
-    const total = items.length;
-    const rows  = Math.ceil(total / cols);
-
-    /* Bresenham accumulator — distributes intls across rows in proportion
-       to their share of the pool, with no row going over its quota. */
-    const result: Deal[] = new Array(total);
-    let li = 0; let ii = 0;
-    let intlAcc = 0;
-    let intlAssigned = 0;
-
-    for (let r = 0; r < rows; r++) {
-      const rowSize = Math.min(cols, total - r * cols);
-      intlAcc += (intl.length * rowSize) / total;
-      const want = Math.round(intlAcc) - intlAssigned;
-      const intlThisRow = Math.max(0, Math.min(want, intl.length - intlAssigned, rowSize));
-
-      // Place intls at strided columns + per-row offset so vertical
-      // alignment doesn't form (e.g. all-intl col, all-local col)
-      const intlCols = new Set<number>();
-      if (intlThisRow > 0) {
-        const stride = Math.max(1, Math.floor(rowSize / intlThisRow));
-        for (let k = 0; k < intlThisRow; k++) {
-          intlCols.add((k * stride + r) % rowSize);
-        }
-      }
-
-      for (let c = 0; c < rowSize; c++) {
-        const pos = r * cols + c;
-        if (intlCols.has(c) && ii < intl.length) {
-          result[pos] = intl[ii++];
-        } else if (li < local.length) {
-          result[pos] = local[li++];
-        } else if (ii < intl.length) {
-          result[pos] = intl[ii++];
-        }
-      }
-      intlAssigned += intlThisRow;
-    }
-    return result;
-  }
-
-  const staggered = staggerByOrigin(picks);
+  /* Spread same-storeId items so the masonry doesn't show 4 Konga
+     cards stacked vertically in column 0. spaceByStore is a single
+     swap-pass over the flat array; chunkLeftToRight then distributes
+     the result into 2/3/4 columns. With 7+ distinct stores across 16
+     cards the resulting columns end up visually mixed. */
+  const staggered = spaceByStore(picks);
 
   const mobileCols  = chunkLeftToRight(staggered, 2);
   const tabletCols  = chunkLeftToRight(staggered, 3);
