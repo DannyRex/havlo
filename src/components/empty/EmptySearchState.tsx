@@ -28,13 +28,24 @@ import { useRouter } from "next/navigation";
 import { Search, Link as LinkIcon, Bell, ArrowRight, Check } from "lucide-react";
 import { useCountry } from "@/components/providers/CountryProvider";
 
+interface Suggestion {
+  title: string;
+  key:   string;
+}
+
 interface Props {
   /** What the user searched for. Echoed back so the empty state isn't generic. */
   query: string;
-  /** Where this is rendered — used as the `source` for analytics + notify-me data. */
+  /** Where this is rendered. Used as the `source` for analytics + notify-me data. */
   source: "deals" | "compare";
   /** Optional: override the default browse-fallback link. */
   browseHref?: string;
+  /**
+   * 'Did you mean' suggestions from the trigram-similarity fallback.
+   * Rendered as clickable pills above the three recovery options.
+   * Empty array = no suggestions shown.
+   */
+  suggestions?: Suggestion[];
 }
 
 function looksLikeUrl(v: string): boolean {
@@ -42,7 +53,7 @@ function looksLikeUrl(v: string): boolean {
   return /^https?:\/\//i.test(t) || /^(www\.|[a-z]+\.(com|ng|co|io|de|in|ae))/i.test(t);
 }
 
-export default function EmptySearchState({ query, source, browseHref }: Props) {
+export default function EmptySearchState({ query, source, browseHref, suggestions = [] }: Props) {
   const router  = useRouter();
   const { country } = useCountry();
 
@@ -111,7 +122,7 @@ export default function EmptySearchState({ query, source, browseHref }: Props) {
     <div className="max-w-xl mx-auto py-10 sm:py-14 px-4">
 
       {/* Heading */}
-      <div className="text-center mb-8">
+      <div className="text-center mb-6">
         <Search size={28} className="text-ink-3 mx-auto mb-3" strokeWidth={1.5} />
         <h3 className="text-base sm:text-lg font-semibold text-ink mb-1.5 leading-snug">
           {query
@@ -119,10 +130,39 @@ export default function EmptySearchState({ query, source, browseHref }: Props) {
             : <>Nothing matches those filters</>
           }
         </h3>
-        <p className="text-sm text-ink-3 leading-relaxed">
-          Three ways forward. Pick whichever fits.
-        </p>
+        {suggestions.length === 0 && (
+          <p className="text-sm text-ink-3 leading-relaxed">
+            Three ways forward. Pick whichever fits.
+          </p>
+        )}
       </div>
+
+      {/* Did-you-mean pills — closest matching titles via trigram
+          similarity. Rendered before the recovery options because a
+          one-click correction is the lowest-friction path back. Routes
+          to /[country]/compare?q=<title> so the user sees a fresh
+          search-results view instead of jumping to a single product. */}
+      {suggestions.length > 0 && (
+        <div className="text-center mb-7">
+          <p className="text-xs text-ink-3 uppercase tracking-[0.08em] mb-2.5 font-semibold">
+            Did you mean
+          </p>
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {suggestions.map((s) => (
+              <Link
+                key={s.key}
+                href={`/${country.code}/compare?q=${encodeURIComponent(s.title)}`}
+                className="px-3 py-1.5 rounded-full bg-surface-2 hover:bg-border border border-border text-[13px] text-ink hover:text-ink transition-colors"
+              >
+                {s.title.length > 50 ? `${s.title.slice(0, 47)}…` : s.title}
+              </Link>
+            ))}
+          </div>
+          <p className="text-sm text-ink-3 leading-relaxed mt-5">
+            Or pick a different way forward.
+          </p>
+        </div>
+      )}
 
       {/* Option 1 — URL paste (primary, highlighted) */}
       <div className="rounded-2xl border border-border-strong bg-surface p-4 sm:p-5 mb-3">

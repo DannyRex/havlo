@@ -67,11 +67,21 @@ export interface DupeResult extends ProductGroup {
   savingsPercent: number;     // 0–100
 }
 
+/* Lightweight 'did you mean' suggestion shape. We don't need full
+   ProductGroup payloads here (no offers / brand / prices), just
+   enough to render a clickable pill that re-runs search for that
+   title or routes by key. Returned in the empty-mode response. */
+export interface SearchSuggestion {
+  title: string;
+  key:   string;     // product_id, for direct ?key=… routing
+  score: number;     // 0–1 trigram similarity
+}
+
 export type SearchOutput =
   | { mode: "single"; query: string; group: ProductGroup; alternatives: ProductGroup[] }
   | { mode: "list"; query: string; groups: ProductGroup[]; total: number }
   | { mode: "similar"; query: string; anchor: ProductGroup; dupes: DupeResult[] }
-  | { mode: "empty"; query: string; suggestions: ProductGroup[] };
+  | { mode: "empty"; query: string; suggestions: SearchSuggestion[] };
 
 /* ── Store metadata ───────────────────────────────────────────────── */
 

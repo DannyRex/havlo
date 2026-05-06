@@ -483,10 +483,19 @@ function CompareContent() {
                 </p>
               </div>
             ) : (
-              /* Layered recovery — URL paste / notify-me / browse.
-                 Same component used on /deals so the empty UX is
-                 consistent across surfaces. */
-              <EmptySearchState query={displayQuery} source="compare" />
+              /* Layered recovery: did-you-mean pills (when trigram
+                 similarity finds anything close) + URL paste / notify-
+                 me / browse. Same component used on /deals so the
+                 empty UX is consistent across surfaces. */
+              <EmptySearchState
+                query={displayQuery}
+                source="compare"
+                suggestions={
+                  result?.mode === "empty"
+                    ? result.suggestions.map((s) => ({ title: s.title, key: s.key }))
+                    : []
+                }
+              />
             )}
           </div>
         );

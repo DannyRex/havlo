@@ -18,7 +18,7 @@
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { usdToNgn } from "@/lib/utils";
 import type {
-  SearchOutput, ProductGroup, StoreOffer, DupeResult,
+  SearchOutput, ProductGroup, StoreOffer, DupeResult, SearchSuggestion,
 } from "./index";
 
 /* ── Row shapes ───────────────────────────────────────────────────── */
@@ -456,6 +456,27 @@ export async function pgFtsFindDupes(
 
 /* ── Main entrypoint ──────────────────────────────────────────────── */
 
+/* Did-you-mean: top-3 closest title matches via the suggest_titles RPC
+   (scripts/db/0008-suggest-titles.sql). Used to populate the empty-mode
+   response's `suggestions` array so the EmptySearchState UI can render
+   "Did you mean…" pills. Falls through to [] gracefully if the RPC
+   isn't migrated yet — no error surface. */
+async function fetchDidYouMean(q: string): Promise<SearchSuggestion[]> {
+  const supa = getSupabaseAdmin();
+  if (!supa || !q.trim() || q.trim().length < 2) return [];
+  try {
+    const { data, error } = await supa.rpc("suggest_titles", { q, max_results: 3 });
+    if (error || !data) return [];
+    return (data as Array<{ product_id: string; title: string; score: number }>).map((r) => ({
+      title: r.title,
+      key:   r.product_id,
+      score: r.score,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function pgFtsFindSimilar(
   rawQuery: string,
   opts?: { limit?: number },
@@ -551,7 +572,11 @@ export async function pgFtsFindSimilar(
 
   const picked = pickBetter(primary, fallback);
   if (!picked) {
-    return { mode: "empty", query: q, suggestions: [] };
+    /* Truly empty — surface 'did you mean' candidates so the user
+       has a one-click recovery path. Pulls top-3 closest titles via
+       trigram similarity in suggest_titles(). */
+    const suggestions = await fetchDidYouMean(q);
+    return { mode: "empty", query: q, suggestions };
   }
 
   const topRow = picked.row;
