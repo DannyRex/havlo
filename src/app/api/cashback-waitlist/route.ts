@@ -18,6 +18,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
+import { sendEmail } from "@/lib/email/send";
+import { cashbackWaitlistConfirmation } from "@/lib/email/templates/cashback-waitlist";
 
 interface WaitlistRequest {
   email?:   string;
@@ -82,6 +84,21 @@ export async function POST(req: NextRequest) {
     console.error("[cashback-waitlist] insert error:", error.message);
     return NextResponse.json({ ok: false, error: "Could not save signup" }, { status: 500 });
   }
+
+  /* Send confirmation email. Same pattern as notify-product: awaited
+     but non-blocking on failure. Tagged so the Resend dashboard can
+     report on waitlist signup volume separately from notify-me. */
+  const tmpl = cashbackWaitlistConfirmation({ country });
+  await sendEmail({
+    to:      email,
+    subject: tmpl.subject,
+    text:    tmpl.text,
+    html:    tmpl.html,
+    tags: [
+      { name: "category", value: "waitlist-confirmation" },
+      { name: "source",   value: source.replace(/[^a-z0-9_-]/gi, "_").slice(0, 50) },
+    ],
+  });
 
   return NextResponse.json({ ok: true });
 }

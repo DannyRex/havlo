@@ -14,6 +14,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
+import { sendEmail } from "@/lib/email/send";
+import { notifyProductConfirmation } from "@/lib/email/templates/notify-product";
 
 interface NotifyRequest {
   query?:   string;
@@ -83,6 +85,22 @@ export async function POST(req: NextRequest) {
     console.error("[notify-product] insert error:", error.message);
     return NextResponse.json({ ok: false, error: "Could not save request" }, { status: 500 });
   }
+
+  /* Send confirmation email. Awaited (Resend is sub-200ms typical) but
+     failures are non-blocking — the row is already saved, the email is
+     a nice-to-have. Logged in sendEmail() if it fails. Tagged so the
+     Resend dashboard can filter / report on confirmation volume. */
+  const tmpl = notifyProductConfirmation({ query, country });
+  await sendEmail({
+    to:      email,
+    subject: tmpl.subject,
+    text:    tmpl.text,
+    html:    tmpl.html,
+    tags: [
+      { name: "category", value: "notify-confirmation" },
+      { name: "source",   value: source.replace(/[^a-z0-9_-]/gi, "_").slice(0, 50) },
+    ],
+  });
 
   return NextResponse.json({ ok: true });
 }
