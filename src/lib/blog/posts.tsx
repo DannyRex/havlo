@@ -39,6 +39,11 @@ export interface BlogPost {
   readMinutes: number;
   /** Optional categorization for future /blog?category=X views. */
   tags?:       string[];
+  /** ISO country codes this post targets. Used by getPostsForCountry
+      to filter the /blog index for the user's country. Use ["all"]
+      (or omit) for cross-cutting posts that apply globally
+      (counterfeit guides, cross-border explainers, etc.). */
+  countries?:  string[];
   body:        ReactNode;
 }
 
@@ -50,6 +55,7 @@ export const posts: BlogPost[] = [
     publishedAt: "2026-05-05",
     readMinutes: 4,
     tags:        ["phones", "nigeria", "buying-guide"],
+    countries:   ["ng"],
     body: (
       <>
         <p>
@@ -145,6 +151,7 @@ export const posts: BlogPost[] = [
     publishedAt: "2026-05-06",
     readMinutes: 5,
     tags:        ["computing", "nigeria", "buying-guide"],
+    countries:   ["ng"],
     body: (
       <>
         <p>
@@ -251,6 +258,7 @@ export const posts: BlogPost[] = [
     publishedAt: "2026-05-06",
     readMinutes: 5,
     tags:        ["gaming", "nigeria", "buying-guide"],
+    countries:   ["ng"],
     body: (
       <>
         <p>
@@ -367,6 +375,7 @@ export const posts: BlogPost[] = [
     publishedAt: "2026-05-06",
     readMinutes: 4,
     tags:        ["audio", "nigeria", "buying-guide"],
+    countries:   ["ng"],
     body: (
       <>
         <p>
@@ -481,6 +490,7 @@ export const posts: BlogPost[] = [
     publishedAt: "2026-05-06",
     readMinutes: 5,
     tags:        ["phones", "nigeria", "buying-guide"],
+    countries:   ["ng"],
     body: (
       <>
         <p>
@@ -575,6 +585,328 @@ export const posts: BlogPost[] = [
       </>
     ),
   },
+
+  {
+    slug:        "playstation-5-uk-deals-2026",
+    title:       "Best PlayStation 5 Deals in the UK 2026",
+    description: "PS5 Slim pricing across Argos, Currys, Amazon UK, John Lewis, and Game. Plus the bundle math that beats buying console + games separately.",
+    publishedAt: "2026-05-06",
+    readMinutes: 5,
+    tags:        ["gaming", "uk", "buying-guide"],
+    countries:   ["uk"],
+    body: (
+      <>
+        <p>
+          The PS5 Slim has been the easier console to find in the UK
+          since late 2023. Pricing settled around{" "}
+          <strong>£429-489</strong> for the disc edition,{" "}
+          <strong>£389-429</strong> for digital. Here is where the
+          legitimate stock actually lives this week.
+        </p>
+
+        <h2>Where to buy in the UK</h2>
+        <ul>
+          <li>
+            <strong>Argos</strong> consistently has the sharpest PS5
+            pricing in the UK. Click-and-collect from local stores
+            usually beats home delivery on convenience and reliability.
+          </li>
+          <li>
+            <strong>Amazon UK</strong> matches Argos on the base SKU
+            and occasionally undercuts during Lightning Deal events.
+            Prime delivery makes this the easiest path for most buyers.
+          </li>
+          <li>
+            <strong>Currys</strong> runs aggressive PS5 bundle promotions
+            (console plus 2 games plus extra controller) several times
+            per quarter. The bundle math beats buying separately by
+            £40-80 when active.
+          </li>
+          <li>
+            <strong>John Lewis</strong> matches the price but adds the
+            standard 2-year guarantee at no extra cost. Worth the slight
+            faff for buyers who want longer protection without paying
+            for an extended warranty.
+          </li>
+          <li>
+            <strong>Game</strong> remains a viable specialist option,
+            particularly for trade-ins. Their bundles often include
+            preowned games that nudge total value above competitors.
+          </li>
+        </ul>
+
+        <h2>Disc edition vs digital edition</h2>
+        <p>
+          The disc edition costs around £40-60 more than digital in the
+          UK. For most buyers the disc edition is worth it: physical
+          games are significantly cheaper used (CeX, GAME, Facebook
+          Marketplace), you can resell or trade, and PS Plus discounts
+          on digital titles erode quickly when bought new.
+        </p>
+        <p>
+          Digital makes sense if you only play first-party Sony games and
+          plan to subscribe to PS Plus Extra for the rotating catalog.
+          Otherwise the disc edition pays for itself in 3-4 games.
+        </p>
+
+        <h2>The bundle math worth knowing</h2>
+        <p>
+          A standalone PS5 Slim disc edition is around £450. Buying a
+          quality second DualSense controller (£60) plus two new
+          first-party games (£60-70 each) separately runs the total to
+          £620-650.
+        </p>
+        <p>
+          Currys runs promotions where the same console plus two games
+          plus extra controller bundles for £530-560. That is £80-120
+          off the unbundled price for the same items. Watch for these
+          around major retail events: Black Friday, Boxing Day, January
+          sales, Easter, and the back-to-school window.
+        </p>
+
+        <h2>What about PS5 Pro?</h2>
+        <p>
+          The PS5 Pro launched in late 2024 at £700 in the UK and remains
+          there. For most buyers the Pro is hard to justify: the Slim
+          handles every current PS5 game at acceptable settings, and the
+          Pro&apos;s upgraded GPU + AI upscaling are most visible in
+          first-party showcase titles.
+        </p>
+        <p>
+          Get the Pro if you have a 4K 120Hz OLED, play primarily
+          first-party Sony titles, and are willing to pay £250 more for
+          marginally better visuals. Otherwise the Slim is the better
+          value.
+        </p>
+
+        <h2>How we update this</h2>
+        <p>
+          Havlo refreshes UK PS5 pricing across all retailers above
+          daily. For current real-time pricing, search PlayStation 5 on
+          the home page or browse the Gaming category.
+        </p>
+      </>
+    ),
+  },
+
+  {
+    slug:        "uae-tech-shopping-guide-2026",
+    title:       "Buying Tech in the UAE 2026: Amazon AE vs Noon vs Sharaf DG",
+    description: "How to actually find the best tech prices in Dubai and Abu Dhabi. Amazon AE, Noon, Sharaf DG, Lulu, and the cross-border options worth considering.",
+    publishedAt: "2026-05-06",
+    readMinutes: 5,
+    tags:        ["electronics", "uae", "buying-guide"],
+    countries:   ["ae"],
+    body: (
+      <>
+        <p>
+          The UAE tech retail landscape has consolidated around four
+          serious players: Amazon AE (formerly Souq), Noon, Sharaf DG,
+          and Lulu. Each has a clear lane. Knowing which to use saves
+          AED 200-800 on a typical electronics purchase.
+        </p>
+
+        <h2>Amazon AE</h2>
+        <p>
+          Amazon&apos;s UAE storefront has the broadest catalog by a
+          comfortable margin. Coverage on flagship phones, laptops, and
+          audio gear matches global Amazon stores. Prime delivery in
+          Dubai and Abu Dhabi is reliable enough that next-day is the
+          rule, not the exception.
+        </p>
+        <p>
+          Best for: anything Apple, anything mainstream Samsung, audio
+          gear (Sony, Bose, JBL), and Kindle products. Pricing is
+          competitive but rarely the absolute cheapest in market.
+        </p>
+
+        <h2>Noon</h2>
+        <p>
+          Noon is the local rival, founded by UAE-based Mohamed Alabbar.
+          Prices are aggressive on flagship phones especially, often
+          AED 100-300 below Amazon AE during Yellow Friday and similar
+          regional shopping events.
+        </p>
+        <p>
+          Best for: phone launches (Samsung S-series, iPhone 15-16),
+          gaming consoles, and household appliances. Their warranty
+          handling has improved significantly since 2023.
+        </p>
+
+        <h2>Sharaf DG</h2>
+        <p>
+          Sharaf DG is the UAE&apos;s legacy electronics specialist with
+          large physical stores across the country. They are the
+          authorized Apple Premium Reseller in the UAE, which means
+          AppleCare and warranty service runs cleanly through them.
+        </p>
+        <p>
+          Best for: Apple products specifically (peace of mind on
+          warranty), high-value purchases where you want to inspect in
+          person before paying, and anyone who wants traditional retail
+          service rather than online support.
+        </p>
+
+        <h2>Lulu Hypermarket</h2>
+        <p>
+          Lulu is more known for groceries but has a respectable
+          electronics section, particularly on appliances and TVs. They
+          run quarterly &quot;Lulu Online&quot; promotions that
+          occasionally beat the dedicated electronics retailers on
+          mainstream brands.
+        </p>
+        <p>
+          Best for: large appliances (fridges, washers, dryers), TVs,
+          and kitchen electronics. Worth checking before buying these
+          categories elsewhere.
+        </p>
+
+        <h2>Cross-border math: amazon.com from the UAE</h2>
+        <p>
+          For products that are dramatically cheaper on amazon.com than
+          amazon.ae, cross-border via a forwarder (MyUS, Borderlinx,
+          Aramex) makes sense for high-value items. Total delivered cost
+          for a $1,000 product runs roughly AED 4,200-4,600 (item plus
+          shipping plus 5% UAE customs duty plus forwarder fee), versus
+          AED 4,800-5,200 buying the same item locally.
+        </p>
+        <p>
+          Worth it for: Apple flagship phones and laptops, Sony cameras,
+          DJI drones. Not worth it for: anything under $300 (the fees
+          eat the savings) or anything where local warranty matters.
+        </p>
+
+        <h2>How we update this</h2>
+        <p>
+          Havlo refreshes UAE electronics pricing daily across the
+          retailers above. For current real-time pricing on any product,
+          search by name on the home page or browse the relevant
+          category.
+        </p>
+      </>
+    ),
+  },
+
+  {
+    slug:        "spot-counterfeit-airpods-buyer-guide-2026",
+    title:       "How to Spot Counterfeit AirPods: A Buyer's Guide",
+    description: "Counterfeit AirPods Pro look identical to the real thing. Here is the verification checklist that catches every fake regardless of how convincing it looks at first glance.",
+    publishedAt: "2026-05-06",
+    readMinutes: 4,
+    tags:        ["audio", "buying-guide", "counterfeit"],
+    countries:   ["all"],
+    body: (
+      <>
+        <p>
+          Counterfeit AirPods Pro 2 are the most refined fakes in
+          consumer electronics. The packaging is correct down to the
+          shrink-wrap, the serial numbers match Apple&apos;s format,
+          and the buds physically look identical from outside the case.
+          Visual inspection alone catches almost none of them.
+        </p>
+        <p>
+          The reliable tests below catch every counterfeit we have seen,
+          regardless of how convincing the unit looks at first glance.
+          They take about 90 seconds total. Run them before you pay.
+        </p>
+
+        <h2>Test 1: pair with iPhone, check the Settings page</h2>
+        <p>
+          Genuine AirPods show the dedicated &quot;AirPods Pro&quot;
+          card in the iPhone Settings, with battery percentages for
+          left bud, right bud, and case shown separately. The card uses
+          the official AirPods Pro graphic.
+        </p>
+        <p>
+          Counterfeits behave in one of three ways during pairing:
+        </p>
+        <ul>
+          <li>
+            They never trigger the Apple pairing animation (the
+            full-screen card that pops up on iPhone proximity)
+          </li>
+          <li>
+            They show as a generic Bluetooth device with no battery
+            percentages
+          </li>
+          <li>
+            They show a similar-looking card but with slight visual
+            differences (wrong icon style, missing animation, fewer
+            battery readouts)
+          </li>
+        </ul>
+        <p>
+          Any deviation from the genuine card is a confirmed counterfeit.
+        </p>
+
+        <h2>Test 2: verify the serial at checkcoverage.apple.com</h2>
+        <p>
+          The serial number on genuine AirPods is printed inside the
+          case lid (open the case, look at the inside top of the lid).
+          Enter it at checkcoverage.apple.com.
+        </p>
+        <p>
+          Genuine units return a valid warranty result (either
+          &quot;within warranty&quot; or &quot;out of warranty&quot;
+          with the original purchase date). Counterfeit serials return
+          one of three errors:
+        </p>
+        <ul>
+          <li>&quot;Serial number not found&quot;</li>
+          <li>&quot;Please check your serial number&quot;</li>
+          <li>A valid warranty result for a completely different product (e.g. an iPad)</li>
+        </ul>
+
+        <h2>Test 3: stress-test active noise cancellation</h2>
+        <p>
+          Genuine AirPods Pro have transformative noise cancellation.
+          Hold them in a noisy environment (street traffic, busy cafe,
+          running tap), then turn ANC on via the case stem squeeze or
+          Settings. Ambient noise should drop dramatically and
+          immediately.
+        </p>
+        <p>
+          Counterfeit ANC is either non-existent (no audible change) or
+          extremely weak (slight muffling that is far less than what
+          genuine units produce). The difference is unmistakable in any
+          noisy environment.
+        </p>
+
+        <h2>Test 4: check firmware version</h2>
+        <p>
+          Settings → Bluetooth → tap the (i) next to AirPods Pro →
+          scroll to &quot;Version&quot;. Genuine units show a current
+          firmware version (e.g. 7E93 or higher as of 2026).
+          Counterfeits show either no firmware version, an
+          implausibly-old version, or a fake string.
+        </p>
+        <p>
+          Apple pushes firmware updates over the lifetime of the
+          product. Genuine AirPods Pro 2 will continue receiving updates
+          for years. Counterfeits never receive any.
+        </p>
+
+        <h2>Why genuine AirPods cost what they do</h2>
+        <p>
+          Genuine AirPods Pro 2 with USB-C land around $199 on Amazon
+          US, £199 on Amazon UK, and around AED 850 in the UAE.
+          Anything dramatically below those numbers is almost certainly
+          counterfeit. The H2 chip alone has more silicon cost than what
+          counterfeit listings sell the entire product for.
+        </p>
+
+        <h2>Where to buy with confidence</h2>
+        <p>
+          For the lowest counterfeit risk: authorized Apple resellers
+          (Slot in Nigeria, Sharaf DG in UAE, John Lewis in UK), Apple
+          Store directly, and Amazon listings sold by Amazon itself
+          (not third-party sellers). Avoid: Computer Village stalls,
+          unverified Konga or Jumia third-party sellers, deals that
+          look too good to be true.
+        </p>
+      </>
+    ),
+  },
 ];
 
 /** Lookup helper for the dynamic [slug] route. */
@@ -592,4 +924,27 @@ export function getPostsByDate(): BlogPost[] {
   return [...posts].sort(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
   );
+}
+
+/** Posts relevant to a given country, sorted newest-first.
+ *
+ *  Filter rules:
+ *    - Posts with countries containing the user's code → keep
+ *    - Posts with countries containing 'all' → keep (cross-cutting)
+ *    - Posts with no countries field → keep (legacy / global default)
+ *
+ *  Fallback: if the filter would produce zero posts (e.g. user is in
+ *  a country we haven't written for yet), return all posts so the
+ *  /blog index never renders empty. The flag chip on each card still
+ *  signals which market the post targets so users understand why
+ *  some posts are NG-specific etc.
+ */
+export function getPostsForCountry(countryCode: string): BlogPost[] {
+  const code = countryCode.toLowerCase();
+  const all  = getPostsByDate();
+  const filtered = all.filter((p) => {
+    if (!p.countries || p.countries.length === 0) return true;
+    return p.countries.includes(code) || p.countries.includes("all");
+  });
+  return filtered.length > 0 ? filtered : all;
 }

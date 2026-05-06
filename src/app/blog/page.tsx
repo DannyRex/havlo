@@ -1,4 +1,17 @@
-/* /blog — index page listing all posts in date-desc order.
+/* /blog — index page listing posts relevant to the user's country.
+
+   Why country-filtered: the catalog covers seven markets but each
+   post targets a specific market's retailers. Showing UK retailer
+   guides to a Nigerian visitor is noise. Filter at render time
+   based on the cookie country (set by CountryProvider / middleware).
+   Fallback to ALL posts when the filter produces zero hits so the
+   page never renders empty for countries we haven't written for yet.
+
+   SEO: each /blog/{slug} URL is globally accessible. The filter is
+   a UX layer on the index only — Google still finds every post via
+   sitemap entries and individual URL crawling. No duplicate-content
+   risk because /blog has a single canonical regardless of which
+   posts get rendered.
 
    Built for SEO content engine: each post targets a specific
    commercial-intent search query (e.g. "best iPhone 15 deals
@@ -9,7 +22,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight, Calendar, Clock } from "lucide-react";
-import { getPostsByDate } from "@/lib/blog/posts";
+import { getPostsForCountry } from "@/lib/blog/posts";
+import { getServerCountry } from "@/lib/country-server";
+import { COUNTRIES } from "@/lib/country";
+
+/* Country code → flag emoji map for the post-card chip. Pulled from
+   the existing COUNTRIES roster so the same flags shown in the
+   country switcher render here too. "all" gets a globe. */
+const FLAG_FOR: Record<string, string> = Object.fromEntries(
+  COUNTRIES.map((c) => [c.code, c.flag]),
+);
+function flagFor(code: string): string {
+  if (code === "all") return "🌍";
+  return FLAG_FOR[code] ?? "🌐";
+}
 
 export const metadata: Metadata = {
   title: "Blog",
@@ -25,7 +51,8 @@ export const metadata: Metadata = {
 };
 
 export default function BlogIndexPage() {
-  const posts = getPostsByDate();
+  const country = getServerCountry();
+  const posts   = getPostsForCountry(country.code);
 
   return (
     <main className="bg-bg">
@@ -58,6 +85,24 @@ export default function BlogIndexPage() {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
+                      {/* Country flag chips — shows which market(s) this
+                          post targets. Helps the user understand why
+                          they're seeing a UK guide on their NG view
+                          (cross-cutting topic, or fallback when no
+                          local content exists yet). */}
+                      {post.countries && post.countries.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                          {post.countries.map((c) => (
+                            <span
+                              key={c}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-2 border border-border text-[10px] uppercase tracking-[0.06em] text-ink-3"
+                            >
+                              <span aria-hidden="true">{flagFor(c)}</span>
+                              <span>{c === "all" ? "Global" : c.toUpperCase()}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <h2 className="text-xl sm:text-2xl font-bold text-ink tracking-[-0.02em] leading-tight mb-2 group-hover:text-ink">
                         {post.title}
                       </h2>

@@ -306,17 +306,20 @@ function CompareContent() {
                   <h2 className="text-[15px] sm:text-lg font-semibold text-ink leading-snug line-clamp-2">
                     {result.anchor.title}
                   </h2>
-                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
-                    {result.anchor.bestPrice > 0 ? (
+                  {/* Price block: only render when we actually have a
+                      number. The previous fallback text ('Price not
+                      shown on the source page') was confessional dev-
+                      language that didn't help users — the store
+                      chips below already give them a clear path to
+                      click through and see the real price on the
+                      retailer site. Cleaner UI to just hide the row. */}
+                  {result.anchor.bestPrice > 0 && (
+                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
                       <span className="text-lg sm:text-xl font-bold text-ink">
                         {formatNaira(result.anchor.bestPrice)}
                       </span>
-                    ) : (
-                      <span className="text-xs text-ink-3 italic">
-                        Price not shown on the source page
-                      </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {/* Store chips — horizontally scroll on mobile, no awkward wraps */}
                   <div className="-mx-4 sm:mx-0 mt-3">
