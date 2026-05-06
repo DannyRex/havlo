@@ -1,5 +1,4 @@
 import type { MetadataRoute } from "next";
-import { categories } from "@/lib/data/categories";
 import { COUNTRIES } from "@/lib/country";
 import { SITE_URL, buildHreflangAlternates } from "@/lib/seo";
 import { posts } from "@/lib/blog/posts";
@@ -77,25 +76,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }));
   });
 
-  /* Category routes — country-scoped + hreflang. Each category surfaces
-     the same product taxonomy across all 6 countries. */
-  const categoryRoutes: MetadataRoute.Sitemap = COUNTRIES.flatMap((c) =>
-    categories
-      .filter((cat) => cat.slug !== "all")
-      .map((cat) => ({
-        url:            `${SITE_URL}/${c.code}/deals?category=${cat.slug}`,
-        priority:       0.6,
-        changeFrequency: "daily" as const,
-        lastModified:   now,
-        alternates: {
-          languages: Object.fromEntries(
-            Object.entries(buildHreflangAlternates("deals")).map(
-              ([lang, url]) => [lang, `${url}?category=${cat.slug}`],
-            ),
-          ),
-        },
-      })),
-  );
+  /* Category filter URLs are intentionally NOT in the sitemap.
+     /[country]/deals canonicalizes ?category=X variants back to the
+     base via generateMetadata's `alternates.canonical`, so emitting
+     them as separate sitemap entries told Google "70 unique pages"
+     while every one of them pointed at the same canonical. Result
+     was 70 entries stuck in 'Discovered – currently not indexed'.
+
+     The category filter UI is reachable from /deals on every country,
+     so users + bots can still navigate to it; we just don't ask Google
+     to spend index budget on near-duplicate query-string variants.
+     Same pattern as NerdWallet / Wirecutter / Skyscanner sitemaps. */
 
   return [
     ...homepages,
@@ -104,6 +95,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...globalRoutes,
     ...blogIndexRoutes,
     ...blogPostRoutes,
-    ...categoryRoutes,
   ];
 }
