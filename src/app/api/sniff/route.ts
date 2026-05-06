@@ -146,8 +146,14 @@ function decodeHtmlEntities(s: string): string {
                                       "lowPrice": ..., "priceCurrency": ... } }
      - Plain Offer: { "@type": "Offer", "price": ... } */
 function extractPriceFromJsonLd(html: string): { price: number | null; currency: string | null } {
-  const blocks = html.matchAll(
-    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  /* Array.from() because the project's tsconfig target doesn't
+     downlevel-iterate matchAll's RegExpStringIterator. Eager
+     materialisation is fine — JSON-LD blocks per page typically
+     count in single digits. */
+  const blocks = Array.from(
+    html.matchAll(
+      /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+    ),
   );
   for (const m of blocks) {
     try {
