@@ -3,20 +3,28 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, Tag, Search, Menu, X } from "lucide-react";
+import { Home, Tag, Search, BookOpen, Info, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import Logo from "@/components/ui/Logo";
 import CountrySelect from "@/components/layout/CountrySelect";
 
+/* Mobile drawer navigation. Includes ALL primary destinations so
+   the drawer doubles as a sitemap on phones. Desktop nav only
+   surfaces the most-clicked items (filtered below) — Blog + About
+   remain reachable via the footer for desktop visitors. */
 const navLinks = [
-  { href: "/",        label: "Home",          Icon: Home   },
-  { href: "/deals",   label: "Deals",         Icon: Tag    },
-  { href: "/compare", label: "Find for less", Icon: Search },
+  { href: "/",        label: "Home",          Icon: Home     },
+  { href: "/deals",   label: "Deals",         Icon: Tag      },
+  { href: "/compare", label: "Find for less", Icon: Search   },
+  { href: "/blog",    label: "Blog",          Icon: BookOpen },
+  { href: "/about",   label: "About",         Icon: Info     },
 ];
 
-/* Subset shown in the desktop top nav (logo serves as Home) */
-const desktopLinks = navLinks.filter((l) => l.href !== "/");
+/* Desktop top nav: Deals + Find for less + Blog. Logo serves as Home;
+   About lives in the footer (less frequently clicked on desktop). */
+const DESKTOP_LINK_HREFS = new Set(["/deals", "/compare", "/blog"]);
+const desktopLinks = navLinks.filter((l) => DESKTOP_LINK_HREFS.has(l.href));
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -183,17 +191,20 @@ export default function Navbar() {
             })}
           </nav>
 
-          {/* Footer note inside drawer */}
+          {/* Footer note inside drawer. Tagline kept generic (no
+              hardcoded store counts that drift with each country
+              roster change). Contact stays as a low-friction
+              secondary link. */}
           <div className="mt-auto pt-6 border-t border-border">
             <p className="text-[11px] text-ink-3 leading-relaxed">
-              Havlo finds cheaper alternatives across 12+ stores worldwide.
+              Find similar products for less. Across local and global stores.
             </p>
             <Link
               href="/contact"
               onClick={() => setDrawerOpen(false)}
               className="text-[11px] text-ink-2 hover:text-ink transition-colors mt-2 inline-block underline-offset-4 hover:underline"
             >
-              Contact us →
+              Contact us
             </Link>
           </div>
         </div>
