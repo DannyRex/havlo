@@ -136,20 +136,124 @@ function decodeHtmlEntities(s: string): string {
     .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)));
 }
 
+/* Pull price + currency from a JSON-LD <script> block. JSON-LD is the
+   modern e-commerce standard (Amazon, Shopify, BigCommerce, most
+   Magento templates). The schema is Schema.org Product with nested
+   offers. Variants we handle:
+     - Single Product: { "@type": "Product", "offers": { "price": ... } }
+     - Multiple Products: array of Product
+     - AggregateOffer: { "offers": { "@type": "AggregateOffer",
+                                      "lowPrice": ..., "priceCurrency": ... } }
+     - Plain Offer: { "@type": "Offer", "price": ... } */
+function extractPriceFromJsonLd(html: string): { price: number | null; currency: string | null } {
+  const blocks = html.matchAll(
+    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  );
+  for (const m of blocks) {
+    try {
+      const json = JSON.parse(m[1].trim());
+      const items: unknown[] = Array.isArray(json)
+        ? json
+        : json["@graph"]
+          ? (json["@graph"] as unknown[])
+          : [json];
+      for (const item of items) {
+        const result = pickPriceFromItem(item);
+        if (result) return result;
+      }
+    } catch {
+      // Malformed JSON — skip this block, try the next
+    }
+  }
+  return { price: null, currency: null };
+}
+
+/* Recurse into a JSON-LD item looking for a price. Handles Product,
+   Offer, AggregateOffer, and nested .offers objects. */
+function pickPriceFromItem(
+  item: unknown,
+): { price: number; currency: string | null } | null {
+  if (!item || typeof item !== "object") return null;
+  const obj = item as Record<string, unknown>;
+
+  const direct = readPriceField(obj);
+  if (direct) return direct;
+
+  /* Nested offers object/array */
+  const offers = obj["offers"];
+  if (Array.isArray(offers)) {
+    for (const o of offers) {
+      const r = pickPriceFromItem(o);
+      if (r) return r;
+    }
+  } else if (offers && typeof offers === "object") {
+    const r = pickPriceFromItem(offers);
+    if (r) return r;
+  }
+
+  return null;
+}
+
+/* Extract a numeric price + currency code from a single JSON-LD
+   object (a Product, Offer, or AggregateOffer). */
+function readPriceField(
+  obj: Record<string, unknown>,
+): { price: number; currency: string | null } | null {
+  // Try price first, then lowPrice (AggregateOffer)
+  const raw =
+    obj["price"] ??
+    obj["lowPrice"] ??
+    obj["highPrice"] ??
+    null;
+  if (raw == null) return null;
+  const price = parseFloat(String(raw).replace(/[^0-9.]/g, ""));
+  if (!isFinite(price) || price <= 0) return null;
+  const currency =
+    (obj["priceCurrency"] as string | undefined) ??
+    (obj["currency"] as string | undefined) ??
+    null;
+  return { price, currency };
+}
+
 function extractPrice(html: string): { price: number | null; currency: string | null } {
-  const amount =
+  /* 1. Try og: / product: meta tags first — fast path for sites that
+        expose Open Graph product price (some Shopify themes, many
+        Magento installs). */
+  const ogAmount =
     extractMeta(html, "og:price:amount") ??
     extractMeta(html, "product:price:amount") ??
     extractMeta(html, "twitter:data1") ??
     null;
-  const currency =
+  const ogCurrency =
     extractMeta(html, "og:price:currency") ??
     extractMeta(html, "product:price:currency") ??
     null;
-  if (amount) {
-    const price = parseFloat(amount.replace(/[^0-9.]/g, ""));
-    if (!isNaN(price) && price > 0) return { price, currency };
+  if (ogAmount) {
+    const price = parseFloat(ogAmount.replace(/[^0-9.]/g, ""));
+    if (!isNaN(price) && price > 0) return { price, currency: ogCurrency };
   }
+
+  /* 2. JSON-LD structured data — modern e-commerce standard. Amazon,
+        most Shopify stores, and any site with proper SEO ships this. */
+  const jsonLd = extractPriceFromJsonLd(html);
+  if (jsonLd.price) return jsonLd;
+
+  /* 3. Schema.org microdata — older sites (and some big retailers
+        like Argos, Currys) expose price via itemprop attributes
+        rather than og: meta. */
+  const itempropMatch = html.match(
+    /<(?:meta|span|div)[^>]+itemprop=["']price["'][^>]*(?:content|>)\s*=?\s*["']?([0-9][0-9.,]*)["']?/i,
+  );
+  if (itempropMatch?.[1]) {
+    const price = parseFloat(itempropMatch[1].replace(/[^0-9.]/g, ""));
+    if (!isNaN(price) && price > 0) {
+      const currencyMatch = html.match(
+        /itemprop=["']priceCurrency["'][^>]+content=["']([A-Z]{3})["']/i,
+      );
+      return { price, currency: currencyMatch?.[1] ?? null };
+    }
+  }
+
   return { price: null, currency: null };
 }
 
@@ -304,7 +408,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     if (!reader) throw new Error("No response body");
     const decoder = new TextDecoder();
     let chunk = "";
-    const MAX_BYTES = 65_536; // 64 KB
+    /* 256 KB cap. Modern e-commerce <head> sections regularly hit
+       100-200 KB (massive lists of preloads, font CSS, JSON-LD,
+       inlined React state, every meta tag SEO best practice
+       recommends). Stopping at 64 KB cut off the JSON-LD <script>
+       block on Amazon and similar — which meant og:image worked but
+       price extraction silently returned null even when the price
+       was right there in structured data. 256 KB covers virtually
+       every site without burning meaningful bandwidth. */
+    const MAX_BYTES = 262_144;
     let total = 0;
     while (true) {
       const { done, value } = await reader.read();
