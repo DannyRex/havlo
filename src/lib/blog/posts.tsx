@@ -907,6 +907,375 @@ export const posts: BlogPost[] = [
       </>
     ),
   },
+
+  {
+    slug:        "best-air-fryer-deals-nigeria-2026",
+    title:       "Best Air Fryer Deals in Nigeria 2026",
+    description: "Air fryer prices across Konga, Jumia, ShopInverse, Pointek, and Slot. Plus which size to buy and the brands actually worth your money.",
+    publishedAt: "2026-05-06",
+    readMinutes: 5,
+    tags:        ["appliances", "nigeria", "buying-guide"],
+    countries:   ["ng"],
+    body: (
+      <>
+        <p>
+          Air fryers became a Nigerian kitchen staple after the 2023
+          fuel-subsidy removal pushed gas prices up. Pricing across
+          Lagos retailers ranges from{" "}
+          <strong>₦35,000 to ₦180,000</strong> for a workable family
+          unit, with most strong picks landing between ₦55,000 and
+          ₦95,000. Here is where to shop and what to actually buy.
+        </p>
+
+        <h2>Where to buy in Nigeria</h2>
+        <ul>
+          <li>
+            <strong>Konga</strong> has the deepest selection of air
+            fryers in Nigeria, including authorized dealers for Philips,
+            Tefal, and Hisense. Prices update weekly with active
+            promotional cycles.
+          </li>
+          <li>
+            <strong>Jumia</strong> matches Konga on selection and
+            occasionally beats them on Black Friday and Jumia
+            Anniversary deals. Read seller details: stick with verified
+            sellers or Jumia Express for warranty handling.
+          </li>
+          <li>
+            <strong>ShopInverse</strong> consistently runs the sharpest
+            pricing on appliances in Lagos. Smaller catalog but
+            competitive on the brands they stock.
+          </li>
+          <li>
+            <strong>Pointek</strong> is the safe choice for higher-value
+            units (above ₦100K). In-store pickup in Ikeja works well if
+            you want to inspect before paying.
+          </li>
+          <li>
+            <strong>Slot</strong> stocks select air fryer models
+            alongside their phone and laptop range, mostly Philips and
+            Tefal at consistent pricing.
+          </li>
+        </ul>
+
+        <h2>What size to buy</h2>
+        <p>
+          Air fryer size is measured in litres. The right size depends
+          on household size:
+        </p>
+        <ul>
+          <li>
+            <strong>3-4L</strong>: cooks for 1-2 people. Cheapest entry
+            point (₦35-55K). Too small for a typical Nigerian family
+            meal.
+          </li>
+          <li>
+            <strong>5-6L</strong>: the sweet spot for most homes.
+            Handles a whole chicken, a tray of fish, or party-size
+            chips. Pricing ₦55-90K. This is what most buyers should get.
+          </li>
+          <li>
+            <strong>7-9L</strong>: large family use, batch cooking, or
+            entertaining. Pricing ₦95-150K. Worth it if you cook for
+            5+ regularly.
+          </li>
+          <li>
+            <strong>Dual-zone</strong>: two separate baskets, cook two
+            things at once. Brands: Ninja, Tefal Dual Easy Fry. Pricing
+            ₦130-220K. Convenience upgrade, not a cooking-quality one.
+          </li>
+        </ul>
+
+        <h2>Brands worth your money</h2>
+        <p>
+          <strong>Philips</strong> remains the gold standard. Their
+          Avance Collection units have the best build quality and
+          consistent results. Available at Konga, Jumia, Pointek, Slot.
+          Pay the premium if you intend to use it heavily.
+        </p>
+        <p>
+          <strong>Tefal</strong> is the value pick. Easy Fry and Easy
+          Fry XXL models offer 80% of the Philips experience at 60% of
+          the price. Wide availability across all NG retailers.
+        </p>
+        <p>
+          <strong>Hisense</strong> ships locally-distributed units at
+          aggressive prices, particularly for the larger sizes.
+          Warranty handling is straightforward through Hisense Nigeria
+          service centers.
+        </p>
+        <p>
+          <strong>Ninja</strong> is the choice for dual-zone or
+          large-capacity cooking. Imported via cross-border or premium
+          retailers like Pointek. Pricier than alternatives but the
+          dual-zone Foodi range has no real local competition.
+        </p>
+
+        <h2>Brands to avoid</h2>
+        <p>
+          Generic brands at ₦25-35K (Saachi, Master Chef, anonymous
+          China imports): poor temperature control, plastic basket
+          coatings that flake into food after a few months, and
+          warranty support that effectively does not exist. Spend an
+          extra ₦20-30K and get a Tefal or Hisense.
+        </p>
+
+        <h2>Cross-border math</h2>
+        <p>
+          Amazon UK has Tefal and Ninja units at GBP prices that work
+          out 25-35% cheaper delivered to Lagos than the same SKU
+          locally. Worth it for the larger Ninja Foodi units (₦40-70K
+          savings) but rarely worth it for sub-₦60K units once shipping
+          and customs are factored in.
+        </p>
+
+        <h2>How we update this</h2>
+        <p>
+          Havlo refreshes air fryer pricing across all NG retailers
+          daily. Search by brand or model on the home page or browse
+          the Appliances category for current prices.
+        </p>
+      </>
+    ),
+  },
+
+  {
+    slug:        "best-sneaker-deals-nigeria-2026",
+    title:       "Best Sneaker Deals in Nigeria 2026: Air Force 1, Samba, Yeezy",
+    description: "Where to find authentic sneakers in Lagos. Jumia, Konga, ASOS, Stockx, plus the authentication checklist that keeps you out of fake territory.",
+    publishedAt: "2026-05-06",
+    readMinutes: 5,
+    tags:        ["fashion", "nigeria", "buying-guide"],
+    countries:   ["ng"],
+    body: (
+      <>
+        <p>
+          Sneaker culture in Lagos has matured into a real market.
+          Authentic Air Force 1, Adidas Samba, and Yeezy slides command{" "}
+          <strong>₦65,000 to ₦150,000</strong> from legitimate sources.
+          Below that, you are almost certainly looking at counterfeits
+          (or rare clearance stock from outdated colorways). Here is
+          where authentic stock actually lives and how to verify before
+          you buy.
+        </p>
+
+        <h2>Where authentic sneakers live in Nigeria</h2>
+        <ul>
+          <li>
+            <strong>Foot Locker Nigeria</strong> (when in stock):
+            authorized Nike and Jordan distribution. The cleanest path
+            for current-season releases. Limited Lagos retail presence
+            but online shipping is reliable.
+          </li>
+          <li>
+            <strong>Jumia (verified sellers only)</strong>: filter to
+            sellers with 1,000+ sales and Jumia Express badge. Authentic
+            stock exists here but careful selection is required.
+            Avoid sellers based outside Lagos with low ratings.
+          </li>
+          <li>
+            <strong>Konga (Jumia equivalent)</strong>: same rules.
+            Konga&apos;s seller verification is slightly tighter than
+            Jumia&apos;s in our experience.
+          </li>
+          <li>
+            <strong>ASOS</strong>: ships internationally to Nigeria with
+            authentic Nike, Adidas, New Balance, and Puma. Pricing is
+            often comparable to local after shipping.
+          </li>
+          <li>
+            <strong>StockX</strong>: every pair authenticated by StockX
+            staff before shipping. The most reliable cross-border
+            option for resale-tier silhouettes (Jordan 1, Yeezy, Dunk
+            SB). Pricing is at full market rate, no bargains.
+          </li>
+        </ul>
+
+        <h2>Authentication checklist</h2>
+        <p>
+          Run these checks before paying. Three minutes of inspection
+          beats months of buyer&apos;s remorse:
+        </p>
+        <ul>
+          <li>
+            <strong>Box label.</strong> Genuine boxes have crisp,
+            high-resolution labels with consistent fonts. Counterfeit
+            boxes typically have fuzzy text, slightly-off color
+            registration, or misaligned barcodes.
+          </li>
+          <li>
+            <strong>Style code matching.</strong> The style code on the
+            box label (e.g., CW2288-111 for white Air Force 1)
+            must exactly match the tongue label inside the shoe. Any
+            mismatch is a confirmed counterfeit.
+          </li>
+          <li>
+            <strong>Stitching quality.</strong> Genuine Nike and Adidas
+            stitching is dense, even, and finishes cleanly at every
+            seam. Counterfeit stitching has visible loose threads,
+            uneven spacing, or amateur knot terminations.
+          </li>
+          <li>
+            <strong>Smell test.</strong> Genuine sneakers smell of
+            leather and rubber. Strong glue or chemical odors indicate
+            inferior materials and almost always counterfeit
+            construction.
+          </li>
+          <li>
+            <strong>Weight and feel.</strong> Hold both shoes from a
+            pair. Genuine pairs feel evenly weighted. Counterfeit pairs
+            are often noticeably uneven (rushed manufacturing).
+          </li>
+        </ul>
+
+        <h2>The Yeezy slides exception</h2>
+        <p>
+          Yeezy slides are the most counterfeited sneaker in Nigeria.
+          The fakes are particularly convincing because the design is
+          simple. Authentication beyond the box label is hard.
+        </p>
+        <p>
+          Buy Yeezy slides only from StockX (with their authentication
+          guarantee) or directly from Adidas&apos; official online
+          channels. Local listings under ₦35K are universally fake; even
+          ₦45-55K listings are often counterfeit.
+        </p>
+
+        <h2>Cross-border math</h2>
+        <p>
+          Foot Locker US has classic Air Force 1 around $115. Delivered
+          to Lagos via Aramex or DHL with customs runs around ₦90-105K
+          all-in. That matches or beats local authentic pricing for
+          mainstream silhouettes.
+        </p>
+        <p>
+          For limited-release or resale silhouettes (Jordan 1 Travis,
+          Off-White collaborations, Yeezy 350 v2 in current colorways),
+          StockX is the only reliable channel and pricing reflects
+          resale market rates.
+        </p>
+
+        <h2>How we update this</h2>
+        <p>
+          Havlo refreshes sneaker pricing across all retailers above
+          daily. Search by model on the home page or browse the
+          Fashion category for current prices on Air Force 1, Samba,
+          Yeezy, and other in-demand silhouettes.
+        </p>
+      </>
+    ),
+  },
+
+  {
+    slug:        "best-air-fryer-deals-uk-2026",
+    title:       "Best Air Fryer Deals in the UK 2026: Ninja, Tefal, Salter",
+    description: "Air fryer prices across Argos, Currys, John Lewis, Amazon UK, and Lakeland. Plus single-zone vs dual-zone and which brand actually delivers.",
+    publishedAt: "2026-05-06",
+    readMinutes: 5,
+    tags:        ["appliances", "uk", "buying-guide"],
+    countries:   ["uk"],
+    body: (
+      <>
+        <p>
+          Air fryers are now in over 60% of UK kitchens. The market is
+          dominated by three brands (Ninja, Tefal, Salter) at clearly
+          different price points, plus a long tail of generics that are
+          rarely worth the savings. Pricing across UK retailers ranges
+          from{" "}
+          <strong>£40 to £220</strong>. Here is where to shop and what
+          to actually buy.
+        </p>
+
+        <h2>Where to buy in the UK</h2>
+        <ul>
+          <li>
+            <strong>Argos</strong> consistently has the sharpest pricing
+            on Ninja and Tefal units. Click-and-collect from a local
+            store gives you next-day pickup and easy returns if there
+            is a fault.
+          </li>
+          <li>
+            <strong>Currys</strong> matches Argos on most SKUs and runs
+            heavy promotions during major retail events. Their delivery
+            and installation services are useful for the larger
+            countertop models.
+          </li>
+          <li>
+            <strong>John Lewis</strong> charges a small premium but
+            adds the standard 2-year guarantee. Worth the £10-20 premium
+            on higher-value Ninja units (£150+) where extended cover
+            matters.
+          </li>
+          <li>
+            <strong>Amazon UK</strong> often beats the high-street
+            retailers during Lightning Deals and Prime Day. Same-day
+            delivery on Prime is reliable in major cities.
+          </li>
+          <li>
+            <strong>Lakeland</strong> is the kitchen specialist with
+            strong customer service. Slightly limited selection but
+            their warranty support is excellent if something fails.
+          </li>
+        </ul>
+
+        <h2>Single-zone vs dual-zone</h2>
+        <p>
+          Single-zone units have one large basket. They cook one thing
+          at a time but with maximum capacity for that item. Best for:
+          large batches of one food (Sunday roast chips, full chicken,
+          tray of vegetables). Pricing: £45-100.
+        </p>
+        <p>
+          Dual-zone units have two separate baskets that can cook
+          different things simultaneously at different temperatures.
+          Best for: weeknight family meals (chicken in one basket,
+          vegetables in the other). Pricing: £130-220.
+        </p>
+        <p>
+          Most households end up using dual-zone for 80% of meals. The
+          time savings on weeknights justify the price premium for any
+          family of three or more. Single buyers and couples can stick
+          with single-zone.
+        </p>
+
+        <h2>Brands worth your money</h2>
+        <p>
+          <strong>Ninja</strong> dominates the UK air fryer market. The
+          Foodi DualZone range (AF300, AF400, AF451) is the gold
+          standard for dual-zone cooking. Build quality, basket
+          coatings, and software are noticeably ahead of competitors.
+          Pay the premium if you cook frequently.
+        </p>
+        <p>
+          <strong>Tefal</strong> is the value alternative. The Easy Fry
+          range covers single-zone needs at half the Ninja price. Easy
+          Fry XXL handles a whole chicken comfortably at around £85.
+        </p>
+        <p>
+          <strong>Salter</strong> sits below Tefal on price (£40-70)
+          with surprisingly competent units for the budget end. Their
+          dual-zone offering is workable if you want the convenience
+          without the Ninja premium.
+        </p>
+
+        <h2>Brands to skip</h2>
+        <p>
+          Cosori, Princess, and various Amazon-only brands at sub-£50:
+          variable build quality, basket coatings that flake within
+          months of regular use, and customer support that ranges from
+          slow to non-existent. The £30 you save now becomes a £100
+          replacement next year. Buy the Salter or Tefal instead.
+        </p>
+
+        <h2>How we update this</h2>
+        <p>
+          Havlo refreshes UK air fryer pricing across all retailers
+          above daily. Search by brand or model on the home page or
+          browse the Appliances category for current prices.
+        </p>
+      </>
+    ),
+  },
 ];
 
 /** Lookup helper for the dynamic [slug] route. */
