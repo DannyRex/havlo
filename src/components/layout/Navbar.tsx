@@ -30,9 +30,17 @@ export default function Navbar() {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  /* Active matcher accounts for country-prefixed routes. /deals
+     is active for /ng/deals, /uk/deals etc. Same for /compare and
+     /blog (country-prefixed canonical URLs). The bare /href in
+     navLinks gets redirected to /{country}/href by middleware /
+     legacy redirect pages, so active state needs to recognise both. */
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
-    return pathname === href || pathname.startsWith(href + "/");
+    if (pathname === href || pathname.startsWith(href + "/")) return true;
+    /* Country-prefix match: /ng/deals when href === /deals */
+    return /^\/[a-z]{2}\//.test(pathname)
+      && pathname.startsWith(`/${pathname.split("/")[1]}${href}`);
   };
 
   /* Close drawer on route change so navigating from inside it cleans up */

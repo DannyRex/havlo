@@ -21,6 +21,7 @@ import { useCountry } from "@/components/providers/CountryProvider";
 import {
   USD_FX, formatLocal, type Country,
 } from "@/lib/country";
+import { getCashbackForStore } from "@/lib/cashback";
 import type { Deal } from "@/types";
 
 interface Props {
@@ -95,6 +96,10 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
   const cleanedTitle = cleanTitle(deal.title);
   const saved = savings(deal.originalPrice, deal.salePrice);
   const hasDiscount = deal.originalPrice > deal.salePrice && deal.discountPercent > 0;
+  /* Cashback rate for the deal's store — null when no rate is set
+     (no badge shown). Phase 1 is display-only; Phase 2 wires this
+     to actual user accounts + payouts. */
+  const cashback = getCashbackForStore(deal.storeId);
 
   /* Primary price = user's preferred currency.
      Secondary price = original currency (only when different) so the
@@ -159,6 +164,21 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
               off
             </span>
           </div>
+        )}
+
+        {/* Cashback badge — left edge, below the image. Subtle pill
+            so it doesn't compete with the discount circle on the
+            opposite corner. Tappable to take user to the cashback
+            explainer page (handled at the parent <a> level since the
+            whole card is one link). */}
+        {cashback && (
+          <span
+            className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-white shadow-sm"
+            style={{ background: "rgba(16, 185, 129, 0.95)" }}
+          >
+            <span aria-hidden="true">↻</span>
+            <span>{cashback.percent}% back</span>
+          </span>
         )}
 
         {showIntl && (

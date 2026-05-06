@@ -35,29 +35,47 @@ export default function sitemap(): MetadataRoute.Sitemap {
     alternates:     { languages: buildHreflangAlternates("compare") },
   }));
 
-  /* Global routes — country-independent, no hreflang variants. About
-     gets a higher priority (0.6) than legal pages because partnership
-     prospects + branded queries ("havlo about", "havlo founder") land
-     here, and we want it indexed quickly. */
+  /* Global routes — country-independent, no hreflang variants.
+     /blog dropped from here: it now redirects to /[country]/blog,
+     which is the canonical surface emitted below. */
   const globalRoutes: MetadataRoute.Sitemap = [
     { url: `${SITE_URL}/about`,           priority: 0.6, changeFrequency: "monthly", lastModified: now },
-    { url: `${SITE_URL}/blog`,            priority: 0.7, changeFrequency: "weekly",  lastModified: now },
     { url: `${SITE_URL}/contact`,         priority: 0.4, changeFrequency: "yearly",  lastModified: now },
     { url: `${SITE_URL}/privacy-policy`,  priority: 0.3, changeFrequency: "monthly", lastModified: now },
     { url: `${SITE_URL}/terms-of-use`,    priority: 0.3, changeFrequency: "monthly", lastModified: now },
     { url: `${SITE_URL}/disclaimer`,      priority: 0.3, changeFrequency: "monthly", lastModified: now },
   ];
 
-  /* Blog post URLs — high priority since they target commercial-intent
-     queries and we want Google to crawl/rank them quickly. lastModified
-     uses the post's own publishedAt rather than `now` so unchanged
-     posts don't get treated as updated each time the sitemap rebuilds. */
-  const blogPostRoutes: MetadataRoute.Sitemap = posts.map((post) => ({
-    url:             `${SITE_URL}/blog/${post.slug}`,
+  /* Per-country blog index. Each country's /[country]/blog gets its
+     own sitemap entry with hreflang alternates pointing at sibling
+     country variants. */
+  const blogIndexRoutes: MetadataRoute.Sitemap = COUNTRIES.map((c) => ({
+    url:             `${SITE_URL}/${c.code}/blog`,
     priority:        0.7,
-    changeFrequency: "monthly",
-    lastModified:    new Date(post.publishedAt),
+    changeFrequency: "weekly",
+    lastModified:    now,
+    alternates:      { languages: buildHreflangAlternates("blog") },
   }));
+
+  /* Per-country blog posts. Emit (country × post) pairs only for
+     valid combinations: a post tagged ['ng'] only appears under
+     /ng/blog/[slug], a post tagged ['all'] under every country.
+     Canonical URL is set on the post page itself (always primary
+     country) so Google ranks the right variant. lastModified uses
+     post's publishedAt so unchanged posts don't churn. */
+  const blogPostRoutes: MetadataRoute.Sitemap = posts.flatMap((post) => {
+    const targets = !post.countries || post.countries.length === 0
+      ? COUNTRIES.map((c) => c.code)
+      : post.countries.includes("all")
+        ? COUNTRIES.map((c) => c.code)
+        : post.countries;
+    return targets.map((c) => ({
+      url:             `${SITE_URL}/${c}/blog/${post.slug}`,
+      priority:        0.7,
+      changeFrequency: "monthly" as const,
+      lastModified:    new Date(post.publishedAt),
+    }));
+  });
 
   /* Category routes — country-scoped + hreflang. Each category surfaces
      the same product taxonomy across all 6 countries. */
@@ -84,6 +102,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...dealsPages,
     ...comparePages,
     ...globalRoutes,
+    ...blogIndexRoutes,
     ...blogPostRoutes,
     ...categoryRoutes,
   ];

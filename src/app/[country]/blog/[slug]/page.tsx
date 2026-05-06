@@ -1,0 +1,178 @@
+/* /[country]/blog/[slug] — per-country blog post page.
+
+   Same content as the legacy /blog/[slug] route, but URL-prefixed
+   by country. Canonical URL points at the post's PRIMARY country
+   (first entry in countries[]) so when the same post is reachable
+   via multiple country URLs (cross-cutting "all" posts), Google
+   knows which version to rank.
+
+   Static-rendered: generateStaticParams emits (country × slug)
+   pairs only for relevant combinations (skip /uk/blog/iphone-nigeria-
+   2026 since the post is NG-specific). Avoids 404s from invalid
+   combinations and keeps the build clean. */
+
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, Calendar, Clock } from "lucide-react";
+import { getPostBySlug, posts as allPosts } from "@/lib/blog/posts";
+import { COUNTRIES, getCountry } from "@/lib/country";
+
+const SITE_URL = "https://havlo.io";
+
+interface Params {
+  country: string;
+  slug:    string;
+}
+
+/* Generate (country × slug) pairs for every valid combination. A
+   post with countries: ["ng"] only emits /ng/blog/[slug]. A post
+   with countries: ["all"] emits a page for every country. A post
+   with no countries field gets every country (legacy default). */
+export function generateStaticParams() {
+  const params: Params[] = [];
+  for (const post of allPosts) {
+    const targets = !post.countries || post.countries.length === 0
+      ? COUNTRIES.map((c) => c.code)
+      : post.countries.includes("all")
+        ? COUNTRIES.map((c) => c.code)
+        : post.countries;
+    for (const c of targets) {
+      params.push({ country: c, slug: post.slug });
+    }
+  }
+  return params;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Params;
+}): Promise<Metadata> {
+  const post = getPostBySlug(params.slug);
+  if (!post) return { title: "Not found" };
+
+  const country = getCountry(params.country);
+
+  /* Canonical URL = post's primary country (first non-"all" entry).
+     For cross-cutting "all" posts, use this country's URL as
+     canonical so each country variant gets its own ranking signal
+     without competing with siblings. Pragmatic — most users land
+     here via the country URL anyway. */
+  const primaryCountry =
+    post.countries?.find((c) => c !== "all") ?? country.code;
+  const canonicalUrl = `${SITE_URL}/${primaryCountry}/blog/${post.slug}`;
+  const url = `${SITE_URL}/${country.code}/blog/${post.slug}`;
+
+  return {
+    title:       post.title,
+    description: post.description,
+    alternates: { canonical: canonicalUrl },
+    openGraph: {
+      type:           "article",
+      title:          `${post.title} · Havlo`,
+      description:    post.description,
+      url,
+      siteName:       "Havlo",
+      publishedTime:  post.publishedAt,
+      tags:           post.tags,
+    },
+    twitter: {
+      card:        "summary_large_image",
+      title:       post.title,
+      description: post.description,
+    },
+  };
+}
+
+export default function CountryBlogPostPage({
+  params,
+}: {
+  params: Params;
+}) {
+  const post = getPostBySlug(params.slug);
+  if (!post) notFound();
+
+  const country = getCountry(params.country);
+
+  /* Validate that this country/post combination is allowed. If a
+     user types /uk/blog/iphone-nigeria-2026 manually, we 404 rather
+     than rendering content that doesn't apply to them. Posts tagged
+     'all' are valid for every country. */
+  const isRelevant =
+    !post.countries
+    || post.countries.length === 0
+    || post.countries.includes(country.code)
+    || post.countries.includes("all");
+  if (!isRelevant) notFound();
+
+  return (
+    <main className="bg-bg">
+      <article className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+
+        <Link
+          href={`/${country.code}/blog`}
+          className="inline-flex items-center gap-1.5 text-sm text-ink-3 hover:text-ink mb-8 transition-colors"
+        >
+          <ArrowLeft size={14} />
+          Back to {country.name} blog
+        </Link>
+
+        <header className="mb-8 sm:mb-10">
+          <h1 className="text-3xl sm:text-[40px] font-bold text-ink tracking-[-0.025em] leading-[1.1] mb-4">
+            {post.title}
+          </h1>
+          <p className="text-ink-2 text-[15px] sm:text-lg leading-relaxed mb-5">
+            {post.description}
+          </p>
+          <div className="flex items-center gap-4 text-xs text-ink-3 pb-6 border-b border-border">
+            <span className="inline-flex items-center gap-1.5">
+              <Calendar size={12} />
+              <time dateTime={post.publishedAt}>
+                {new Date(post.publishedAt).toLocaleDateString(undefined, {
+                  year:  "numeric",
+                  month: "long",
+                  day:   "numeric",
+                })}
+              </time>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Clock size={12} />
+              {post.readMinutes} min read
+            </span>
+          </div>
+        </header>
+
+        <div
+          className="
+            text-ink-2 text-[15px] sm:text-base leading-[1.7]
+            [&>p]:mb-5
+            [&>h2]:mt-10 [&>h2]:mb-3 [&>h2]:text-xl sm:[&>h2]:text-2xl [&>h2]:font-bold [&>h2]:text-ink [&>h2]:tracking-[-0.02em] [&>h2]:leading-tight
+            [&>ul]:mb-5 [&>ul]:pl-5 [&>ul]:space-y-2.5
+            [&>ul>li]:list-disc [&>ul>li]:marker:text-ink-3
+            [&_strong]:text-ink [&_strong]:font-semibold
+            [&_a]:text-ink [&_a]:underline [&_a]:underline-offset-4 [&_a]:decoration-ink/40 hover:[&_a]:decoration-ink
+          "
+        >
+          {post.body}
+        </div>
+
+        <footer className="mt-14 pt-8 border-t border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <Link
+            href={`/${country.code}/blog`}
+            className="inline-flex items-center gap-1.5 text-sm text-ink-3 hover:text-ink transition-colors"
+          >
+            <ArrowLeft size={14} />
+            More posts
+          </Link>
+          <Link
+            href={`/${country.code}/compare`}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-ink text-bg font-semibold text-sm hover:opacity-90 transition-opacity"
+          >
+            Find for less now
+          </Link>
+        </footer>
+      </article>
+    </main>
+  );
+}
