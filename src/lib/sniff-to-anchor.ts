@@ -20,6 +20,58 @@ function inferStoreId(store: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+/* Resolve the store logo URL.
+
+   Why this exists: inferStoreId() turns "Amazon UK" into "amazon-uk",
+   then sniffToAnchor was building "/logos/amazon-uk.png" which doesn't
+   exist (we only ship /logos/amazon.png). Result: broken-image icon on
+   the result button.
+
+   Multi-marketplace brands (Amazon UK / DE / AE / IN, Jumia .com / .ng,
+   etc.) all share their parent brand logo. Map them to the canonical
+   bundled icon. For genuinely unknown stores, fall back to Google's
+   favicon service against the hostname so the chip always renders
+   something rather than a broken image. */
+const KNOWN_LOGOS: Record<string, string> = {
+  jumia:       "/logos/jumia.png",
+  konga:       "/logos/konga.png",
+  aliexpress:  "/logos/aliexpress.png",
+  asos:        "/logos/asos.png",
+  slot:        "/logos/slot.png",
+  shein:       "/logos/shein.png",
+  temu:        "/logos/temu.png",
+  dhgate:      "/logos/dhgate.png",
+  jiji:        "/logos/jiji.png",
+  spar:        "/logos/spar.png",
+  "3c-hub":    "/logos/3chub.png",
+  "3chub":     "/logos/3chub.png",
+  threechub:   "/logos/threechub.png",
+};
+
+function getStoreLogoUrl(storeName: string, productUrl: string): string {
+  const lc = storeName.toLowerCase().trim();
+
+  /* Multi-marketplace Amazon — UK / DE / AE / IN / US all use the same
+     amazon.png arrow logo. Recognised by prefix not slug because the
+     id form is "amazon-uk", "amazon-de" etc. */
+  if (lc.startsWith("amazon")) return "/logos/amazon.png";
+
+  /* Match the slugged form against bundled logos. */
+  const slug = lc.replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  if (slug in KNOWN_LOGOS) return KNOWN_LOGOS[slug];
+
+  /* Fall back to Google's favicon service. Always returns SOMETHING
+     (real favicon for known sites, generic globe for unknown), so the
+     chip never renders as a broken image. The 16px chip size hides
+     most quality differences. */
+  try {
+    const hostname = new URL(productUrl).hostname.replace(/^www\./, "");
+    return `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`;
+  } catch {
+    return `/logos/${slug}.png`;
+  }
+}
+
 export function sniffToAnchor(sniff: SniffResult): ProductGroup | null {
   /* Title is required — without it we have nothing useful to display.
      Price is OPTIONAL: many retailers (Jumia included) hide price behind
@@ -39,7 +91,7 @@ export function sniffToAnchor(sniff: SniffResult): ProductGroup | null {
   const offer: StoreOffer = {
     storeId,
     storeName:      sniff.store ?? "External",
-    storeLogoUrl:   `/logos/${storeId}.png`,
+    storeLogoUrl:   getStoreLogoUrl(sniff.store ?? "External", sniff.url),
     storeColor:     "#0057FF",
     price:          priceNgn,
     currency:       "NGN",
