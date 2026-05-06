@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, Tag, Search, BookOpen, Info, Menu, X } from "lucide-react";
+import { Home, Tag, Search, BookOpen, Info, Coins, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import Logo from "@/components/ui/Logo";
@@ -14,16 +14,20 @@ import CountrySelect from "@/components/layout/CountrySelect";
    surfaces the most-clicked items (filtered below) — Blog + About
    remain reachable via the footer for desktop visitors. */
 const navLinks = [
-  { href: "/",        label: "Home",          Icon: Home     },
-  { href: "/deals",   label: "Deals",         Icon: Tag      },
-  { href: "/compare", label: "Find for less", Icon: Search   },
-  { href: "/blog",    label: "Blog",          Icon: BookOpen },
-  { href: "/about",   label: "About",         Icon: Info     },
+  { href: "/",         label: "Home",          Icon: Home     },
+  { href: "/deals",    label: "Deals",         Icon: Tag      },
+  { href: "/compare",  label: "Find for less", Icon: Search   },
+  { href: "/cashback", label: "Cashback",      Icon: Coins    },
+  { href: "/blog",     label: "Blog",          Icon: BookOpen },
+  { href: "/about",    label: "About",         Icon: Info     },
 ];
 
-/* Desktop top nav: Deals + Find for less + Blog. Logo serves as Home;
-   About lives in the footer (less frequently clicked on desktop). */
-const DESKTOP_LINK_HREFS = new Set(["/deals", "/compare", "/blog"]);
+/* Desktop top nav: Deals + Find for less + Cashback + Blog. Logo
+   serves as Home; About lives in the footer (less frequently
+   clicked on desktop). Cashback gets desktop placement because
+   it's a primary value-prop / acquisition driver, not just a
+   reference page like About. */
+const DESKTOP_LINK_HREFS = new Set(["/deals", "/compare", "/cashback", "/blog"]);
 const desktopLinks = navLinks.filter((l) => DESKTOP_LINK_HREFS.has(l.href));
 
 export default function Navbar() {

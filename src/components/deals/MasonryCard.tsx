@@ -166,18 +166,19 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
           </div>
         )}
 
-        {/* Cashback badge — left edge, below the image. Subtle pill
-            so it doesn't compete with the discount circle on the
-            opposite corner. Tappable to take user to the cashback
-            explainer page (handled at the parent <a> level since the
-            whole card is one link). */}
+        {/* Cashback badge — top-left, opposite corner from the
+            discount circle. Copy: 'Earn 2% cashback' is unambiguous
+            (no cryptic '↻' icon, no confusion about what 'back'
+            means). Title attribute provides context on hover for
+            users who want to know more. Tappable region is the full
+            card since the whole thing is a link to /api/go. */}
         {cashback && (
           <span
+            title={`Earn ${cashback.percent}% cashback when you buy through Havlo. Coming soon — join the waitlist on the Cashback page.`}
             className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-white shadow-sm"
             style={{ background: "rgba(16, 185, 129, 0.95)" }}
           >
-            <span aria-hidden="true">↻</span>
-            <span>{cashback.percent}% back</span>
+            <span>Earn {cashback.percent}%</span>
           </span>
         )}
 
