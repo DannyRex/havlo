@@ -3,10 +3,23 @@ import LegalPage from "@/components/legal/LegalPage";
 
 const sections = [
   {
+    /* Lead with the affiliate disclosure so anchor links from the
+       footer ('/disclaimer#affiliate-disclosure') land users at the
+       most legally-relevant section first. Covers FTC clear-and-
+       conspicuous standard + the Amazon Associates Operating
+       Agreement requirement to include the 'qualifying purchases'
+       phrase verbatim somewhere on the site. */
+    title: "Affiliate disclosure",
+    paragraphs: [
+      "Havlo earns small commissions on qualifying purchases through some of our outbound links. This never changes the price you pay. It's the same model used by NerdWallet, Wirecutter, Skyscanner, and most other comparison platforms.",
+      "As an Amazon Associate, Havlo earns from qualifying purchases. This applies to clicks that lead to amazon.com, amazon.co.uk, amazon.de, amazon.ae, amazon.in, and other Amazon marketplaces.",
+      "Active affiliate relationships: Amazon Associates and Skimlinks (a network covering around 48,000 retailers). Pending approvals: Konga, AliExpress Advanced API, and Awin. New partners get added as their approvals come through. Higher-paying retailers do not rank higher in search; the cheapest option always shows first.",
+    ],
+  },
+  {
     title: "Havlo is not the seller",
     paragraphs: [
       "Havlo is an independent comparison and discovery platform. We do not sell the products listed, do not take payment, do not handle shipping, and do not provide warranty or returns. Every transaction happens directly between you and the retailer whose site you click through to.",
-      "Where you see Havlo affiliate links, we may earn a small commission from the retailer when a purchase is made. This never changes the price you pay.",
     ],
   },
   {

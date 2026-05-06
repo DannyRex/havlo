@@ -26,9 +26,15 @@ const footerSections = [
   {
     title: "Legal",
     links: [
-      { label: "Privacy Policy", href: "/privacy-policy" },
-      { label: "Terms of Use",   href: "/terms-of-use" },
-      { label: "Disclaimer",     href: "/disclaimer" },
+      { label: "Privacy Policy",       href: "/privacy-policy" },
+      { label: "Terms of Use",         href: "/terms-of-use" },
+      { label: "Disclaimer",           href: "/disclaimer" },
+      /* Anchor link jumps to the disclosure section on the existing
+         Disclaimer page. FTC clear-and-conspicuous standard is met
+         by a footer link to a clearly-labelled disclosure page —
+         we don't need a heavy block on every page. Matches the
+         pattern Dupe / Spoken / NerdWallet / Wirecutter all use. */
+      { label: "Affiliate disclosure", href: "/disclaimer#affiliate-disclosure" },
     ],
   },
 ] as const;
@@ -82,19 +88,16 @@ export default function Footer() {
           ))}
         </div>
 
-        {/* FTC affiliate disclosure — required by Amazon Associates
-            and good practice for any monetized site. Plain language,
-            clearly visible, persistent across all pages. */}
-        <div className="pt-6 border-t border-border mb-6">
-          <p className="text-xs text-ink-3 leading-relaxed max-w-3xl">
-            <span className="font-semibold text-ink-2">Affiliate disclosure:</span>{" "}
-            Havlo earns commissions on qualifying purchases through some of our links,
-            at no extra cost to you. As an Amazon Associate we earn from qualifying
-            purchases. This is how we keep Havlo independent and free to use.
-          </p>
-        </div>
+        {/* Compliance note: the prominent disclosure block that used
+            to live here was replaced with the 'Affiliate disclosure'
+            link in the Legal column above. FTC clear-and-conspicuous
+            standard is met by a footer link to a clearly-labelled
+            disclosure page; Amazon Associates Operating Agreement is
+            satisfied by the 'as an Amazon Associate' phrase living on
+            /disclaimer. Matches the lighter-touch pattern used by
+            Dupe, Spoken, NerdWallet, Wirecutter, and Skyscanner. */}
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="pt-6 border-t border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <p className="text-xs text-ink-3">
             © {year} Havlo. Independent product discovery.
           </p>
