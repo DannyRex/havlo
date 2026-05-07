@@ -12,6 +12,7 @@ import LiveResults from "@/components/compare/LiveResults";
 import EmptySearchState from "@/components/empty/EmptySearchState";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
+import DealUnavailableBanner from "@/components/feedback/DealUnavailableBanner";
 import { formatNaira, getClickThroughUrl } from "@/lib/utils";
 import { trackClick } from "@/lib/trackClick";
 import { sniffToAnchor } from "@/lib/sniff-to-anchor";
@@ -433,7 +434,16 @@ function CompareContent() {
                                 store'. Less chrome than a separate button,
                                 bigger tap area on mobile. */}
                             <a
-                              href={getClickThroughUrl({ url: offer.url, id: `${result.anchor.key}-${offer.storeId}` })}
+                              href={getClickThroughUrl({
+                                url: offer.url,
+                                id: `${result.anchor.key}-${offer.storeId}`,
+                                /* Title hint lets /api/go fall back to
+                                   /compare?q=<title> if Google-relay
+                                   resolution fails — user sees alternative
+                                   listings instead of bouncing home with
+                                   ?deal_unavailable=1. */
+                                title: result.anchor.title,
+                              })}
                               target="_blank"
                               rel="noopener noreferrer sponsored"
                               onClick={() => trackClick(result.anchor.key, query, i, "anchor-comparison")}
@@ -730,6 +740,11 @@ export default function ComparePage() {
         <div className="w-6 h-6 rounded-full border-2 border-border border-t-brand animate-spin" />
       </div>
     }>
+      {/* Recovery banner — sits above the search bar and search
+          results when /api/go bounced the user back here with the
+          deal_unavailable=1 flag. Inside the same Suspense boundary
+          because it reads useSearchParams. */}
+      <DealUnavailableBanner />
       <CompareContent />
     </Suspense>
   );

@@ -17,6 +17,7 @@
 
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { usdToNgn } from "@/lib/utils";
+import { isUsableMerchantUrl } from "@/lib/url-helpers";
 import type {
   SearchOutput, ProductGroup, StoreOffer, DupeResult, SearchSuggestion,
 } from "./index";
@@ -403,7 +404,17 @@ function ftsRowToSingleOffer(r: FtsRow): StoreOffer {
 }
 
 function buildAnchorGroup(p: AnchorProduct): ProductGroup {
-  const inStock = p.offers.filter((o) => o.in_stock !== false);
+  /* Two filters:
+     1. in_stock — drop offers the merchant has sold out of
+     2. isUsableMerchantUrl — drop offers whose stored URL points at
+        Google Shopping relay URLs that /api/go can't reliably resolve.
+        Without this, users were clicking compare offers and getting
+        bounced to /ng?deal_unavailable=1 (open new tab → immediate
+        redirect home → confusing). Same gate /deals already applies
+        via browse-db.ts. */
+  const inStock = p.offers
+    .filter((o) => o.in_stock !== false)
+    .filter((o) => isUsableMerchantUrl(o.url));
   /* Pass the parent product's title down to each offer so the
      comparison rows on /compare can show 'as titled at this store'
      subtitles. For pooled cross-product anchors, each offer's
@@ -549,6 +560,11 @@ export async function pgFtsFindDupes(
        If we don't (sniff returned no price), keep all plausible matches. */
     .filter((r) => noCeiling || priceInNgn(r.current_price, r.currency) < anchorPriceNgn * 0.99)
     .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug))
+    /* URL usability — drop Google-relay rows that /api/go can't
+       reliably resolve to a real merchant. Without this, paste-a-link
+       dupes were occasionally returning offers that bounced to
+       /ng?deal_unavailable=1 on click. */
+    .filter((r) => isUsableMerchantUrl(r.url))
     /* Accessory match-flip: a query that's an accessory ('iPhone 15
        Case') must only see other accessories. Otherwise, drop them. */
     .filter((r) => queryIsAccessory ? looksLikeAccessory(r.title) : !looksLikeAccessory(r.title))
@@ -841,6 +857,8 @@ export async function pgFtsFindSimilar(
     .filter((r) => priceInNgn(r.current_price, r.currency) < anchor.bestPrice * 0.99)
     // Implausibly low prices are almost always upstream data errors.
     .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug))
+    // URL usability — drop Google-relay rows /api/go can't resolve.
+    .filter((r) => isUsableMerchantUrl(r.url))
     // Drop accessory / parts / replacement noise
     .filter((r) => !looksLikeAccessory(r.title))
     // Drop counterfeit-looking titles ("Apple MacBook Neo A18 Pro")

@@ -91,7 +91,12 @@ export default function DupeCard({
         {/* Primary store CTA — best (cheapest) offer prominent */}
         {bestOffer && (
           <a
-            href={getClickThroughUrl({ url: bestOffer.url, id: `${dupe.key}-${bestOffer.storeId}` })}
+            href={getClickThroughUrl({
+              url: bestOffer.url,
+              id: `${dupe.key}-${bestOffer.storeId}`,
+              /* Title hint for /api/go fallback recovery. */
+              title: dupe.title,
+            })}
             target="_blank"
             rel="noopener noreferrer sponsored"
             onClick={() => trackClick(dupe.key, query, rank, mode)}
@@ -134,7 +139,11 @@ export default function DupeCard({
                 {visibleOffers.slice(1).map((offer) => (
                   <a
                     key={`${offer.storeId}-${offer.price}`}
-                    href={getClickThroughUrl({ url: offer.url, id: `${dupe.key}-${offer.storeId}` })}
+                    href={getClickThroughUrl({
+                      url: offer.url,
+                      id: `${dupe.key}-${offer.storeId}`,
+                      title: dupe.title,
+                    })}
                     target="_blank"
                     rel="noopener noreferrer sponsored"
                     onClick={() => trackClick(dupe.key, query, rank, mode)}

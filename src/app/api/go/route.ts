@@ -120,6 +120,12 @@ async function resolveViaSerpApi(googleUrl: string): Promise<string | null> {
 
 export async function GET(req: NextRequest) {
   const target = req.nextUrl.searchParams.get("url");
+  /* Optional title hint passed through from the deal card click. When
+     the merchant resolution fails downstream, we use this to send the
+     user to /compare?q=<title> instead of bouncing home — they get
+     to see alternative listings for the same product instead of
+     a 'deal_unavailable' message with no recovery path. */
+  const titleHint = req.nextUrl.searchParams.get("title")?.trim() ?? "";
   const country = getServerCountry();
   const ctx = { country: country.code };
 
@@ -176,12 +182,22 @@ export async function GET(req: NextRequest) {
     return sendOut(resolved);
   }
 
-  /* Last resort — Google relay we couldn't resolve. Used to 307 to
-     the Google URL itself but that lands the user on a Google
-     Shopping search page which feels broken (they expected to
-     reach a merchant). Send them to the homepage with a deal-
-     unavailable indicator so the UX is at least sensible. The
-     country-aware redirect picks the right /{country}/ root. */
+  /* Last resort — Google relay we couldn't resolve.
+     If we have a title hint, send the user to /compare?q=<title>
+     so they see ALTERNATIVE listings for the same product rather
+     than a 'deal_unavailable' message with nowhere to go. Better
+     UX than the previous bounce-home-with-flag pattern (which
+     was the user-reported bug — open a new tab, immediately
+     redirect to /ng?deal_unavailable=1, no recovery path).
+
+     Without a title hint we still fall back to the homepage flag
+     because /compare with no query is just an empty page. */
+  if (titleHint) {
+    const compareUrl = new URL(`${req.nextUrl.origin}/${country.code}/compare`);
+    compareUrl.searchParams.set("q", titleHint);
+    compareUrl.searchParams.set("deal_unavailable", "1");
+    return NextResponse.redirect(compareUrl, 307);
+  }
   const home = new URL(`${req.nextUrl.origin}/${country.code}`);
   home.searchParams.set("deal_unavailable", "1");
   return NextResponse.redirect(home, 307);

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import Hero from "@/components/landing/Hero";
 import TrendingDeals from "@/components/landing/TrendingDeals";
 import TrendingSearches from "@/components/landing/TrendingSearches";
@@ -9,6 +10,7 @@ import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import CTA from "@/components/landing/CTA";
 import RefreshOnInterval from "@/components/ui/RefreshOnInterval";
 import JsonLd from "@/components/seo/JsonLd";
+import DealUnavailableBanner from "@/components/feedback/DealUnavailableBanner";
 import { COUNTRIES, getCountry } from "@/lib/country";
 import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList } from "@/lib/seo";
 
@@ -72,6 +74,14 @@ export default function HomePage({ params }: { params: { country: string } }) {
   return (
     <>
       <JsonLd data={breadcrumb} />
+      {/* Recovery banner — only renders when /api/go bounced the user
+          back here because a Google-relay merchant URL couldn't be
+          resolved. Suspense boundary required because the banner
+          reads useSearchParams() and Next 14 expects that to be
+          inside a Suspense for static-rendered routes. */}
+      <Suspense fallback={null}>
+        <DealUnavailableBanner />
+      </Suspense>
       <Hero storeCount={storeCount} />
       <TrendingDeals />
       <TrendingSearches />

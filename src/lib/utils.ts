@@ -19,13 +19,19 @@ export function cn(...inputs: ClassValue[]) {
    — which is exactly the bug we just shipped on the curated Amazon
    catalog. The /api/go route is the affiliate chokepoint and must
    be in every deal click path. */
-export function getClickThroughUrl(item: { url: string; id?: string }): string {
+export function getClickThroughUrl(item: { url: string; id?: string; title?: string }): string {
   /* Already wrapped (legacy SerpAPI rows, AliExpress converter
      output, anything else that pre-encoded). Don't double-wrap. */
   if (item.url.startsWith("/api/go")) return item.url;
 
   const params = new URLSearchParams({ url: item.url });
   if (item.id) params.set("id", item.id);
+  /* Title hint — when /api/go can't resolve a Google-relay URL at
+     click time, it falls back to /compare?q=<title> so the user
+     still sees alternative listings for the same product instead of
+     bouncing to a 'deal_unavailable' homepage flag. Truncated to keep
+     URL length reasonable. */
+  if (item.title) params.set("title", item.title.slice(0, 120));
   return `/api/go?${params.toString()}`;
 }
 
