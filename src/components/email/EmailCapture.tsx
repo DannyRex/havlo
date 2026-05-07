@@ -1,9 +1,11 @@
 "use client";
 
-/* Email capture component — single-input newsletter signup that
-   posts to either Buttondown / Resend / Loops / Formspree (any
-   simple POST endpoint) or falls back to mailto: when no endpoint
-   is configured.
+/* Email capture component — single-input newsletter signup. Posts
+   to Havlo's own /api/newsletter endpoint by default which writes
+   to the newsletter_subscribers table and fires a welcome email via
+   Resend. Can be overridden via NEXT_PUBLIC_NEWSLETTER_FORM_URL or
+   the `endpoint` prop if you ever need to point at Buttondown /
+   Loops / Formspree.
 
    Why now: every visitor who lands on Havlo and bounces is lost
    forever. With email capture, even pre-launch traffic compounds
@@ -16,12 +18,6 @@
    the SearchBar / Hero composer aesthetic so it reads as native
    to Havlo. Inline state (idle / submitting / ok / error). No
    modal, no popup — embedded in the CTA section of the homepage.
-
-   Setup: NEXT_PUBLIC_NEWSLETTER_FORM_URL=https://buttondown.com/api/...
-   in Vercel envs. The endpoint should accept JSON with { email }.
-   When unset, the form falls back to a mailto: link so dev /
-   preview deploys still do something useful instead of failing
-   silently. Same fallback pattern as ContactForm.
 */
 
 import { useState, type FormEvent } from "react";
@@ -54,7 +50,13 @@ export default function EmailCapture({
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
-  const resolvedEndpoint = endpoint ?? process.env.NEXT_PUBLIC_NEWSLETTER_FORM_URL ?? "";
+  /* Default to the in-house /api/newsletter route. The mailto
+     fallback was firing for every signup because the env var was
+     never set, so users saw their mail app open instead of the
+     success state. */
+  const resolvedEndpoint = endpoint
+    ?? process.env.NEXT_PUBLIC_NEWSLETTER_FORM_URL
+    ?? "/api/newsletter";
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -65,16 +67,6 @@ export default function EmailCapture({
     if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
       setStatus("error");
       setErrorMsg("That email address doesn't look right.");
-      return;
-    }
-
-    /* No endpoint configured → fall back to mailto so the user isn't
-       stuck. Same defensive pattern as ContactForm. */
-    if (!resolvedEndpoint) {
-      const subject = encodeURIComponent("Subscribe me to the Havlo deals digest");
-      const body = encodeURIComponent(`Email: ${trimmed}\nSource: ${source}`);
-      window.location.href = `mailto:hello@havlo.io?subject=${subject}&body=${body}`;
-      setStatus("idle");
       return;
     }
 

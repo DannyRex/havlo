@@ -178,11 +178,12 @@ export default async function TrendingDeals() {
   if (picks.length === 0) return null;
 
   /* Spread same-storeId items so the masonry doesn't show 4 Konga
-     cards stacked vertically in column 0. spaceByStore is a single
-     swap-pass over the flat array; chunkLeftToRight then distributes
-     the result into 2/3/4 columns. With 7+ distinct stores across 16
-     cards the resulting columns end up visually mixed. */
-  const staggered = spaceByStore(picks);
+     cards stacked vertically in column 0. minGap=4 matches the
+     desktop column count: items 0..3 (col 0 with column-fill:_balance)
+     are guaranteed to have 4 distinct stores. Mobile / tablet still
+     benefit because the ordering propagates through the same array
+     into their narrower column counts. */
+  const staggered = spaceByStore(picks, 4);
 
   return (
     <section className="py-12 sm:py-20 bg-bg">

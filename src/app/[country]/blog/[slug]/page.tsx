@@ -13,6 +13,7 @@
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { buildHreflangAlternates } from "@/lib/seo";
 import Link from "next/link";
 import { ArrowLeft, Calendar, Clock } from "lucide-react";
 import { getPostBySlug, posts as allPosts } from "@/lib/blog/posts";
@@ -67,7 +68,15 @@ export async function generateMetadata({
   return {
     title:       post.title,
     description: post.description,
-    alternates: { canonical: canonicalUrl },
+    alternates: {
+      canonical: canonicalUrl,
+      /* Hreflang for the post's country variants. Builds language
+         alternates pointing at /[country]/blog/[slug] for each country.
+         If the post is country-specific (countries: ['ng']), only NG
+         gets the alternate and Google knows the post is NG-only.
+         Closes the High 12 hreflang gap from the QA audit. */
+      languages: buildHreflangAlternates(`blog/${post.slug}`),
+    },
     openGraph: {
       type:           "article",
       title:          `${post.title} · Havlo`,

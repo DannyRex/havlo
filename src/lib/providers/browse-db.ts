@@ -148,7 +148,18 @@ export const dbBrowseProvider: BrowseProvider = {
     if (q.origin && q.origin !== "all") {
       query = applyOriginFilter(query, q.origin);
     }
-    query = query.order(col, { ascending: asc }).limit(500);
+    /* Bumped from 500 → 2000. With the 500 cap, different sorts
+       returned different post-filter totals (897 origin-count vs
+       182 deals on Relevance vs 310 deals on Latest in the QA
+       audit, Bucket 3#5) because each sort selected a different
+       top-500 subset, then filterDealsForCountry pruned each
+       differently. At Havlo's current scale (a few thousand offers
+       across the whole DB) 2000 brings effectively every row that
+       could pass downstream filters into memory once, eliminating
+       the sort-dependent count variance. Re-evaluate when total
+       offers crosses 5000 — at that point a separate count query
+       + cursor-based pagination is the right shape. */
+    query = query.order(col, { ascending: asc }).limit(2000);
 
     const { data, error } = await query;
     if (error) {

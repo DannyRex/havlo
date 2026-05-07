@@ -40,24 +40,47 @@ export async function GET(req: NextRequest) {
       ? "intl"
       : (!isNG ? "intl" : origin);
 
-    const allRaw = await provider.fetchDeals({
+    /* Bucket 3#5 fix from QA audit — origin counts and result counts
+       were both derived but from different pipelines:
+         • Result count came from filterDealsForCountry on the
+           sort-limited fetch (changed with sort)
+         • Origin counts came from a SQL count(*) that ignored
+           filterDealsForCountry, the curated catalog merge, and the
+           in-memory plausibility filters
+       So 'All 897 / Local 202 / Intl 665' (SQL) coexisted with
+       '182 deals' (Relevance) and '310 deals' (Latest), and the
+       appliances+50% case showed '1' in the toggle but '0' in the
+       result. Reconcile by deriving everything from one fetch:
+       pull origin='all', country-filter, bucket by currency in-
+       memory, then apply the user's chosen origin to the items
+       returned. Counts and items are now guaranteed consistent. */
+    const allRawAcrossOrigins = await provider.fetchDeals({
       categorySlug: category,
       minDiscount: minDiscount ? parseInt(minDiscount, 10) : undefined,
       sort,
       search,
-      origin: effectiveOrigin,
+      origin: "all",
     });
 
     /* Country store filter — pure-function, runs over Deal[] */
-    const all = filterDealsForCountry(allRaw, country);
+    const allFiltered = filterDealsForCountry(allRawAcrossOrigins, country);
 
-    // Counts ignore the current `origin` filter so the toggle can show
-    // "what would I get if I switched"
-    const originCounts = await provider.getOriginCounts({
-      categorySlug: category,
-      minDiscount: minDiscount ? parseInt(minDiscount, 10) : undefined,
-      search,
-    });
+    /* Bucket by currency-as-origin so the toggle counts and items
+       always match. NGN-priced items count as local; USD/other count
+       as intl. Same heuristic the dealToStoreRow ingestion uses. */
+    const localFiltered = allFiltered.filter((d) => d.currency === "NGN");
+    const intlFiltered  = allFiltered.filter((d) => d.currency !== "NGN");
+    const originCounts = {
+      all:   allFiltered.length,
+      local: localFiltered.length,
+      intl:  intlFiltered.length,
+    };
+
+    /* Apply the user's origin filter for the items in the response. */
+    const all =
+      effectiveOrigin === "local" ? localFiltered :
+      effectiveOrigin === "intl"  ? intlFiltered  :
+      allFiltered;
 
     const total = all.length;
     const items = all.slice(offset, offset + limit);

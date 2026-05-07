@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { ArrowRight, TrendingDown } from "lucide-react";
-import { deals } from "@/lib/data/deals";
+import { deals as staticDeals } from "@/lib/data/deals";
+import { getServerCountry } from "@/lib/country-server";
+import { getActiveBrowseProvider } from "@/lib/providers";
+import { filterDealsForCountry } from "@/lib/country";
+import type { Deal } from "@/types";
 
 /* 5-min seeded PRNG so the collage rotates with the rest of the page.
    Same bucket pattern as TrendingDeals + TrendingSearches — keeps every
@@ -37,15 +41,52 @@ function seededShuffle<T>(items: T[], rng: () => number): T[] {
   return arr;
 }
 
-/* Pick three real product images, fresh every 5-min rotation.
-   Server-rendered → SSR and CSR see the same picks (no hydration mismatch). */
-function pickCollage() {
-  const candidates = deals.filter(
-    (d) =>
-      d.imageUrl &&
-      d.discountPercent >= 20 &&
-      d.title.length < 60,
-  );
+/* Pick three country-appropriate product images, fresh every 5-min
+   rotation. Server-rendered → SSR and CSR see the same picks (no
+   hydration mismatch).
+
+   Source priority (Bucket 2#1 + Bucket 3#1 fixes from QA audit):
+     1. Live browse provider, filtered through filterDealsForCountry
+        so a UK visitor sees Currys / Argos / John Lewis cards, a US
+        visitor sees Walmart / Best Buy / Macy's, etc.
+     2. Static `deals` array filtered by currency (NGN out for
+        non-NG, kept for NG). Fallback when the live DB is thin or
+        the filter trims everything.
+   The static fallback prevents an empty collage on early traffic to
+   a country whose catalog is still small. */
+async function pickCollage(country: { code: string; name: string }): Promise<Deal[]> {
+  const isNG = country.code === "ng";
+
+  /* Try the live catalog first. fetchDeals returns the country's
+     existing rows; we filter further to discount-worthy items with
+     short clean titles for the polaroid aesthetic. */
+  let candidates: Deal[] = [];
+  try {
+    const provider = await getActiveBrowseProvider();
+    const live = await provider.fetchDeals({
+      sort: "discount",
+      minDiscount: 20,
+      origin: isNG ? "all" : "intl",
+    });
+    const liveFiltered = filterDealsForCountry(
+      live.filter((d) => d.imageUrl && d.title.length < 60),
+      country as Parameters<typeof filterDealsForCountry>[1],
+    );
+    if (liveFiltered.length >= 3) candidates = liveFiltered;
+  } catch {/* fall through to static */}
+
+  /* Static fallback. Same currency filter as before so non-NG users
+     never see Konga / 3C Hub products even when the live DB is empty. */
+  if (candidates.length < 3) {
+    candidates = staticDeals.filter((d) => {
+      if (!d.imageUrl) return false;
+      if (d.discountPercent < 20) return false;
+      if (d.title.length >= 60) return false;
+      if (!isNG && d.currency === "NGN") return false;
+      return true;
+    });
+  }
+
   if (candidates.length < 3) return candidates;
   const rng = makeRng(freshnessSeed());
   return seededShuffle(candidates, rng).slice(0, 3);
@@ -105,8 +146,13 @@ function CollageCard({
   );
 }
 
-export default function CTA() {
-  const collage = pickCollage();
+export default async function CTA() {
+  /* getServerCountry reads the cookie set by middleware. Synchronous
+     here even though pickCollage is async — pickCollage hits the
+     live browse provider so we await it for the country's actual
+     catalog before rendering. */
+  const country = getServerCountry();
+  const collage = await pickCollage(country);
 
   return (
     <section className="py-14 sm:py-24 bg-bg">

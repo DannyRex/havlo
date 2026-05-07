@@ -53,23 +53,44 @@ function relevanceScore(d: Deal): number {
   return discount + recency + monetizationBoost;
 }
 
-/* Single-pass anti-clustering: walk the sorted list; whenever a card
-   shares storeId with the previous one, swap it with the next non-
-   matching card. Minimises rank disruption — a strongly-scored item
-   never moves more than a few slots, so the relevance order is
-   preserved while runs of the same store get broken up.
+/* Anti-clustering with configurable gap. For each position i, the
+   item's storeId must differ from every storeId in the preceding
+   `minGap` slots. When the constraint is violated, swap with the
+   next item whose store satisfies the constraint.
 
-   This solves the symptom on /deals where 'newest' sort showed runs
-   of one store at a time (because ingestion writes timestamps per-
-   store-batch). With relevance sort, the runs come from sort-tied
-   items; this pass interleaves them. */
-export function spaceByStore(deals: Deal[]): Deal[] {
+   Why minGap matters for grid layouts: with CSS `columns-N` (or any
+   masonry-style top-to-bottom column fill), consecutive array items
+   land in the same column. If minGap=1 only spaces immediate pairs,
+   a Konga-Amazon-Konga-Amazon pattern still puts two Kongas in the
+   same column. Setting minGap=N (where N = column count) prevents
+   that — col 0 (items 0..N-1) is guaranteed to have N distinct
+   stores, breaking visible vertical clusters.
+
+   Trade-off: higher minGap moves more items around, slightly
+   diluting score-based ranking. minGap=4 (desktop col count) is
+   the sweet spot — meaningful de-clustering without over-shuffling.
+   QA audit (Bucket 2#2 / High 9) wanted this enforced in the column
+   dimension. */
+export function spaceByStore(deals: Deal[], minGap: number = 1): Deal[] {
   const result = [...deals];
+  const gap = Math.max(1, minGap);
+
   for (let i = 1; i < result.length; i++) {
-    if (result[i].storeId !== result[i - 1].storeId) continue;
-    /* Find next item with a different store and swap it into position i. */
+    /* Set of storeIds the item at position i must NOT match — namely,
+       the storeIds at positions [i - gap, i - 1]. */
+    const forbidden = new Set<string>();
+    for (let g = 1; g <= gap && i - g >= 0; g++) {
+      forbidden.add(result[i - g].storeId);
+    }
+
+    if (!forbidden.has(result[i].storeId)) continue;
+
+    /* Find the next item whose storeId satisfies the constraint
+       and swap it into position i. If none exists (rare: pool is
+       so dominated by one store that no swap helps), leave as-is.
+       The visible cluster is unavoidable in that case. */
     for (let j = i + 1; j < result.length; j++) {
-      if (result[j].storeId !== result[i - 1].storeId) {
+      if (!forbidden.has(result[j].storeId)) {
         [result[i], result[j]] = [result[j], result[i]];
         break;
       }
