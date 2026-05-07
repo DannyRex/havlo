@@ -9,6 +9,7 @@
    masonry-layout.ts so server components can still import them. */
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   cleanTitle,
   formatCompact,
@@ -74,11 +75,18 @@ function ResilientImage({ deal, priority }: { deal: Deal; priority: boolean }) {
     );
   }
 
+  /* alt = product title (truncated). Empty alt was an a11y miss
+     (screen readers skipped product images entirely) and an SEO
+     miss (Google Image Search ignores unlabeled product photos).
+     Truncate to ~120 chars so we don't blow up on absurdly long
+     scraped titles. */
+  const altText = cleanTitle(deal.title).slice(0, 120);
+
   return (
     /* eslint-disable-next-line @next/next/no-img-element */
     <img
       src={deal.imageUrl}
-      alt=""
+      alt={altText}
       loading={priority ? "eager" : "lazy"}
       fetchPriority={priority ? "high" : "auto"}
       decoding={priority ? "sync" : "async"}
@@ -90,6 +98,7 @@ function ResilientImage({ deal, priority }: { deal: Deal; priority: boolean }) {
 
 export default function MasonryCard({ deal, aspect, showOriginBadge = true, priority = false }: Props) {
   const { country } = useCountry();
+  const router      = useRouter();
   const dealCcy = deal.currency as Country["currency"];
   const sameCcy = dealCcy === country.currency;
 
@@ -167,19 +176,29 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
         )}
 
         {/* Cashback badge — top-left, opposite corner from the
-            discount circle. Copy: 'Earn 2% cashback' is unambiguous
-            (no cryptic '↻' icon, no confusion about what 'back'
-            means). Title attribute provides context on hover for
-            users who want to know more. Tappable region is the full
-            card since the whole thing is a link to /api/go. */}
+            discount circle. As of QA Bucket 2#26, the badge is
+            both a tooltip AND a clickable shortcut to the cashback
+            explainer page. Implemented as a <button> instead of a
+            nested <a> so the parent /api/go anchor stays valid HTML
+            (nesting two anchors breaks browsers). onClick swallows
+            propagation + the default to keep the parent click from
+            also firing, then routes to the country-aware cashback
+            page imperatively via next/navigation. */}
         {cashback && (
-          <span
-            title={`Earn ${cashback.percent}% cashback when you shop through Havlo. Coming soon. Join the waitlist on the Cashback page.`}
-            className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-white shadow-sm"
+          <button
+            type="button"
+            title={`Earn ${cashback.percent}% cashback when you shop through Havlo. Coming soon. Tap to learn more.`}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              router.push(`/${country.code}/cashback`);
+            }}
+            className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-white shadow-sm hover:brightness-110 active:brightness-95 transition-[filter] cursor-pointer"
             style={{ background: "rgba(16, 185, 129, 0.95)" }}
+            aria-label={`Earn ${cashback.percent}% cashback. Open cashback details.`}
           >
             <span>Earn {cashback.percent}%</span>
-          </span>
+          </button>
         )}
 
         {showIntl && (

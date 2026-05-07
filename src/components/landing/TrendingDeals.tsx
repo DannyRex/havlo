@@ -5,7 +5,7 @@ import { filterDealsForCountry } from "@/lib/country";
 import { classifyDeal, spaceByStore } from "@/lib/providers/curated-helper";
 import type { Deal } from "@/types";
 import MasonryCard from "@/components/deals/MasonryCard";
-import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
+import { MASONRY_ASPECTS } from "@/components/deals/masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
 
 /* Deterministic seed bucketed into 5-minute windows so picks rotate
@@ -40,24 +40,6 @@ function seededShuffle<T>(items: T[], rng: () => number): T[] {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
-}
-
-function MasonryColumn({
-  items, gapClass, startIndex, eagerFirst = 0,
-}: { items: Deal[]; gapClass: string; startIndex: number; eagerFirst?: number }) {
-  return (
-    <div className={`flex-1 flex flex-col ${gapClass} min-w-0`}>
-      {items.map((d, i) => (
-        <AnimateIn key={d.id} delay={Math.min(i, 6) * 60}>
-          <MasonryCard
-            deal={d}
-            aspect={MASONRY_ASPECTS[(startIndex + i) % MASONRY_ASPECTS.length]}
-            priority={i < eagerFirst}
-          />
-        </AnimateIn>
-      ))}
-    </div>
-  );
 }
 
 export default async function TrendingDeals() {
@@ -202,10 +184,6 @@ export default async function TrendingDeals() {
      cards the resulting columns end up visually mixed. */
   const staggered = spaceByStore(picks);
 
-  const mobileCols  = chunkLeftToRight(staggered, 2);
-  const tabletCols  = chunkLeftToRight(staggered, 3);
-  const desktopCols = chunkLeftToRight(staggered, 4);
-
   return (
     <section className="py-12 sm:py-20 bg-bg">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
@@ -236,22 +214,27 @@ export default async function TrendingDeals() {
           </Link>
         </div>
 
-        {/* eagerFirst={1} on each column: only the topmost card per column
-            is eagerly loaded. That's the LCP candidate set on every viewport
-            without flooding the network with priority hints. */}
-        <div className="flex gap-2 sm:hidden">
-          {mobileCols.map((col, i) => (
-            <MasonryColumn key={i} items={col} gapClass="gap-2" startIndex={i * 100} eagerFirst={1} />
-          ))}
-        </div>
-        <div className="hidden sm:flex lg:hidden gap-3">
-          {tabletCols.map((col, i) => (
-            <MasonryColumn key={i} items={col} gapClass="gap-3" startIndex={i * 100} eagerFirst={1} />
-          ))}
-        </div>
-        <div className="hidden lg:flex gap-4">
-          {desktopCols.map((col, i) => (
-            <MasonryColumn key={i} items={col} gapClass="gap-4" startIndex={i * 100} eagerFirst={1} />
+        {/* Single render via CSS columns — addresses Bucket 1#24 from
+            QA audit. Previously rendered three full DOM copies (mobile
+            2-col / tablet 3-col / desktop 4-col), CSS-hidden via media
+            queries. Each <img> still fetched even when the parent was
+            display:none, costing 3× network requests for the trending
+            grid. CSS column-count picks the right column count per
+            viewport from a single rendering, and break-inside-avoid
+            keeps each card intact. eagerFirst is approximated as
+            'first 4 cards across all columns' since the browser
+            decides column allocation at paint time. */}
+        <div className="columns-2 sm:columns-3 lg:columns-4 gap-2 sm:gap-3 lg:gap-4 [column-fill:_balance]">
+          {staggered.map((d, i) => (
+            <div key={d.id} className="break-inside-avoid mb-2 sm:mb-3 lg:mb-4">
+              <AnimateIn delay={Math.min(i, 6) * 60}>
+                <MasonryCard
+                  deal={d}
+                  aspect={MASONRY_ASPECTS[i % MASONRY_ASPECTS.length]}
+                  priority={i < 4}
+                />
+              </AnimateIn>
+            </div>
           ))}
         </div>
 

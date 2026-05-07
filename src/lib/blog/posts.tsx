@@ -68,7 +68,7 @@ export const posts: BlogPost[] = [
         <p>
           We pulled the current listings from every major Nigerian retailer
           covering iPhones plus the cross-border options Nigerians actually
-          use. Here&apos;s where the actual best prices live this week.
+          use. Here's where the actual best prices live this week.
         </p>
 
         <h2>Local Nigerian retailers</h2>
@@ -127,7 +127,7 @@ export const posts: BlogPost[] = [
           warranty is on you.
         </p>
         <p>
-          For a flagship phone you&apos;ll keep for 3+ years, the ₦150k
+          For a flagship phone you'll keep for 3+ years, the ₦150k
           warranty premium is usually worth it. For a second device or a
           gift, cross-border is fine.
         </p>
@@ -137,7 +137,7 @@ export const posts: BlogPost[] = [
           Havlo refreshes prices across all the retailers above every
           24 hours. The article reflects current pricing logic and where the
           deals consistently sit; for live current numbers, search any
-          iPhone 15 model on the home page and you&apos;ll see real-time
+          iPhone 15 model on the home page and you'll see real-time
           comparisons.
         </p>
       </>
@@ -158,12 +158,12 @@ export const posts: BlogPost[] = [
           The MacBook Air M3 13&quot; is the most-recommended laptop on Havlo
           for non-gaming buyers. Eighteen hours of real-world battery, fanless
           silent operation, and genuinely premium build at a price point that
-          undercuts the Pro line by about ₦300k for buyers who don&apos;t need
+          undercuts the Pro line by about ₦300k for buyers who don't need
           ProMotion.
         </p>
         <p>
           Pricing in Nigeria swings widely depending on the configuration and
-          where you buy. Here&apos;s the actual landscape this week.
+          where you buy. Here's the actual landscape this week.
         </p>
 
         <h2>Local Nigerian retailers</h2>
@@ -176,7 +176,7 @@ export const posts: BlogPost[] = [
           <li>
             <strong>Slot</strong> is the most reliable for current-gen
             MacBooks in Lagos. Stock is consistent, prices update with
-            Apple&apos;s global moves, and warranty service runs through Apple
+            Apple's global moves, and warranty service runs through Apple
             Nigeria.
           </li>
           <li>
@@ -218,7 +218,7 @@ export const posts: BlogPost[] = [
         <p>
           The MacBook Air M3 16GB/512GB lands around $1,300 on Amazon US.
           With shipping and Lagos customs duty (15-20% typical for laptops),
-          the total delivered cost runs ₦1.15-1.25M. That&apos;s ₦150-250k
+          the total delivered cost runs ₦1.15-1.25M. That's ₦150-250k
           below the same SKU at Slot.
         </p>
         <p>
@@ -242,7 +242,7 @@ export const posts: BlogPost[] = [
 
         <h2>How we update this</h2>
         <p>
-          Havlo&apos;s pricing data refreshes daily across all the retailers
+          Havlo's pricing data refreshes daily across all the retailers
           above. For live current pricing on any specific MacBook
           configuration, search the model on the home page or browse the
           Computing category.
@@ -254,7 +254,7 @@ export const posts: BlogPost[] = [
   {
     slug:        "playstation-5-slim-nigeria-2026",
     title:       "PlayStation 5 Slim in Nigeria 2026: Where to Find the Best Price",
-    description: "PS5 Slim pricing across Nigeria&apos;s main retailers, plus the verification checklist to follow before paying so you don&apos;t end up with a counterfeit or grey-market unit.",
+    description: "PS5 Slim pricing across Nigeria's main retailers, plus the verification checklist to follow before paying so you don't end up with a counterfeit or grey-market unit.",
     publishedAt: "2026-05-06",
     readMinutes: 5,
     tags:        ["gaming", "nigeria", "buying-guide"],
@@ -266,10 +266,10 @@ export const posts: BlogPost[] = [
           its late-2023 launch. Local Nigerian pricing settled into a stable
           range around <strong>₦650-820k</strong> for the disc edition.
           Anything below that range deserves close inspection; anything
-          above is a markup most buyers shouldn&apos;t accept.
+          above is a markup most buyers shouldn't accept.
         </p>
         <p>
-          Here&apos;s where the legitimate stock actually lives, and the
+          Here's where the legitimate stock actually lives, and the
           verification checklist that protects you from the counterfeits and
           grey-market resellers that flood Lagos console listings.
         </p>
@@ -303,7 +303,7 @@ export const posts: BlogPost[] = [
           Apple products because Sony prices regionally. The base US price
           ($499) lands around ₦680-750k delivered to Lagos with shipping
           and duty, which is competitive with local stock but the warranty
-          tradeoff usually isn&apos;t worth it for a console.
+          tradeoff usually isn't worth it for a console.
         </p>
         <p>
           Where cross-border makes sense: bundles. Amazon US runs holiday
@@ -336,7 +336,7 @@ export const posts: BlogPost[] = [
           </li>
           <li>
             <strong>Insist on the original receipt for warranty
-            registration.</strong> Sony&apos;s warranty starts from
+            registration.</strong> Sony's warranty starts from
             first-purchase date, not your purchase date. A unit sold to you
             new but originally bought 14 months ago has 10 months left on
             warranty, not 24.
@@ -349,7 +349,7 @@ export const posts: BlogPost[] = [
           For most buyers the disc edition is worth it: physical games are
           significantly cheaper used, you can resell or trade, and
           PlayStation Plus discounts on digital games erode quickly when
-          they&apos;re full price.
+          they're full price.
         </p>
         <p>
           Digital edition makes sense if you only play first-party games
@@ -359,7 +359,7 @@ export const posts: BlogPost[] = [
 
         <h2>How we update this</h2>
         <p>
-          Havlo&apos;s data refreshes daily across all the retailers
+          Havlo's data refreshes daily across all the retailers
           above. For current PS5 pricing across every Nigerian retailer
           plus cross-border options, search on the home page or browse the
           Gaming category.
@@ -381,7 +381,7 @@ export const posts: BlogPost[] = [
         <p>
           AirPods Pro 2 are the most counterfeited Apple product in Nigeria
           by a wide margin. Walk through any Computer Village stall and
-          you&apos;ll find &quot;AirPods Pro 2&quot; for ₦25k that look
+          you'll find &quot;AirPods Pro 2&quot; for ₦25k that look
           identical to the ₦190k authentic units at Slot. This guide is
           mostly about not buying the fakes.
         </p>
@@ -418,7 +418,7 @@ export const posts: BlogPost[] = [
         <h2>How to spot counterfeit AirPods Pro 2</h2>
         <p>
           Counterfeits have improved dramatically. Visual inspection alone
-          isn&apos;t enough anymore. The reliable tests:
+          isn't enough anymore. The reliable tests:
         </p>
         <ul>
           <li>
@@ -451,8 +451,8 @@ export const posts: BlogPost[] = [
         <p>
           Amazon US has AirPods Pro 2 at $199 sealed retail. Delivered to
           Lagos with shipping and customs (audio products usually 10-15%
-          duty), the total runs around ₦155-175k. That&apos;s ₦20-50k below
-          even 3C Hub&apos;s pricing.
+          duty), the total runs around ₦155-175k. That's ₦20-50k below
+          even 3C Hub's pricing.
         </p>
         <p>
           For AirPods specifically, cross-border is a strong play because
@@ -464,7 +464,7 @@ export const posts: BlogPost[] = [
         <p>
           Apple typically refreshes AirPods Pro on a roughly 3-year cycle.
           The Pro 2 launched in 2022; the Pro 3 with H3 chip is rumored for
-          late 2026. If you&apos;re willing to wait 6+ months, prices on the
+          late 2026. If you're willing to wait 6+ months, prices on the
           Pro 2 will likely drop another ₦20-30k as the Pro 3 launches.
         </p>
         <p>
@@ -504,7 +504,7 @@ export const posts: BlogPost[] = [
           Pricing in Nigeria has been unusually sticky compared to other
           Samsung flagships. Most S-series phones drop 25-30% in their
           second year; the S24 Ultra has only fallen about 12% since
-          launch. Here&apos;s where to find it cheapest right now.
+          launch. Here's where to find it cheapest right now.
         </p>
 
         <h2>Local Nigerian retailers</h2>
@@ -541,7 +541,7 @@ export const posts: BlogPost[] = [
           region got the Snapdragon 8 Gen 3, no Exynos variant exists.
         </p>
         <p>
-          This means buying cross-border doesn&apos;t cost you anything on
+          This means buying cross-border doesn't cost you anything on
           the chipset front. The unit shipped in any region runs the same
           chip with the same performance.
         </p>
@@ -550,12 +550,12 @@ export const posts: BlogPost[] = [
         <p>
           Amazon US lists the Galaxy S24 Ultra 256GB at around $1,099
           unlocked. With shipping and Lagos customs (typically 15% for
-          phones), total delivered cost runs around ₦1.20-1.30M. That&apos;s
+          phones), total delivered cost runs around ₦1.20-1.30M. That's
           ₦150-300k below the same SKU at Slot.
         </p>
         <p>
-          For a phone you&apos;ll keep 3-4 years, that savings is meaningful.
-          The tradeoff is warranty service: Samsung&apos;s international
+          For a phone you'll keep 3-4 years, that savings is meaningful.
+          The tradeoff is warranty service: Samsung's international
           warranty officially covers the device anywhere Samsung operates,
           but in practice Samsung Nigeria service centers have been known to
           require proof of local purchase before honoring claims. If
@@ -577,7 +577,7 @@ export const posts: BlogPost[] = [
 
         <h2>How we update this</h2>
         <p>
-          Havlo&apos;s pricing data refreshes daily across all retailers
+          Havlo's pricing data refreshes daily across all retailers
           above. For current real-time pricing on any Galaxy S24 Ultra
           configuration, search the model on the home page or browse the
           Phones category.
@@ -669,7 +669,7 @@ export const posts: BlogPost[] = [
           The PS5 Pro launched in late 2024 at £700 in the UK and remains
           there. For most buyers the Pro is hard to justify: the Slim
           handles every current PS5 game at acceptable settings, and the
-          Pro&apos;s upgraded GPU + AI upscaling are most visible in
+          Pro's upgraded GPU + AI upscaling are most visible in
           first-party showcase titles.
         </p>
         <p>
@@ -708,7 +708,7 @@ export const posts: BlogPost[] = [
 
         <h2>Amazon AE</h2>
         <p>
-          Amazon&apos;s UAE storefront has the broadest catalog by a
+          Amazon's UAE storefront has the broadest catalog by a
           comfortable margin. Coverage on flagship phones, laptops, and
           audio gear matches global Amazon stores. Prime delivery in
           Dubai and Abu Dhabi is reliable enough that next-day is the
@@ -735,7 +735,7 @@ export const posts: BlogPost[] = [
 
         <h2>Sharaf DG</h2>
         <p>
-          Sharaf DG is the UAE&apos;s legacy electronics specialist with
+          Sharaf DG is the UAE's legacy electronics specialist with
           large physical stores across the country. They are the
           authorized Apple Premium Reseller in the UAE, which means
           AppleCare and warranty service runs cleanly through them.
@@ -800,7 +800,7 @@ export const posts: BlogPost[] = [
         <p>
           Counterfeit AirPods Pro 2 are the most refined fakes in
           consumer electronics. The packaging is correct down to the
-          shrink-wrap, the serial numbers match Apple&apos;s format,
+          shrink-wrap, the serial numbers match Apple's format,
           and the buds physically look identical from outside the case.
           Visual inspection alone catches almost none of them.
         </p>
@@ -1075,8 +1075,8 @@ export const posts: BlogPost[] = [
           </li>
           <li>
             <strong>Konga (Jumia equivalent)</strong>: same rules.
-            Konga&apos;s seller verification is slightly tighter than
-            Jumia&apos;s in our experience.
+            Konga's seller verification is slightly tighter than
+            Jumia's in our experience.
           </li>
           <li>
             <strong>ASOS</strong>: ships internationally to Nigeria with
@@ -1094,7 +1094,7 @@ export const posts: BlogPost[] = [
         <h2>Authentication checklist</h2>
         <p>
           Run these checks before paying. Three minutes of inspection
-          beats months of buyer&apos;s remorse:
+          beats months of buyer's remorse:
         </p>
         <ul>
           <li>
@@ -1136,7 +1136,7 @@ export const posts: BlogPost[] = [
         </p>
         <p>
           Buy Yeezy slides only from StockX (with their authentication
-          guarantee) or directly from Adidas&apos; official online
+          guarantee) or directly from Adidas' official online
           channels. Local listings under ₦35K are universally fake; even
           ₦45-55K listings are often counterfeit.
         </p>
@@ -1367,7 +1367,7 @@ export const posts: BlogPost[] = [
           </li>
           <li>
             <strong>Brand websites for ingredient lists.</strong>{" "}
-            Check the back-of-bottle ingredients against the brand&apos;s
+            Check the back-of-bottle ingredients against the brand's
             official ingredient list on their website. Counterfeits
             sometimes simplify or substitute ingredients with cheaper
             alternatives.
@@ -1548,7 +1548,7 @@ export const posts: BlogPost[] = [
         </ul>
         <p>
           Bottom line: buy locally for TVs. The 10-20% savings from
-          cross-border isn&apos;t worth the warranty and logistics risk.
+          cross-border isn't worth the warranty and logistics risk.
         </p>
 
         <h2>How we update this</h2>

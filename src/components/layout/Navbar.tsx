@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, Tag, Search, Info, Coins, Menu, X } from "lucide-react";
+import { Home, Tag, Search, Info, Coins, BookOpen, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import Logo from "@/components/ui/Logo";
@@ -19,6 +19,7 @@ const navLinks = [
   { href: "/deals",    label: "Deals",         Icon: Tag      },
   { href: "/compare",  label: "Find for less", Icon: Search   },
   { href: "/cashback", label: "Cashback",      Icon: Coins    },
+  { href: "/blog",     label: "Blog",          Icon: BookOpen },
   { href: "/about",    label: "About",         Icon: Info     },
 ];
 
@@ -156,7 +157,7 @@ export default function Navbar() {
         <div className="h-full flex flex-col p-5">
 
           {/* Header — logo + close */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-6">
             <Link
               href="/"
               aria-label="Havlo home"
@@ -172,6 +173,17 @@ export default function Navbar() {
             >
               <X size={20} strokeWidth={1.75} />
             </button>
+          </div>
+
+          {/* Country switcher in drawer — addresses Bucket 1#23 from
+              QA audit. Mobile users had to scroll to footer to change
+              country, which most never found. Place above the nav so
+              it's the first interaction surface in the drawer. */}
+          <div className="mb-6 px-1">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-3 mb-2">
+              Country
+            </p>
+            <CountrySelect />
           </div>
 
           {/* Nav links */}

@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X, SlidersHorizontal, LayoutGrid, List } from "lucide-react";
 import CategoryNav from "./CategoryNav";
 import OriginToggle from "./OriginToggle";
 import ListCard from "./ListCard";
 import MasonryCard from "./MasonryCard";
-import { MASONRY_ASPECTS, chunkLeftToRight } from "./masonry-layout";
+import { MASONRY_ASPECTS } from "./masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
 import EmptySearchState from "@/components/empty/EmptySearchState";
 import { useCountry } from "@/components/providers/CountryProvider";
+import { cn } from "@/lib/utils";
+import { categories } from "@/lib/data/categories";
 import type { Deal, DiscountTier, OriginFilter, SortOption } from "@/types";
 
 type ViewMode = "grid" | "list";
@@ -41,36 +43,16 @@ const SORTS: { value: SortOption; label: string }[] = [
   { value: "price_desc", label: "Price: high → low" },
 ];
 
-/* ── Single masonry column ─────────────────────────────────────── */
-function Column({ items, gapClass, startIndex }: { items: Deal[]; gapClass: string; startIndex: number }) {
+/* ── Skeleton tile rendered during initial load ────────────────── */
+function SkeletonTile({ aspect }: { aspect: string }) {
   return (
-    <div className={`flex-1 flex flex-col ${gapClass} min-w-0`}>
-      {items.map((d, i) => (
-        <AnimateIn key={d.id} delay={Math.min(i, 6) * 50}>
-          <MasonryCard
-            deal={d}
-            aspect={MASONRY_ASPECTS[(startIndex + i) % MASONRY_ASPECTS.length]}
-          />
-        </AnimateIn>
-      ))}
-    </div>
-  );
-}
-
-/* ── Skeleton column for first-load ────────────────────────────── */
-function SkeletonColumn({ count, gapClass, startIndex }: { count: number; gapClass: string; startIndex: number }) {
-  return (
-    <div className={`flex-1 flex flex-col ${gapClass} min-w-0`}>
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i}>
-          <div className={`skeleton ${MASONRY_ASPECTS[(startIndex + i) % MASONRY_ASPECTS.length]} rounded-xl sm:rounded-2xl`} />
-          <div className="pt-2.5 px-0.5 space-y-1.5">
-            <div className="skeleton h-2.5 w-1/3 rounded" />
-            <div className="skeleton h-3 w-3/4 rounded" />
-            <div className="skeleton h-3 w-1/3 rounded" />
-          </div>
-        </div>
-      ))}
+    <div>
+      <div className={`skeleton ${aspect} rounded-xl sm:rounded-2xl`} />
+      <div className="pt-2.5 px-0.5 space-y-1.5">
+        <div className="skeleton h-2.5 w-1/3 rounded" />
+        <div className="skeleton h-3 w-3/4 rounded" />
+        <div className="skeleton h-3 w-1/3 rounded" />
+      </div>
     </div>
   );
 }
@@ -86,7 +68,22 @@ export default function DealFeed() {
      (linked from homepage CategoryGrid tiles) lands on the correct
      filtered view instead of the default "all". */
   const searchParams = useSearchParams();
-  const initialCategory = searchParams.get("category") ?? "all";
+  /* Validate category against the known list. An unknown slug
+     (e.g. ?category=junkjunkjunk from a stale Slack/Twitter link)
+     used to silently fall back to 'all' with no UI hint, leaving
+     the user wondering why the filter pill they expected wasn't
+     selected. We now keep the bad slug around in `invalidCategory`
+     state and surface a dismissable info chip below the filter bar. */
+  const requestedCategoryRaw = searchParams.get("category") ?? "all";
+  const validCategorySlugs = new Set(categories.map((c) => c.slug));
+  const initialCategory = validCategorySlugs.has(requestedCategoryRaw)
+    ? requestedCategoryRaw
+    : "all";
+  const [invalidCategory, setInvalidCategory] = useState<string | null>(
+    !validCategorySlugs.has(requestedCategoryRaw) && requestedCategoryRaw !== "all"
+      ? requestedCategoryRaw
+      : null,
+  );
   const initialTierRaw = searchParams.get("minDiscount") ?? "all";
   const initialTier = VALID_TIERS.has(initialTierRaw as DiscountTier)
     ? (initialTierRaw as DiscountTier)
@@ -228,10 +225,6 @@ export default function DealFeed() {
     return () => observer.disconnect();
   }, [loadMore]);
 
-  /* ── L→R column splits ── */
-  const mobileCols  = useMemo(() => chunkLeftToRight(items, 2), [items]);
-  const tabletCols  = useMemo(() => chunkLeftToRight(items, 3), [items]);
-  const desktopCols = useMemo(() => chunkLeftToRight(items, 4), [items]);
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-8 sm:py-12">
@@ -246,8 +239,12 @@ export default function DealFeed() {
         </p>
       </div>
 
-      {/* Search input */}
-      <div className="relative mb-4">
+      {/* Search input + subtitle. Subtitle addresses Bucket 2#25 from
+          QA audit: placeholder text disappears on focus, leaving the
+          user without context for what Enter does (filter vs compare).
+          Persistent micro-copy below the input keeps the rule visible
+          while the user is typing. */}
+      <div className="relative mb-1.5">
         <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-3 pointer-events-none" />
         <input
           type="text"
@@ -273,6 +270,32 @@ export default function DealFeed() {
           </button>
         )}
       </div>
+      <p className="text-[11px] text-ink-3 mb-4 px-4">
+        Type to filter the list. Press Enter to compare across stores.
+      </p>
+
+      {/* Invalid-category info chip — addresses Bucket 2#17 from QA
+          audit. When the URL ?category= param doesn't match any
+          known slug, surface a dismissable explanation instead of
+          silently swapping to All. */}
+      {invalidCategory && (
+        <div
+          role="status"
+          className="mb-4 flex items-start gap-2 rounded-xl border border-border bg-surface-2 px-3.5 py-2.5"
+        >
+          <span className="text-[11px] sm:text-xs text-ink-2 leading-relaxed flex-1">
+            We don&apos;t have a &ldquo;{invalidCategory}&rdquo; category. Showing all deals instead.
+          </span>
+          <button
+            type="button"
+            onClick={() => setInvalidCategory(null)}
+            aria-label="Dismiss"
+            className="shrink-0 -m-1 p-1 text-ink-3 hover:text-ink transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Origin toggle */}
       <div className="mb-4">
@@ -375,32 +398,31 @@ export default function DealFeed() {
         </div>
       </div>
 
-      {/* Initial skeletons */}
+      {/* Initial skeletons — same single-render approach as the
+          loaded grid. 12 placeholder tiles is enough to fill the
+          fold across all viewport sizes. */}
       {loading && (
-        <>
-          <div className="flex gap-2 sm:hidden">
-            <SkeletonColumn count={6} gapClass="gap-2" startIndex={0} />
-            <SkeletonColumn count={6} gapClass="gap-2" startIndex={100} />
-          </div>
-          <div className="hidden sm:flex lg:hidden gap-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <SkeletonColumn key={i} count={4} gapClass="gap-3" startIndex={i * 100} />
-            ))}
-          </div>
-          <div className="hidden lg:flex gap-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <SkeletonColumn key={i} count={3} gapClass="gap-4" startIndex={i * 100} />
-            ))}
-          </div>
-        </>
+        <div className="columns-2 sm:columns-3 lg:columns-4 gap-2 sm:gap-3 lg:gap-4 [column-fill:_balance]">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className="break-inside-avoid mb-2 sm:mb-3 lg:mb-4">
+              <SkeletonTile aspect={MASONRY_ASPECTS[i % MASONRY_ASPECTS.length]} />
+            </div>
+          ))}
+        </div>
       )}
 
-      {/* Masonry grid (tablet + desktop always; mobile when viewMode=grid)
-          OR list view on mobile when user toggled it. */}
+      {/* Single CSS-columns render — addresses Bucket 1#24 from QA
+          audit. Previously rendered three full DOM copies (mobile /
+          tablet / desktop) CSS-hidden via media queries; each card's
+          <img> still fetched even when the parent was display:none,
+          so the tab made 3× the network requests. Now: one DOM tree
+          with responsive `columns-2 sm:columns-3 lg:columns-4`.
+          break-inside-avoid keeps each card intact across columns.
+          Mobile list-view stays separate because a list is always
+          one column with different per-row layout. */}
       {!loading && items.length > 0 && (
         <>
-          {/* Mobile — list OR masonry depending on user preference */}
-          {viewMode === "list" ? (
+          {viewMode === "list" && (
             <div className="flex flex-col gap-2 sm:hidden">
               {items.map((d, i) => (
                 <AnimateIn key={d.id} delay={Math.min(i, 8) * 40}>
@@ -408,21 +430,22 @@ export default function DealFeed() {
                 </AnimateIn>
               ))}
             </div>
-          ) : (
-            <div className="flex gap-2 sm:hidden">
-              {mobileCols.map((col, i) => (
-                <Column key={i} items={col} gapClass="gap-2" startIndex={i * 100} />
-              ))}
-            </div>
           )}
-          <div className="hidden sm:flex lg:hidden gap-3">
-            {tabletCols.map((col, i) => (
-              <Column key={i} items={col} gapClass="gap-3" startIndex={i * 100} />
-            ))}
-          </div>
-          <div className="hidden lg:flex gap-4">
-            {desktopCols.map((col, i) => (
-              <Column key={i} items={col} gapClass="gap-4" startIndex={i * 100} />
+          <div
+            className={cn(
+              "columns-2 sm:columns-3 lg:columns-4 gap-2 sm:gap-3 lg:gap-4 [column-fill:_balance]",
+              viewMode === "list" && "hidden sm:block",
+            )}
+          >
+            {items.map((d, i) => (
+              <div key={d.id} className="break-inside-avoid mb-2 sm:mb-3 lg:mb-4">
+                <AnimateIn delay={Math.min(i, 6) * 50}>
+                  <MasonryCard
+                    deal={d}
+                    aspect={MASONRY_ASPECTS[i % MASONRY_ASPECTS.length]}
+                  />
+                </AnimateIn>
+              </div>
             ))}
           </div>
         </>
