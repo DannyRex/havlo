@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { formatNaira } from "@/lib/utils";
+import { formatNaira, proxiedImageUrl, cleanTitle } from "@/lib/utils";
 import type { ProductGroup } from "@/lib/search";
 
 export default function GroupCard({ g }: { g: ProductGroup }) {
@@ -12,7 +12,13 @@ export default function GroupCard({ g }: { g: ProductGroup }) {
       <div className="relative w-24 h-24 shrink-0 sm:w-full sm:h-auto sm:aspect-square overflow-hidden rounded-xl bg-white">
         {g.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={g.imageUrl} alt={g.title} className="w-full h-full object-contain p-2" />
+          <img
+            src={proxiedImageUrl(g.imageUrl)}
+            alt={cleanTitle(g.title).slice(0, 120)}
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-contain p-2"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-3xl text-ink">{g.imageEmoji}</div>
         )}

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { ExternalLink, Trophy, Truck, Globe, Star } from "lucide-react";
-import { formatNaira } from "@/lib/utils";
+import { formatNaira, proxiedImageUrl, cleanTitle } from "@/lib/utils";
 import { trackClick } from "@/lib/trackClick";
 import type { ProductGroup } from "@/lib/search";
 
@@ -21,7 +21,18 @@ export default function PriceResults({
       <div className="flex items-start gap-4 sm:gap-5 p-4 sm:p-5 rounded-2xl bg-surface-2 border border-border mb-6">
         {imageUrl ? (
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden flex-shrink-0 bg-white">
-            <img src={imageUrl} alt={title} className="w-full h-full object-contain p-2" />
+            {/* Proxied so Amazon / ASOS / AliExpress hotlink-block CDNs
+                don't blank these. Eager + high priority because this is
+                the LCP image on /compare anchor cards. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={proxiedImageUrl(imageUrl)}
+              alt={cleanTitle(title).slice(0, 120)}
+              loading="eager"
+              fetchPriority="high"
+              decoding="sync"
+              className="w-full h-full object-contain p-2"
+            />
           </div>
         ) : (
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl flex items-center justify-center text-3xl flex-shrink-0"
@@ -78,7 +89,20 @@ export default function PriceResults({
               {/* Product thumbnail from this store (helps verify it's the same item) */}
               {p.imageUrl && (
                 <div className="w-12 h-12 rounded-lg overflow-hidden bg-white shrink-0 hidden sm:block">
-                  <img src={p.imageUrl} alt="" className="w-full h-full object-contain p-1" />
+                  {/* Per-offer thumbnail. Lazy + low priority since
+                      these sit below the LCP. proxiedImageUrl handles
+                      cross-domain hotlink blocks. Empty alt is correct
+                      here — the offer row already has the store name +
+                      product title as text labels, so the image is
+                      decorative. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={proxiedImageUrl(p.imageUrl)}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full h-full object-contain p-1"
+                  />
                 </div>
               )}
 

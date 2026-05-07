@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, TrendingDown, Store } from "lucide-react";
-import { formatNaira } from "@/lib/utils";
+import { formatNaira, proxiedImageUrl, cleanTitle } from "@/lib/utils";
 import type { Alternative } from "@/types";
 
 interface Props {
@@ -18,8 +18,16 @@ export default function AlternativeCard({ alt }: Props) {
       <div className="h-28 sm:h-32 flex items-center justify-center relative border-b border-border overflow-hidden"
            style={{ background: alt.imageGradient }}>
         {alt.imageUrl ? (
-          <img src={alt.imageUrl} alt={alt.title}
-               className="w-full h-full object-contain p-3 bg-white" />
+          /* Below-the-anchor → lazy + low priority. proxiedImageUrl
+             handles Amazon / ASOS / AliExpress hotlink blocks. */
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={proxiedImageUrl(alt.imageUrl)}
+            alt={cleanTitle(alt.title).slice(0, 120)}
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-contain p-3 bg-white"
+          />
         ) : (
           <span className="text-4xl sm:text-5xl">{alt.imageEmoji}</span>
         )}
