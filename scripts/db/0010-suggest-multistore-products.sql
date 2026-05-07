@@ -1,25 +1,23 @@
 -- ──────────────────────────────────────────────────────────────────
--- Returns product titles for the search-bar chip pool. A product
--- qualifies when:
+-- Returns product titles for the search-bar chip pool. The point of
+-- Havlo is local-vs-cross-border price comparison; the chip rule
+-- enforces that explicitly.
+--
+-- A product qualifies when:
 --   1. AT LEAST ONE store carrying it is in the user's country
---      (so the comparison includes a local-shopper option)
---   2. AT LEAST 2 distinct stores total carry it (so the comparison
---      actually compares — single-store chip is pointless)
+--      (the LOCAL leg of the comparison)
+--   2. AT LEAST ONE store carrying it is NOT in the user's country
+--      (the CROSS-BORDER leg — could be Amazon, AliExpress, ASOS,
+--      or another country's local retailer)
 --
--- Why both rules: rule 1 alone could match a product carried only
--- locally with no comparison value. Rule 2 alone (the v1 of this
--- function) matched products carried by 2 international stores
--- with no local presence — chip leads to a Marshall Stanmore page
--- showing only Amazon US + ASOS, no Konga/Jumia, when the user is
--- on /ng. The user reported that as a bug.
+-- Why not just '>=2 distinct stores total': that allowed Konga +
+-- Konga-as-NG (same retailer, different SKUs) to qualify and
+-- excluded Konga + Amazon (one local + one cross-border) — the
+-- exact pair that demonstrates Havlo's value prop. The new rule
+-- requires both legs of the comparison to exist.
 --
--- The 'local' definition uses the stores.country column (set by
--- the ingestion pipeline: 'NG' for konga / jumia / 3c-hub / slot,
--- null for international Amazon / ASOS / AliExpress).
---
--- Sort key: distinct store count desc, then total offer count desc,
--- then most-recently scraped offer to keep the list rotating with
--- the catalog.
+-- Sort: more stores wins, more offers wins, then most-recently-
+-- scraped offer to keep the list rotating with the catalog.
 -- ──────────────────────────────────────────────────────────────────
 
 create or replace function suggest_multistore_products(
@@ -33,29 +31,36 @@ returns table (
   total_offers int
 )
 language sql stable as $$
-  with products_with_local_store as (
-    -- Products that have at least one offer from a store tagged
-    -- with the user's country. Distinct so a product with multiple
-    -- local-store offers only appears once.
-    select distinct p.id as product_id, p.title
-    from products p
-    join offers o on o.product_id = p.id
-    join stores s on s.id = o.store_id
-    where length(p.title) between 6 and 80
-      and lower(s.country) = lower(user_country)
-  )
+  with
+    /* Products carried by at least one store local to the user. */
+    local_products as (
+      select distinct o.product_id
+      from offers o
+      join stores s on s.id = o.store_id
+      where lower(s.country) = lower(user_country)
+    ),
+    /* Products carried by at least one store NOT local to the user.
+       Includes truly cross-border (s.country IS NULL — AliExpress,
+       DHGate, Shein, Temu) AND stores tagged for a different
+       country (Amazon UK on /ng, ASOS on /us, etc.). */
+    nonlocal_products as (
+      select distinct o.product_id
+      from offers o
+      join stores s on s.id = o.store_id
+      where s.country is null
+         or lower(s.country) <> lower(user_country)
+    )
   select
-    pwl.product_id,
-    pwl.title,
-    count(distinct o.store_id)::int as store_count,
-    count(o.id)::int                 as total_offers
-  from products_with_local_store pwl
-  join offers o on o.product_id = pwl.product_id
-  group by pwl.product_id, pwl.title
-  having count(distinct o.store_id) >= 2
-  order by
-    count(distinct o.store_id) desc,
-    count(o.id) desc,
-    max(o.scraped_at) desc nulls last
+    p.id as product_id,
+    p.title,
+    (select count(distinct store_id)::int from offers where product_id = p.id)
+      as store_count,
+    (select count(*)::int from offers where product_id = p.id)
+      as total_offers
+  from products p
+  where length(p.title) between 6 and 80
+    and p.id in (select product_id from local_products)
+    and p.id in (select product_id from nonlocal_products)
+  order by store_count desc, total_offers desc
   limit max_results;
 $$;
