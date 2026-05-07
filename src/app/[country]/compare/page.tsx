@@ -338,60 +338,153 @@ function CompareContent() {
                   <h2 className="text-[15px] sm:text-lg font-semibold text-ink leading-snug line-clamp-2">
                     {result.anchor.title}
                   </h2>
-                  {/* Price block: only render when we actually have a
-                      number. The previous fallback text ('Price not
-                      shown on the source page') was confessional dev-
-                      language that didn't help users — the store
-                      chips below already give them a clear path to
-                      click through and see the real price on the
-                      retailer site. Cleaner UI to just hide the row. */}
-                  {result.anchor.bestPrice > 0 && (
-                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
-                      <span className="text-lg sm:text-xl font-bold text-ink">
-                        {formatNaira(result.anchor.bestPrice)}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Store chips — horizontally scroll on mobile, no awkward wraps */}
-                  <div className="-mx-4 sm:mx-0 mt-3">
-                    <div className="flex gap-1.5 overflow-x-auto no-scrollbar px-4 sm:px-0 sm:flex-wrap">
-                      {result.anchor.offers.slice(0, 4).map((offer, i) => (
-                        <a
-                          key={`${offer.storeId}-${offer.price}`}
-                          href={getClickThroughUrl({ url: offer.url, id: `${result.anchor.key}-${offer.storeId}` })}
-                          target="_blank"
-                          rel="noopener noreferrer sponsored"
-                          onClick={() => trackClick(result.anchor.key, query, i, "similar-anchor")}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-border hover:border-border-strong hover:bg-surface-2 transition-all text-ink-2 hover:text-ink shrink-0 whitespace-nowrap"
-                        >
-                          <div className="w-4 h-4 rounded overflow-hidden shrink-0 bg-surface-2">
-                            <Image
-                              src={offer.storeLogoUrl}
-                              alt={offer.storeName}
-                              width={16}
-                              height={16}
-                              className="object-contain"
-                              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                            />
-                          </div>
-                          {offer.storeName}
-                          {offer.isInternational && offer.landedCostExtra > 0 && (
-                            <Plane size={9} className="text-amber-500" />
-                          )}
-                          <ExternalLink size={10} className="text-ink-3" />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
+                  {/* Show price summary line: cheapest store's price as
+                      headline, savings span vs the most expensive store
+                      across the offer set. Both numbers are real to the
+                      user since they come from real offers below. */}
+                  {result.anchor.offers.length > 0 && result.anchor.bestPrice > 0 && (() => {
+                    const sorted = [...result.anchor.offers]
+                      .filter((o) => o.landedPrice > 0)
+                      .sort((a, b) => a.landedPrice - b.landedPrice);
+                    const cheapest = sorted[0];
+                    const dearest  = sorted[sorted.length - 1];
+                    const spread   = dearest && cheapest && dearest.landedPrice > cheapest.landedPrice
+                      ? dearest.landedPrice - cheapest.landedPrice
+                      : 0;
+                    return (
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
+                        <span className="text-lg sm:text-xl font-bold text-ink">
+                          {formatNaira(cheapest?.landedPrice ?? result.anchor.bestPrice)}
+                        </span>
+                        {spread > 0 && (
+                          <span className="text-xs text-ink-3">
+                            Save up to <span className="text-success font-semibold">{formatNaira(spread)}</span> across stores
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {result.dupes.length > 0 && result.dupes[0].savingsPercent > 0 && (
-                    <p className="mt-3 text-xs text-success font-medium">
+                    <p className="mt-2 text-xs text-success font-medium">
                       Alternatives from {formatNaira(result.dupes.reduce((min, d) => Math.min(min, d.bestPrice), Infinity))}
                     </p>
                   )}
                 </div>
               </div>
+
+              {/* ── Price comparison rows ──────────────────────────
+                  Only render when there's actually a comparison to
+                  show (>=2 offers). Each offer becomes a row with the
+                  store logo, price, delivery info, and a real 'View'
+                  CTA — replacing the old emoji-pill chips that didn't
+                  show prices and weren't useful for comparison.
+                  Sorted by landedPrice ascending (cheapest first); the
+                  top row gets a 'Best price' badge. */}
+              {result.anchor.offers.length > 1 && (() => {
+                const sorted = [...result.anchor.offers]
+                  .filter((o) => o.landedPrice > 0)
+                  .sort((a, b) => a.landedPrice - b.landedPrice);
+                if (sorted.length < 2) return null;
+                const cheapest = sorted[0].landedPrice;
+                return (
+                  <div className="mt-5 pt-5 border-t border-border">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-3">
+                        Across {sorted.length} stores
+                      </p>
+                      <p className="text-[11px] text-ink-3">
+                        Sorted cheapest first
+                      </p>
+                    </div>
+                    <ul className="space-y-2">
+                      {sorted.map((offer, i) => {
+                        const isBest    = i === 0;
+                        const savings   = offer.landedPrice - cheapest;
+                        const showLanded = offer.isInternational && offer.landedCostExtra > 0;
+                        return (
+                          <li
+                            key={`${offer.storeId}-${offer.price}-${i}`}
+                            className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                              isBest
+                                ? "border-success/40 bg-success/5"
+                                : "border-border bg-bg/50 hover:border-border-strong"
+                            }`}
+                          >
+                            <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-white flex items-center justify-center">
+                              <Image
+                                src={offer.storeLogoUrl}
+                                alt={offer.storeName}
+                                width={36}
+                                height={36}
+                                className="object-contain"
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                              />
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-semibold text-ink">
+                                  {offer.storeName}
+                                </span>
+                                {isBest && (
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-success bg-success/15 px-1.5 py-0.5 rounded">
+                                    Best price
+                                  </span>
+                                )}
+                                {offer.isInternational && (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-500">
+                                    <Plane size={10} /> Cross-border
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-ink-3 mt-0.5">
+                                {offer.deliveryDays
+                                  ? `${offer.deliveryDays} ${offer.deliveryDays === 1 ? "day" : "days"} delivery`
+                                  : "Delivery varies"}
+                                {showLanded && (
+                                  <>
+                                    {" · "}
+                                    <span title="Includes ~30% landed-cost estimate (shipping + duties)">
+                                      landed price shown
+                                    </span>
+                                  </>
+                                )}
+                              </p>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <p className={`text-base font-bold tabular-nums ${isBest ? "text-success" : "text-ink"}`}>
+                                {formatNaira(offer.landedPrice)}
+                              </p>
+                              {savings > 0 && (
+                                <p className="text-[11px] text-ink-3 tabular-nums">
+                                  +{formatNaira(savings)}
+                                </p>
+                              )}
+                            </div>
+
+                            <a
+                              href={getClickThroughUrl({ url: offer.url, id: `${result.anchor.key}-${offer.storeId}` })}
+                              target="_blank"
+                              rel="noopener noreferrer sponsored"
+                              onClick={() => trackClick(result.anchor.key, query, i, "anchor-comparison")}
+                              className={`shrink-0 inline-flex items-center gap-1 px-3.5 py-2 rounded-full text-xs font-semibold transition-colors ${
+                                isBest
+                                  ? "bg-ink text-bg hover:opacity-90"
+                                  : "bg-surface-2 text-ink hover:bg-border"
+                              }`}
+                            >
+                              View
+                              <ExternalLink size={11} strokeWidth={2.25} />
+                            </a>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Connector */}
