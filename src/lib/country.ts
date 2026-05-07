@@ -108,14 +108,42 @@ const DEFAULT_CROSS_BORDER = [
 
 /* Per-country cross-border allowlist. Determines which "international"
    stores are appropriate for the country's audience.
-     - NG: Amazon (US/UK) + AliExpress + ASOS + Shein + Temu + DHgate
-           — what Nigerians actually use for cross-border shopping
-     - IN: Amazon Global only — Shein is banned in India (since 2020)
-     - US: Shein + Temu + AliExpress dominate; Wish declining
-     - UK / DE / AE / ZA: similar global mix */
+
+   NG roster expanded: Nigerian buyers ship from far more US/UK retailers
+   than the original short list captured (Walmart, Target, Best Buy,
+   B&H, Newegg, Argos, Currys, John Lewis, Boots, Next, Macy's,
+   Nordstrom, etc.). Before this expansion the /ng/deals page was
+   limited to ~4 stores even though the DB had 236 stores worth of
+   offers — most were getting filtered out as 'foreign-anchored'.
+
+   Substring matching (matchesAny) — adding 'argos' here matches
+   'argos-uk', 'argos-ae', etc. without needing every variant. */
 const COUNTRY_CROSS_BORDER: Record<string, string[]> = {
-  ng: ["amazon", "amazon.com", "amazon.co.uk", "aliexpress", "asos",
-       "shein", "temu", "dhgate", "ebay", "apple.com", "banggood"],
+  ng: [
+    /* Globals that already shipped to NG long before this commit. */
+    "amazon", "amazon.com", "amazon.co.uk", "aliexpress", "asos",
+    "shein", "temu", "dhgate", "ebay", "apple.com", "banggood",
+    /* US retailers commonly used by NG cross-border shoppers — most
+       are already in the DB via SerpAPI ingest (see
+       scripts/inspect-ng-deals.ts diagnostic). */
+    "walmart", "target", "best buy", "best-buy", "bestbuy",
+    "newegg", "b&h photo", "b-h-photo", "bhphoto", "bhphotovideo",
+    "macy", "nordstrom", "sephora", "ulta", "wayfair", "kohl",
+    "nike", "adidas", "puma", "old navy", "oldnavy", "gap",
+    "fashion nova", "fashion-nova", "dick", "dell.com", "lenovo",
+    "newegg", "etsy", "lowes", "lowe's", "home depot", "homedepot",
+    "staples", "saks", "saks fifth", "carter's", "carters",
+    /* UK retailers — Argos / Currys / John Lewis / Boots etc. all
+       have established freight-forwarder workflows for NG buyers. */
+    "argos", "currys", "john lewis", "john-lewis", "johnlewis",
+    "next.co.uk", "marks-spencer", "marks and spencer", "boots",
+    "selfridges", "harrods", "ao.com", "ao-com", "very",
+    "river island", "river-island", "sports direct", "sportsdirect",
+    "screwfix", "wickes", "halfords", "primark", "matalan",
+    "house of fraser", "debenhams", "ebay.co.uk",
+    /* Cross-region globals NG buyers also reach. */
+    "wish.com", "alibaba.com", "lightinthebox", "geekbuying",
+  ],
   uk: ["aliexpress", "shein", "temu", "dhgate", "banggood"],
   us: ["aliexpress", "shein", "temu", "dhgate"],
   de: ["aliexpress", "shein", "temu", "dhgate", "banggood"],
