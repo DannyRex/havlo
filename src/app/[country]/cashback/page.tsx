@@ -32,7 +32,7 @@ export async function generateMetadata({
   const country = getCountry(params.country);
   const url = `${SITE_URL}/${country.code}/cashback`;
   const title = `Cashback · Havlo ${country.name}`;
-  const description = `Earn cashback when you shop through Havlo. Up to 4% back on Amazon, AliExpress, and more. Coming soon to ${country.name}.`;
+  const description = `Earn up to 5% cashback when you shop through Havlo. Live on Amazon, AliExpress, and more. Coming soon to ${country.name}.`;
   return {
     title,
     description,
@@ -66,8 +66,8 @@ export default function CashbackPage({
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-lg leading-relaxed max-w-2xl">
             When you click through Havlo and buy, the retailer pays us a small
-            commission. We share a slice of that with you. Up to 4% back,
-            depending on the store.
+            commission. We share a slice of that with you. Earn up to 5%
+            cashback, depending on the store.
           </p>
         </header>
 

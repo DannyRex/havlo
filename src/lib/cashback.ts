@@ -41,9 +41,12 @@ const RATES: Record<string, CashbackRate> = {
      structure changes or when category-specific overrides land. */
 
   /* AliExpress — high gross rates (5-50% by category) so we can
-     afford a more generous user share. Activates with
-     ALIEXPRESS_APP_KEY / ALIEXPRESS_APP_SECRET. */
-  "aliexpress":       { percent: 4, storeLabel: "AliExpress" },
+     afford the headline 'up to 5%' user share. Activates with
+     ALIEXPRESS_APP_KEY / ALIEXPRESS_APP_SECRET. Bumped 4% → 5% in
+     coordination with the site-wide 'Earn up to 5%' copy: the
+     headline claim has to be true, and AliExpress's gross
+     commission comfortably supports it. */
+  "aliexpress":       { percent: 5, storeLabel: "AliExpress" },
 };
 
 /** Look up the cashback rate for a store. Returns null when there's

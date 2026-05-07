@@ -203,7 +203,7 @@ export default function Hero({ storeCount }: Props) {
             <Coins size={14} className="text-success" aria-hidden="true" />
             <span>
               <span className="font-semibold">Coming soon:</span>{" "}
-              earn up to 4% cashback when you shop through Havlo
+              earn up to 5% cashback when you shop through Havlo
             </span>
             <span className="text-ink-3 hidden sm:inline" aria-hidden="true">→</span>
           </Link>
