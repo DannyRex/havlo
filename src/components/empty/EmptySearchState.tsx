@@ -57,6 +57,13 @@ export default function EmptySearchState({ query, source, browseHref, suggestion
   const router  = useRouter();
   const { country } = useCountry();
 
+  /* Skip the URL-paste recovery option when the user's query was
+     already a URL. Asking 'paste a product URL' on top of a failed
+     URL search reads as 'we ignored what you sent us, try again',
+     which is wrong and frustrating. They already tried that path;
+     show them the other recovery options instead. */
+  const isUrlQuery = looksLikeUrl(query);
+
   const [url, setUrl]               = useState("");
   const [urlError, setUrlError]     = useState<string | null>(null);
 
@@ -132,7 +139,9 @@ export default function EmptySearchState({ query, source, browseHref, suggestion
         </h3>
         {suggestions.length === 0 && (
           <p className="text-sm text-ink-3 leading-relaxed">
-            Three ways forward. Pick whichever fits.
+            {isUrlQuery
+              ? "We couldn't find this in the catalog yet. Pick a way forward."
+              : "Three ways forward. Pick whichever fits."}
           </p>
         )}
       </div>
@@ -164,7 +173,10 @@ export default function EmptySearchState({ query, source, browseHref, suggestion
         </div>
       )}
 
-      {/* Option 1 — URL paste (primary, highlighted) */}
+      {/* Option 1 — URL paste (primary, highlighted). Hidden when the
+          user's query was itself a URL — they already tried that path;
+          showing it again reads as 'we ignored your input.' */}
+      {!isUrlQuery && (
       <div className="rounded-2xl border border-border-strong bg-surface p-4 sm:p-5 mb-3">
         <div className="flex items-start gap-3 mb-3">
           <div className="shrink-0 w-9 h-9 rounded-full bg-brand/10 text-brand flex items-center justify-center">
@@ -202,6 +214,7 @@ export default function EmptySearchState({ query, source, browseHref, suggestion
           <p className="text-xs text-error mt-2 px-1">{urlError}</p>
         )}
       </div>
+      )}
 
       {/* Option 2 — Notify me */}
       <div className="rounded-2xl border border-border bg-surface p-4 sm:p-5 mb-3">
