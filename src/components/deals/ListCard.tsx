@@ -16,6 +16,7 @@ import {
   timeAgo,
   usdToNgn,
 } from "@/lib/utils";
+import InfoTip from "@/components/ui/InfoTip";
 import type { Deal } from "@/types";
 
 /* Same onError fallback pattern as MasonryCard's ResilientImage —
@@ -71,14 +72,17 @@ export default function ListCard({ deal }: Props) {
   const ngnEquivStr = isUSD ? `≈ ${formatCompact(usdToNgn(deal.salePrice))}` : null;
   const hasDiscount = deal.originalPrice > deal.salePrice && deal.discountPercent > 0;
 
-  /* Cross-border landed-cost estimate. Same 30% markup as
+  /* Cross-border total estimate. Same 30% markup as
      MasonryCard + the /compare anchor row. ListCard is mobile-only
      and assumes NG context (its parent toggles to mobile-list view
      only on /[country]/deals which is country-aware via the API).
-     For USD-priced deals the landed cost is shown as the NGN
-     equivalent + 30% — what an NG user would actually pay. */
+     For USD-priced deals the total is shown as the NGN
+     equivalent + 30% — what an NG user would actually pay.
+     Was "landed" — replaced with "total" + an Info icon explainer
+     because (a) "landed" is logistics jargon, (b) hover tooltips
+     don't work on touch. */
   const landedNgnStr = isUSD
-    ? `≈ ${formatCompact(Math.round(usdToNgn(deal.salePrice) * 1.30))} landed`
+    ? `≈ ${formatCompact(Math.round(usdToNgn(deal.salePrice) * 1.30))}`
     : null;
 
   return (
@@ -139,11 +143,14 @@ export default function ListCard({ deal }: Props) {
         )}
 
         {landedNgnStr && (
-          <p
-            className="text-[10px] text-ink-3 mt-0.5"
-            title="Estimated total landed cost: product price + ~30% rough estimate for cross-border shipping and customs."
-          >
-            {landedNgnStr}
+          <p className="text-[10px] text-ink-3 mt-0.5 flex items-center gap-1">
+            <span>{landedNgnStr}</span>
+            <span>total</span>
+            <InfoTip
+              label="What's included in the total"
+              text="Estimated total: product price + ~30% for cross-border shipping and customs. Actual cost varies."
+              size={11}
+            />
           </p>
         )}
       </div>

@@ -126,8 +126,14 @@ function CollageCard({
           surrounds the image cleanly. */}
       <div className="absolute inset-0 p-3 flex flex-col">
         <div className="flex-1 overflow-hidden rounded-lg ring-1 ring-zinc-100">
+          {/* Alt text was previously alt="" which hid these product
+             photos from screen readers entirely. The collage IS the
+             product proof on the homepage CTA — the surrounding
+             headline doesn't repeat what each card shows. Surface
+             the title + store so an assistive-tech user knows what
+             real catalog samples Havlo is showing them. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={img} alt="" className="w-full h-full object-cover" />
+          <img src={img} alt={`${title} at ${store}, ${percent}% off`} className="w-full h-full object-cover" />
         </div>
         <div className="pt-2.5 px-0.5">
           <p className="text-[11px] text-zinc-500 truncate">{store}</p>
