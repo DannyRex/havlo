@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { SearchX, Sparkles, ArrowDown, ExternalLink, Plane, CheckCircle, AlertCircle } from "lucide-react";
+import { SearchX, Sparkles, ArrowDown, ExternalLink, Plane, CheckCircle, AlertCircle, Coins } from "lucide-react";
+import Link from "next/link";
 import SearchBar from "@/components/compare/SearchBar";
 import Image from "next/image";
 import PriceResults from "@/components/compare/PriceResults";
@@ -14,6 +15,8 @@ import AnimateIn from "@/components/ui/AnimateIn";
 import { formatNaira, getClickThroughUrl } from "@/lib/utils";
 import { trackClick } from "@/lib/trackClick";
 import { sniffToAnchor } from "@/lib/sniff-to-anchor";
+import { getCashbackForUrl } from "@/lib/cashback";
+import { useCountry } from "@/components/providers/CountryProvider";
 import type { SearchOutput, DupeResult } from "@/lib/search";
 import type { SniffResult } from "@/app/api/sniff/route";
 import type { Deal } from "@/types";
@@ -27,6 +30,7 @@ function looksLikeUrl(v: string): boolean {
 function CompareContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { country } = useCountry();
   const initialQuery = searchParams.get("q") ?? "";
   const initialKey   = searchParams.get("key") ?? "";
 
@@ -249,6 +253,33 @@ function CompareContent() {
           )}
         </div>
       )}
+
+      {/* Cashback chip for sniffed URLs from cashback-eligible stores.
+          Surfaces the earning the user gets if they buy through Havlo
+          ("Earn 2% cashback on this through Havlo. Coming soon.") so
+          the link they pasted has visible monetary upside attached.
+          Only renders when the sniff succeeded AND the URL maps to a
+          store in the cashback rate map. Click routes to the country-
+          aware cashback page. */}
+      {sniffResult?.ok && (() => {
+        const cashback = getCashbackForUrl(sniffResult.url);
+        if (!cashback) return null;
+        return (
+          <div className="mt-3 max-w-lg mx-auto px-1">
+            <Link
+              href={`/${country.code}/cashback`}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-success/10 border border-success/30 hover:bg-success/15 transition-colors text-sm"
+            >
+              <Coins size={15} className="text-success shrink-0" aria-hidden="true" />
+              <span className="text-ink flex-1">
+                Earn <strong>{cashback.percent}% cashback</strong> on this through Havlo
+                <span className="text-ink-3 font-normal"> (coming soon)</span>
+              </span>
+              <span className="text-ink-3 text-xs hidden sm:inline" aria-hidden="true">→</span>
+            </Link>
+          </div>
+        );
+      })()}
 
       {/* ── Loading skeletons ── */}
       {loading && (

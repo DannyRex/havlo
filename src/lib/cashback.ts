@@ -56,6 +56,42 @@ export function getCashbackForStore(storeId: string): CashbackRate | null {
   return RATES[lc] ?? null;
 }
 
+/** Resolve a product URL's hostname to one of the storeIds in our
+ *  cashback rate map. Returns null when the URL doesn't point at a
+ *  cashback-eligible retailer (most stores). Used by /compare to
+ *  surface "Earn X% cashback on this item" when the user pastes an
+ *  Amazon / AliExpress URL.
+ *
+ *  Hostname → storeId table is intentionally narrow: only stores
+ *  with active cashback rates resolve. New retailers light up here
+ *  automatically once they're added to RATES + their hostname is
+ *  registered below. */
+const HOST_TO_STORE_ID: Array<{ pattern: RegExp; storeId: string }> = [
+  { pattern: /(^|\.)aliexpress\./i,   storeId: "aliexpress"    },
+  { pattern: /(^|\.)amazon\.co\.uk$/i, storeId: "amazon-co-uk" },
+  { pattern: /(^|\.)amazon\.de$/i,     storeId: "amazon-de"    },
+  { pattern: /(^|\.)amazon\.ae$/i,     storeId: "amazon-ae"    },
+  { pattern: /(^|\.)amazon\.in$/i,     storeId: "amazon-in"    },
+  /* Default Amazon match goes LAST so the marketplace-specific
+     patterns above win when present. amazon.com + the bare
+     amazon.X variant catches all .com / .ca / .com.mx etc. */
+  { pattern: /(^|\.)amazon\./i,        storeId: "amazon"       },
+];
+
+export function getCashbackForUrl(url: string): CashbackRate | null {
+  if (!url) return null;
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  for (const { pattern, storeId } of HOST_TO_STORE_ID) {
+    if (pattern.test(host)) return getCashbackForStore(storeId);
+  }
+  return null;
+}
+
 /** All currently-configured rates, sorted highest first. Used by the
  *  /cashback explainer page to render the rate table. */
 export function getAllCashbackRates(): CashbackRate[] {
