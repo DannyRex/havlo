@@ -570,15 +570,31 @@ export async function pgFtsFindSimilar(
   const limit = opts?.limit ?? 16;
   const qFam = queryFamily(q);
 
-  /* Build a candidate anchor from a single FTS row, validating it has
-     in-stock offers AND a category-plausible price. Returns null when
-     the row exists but doesn't survive validation — caller should then
-     try a fallback query (e.g. token-stripped form) before giving up. */
+  /* Build a candidate anchor from an FTS row.
+
+     Query-time cross-store pooling: after fetching the chosen product,
+     ALSO fetch every other product with the same `signature` (compact
+     'brand|model[|inches]' key from buildSignature). Pool their offers
+     into one anchor.
+
+     Why: catalog ingestion creates fresh product_ids for each retailer
+     because titles vary ('iPhone 15 128GB Black' on Konga vs
+     'iPhone 15 - 128GB - Midnight Black' on Amazon). Even after the
+     dedup backfill, edge cases survive. Doing the merge at QUERY time
+     is forgiving — products only need to share the same parsed key,
+     they don't have to be physically merged in the DB.
+
+     Skip pooling when signature is null ('?|?' bucket — unparsed
+     brand/model). Pooling those would over-merge unrelated rows.
+
+     Returns null when no product survives validation (no in-stock
+     offers, implausible price). Caller falls through to other
+     candidates / fallback queries before giving up. */
   async function resolveAnchorFromRow(row: FtsRow): Promise<ProductGroup | null> {
     const { data: productData, error: pErr } = await supa!
       .from("products")
       .select(`
-        id, title, category_slug, brand, image_url,
+        id, title, category_slug, brand, image_url, signature,
         offers (
           id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
           stores ( id, name, logo_url, is_international )
@@ -587,7 +603,41 @@ export async function pgFtsFindSimilar(
       .eq("id", row.product_id)
       .single();
     if (pErr || !productData) return null;
-    const a = buildAnchorGroup(productData as unknown as AnchorProduct);
+
+    /* Default: anchor uses just the chosen product's offers. */
+    let anchorPayload = productData as unknown as AnchorProduct;
+
+    /* Cross-product pool: only when the chosen product has a usable
+       compact signature (brand+model parsed). The signature column
+       was rewritten from JSON.stringify(sig) to sig.key by the dedup
+       backfill — it's now either 'brand|model' or null. */
+    const signature = (productData as { signature: string | null }).signature;
+    if (signature) {
+      const { data: siblings } = await supa!
+        .from("products")
+        .select(`
+          id, title, category_slug, brand, image_url,
+          offers (
+            id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
+            stores ( id, name, logo_url, is_international )
+          )
+        `)
+        .eq("signature", signature)
+        .neq("id", row.product_id);
+
+      if (siblings && siblings.length > 0) {
+        const baseOffers = (productData as unknown as AnchorProduct).offers ?? [];
+        const siblingOffers = (siblings as unknown as AnchorProduct[]).flatMap(
+          (p) => p.offers ?? [],
+        );
+        anchorPayload = {
+          ...(productData as unknown as AnchorProduct),
+          offers: [...baseOffers, ...siblingOffers],
+        };
+      }
+    }
+
+    const a = buildAnchorGroup(anchorPayload);
     if (a.offers.length === 0) return null;
     if (!priceLooksPlausible(a.bestPrice, a.category)) return null;
     return a;
