@@ -23,9 +23,14 @@ import { sendEmail } from "@/lib/email/send";
 import { newsletterWelcome } from "@/lib/email/templates/newsletter-welcome";
 
 interface NewsletterRequest {
-  email?:   string;
-  source?:  string;
-  country?: string;
+  email?:    string;
+  source?:   string;
+  country?:  string;
+  /* Optional category slug — when set, the subscriber gets only the
+     daily digest items in this category (Phones, Audio, Computing,
+     etc.) instead of the cross-category roundup. Empty / missing /
+     "all" means the standard catch-all newsletter. */
+  category?: string;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -41,6 +46,12 @@ export async function POST(req: NextRequest) {
   const email   = body.email?.trim().toLowerCase();
   const country = body.country?.trim().toLowerCase() ?? null;
   const source  = body.source?.trim() || "homepage";
+  /* Normalise category — empty string / "all" / unrecognised values
+     all become null so the newsletter sender treats them as the
+     catch-all roundup. The send pipeline (Phase 2) will branch on
+     this column to filter the digest. */
+  const rawCat  = body.category?.trim().toLowerCase();
+  const category = rawCat && rawCat !== "all" ? rawCat : null;
 
   if (!email || !EMAIL_RE.test(email)) {
     return NextResponse.json({ ok: false, error: "Valid email required" }, { status: 400 });
@@ -51,7 +62,10 @@ export async function POST(req: NextRequest) {
     const { error } = await supa
       .from("newsletter_subscribers")
       .upsert(
-        { email, source, country, status: "active" },
+        /* category column added in migration 0014. Pre-migration the
+           upsert silently drops the unknown column via PostgREST and
+           falls back to the catch-all behaviour — fail-soft. */
+        { email, source, country, category, status: "active" },
         { onConflict: "email,source", ignoreDuplicates: true },
       );
 

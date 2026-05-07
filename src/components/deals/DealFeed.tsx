@@ -10,6 +10,7 @@ import MasonryCard from "./MasonryCard";
 import { MASONRY_ASPECTS } from "./masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
 import EmptySearchState from "@/components/empty/EmptySearchState";
+import CategorySubscribe from "./CategorySubscribe";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { cn } from "@/lib/utils";
 import { categories } from "@/lib/data/categories";
@@ -352,6 +353,17 @@ export default function DealFeed() {
           </div>
         </div>
       </div>
+
+      {/* Category subscribe widget — appears whenever the user has
+          narrowed to a specific category. Captures the email +
+          category combo so the daily-digest pipeline (Phase 2) can
+          send only matching deals. Hidden on the catch-all view
+          where the homepage NewsletterStrip already covers signup. */}
+      {category !== "all" && (() => {
+        const activeCat = categories.find((c) => c.slug === category);
+        if (!activeCat) return null;
+        return <CategorySubscribe categorySlug={activeCat.slug} categoryName={activeCat.name} />;
+      })()}
 
       {/* Mobile-only view-mode toggle — its own row, right-aligned, just
           above the items grid. Keeps the sticky filter bar uncluttered
