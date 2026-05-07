@@ -25,6 +25,7 @@ import {
 } from "@/lib/country";
 import { getCashbackForStore } from "@/lib/cashback";
 import InfoTip from "@/components/ui/InfoTip";
+import { track } from "@/lib/analytics";
 import type { Deal } from "@/types";
 
 interface Props {
@@ -222,6 +223,14 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              track({
+                name: "cashback_badge_click",
+                props: {
+                  store_id: deal.storeId,
+                  percent: cashback.percent,
+                  country: country.code,
+                },
+              });
               router.push(`/${country.code}/cashback`);
             }}
             className="absolute left-2 top-2 group/cashback inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-white shadow-sm hover:brightness-110 hover:shadow-md active:brightness-95 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:outline-none"

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, X, Sparkles, Link2, ArrowUp } from "lucide-react";
 import { useCountry } from "@/components/providers/CountryProvider";
+import { track, extractDomain } from "@/lib/analytics";
 
 interface Suggestion { title: string; key: string; storeCount: number }
 
@@ -187,7 +188,24 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
   const submit = (q: string) => {
     setOpen(false);
     setHighlighted(-1);
-    if (q.trim()) onSearch(q.trim());
+    const trimmed = q.trim();
+    if (!trimmed) return;
+    /* Branch the analytics event by input shape — paste-link is a
+       different funnel from a typed search and we want to read them
+       separately in GA4. extractDomain returns 'unknown' if the URL
+       doesn't parse, so the event still fires for malformed pastes. */
+    if (/^https?:\/\//i.test(trimmed)) {
+      track({
+        name: "paste_link",
+        props: { domain: extractDomain(trimmed), country: country?.code },
+      });
+    } else {
+      track({
+        name: "search_submit",
+        props: { query: trimmed, source: "compare", country: country?.code },
+      });
+    }
+    onSearch(trimmed);
   };
 
   const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {

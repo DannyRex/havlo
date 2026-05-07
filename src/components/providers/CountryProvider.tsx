@@ -50,6 +50,17 @@ export function CountryProvider({ initialCode, children }: Props) {
     (next: string) => {
       const normalized = next.toLowerCase();
       if (normalized === code) return;
+      /* Fire GA4 'country_switch' before mutating state so the
+         analytics call has access to BOTH the from- and to-country
+         on the same event. Lazy-imported to avoid pulling the
+         analytics module into the SSR bundle for a code path that
+         only fires post-mount on user click. */
+      import("@/lib/analytics").then(({ track }) => {
+        track({
+          name: "country_switch",
+          props: { from: code, to: normalized, country: normalized },
+        });
+      }).catch(() => { /* analytics never breaks UX */ });
       setCode(normalized);
       writeCookie(COUNTRY_COOKIE, normalized, 365);
       // Re-render server components so TrendingDeals etc. pick up the

@@ -22,6 +22,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Loader2, Check, AlertTriangle, ArrowRight } from "lucide-react";
+import { track } from "@/lib/analytics";
 
 interface Props {
   /** Override endpoint at the call site (e.g. for an A/B test or a
@@ -79,6 +80,21 @@ export default function EmailCapture({
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
         throw new Error(json?.error ?? `Request failed (${res.status})`);
+      }
+      /* Analytics fire-and-forget. Branch the event by source so we
+         can read newsletter vs cashback waitlist separately in GA4
+         without keeping two hooks. The email itself is never sent
+         (the analytics wrapper strips PII by virtue of typed props
+         not including an email field). */
+      if (source === "cashback-waitlist") {
+        track({ name: "cashback_waitlist_join", props: { source } });
+      } else {
+        track({
+          name: "newsletter_subscribe",
+          props: {
+            surface: (source === "footer" || source === "blog") ? source : "homepage",
+          },
+        });
       }
       setStatus("ok");
       setEmail("");
