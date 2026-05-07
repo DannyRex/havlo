@@ -71,6 +71,16 @@ export default function ListCard({ deal }: Props) {
   const ngnEquivStr = isUSD ? `≈ ${formatCompact(usdToNgn(deal.salePrice))}` : null;
   const hasDiscount = deal.originalPrice > deal.salePrice && deal.discountPercent > 0;
 
+  /* Cross-border landed-cost estimate. Same 30% markup as
+     MasonryCard + the /compare anchor row. ListCard is mobile-only
+     and assumes NG context (its parent toggles to mobile-list view
+     only on /[country]/deals which is country-aware via the API).
+     For USD-priced deals the landed cost is shown as the NGN
+     equivalent + 30% — what an NG user would actually pay. */
+  const landedNgnStr = isUSD
+    ? `≈ ${formatCompact(Math.round(usdToNgn(deal.salePrice) * 1.30))} landed`
+    : null;
+
   return (
     <a
       /* Routes through /api/go for affiliate tag wrapping — same
@@ -126,6 +136,15 @@ export default function ListCard({ deal }: Props) {
 
         {ngnEquivStr && (
           <p className="text-[10px] text-ink-3 mt-0.5">{ngnEquivStr}</p>
+        )}
+
+        {landedNgnStr && (
+          <p
+            className="text-[10px] text-ink-3 mt-0.5"
+            title="Estimated total landed cost: product price + ~30% rough estimate for cross-border shipping and customs."
+          >
+            {landedNgnStr}
+          </p>
         )}
       </div>
     </a>

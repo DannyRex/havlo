@@ -379,19 +379,41 @@ function CompareContent() {
                   store logo, price, delivery info, and a real 'View'
                   CTA — replacing the old emoji-pill chips that didn't
                   show prices and weren't useful for comparison.
-                  Sorted by landedPrice ascending (cheapest first); the
-                  top row gets a 'Best price' badge. */}
+
+                  Deduped by (storeId, landedPrice rounded to nearest
+                  ₦100): when the query-time signature pool gathers
+                  the same listing from multiple ingest cycles, six
+                  identical AliExpress rows at ₦1,078,896 quietly
+                  surface — visible noise that isn't a comparison.
+                  Same-store + same-price = same listing for UX
+                  purposes; keep the first, drop the rest. Different
+                  prices from the same store DO stay (a retailer
+                  often lists multiple variants — 256GB vs 512GB —
+                  at different prices, and those are real choices).
+
+                  Sorted by landedPrice ascending (cheapest first);
+                  the top row gets a 'Best price' badge. */}
               {result.anchor.offers.length > 1 && (() => {
-                const sorted = [...result.anchor.offers]
+                /* Dedup pass first: collapse same-store + same-price
+                   rows. Round to nearest ₦100 so trivial FX-rounding
+                   differences don't leak through as separate rows. */
+                const seen = new Set<string>();
+                const deduped = result.anchor.offers
                   .filter((o) => o.landedPrice > 0)
-                  .sort((a, b) => a.landedPrice - b.landedPrice);
+                  .filter((o) => {
+                    const key = `${o.storeId}|${Math.round(o.landedPrice / 100) * 100}`;
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                  });
+                const sorted = deduped.sort((a, b) => a.landedPrice - b.landedPrice);
                 if (sorted.length < 2) return null;
                 const cheapest = sorted[0].landedPrice;
                 return (
                   <div className="mt-5 pt-5 border-t border-border">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-3">
-                        Across {sorted.length} stores
+                        Across {sorted.length} {sorted.length === 1 ? "store" : "stores"}
                       </p>
                       <p className="text-[11px] text-ink-3">
                         Sorted cheapest first

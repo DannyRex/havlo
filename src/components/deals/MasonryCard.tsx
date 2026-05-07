@@ -130,6 +130,21 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
   const origFmt  = formatLocal(primaryOrig, country);
   const saveFmt  = primarySaved > 0 ? formatLocal(primarySaved, country) : null;
 
+  /* Landed-cost estimate for cross-border purchases. Uses the same
+     30% markup as the /compare anchor row (offerToStoreOffer in
+     pg-fts.ts) so users see consistent numbers across surfaces.
+     The 30% covers shipping + customs + handling fees as a rough
+     blanket estimate — accurate-ish for clothing / small
+     electronics, may overstate for heavy items or undercut for
+     fashion behind import duties. The 'Estimate' label and tooltip
+     make the assumption explicit so users don't treat it as a
+     quote. Only renders when the deal's currency differs from the
+     user's display currency (proxy for 'this is cross-border'). */
+  const isCrossBorder = !sameCcy;
+  const landedFmt = isCrossBorder
+    ? formatLocal(Math.round(primarySale * 1.30), country)
+    : null;
+
   /* Secondary price (the original-currency hint) — small, italic, below the
      primary line. Skipped when currency matches. NGN gets formatCompact for
      the "₦47K" feel; USD gets formatUSDPrice; others use Intl. */
@@ -245,6 +260,19 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
 
         {secondaryStr && (
           <p className="text-[10px] text-ink-3 mt-0.5">{secondaryStr}</p>
+        )}
+
+        {landedFmt && (
+          <p
+            className="text-[10px] text-ink-3 mt-0.5 flex items-center gap-1"
+            title="Estimated total landed cost: product price + ~30% rough estimate for cross-border shipping and customs. Actual cost varies by carrier, weight, and customs assessment."
+          >
+            <span aria-hidden="true">≈</span>
+            <span>
+              <span className="text-ink-2 font-medium">{landedFmt}</span>{" "}
+              landed
+            </span>
+          </p>
         )}
       </div>
     </a>
