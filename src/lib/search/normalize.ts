@@ -287,6 +287,87 @@ export function buildSignature(title: string): ProductSignature {
   return { brand, model, storageGb, ramGb, inches, color, tokens, key, norm };
 }
 
+/* ── Chip / label display helpers ─────────────────────────────────
+   Display-friendly versions of brand and model tokens. The internal
+   buildSignature() lowercases + normalises everything (so 'apple'
+   matches 'Apple matches APPLE'); for UI surfaces we want the
+   human casing back. Special cases for stylised brand names
+   (iPhone, MacBook, AirPods, JBL, HP, LG, etc.) — anything not in
+   the map falls through to capitalize-first, which covers most of
+   the long tail correctly. */
+
+const BRAND_DISPLAY: Record<string, string> = {
+  apple: "Apple", samsung: "Samsung", google: "Google", microsoft: "Microsoft",
+  hp: "HP", lg: "LG", msi: "MSI", jbl: "JBL", asus: "ASUS", acer: "Acer",
+  dell: "Dell", lenovo: "Lenovo", sony: "Sony", bose: "Bose", anker: "Anker",
+  beats: "Beats", oraimo: "Oraimo", soundpeats: "SoundPEATS",
+  xiaomi: "Xiaomi", oneplus: "OnePlus", huawei: "Huawei", honor: "Honor",
+  oppo: "Oppo", vivo: "Vivo", realme: "Realme", nokia: "Nokia",
+  tecno: "Tecno", infinix: "Infinix", itel: "Itel",
+  hisense: "Hisense", tcl: "TCL", panasonic: "Panasonic", philips: "Philips",
+  scanfrost: "Scanfrost", thermocool: "Thermocool", haier: "Haier",
+  midea: "Midea", sharp: "Sharp", binatone: "Binatone",
+  rayban: "Ray-Ban", oakley: "Oakley",
+  nike: "Nike", adidas: "Adidas", puma: "Puma", reebok: "Reebok",
+  garmin: "Garmin", fitbit: "Fitbit", fossil: "Fossil",
+  remington: "Remington", braun: "Braun", oralb: "Oral-B",
+};
+
+const MODEL_TERM_DISPLAY: Record<string, string> = {
+  iphone: "iPhone", ipad: "iPad", imac: "iMac", macbook: "MacBook",
+  airpods: "AirPods", earpods: "EarPods",
+  galaxy: "Galaxy",
+  ps3: "PS3", ps4: "PS4", ps5: "PS5", ps6: "PS6",
+  surface: "Surface",
+  oled: "OLED", qled: "QLED", uhd: "UHD", led: "LED",
+};
+
+function capitalize(w: string): string {
+  if (!w) return w;
+  return w[0].toUpperCase() + w.slice(1);
+}
+
+function modelDisplay(model: string): string {
+  return model
+    .split(/\s+/)
+    .map((w) => MODEL_TERM_DISPLAY[w.toLowerCase()] ?? capitalize(w))
+    .join(" ");
+}
+
+function brandDisplay(brand: string): string {
+  return BRAND_DISPLAY[brand.toLowerCase()] ?? capitalize(brand);
+}
+
+/* Build a short, clean label suitable for a chip / button. Used by
+   /api/popular-suggestions so search-bar chips show 'Apple iPhone 15
+   Pro Max' instead of 'Apple iPhone 15 Pro Max - 6.9 inch, 256gb Rom,
+   8gb Ram, 5g Network, Black Titanium - International Version'.
+
+   Strategy:
+     1. Title under maxLen chars → use as-is (already short)
+     2. buildSignature parses brand+model → use 'Brand Model' (clean)
+     3. Otherwise truncate at word boundary with ellipsis */
+export function chipLabelForTitle(title: string, maxLen: number = 32): string {
+  const clean = title.trim();
+  if (clean.length <= maxLen) return clean;
+
+  const sig = buildSignature(clean);
+  if (sig.brand && sig.model) {
+    const label = `${brandDisplay(sig.brand)} ${modelDisplay(sig.model)}`;
+    if (label.length <= maxLen) return label;
+    /* Even brand+model exceeds budget → truncate */
+    return label.slice(0, maxLen - 1).trim() + "…";
+  }
+
+  /* No parseable signature: truncate at last word boundary */
+  const truncated = clean.slice(0, maxLen - 1);
+  const lastSpace = truncated.lastIndexOf(" ");
+  if (lastSpace > maxLen / 2) {
+    return truncated.slice(0, lastSpace) + "…";
+  }
+  return truncated.trim() + "…";
+}
+
 /* ── AI-EXTRACTED SIGNATURES (extracted.json) ── */
 // Loaded once at module init — safe in both Next.js server and scripts.
 // Falls back to heuristic buildSignature() when no entry exists (new deals

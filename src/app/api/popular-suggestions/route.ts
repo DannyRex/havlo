@@ -20,6 +20,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
+import { chipLabelForTitle } from "@/lib/search/normalize";
 
 export const revalidate = 600; // 10 min edge cache
 
@@ -65,8 +66,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ items: [] }, { status: 200 });
   }
 
+  /* Each chip label is the parsed 'Brand Model' (e.g. 'Apple iPhone 15
+     Pro Max') instead of the raw retailer title (e.g. 'Apple iPhone
+     15 Pro Max - 6.9 inch, 256gb Rom, 8gb Ram, Black Titanium').
+     Cleaner display + cleaner search query when the user taps the
+     chip, since the click action runs the chip text as a search. */
   const items = ((data as SuggestionRow[] | null) ?? []).map((r) => ({
-    title:      r.title,
+    title:      chipLabelForTitle(r.title),
     storeCount: r.store_count,
   }));
 

@@ -20,6 +20,7 @@
     "ingest:konga": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-providers.ts --provider=konga-affiliate --country=ng",
     "ingest:aliexpress": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-providers.ts --provider=aliexpress-affiliate",
     "ingest:scraped": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-scraped.ts",
+    "ingest:curated": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-curated-targets.ts",
     "dedup": "tsx --tsconfig tsconfig.scripts.json scripts/dedup-products.ts"
   },
   "dependencies": {
