@@ -133,3 +133,15 @@ jobs:
       - name: Ingest SerpAPI live deals → Supabase
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != ''
         run: npm run ingest
+
+      # ── Dedup pass: re-key product signatures with the compact
+      # 'brand|model[|inches]' form and merge any near-duplicates the
+      # ingest steps just created. Zero API credits — pure DB work.
+      # Always runs (not gated on a provider key) so even runs with
+      # only the scraped/Konga ingest stay canonical. Without this,
+      # each retailer creates fresh product_ids and the cross-store
+      # comparison comes from bigger and bigger un-merged trees over
+      # time. See scripts/dedup-products.ts for the full rationale.
+      - name: Dedup products
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: npm run dedup
