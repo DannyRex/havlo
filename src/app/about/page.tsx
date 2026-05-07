@@ -56,11 +56,11 @@ export default function AboutPage() {
             We help shoppers find similar products for less.
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-lg leading-relaxed">
-            Havlo is an independent price comparison platform built for
-            shoppers in emerging markets, starting in Nigeria and expanding
-            across Africa, the Middle East, Europe, and the Americas. Paste
-            a link or search anything, and we find cheaper alternatives
-            across the stores you already know.
+            Havlo is an independent price comparison platform for emerging
+            markets. We started in Nigeria. Today we&apos;re live in seven
+            countries across Africa, Europe, the Middle East, North America,
+            and Asia. Paste a link or search anything. We find cheaper
+            alternatives across the stores you already know.
           </p>
         </header>
 
@@ -71,16 +71,16 @@ export default function AboutPage() {
           </h2>
           <div className="space-y-3.5 text-ink-2 text-[15px] leading-relaxed">
             <p>
-              Online shopping in emerging markets is fragmented. The same
-              product on Jumia, Konga, Slot, and AliExpress can vary by
-              30–50%, and there&apos;s no easy way to know without opening
-              five tabs and price-checking manually.
+              Online shopping in Nigeria is messy. The same product on Jumia,
+              Konga, Slot, and AliExpress can vary by 30 to 50%, and the only
+              way to find that out is opening five tabs and pricing it
+              yourself.
             </p>
             <p>
-              We started Havlo to fix that. A single search box where you
-              can paste any product link or describe what you want, and
-              instantly see who has it cheapest, including cross-border
-              options. No accounts, no paywalls, no clutter.
+              Havlo replaces those five tabs with one search box. Type a
+              product, or paste a link, and see who has it cheapest. Local
+              stores plus cross-border options. No account required, no
+              paywall.
             </p>
           </div>
         </section>
@@ -94,25 +94,25 @@ export default function AboutPage() {
             <li className="flex gap-3">
               <span className="text-ink-3 font-mono shrink-0 mt-0.5">1</span>
               <span>
-                <strong className="text-ink">Search or paste a link.</strong>{" "}
-                Type a product name or paste a Jumia / Amazon / AliExpress URL.
+                <strong className="text-ink">Search or paste.</strong> Type a
+                product name, or paste a Jumia, Amazon, or AliExpress URL.
               </span>
             </li>
             <li className="flex gap-3">
               <span className="text-ink-3 font-mono shrink-0 mt-0.5">2</span>
               <span>
-                <strong className="text-ink">We compare instantly.</strong>{" "}
-                Havlo checks prices across local retailers in your country and
-                global options that ship to you.
+                <strong className="text-ink">Compare in seconds.</strong>{" "}
+                Havlo checks prices across local retailers and cross-border
+                stores that ship to you.
               </span>
             </li>
             <li className="flex gap-3">
               <span className="text-ink-3 font-mono shrink-0 mt-0.5">3</span>
               <span>
-                <strong className="text-ink">You buy direct.</strong> Click
-                through to the retailer with the best price. Havlo never
-                resells. Final purchase, payment, and delivery happen with
-                the merchant.
+                <strong className="text-ink">Buy direct.</strong> Click through
+                to whoever has the best price. Havlo never sells, takes
+                payment, or ships. The transaction is between you and the
+                retailer.
               </span>
             </li>
           </ul>
@@ -126,17 +126,14 @@ export default function AboutPage() {
           </h2>
           <div className="space-y-3.5 text-ink-2 text-[15px] leading-relaxed">
             <p>
-              Havlo is free to use and will stay free. We earn a small
-              commission when you click through to a retailer and complete a
-              purchase, at no extra cost to you. This is the same model used
-              by every major comparison and review site (Skyscanner,
-              Wirecutter, NerdWallet).
+              Havlo is free, and stays free. The retailer pays us a small
+              commission when you click through and buy, at no extra cost to
+              you. Same model as Skyscanner, Wirecutter, NerdWallet.
             </p>
             <p>
-              Crucially, retailers cannot pay to bias rankings. The cheapest
-              option always shows first. Our incentive aligns with yours: we
-              earn more when we genuinely save you money, because better deals
-              earn higher click-through.
+              Retailers can&apos;t pay to rank higher. The cheapest option
+              always shows first. We earn more when we save you more, because
+              that&apos;s what gets clicked.
             </p>
           </div>
         </section>
@@ -147,9 +144,9 @@ export default function AboutPage() {
             Where we operate
           </h2>
           <p className="text-ink-2 text-[15px] leading-relaxed mb-4">
-            Havlo is live in seven countries, with country-specific catalogs
-            of local retailers plus the cross-border stores those shoppers
-            actually use:
+            Live in seven countries today. Each gets its own catalog of local
+            retailers plus the cross-border stores those shoppers actually
+            use:
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-sm">
             {COVERAGE.map((c) => (
@@ -173,8 +170,8 @@ export default function AboutPage() {
             Get in touch
           </h2>
           <p className="text-ink-2 text-[15px] leading-relaxed">
-            For partnership inquiries, retailer integrations, press, or
-            anything else, reach us at{" "}
+            Partnerships, retailer integrations, press, or anything else:
+            reach us at{" "}
             <a
               href="mailto:hello@havlo.io"
               className="text-ink underline underline-offset-4 decoration-ink/40 hover:decoration-ink"
