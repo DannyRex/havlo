@@ -13,6 +13,7 @@
    break during the rollout window. */
 
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { sendEmail } from "@/lib/email/send";
 import { notifyProductConfirmation } from "@/lib/email/templates/notify-product";
@@ -91,21 +92,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Could not save request" }, { status: 500 });
   }
 
-  /* Send confirmation email. Awaited (Resend is sub-200ms typical) but
-     failures are non-blocking — the row is already saved, the email is
-     a nice-to-have. Logged in sendEmail() if it fails. Tagged so the
-     Resend dashboard can filter / report on confirmation volume. */
+  /* Send confirmation email via waitUntil so it can't block the user
+     response. Vercel keeps the function lifecycle alive until the
+     promise settles, but the response is sent immediately. If Resend
+     ever has a slow day, the user still sees the success state. The
+     .catch swallows send errors so they don't surface as unhandled
+     rejections; sendEmail() already logs them. */
   const tmpl = notifyProductConfirmation({ query, country });
-  await sendEmail({
-    to:      email,
-    subject: tmpl.subject,
-    text:    tmpl.text,
-    html:    tmpl.html,
-    tags: [
-      { name: "category", value: "notify-confirmation" },
-      { name: "source",   value: source.replace(/[^a-z0-9_-]/gi, "_").slice(0, 50) },
-    ],
-  });
+  waitUntil(
+    sendEmail({
+      to:      email,
+      subject: tmpl.subject,
+      text:    tmpl.text,
+      html:    tmpl.html,
+      tags: [
+        { name: "category", value: "notify-confirmation" },
+        { name: "source",   value: source.replace(/[^a-z0-9_-]/gi, "_").slice(0, 50) },
+      ],
+    }).catch((err) => {
+      console.error("[notify-product] email send failed:", (err as Error).message);
+    }),
+  );
 
   return NextResponse.json({ ok: true });
 }
