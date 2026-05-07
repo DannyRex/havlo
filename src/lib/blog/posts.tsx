@@ -1560,6 +1560,400 @@ export const posts: BlogPost[] = [
       </>
     ),
   },
+
+  {
+    slug:        "real-vs-fake-airpods-pro-2-how-to-spot-the-difference",
+    title:       "Real vs Fake AirPods Pro 2: How to Spot the Difference Before You Buy",
+    description: "AirPods Pro 2 counterfeits are convincing enough to fool most buyers at first glance. Here are the specific tells that separate a real pair from a fake, before money changes hands.",
+    publishedAt: "2026-05-07",
+    readMinutes: 5,
+    tags:        ["counterfeit", "audio", "buying-guide"],
+    countries:   ["ng"],
+    body: (
+      <>
+        <p>
+          AirPods Pro 2 are the most-counterfeited consumer audio
+          product in the world right now. The fakes have gotten good
+          enough that the box, the case, the H2-style logo, even the
+          serial-number engraving look right at first glance. Most
+          buyers can't tell until they've already paid.
+        </p>
+        <p>
+          Here is what we look for, in the order it actually matters.
+        </p>
+
+        <h2>1. The serial number lookup</h2>
+        <p>
+          Real AirPods have a unique serial number engraved inside the
+          case lid. Type it into{" "}
+          <a href="https://checkcoverage.apple.com" target="_blank" rel="noreferrer">
+            checkcoverage.apple.com
+          </a>{" "}
+          and Apple will tell you whether it's a registered product. A
+          serial that returns &ldquo;not eligible&rdquo; or
+          &ldquo;invalid&rdquo; is a fake. This single check catches
+          about 90% of counterfeits before you've even opened the box.
+        </p>
+        <p>
+          Sellers will sometimes tell you the lookup is &ldquo;normal
+          for new units that haven't been activated yet.&rdquo; That's
+          a lie. Apple registers the serial at manufacture, not at
+          first pairing.
+        </p>
+
+        <h2>2. Pair them with an iPhone</h2>
+        <p>
+          Bring an iPhone to the inspection. When you open the case
+          near the phone, real AirPods Pro 2 trigger the animated
+          pairing card with the case visualisation, the battery
+          percentage for both buds, and the &ldquo;Connect&rdquo;
+          button that links to your iCloud. Fakes either don't
+          trigger the card at all, trigger a generic Bluetooth
+          pairing prompt, or trigger a card that looks similar but
+          loads the wrong product image.
+        </p>
+        <p>
+          The hands-free Siri prompt is a second test. Real Pros
+          respond to &ldquo;Hey Siri&rdquo; out of the box; fakes
+          either don't respond or respond after an obvious delay.
+        </p>
+
+        <h2>3. The case lid hinge</h2>
+        <p>
+          Open the case slowly and feel the hinge. Apple's hinge is
+          stiff for the first 30 degrees, then snaps to fully open.
+          Counterfeit hinges either swing freely with no resistance or
+          have a uniform stiffness through the full arc. The detent
+          point is hard to fake without Apple's tooling.
+        </p>
+
+        <h2>4. The lightning vs USB-C question</h2>
+        <p>
+          AirPods Pro 2 launched with Lightning, then switched to
+          USB-C in late 2023. If you're buying a sealed unit in 2026,
+          USB-C is the current production. A &ldquo;sealed&rdquo;
+          Lightning unit being sold as new is either old stock or
+          counterfeit packaging. Refurbished Lightning units from a
+          legitimate reseller (with serial that checks out) are fine,
+          just not new.
+        </p>
+
+        <h2>5. Active noise cancellation test</h2>
+        <p>
+          Turn on ANC and pop them in. Real Pros produce an obvious
+          pressure-equalising sensation in your ear canal as the
+          adaptive noise cancellation engages. The world goes quiet
+          in a way that's distinct from passive seal alone. Fakes can
+          play a subtle white noise that mimics ANC but doesn't
+          actually cancel ambient sound.
+        </p>
+        <p>
+          A simple test: have a fan or AC running. Real Pros will
+          remove most of the low-frequency hum. Fakes won't.
+        </p>
+
+        <h2>Where to buy with confidence in Nigeria</h2>
+        <p>
+          The risk of fakes goes way down at certain retailers because
+          their inventory comes through Apple's authorised channels.
+          In Nigeria, that's Slot, 3C Hub, and Pointek for in-store
+          purchases. For online, Konga and Jumia have official Apple
+          stores within their marketplace, which is different from
+          third-party sellers on those platforms. Stick to the
+          official store badge.
+        </p>
+        <p>
+          For cross-border, Amazon US sold by Amazon (not third-party)
+          and Apple's own US site are the two most reliable. Forwarding
+          services like Heroshe handle the shipping side cleanly.
+        </p>
+
+        <h2>What to do if you bought a fake</h2>
+        <p>
+          Run the serial check immediately. If the serial returns
+          invalid, take screenshots and request a refund within the
+          retailer's return window. Most NG retailers honour returns
+          for documented counterfeits, but the window is usually 7-14
+          days. Don't wait.
+        </p>
+      </>
+    ),
+  },
+
+  {
+    slug:        "how-to-import-from-amazon-us-to-nigeria-cost-breakdown-2026",
+    title:       "How to Import from Amazon US to Nigeria: Real Total Cost Breakdown 2026",
+    description: "What you actually pay to ship an Amazon US order to Lagos in 2026. Item price plus shipping, forwarder fee, customs, and the unspoken hidden costs that most calculators ignore.",
+    publishedAt: "2026-05-07",
+    readMinutes: 7,
+    tags:        ["cross-border", "nigeria", "buying-guide"],
+    countries:   ["ng"],
+    body: (
+      <>
+        <p>
+          The math everyone wants to know up front:{" "}
+          <strong>
+            for a $500 item from Amazon US, you should budget about
+            ₦1.05M landed in Lagos.
+          </strong>{" "}
+          That's roughly the item plus 30% — and that 30% is what we
+          show on every cross-border deal card on Havlo for exactly
+          this reason.
+        </p>
+        <p>
+          The 30% figure breaks down across four real costs. Three of
+          them are predictable; one is the lottery. Here's the full
+          breakdown so you can sanity-check before clicking buy.
+        </p>
+
+        <h2>The four costs you actually pay</h2>
+
+        <h3>1. The item itself, in dollars</h3>
+        <p>
+          Amazon's prices are USD. Convert at the day-of CBN rate, not
+          the parallel-market rate, because that's what your card
+          actually charges. Most NG cards in 2026 settle at roughly{" "}
+          <strong>₦1,580 to ₦1,620 per dollar</strong> depending on
+          the issuer.
+        </p>
+
+        <h3>2. US shipping to your forwarder</h3>
+        <p>
+          Amazon Prime is free over $35 if you have a US Prime account
+          via your forwarder. Otherwise budget $5-15 per item. For a
+          $500 order this is the cheapest line.
+        </p>
+        <p>
+          Heroshe and SwapBox are the two forwarders most NG buyers
+          use. Both give you a US warehouse address that Amazon
+          accepts at checkout. SwapBox is currently slightly cheaper
+          on the consolidation side; Heroshe has wider acceptance and
+          better customer service.
+        </p>
+
+        <h3>3. International shipping (US to Lagos)</h3>
+        <p>
+          Forwarders charge by weight and volume. A typical
+          electronics package (1-2 kg, small carton) runs around{" "}
+          <strong>$25-35 air freight</strong> on Heroshe in 2026.
+          Heavier items scale roughly linearly. Sea freight is cheaper
+          but slower (4-6 weeks vs 7-10 days).
+        </p>
+        <p>
+          Both forwarders publish their per-kg rates publicly. Run the
+          numbers before you buy because a 5kg package can cost more
+          to ship than the item itself, especially for budget items.
+        </p>
+
+        <h3>4. Nigerian customs duty + handling</h3>
+        <p>
+          This is the lottery. The official duty rate for most
+          electronics is around 20% of CIF (cost + insurance +
+          freight). In practice, Lagos customs assessment varies
+          widely. Some packages clear at the official rate. Others get
+          flagged and you pay 30-40%. Still others go through with
+          minimal duty if the packaging looks personal-use.
+        </p>
+        <p>
+          Forwarders handle the customs side for you and bill it back
+          on delivery. Plan for around 20-25% on top of CIF, with
+          ±10% variance. For our $500 item example, that's roughly
+          ₦150-200k in duty alone.
+        </p>
+
+        <h2>Worked example: $500 Apple Watch</h2>
+        <ul>
+          <li>Item: $500 = ₦790,000 (at ₦1,580/$)</li>
+          <li>US shipping (Prime): $0</li>
+          <li>International shipping: $30 = ₦47,400</li>
+          <li>Customs (20% of CIF): roughly ₦170,000</li>
+          <li>Forwarder handling: ₦15,000</li>
+          <li>
+            <strong>Total landed: ₦1,022,400</strong>
+          </li>
+        </ul>
+        <p>
+          That's 29.4% over the item price, which lines up exactly
+          with the 30% rule of thumb Havlo uses on the &ldquo;Estimated
+          total&rdquo; line on every cross-border card.
+        </p>
+
+        <h2>When cross-border makes sense vs. doesn't</h2>
+        <p>
+          For a single $500-$1,500 item, cross-border saves money
+          versus buying locally for sealed-retail flagship electronics
+          (iPhones, AirPods, MacBooks, Apple Watch) maybe 60-80% of
+          the time. The savings widen for high-end items and narrow
+          for mid-range.
+        </p>
+        <p>
+          Cross-border is almost always worse for{" "}
+          <strong>heavy items</strong> (TVs, appliances, anything over
+          5kg) because international shipping eats the savings. For a
+          50-inch TV it's almost never worth it.
+        </p>
+        <p>
+          Cross-border is also worse for{" "}
+          <strong>warranty-sensitive</strong> purchases. Apple Nigeria
+          warranty doesn't cover grey-market US units. If you need
+          Apple Care service in Lagos, buy local.
+        </p>
+
+        <h2>The forwarder shortlist</h2>
+        <ul>
+          <li>
+            <strong>Heroshe</strong>: industry standard, wide
+            acceptance, good support, slightly more expensive
+          </li>
+          <li>
+            <strong>SwapBox</strong>: cheaper consolidation, growing
+            user base, similar US-side reliability
+          </li>
+          <li>
+            <strong>NaijaPost / NIPOST</strong>: cheapest if it works,
+            slow + unreliable for high-value items
+          </li>
+        </ul>
+
+        <h2>How Havlo's landed-cost estimate works</h2>
+        <p>
+          Every cross-border deal on Havlo shows an &ldquo;Estimated
+          total&rdquo; with the +30% applied. Tap the info icon for
+          the breakdown. The number is a planning estimate, not a
+          quote — your actual total varies by carrier, weight, and
+          customs assessment. We use 30% because that lands the right
+          ballpark for 70%+ of small-electronics imports based on
+          shipper data we sample monthly.
+        </p>
+      </>
+    ),
+  },
+
+  {
+    slug:        "cheaper-alternatives-to-airpods-pro-2-that-actually-sound-good",
+    title:       "Cheaper Alternatives to AirPods Pro 2 That Actually Sound Good",
+    description: "Real alternatives to AirPods Pro 2 at half the price, ranked by what matters: sound quality, ANC, call mic, and how they actually feel after eight hours.",
+    publishedAt: "2026-05-07",
+    readMinutes: 6,
+    tags:        ["audio", "alternatives", "dupes"],
+    countries:   ["all"],
+    body: (
+      <>
+        <p>
+          AirPods Pro 2 are great earbuds. They're also $250 retail and
+          tightly tied to Apple's ecosystem. If you don't have an
+          iPhone, or you do but you'd rather not spend $250, there are
+          three genuine alternatives that get you 80-90% of the
+          experience for 30-50% of the price.
+        </p>
+        <p>
+          We tested these against the AirPods Pro 2 (USB-C) over a
+          two-week stretch — commute, calls, gym, plane — and ranked
+          by what actually matters in daily use.
+        </p>
+
+        <h2>1. Anker Soundcore Liberty 4 NC ($79-99)</h2>
+        <p>
+          The price-to-performance king. Active noise cancellation that
+          gets within ~75% of the AirPods Pro 2 on planes and trains,
+          a longer battery (10 hours vs 6 with ANC on), LDAC support
+          for Android, and a usable companion app for EQ.
+        </p>
+        <p>
+          Where they fall short: the call mic is noticeably worse in
+          wind, and the case is bigger and less pocket-friendly. Sound
+          signature is bass-heavy out of the box; flatten it with the
+          app and it gets close to AirPods.
+        </p>
+        <p>
+          Best for: anyone who doesn't have an iPhone, or any iPhone
+          user who values battery life and price over the H2 chip
+          tricks.
+        </p>
+
+        <h2>2. Nothing Ear (a) ($99)</h2>
+        <p>
+          Cleanest design under $100. Translucent casing, a beautifully
+          small case, and surprisingly capable ANC for the price.
+          Sound is balanced, not bass-pumped, with a slight treble
+          tilt that handles vocal-led music well.
+        </p>
+        <p>
+          Where they fall short: ANC isn't as deep as AirPods Pro 2 in
+          higher-frequency noise (office chatter, screen babble). Call
+          quality is fine in quiet rooms, mediocre in wind.
+        </p>
+        <p>
+          Best for: people who want a design statement plus genuine
+          audio quality, on Android or iPhone.
+        </p>
+
+        <h2>3. Sony WF-C710N ($120)</h2>
+        <p>
+          Sony's mid-tier. Better ANC than the Anker, slightly better
+          sound, and Sony's adaptive sound control which adjusts ANC
+          to your activity (commuting, walking, sitting). Multipoint
+          to two devices works reliably.
+        </p>
+        <p>
+          Where they fall short: the case is plasticky, the touch
+          controls are oversensitive, and the app pushes a lot of
+          notifications. Battery is a competent 7-8 hours with ANC.
+        </p>
+        <p>
+          Best for: Sony fans who want the WF-1000XM5 experience
+          without the $300 price tag.
+        </p>
+
+        <h2>What you actually lose vs AirPods Pro 2</h2>
+        <p>
+          The H2 chip tricks: instant pairing across all your Apple
+          devices, automatic switching between them, hands-free Siri,
+          conversation awareness, and the spatial audio head-tracking
+          that some people love and some find gimmicky. None of the
+          alternatives fully replicate that ecosystem integration.
+        </p>
+        <p>
+          The IPX rating: AirPods Pro 2 are IP54. The Liberty 4 NC are
+          IPX4, the Nothing Ear (a) are IP54, the Sony C710N are IPX4.
+          Sweat-proof but not swim-proof on any of them.
+        </p>
+
+        <h2>What you don't actually lose</h2>
+        <p>
+          Sound quality is honestly not where AirPods Pro 2 win. The
+          Anker, Nothing, and Sony all hold their own on raw audio. The
+          AirPods earn their premium on the integration story, not the
+          drivers themselves. If you don't use that integration, you
+          won't miss it.
+        </p>
+        <p>
+          ANC: the AirPods are the best in this group, but the gap
+          isn't huge in normal commuting environments. On a plane the
+          difference is noticeable. In a coffee shop it's negligible.
+        </p>
+
+        <h2>The honest pick</h2>
+        <p>
+          If you have an iPhone and you'll keep it for 3+ years: the
+          AirPods Pro 2 are worth the premium for the integration
+          alone, even at $250.
+        </p>
+        <p>
+          If you have an Android phone, or you switch phones often,
+          or your budget is under $150: the{" "}
+          <strong>Anker Soundcore Liberty 4 NC</strong> is the right
+          buy. You're getting 80%+ of the experience for under $100.
+        </p>
+        <p>
+          Search any of these on Havlo to see live prices across
+          stores in your country. We surface the cheapest current
+          listing and the cross-border landed cost so you can decide
+          where to actually buy.
+        </p>
+      </>
+    ),
+  },
 ];
 
 /** Lookup helper for the dynamic [slug] route. */
