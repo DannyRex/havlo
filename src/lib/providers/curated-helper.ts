@@ -134,9 +134,17 @@ export function sortDeals(deals: Deal[], sort: SortOption | undefined): Deal[] {
     default:
       /* Score → sort desc → space-by-store. The store-spacing pass
          runs LAST so it sees the final ranked order and minimises
-         disruption when re-arranging adjacent duplicates. */
+         disruption when re-arranging adjacent duplicates.
+
+         minGap=6 (was 1): the previous default only prevented
+         back-to-back same-store items, but with the masonry / 4-
+         column layout users still saw vertical AliExpress / Amazon
+         clusters in column 0 (top of viewport). 6 is wide enough
+         to break vertical clusters in any column count up to 6, so
+         the first viewport on /deals shows store variety not just
+         the top 4 highest-discount stores. */
       sorted.sort((a, b) => relevanceScore(b) - relevanceScore(a));
-      return spaceByStore(sorted);
+      return spaceByStore(sorted, 6);
   }
 }
 
