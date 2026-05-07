@@ -38,23 +38,67 @@ export default function WaitlistForm({ country }: Props) {
       return;
     }
 
+    /* Verbose error handling: distinguish between
+         (a) fetch never reached the server (offline / DNS / aborted)
+         (b) server returned non-OK status with HTML body (5xx error page)
+         (c) server returned OK but body wasn't parseable JSON
+         (d) server returned JSON with ok:false
+       The previous catch-all 'Network error' message lumped (a)-(c)
+       together which made debugging impossible. */
     try {
-      const res = await fetch("/api/cashback-waitlist", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ email, country, source: "cashback-page" }),
-      });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
+      let res: Response;
+      try {
+        res = await fetch("/api/cashback-waitlist", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ email, country, source: "cashback-page" }),
+        });
+      } catch (err) {
+        /* (a) — fetch itself threw. Genuinely network-level. */
+        setStatus("error");
+        setErrorMsg(`Couldn't reach the server. Check your connection and try again. (${(err as Error).message})`);
+        return;
+      }
+
+      if (!res.ok) {
+        /* (b) — server returned 4xx/5xx. Try to read body for context
+           but don't crash if it's an HTML error page. */
+        let bodyHint = "";
+        try {
+          const txt = await res.text();
+          bodyHint = txt.length > 0 ? ` (${txt.slice(0, 100)})` : "";
+        } catch { /* ignore */ }
+        setStatus("error");
+        setErrorMsg(`Server returned ${res.status}.${bodyHint} Try again in a moment.`);
+        return;
+      }
+
+      let data: { ok?: boolean; error?: string };
+      try {
+        data = await res.json();
+      } catch {
+        /* (c) — response wasn't valid JSON. Vercel sometimes returns
+           HTML on edge-runtime crashes; surface a clearer hint. */
+        setStatus("error");
+        setErrorMsg("Server response wasn't readable. Try again in a moment.");
+        return;
+      }
+
       if (!data.ok) {
+        /* (d) — server explicitly said it failed. */
         setStatus("error");
         setErrorMsg(data.error ?? "Could not save your signup.");
         return;
       }
+
       setStatus("ok");
       e.currentTarget.reset();
-    } catch {
+    } catch (err) {
+      /* Defensive fallthrough — should never hit since each branch
+         above sets status itself, but guards against future code
+         changes accidentally re-introducing the silent error. */
       setStatus("error");
-      setErrorMsg("Network error. Try again in a moment.");
+      setErrorMsg(`Unexpected error: ${(err as Error).message}`);
     }
   }
 
