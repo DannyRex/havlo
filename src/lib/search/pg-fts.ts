@@ -302,6 +302,40 @@ function candidateHasAllVariants(title: string, variants: string[]): boolean {
   });
 }
 
+/* Extract whole-number model markers from the query (e.g. '15' from
+   'iPhone 15 Pro Max', '24' from 'Galaxy S24 Ultra'). When present,
+   every candidate must contain each one as a whole token; otherwise
+   'iPhone 15 Pro Max' silently anchored to 'iPhone 16 Pro Max' (the
+   variant gate alone passed both). Numeric-only tokens, 1-4 digits,
+   excluding tokens like 'M4' where the digit is glued to letters. */
+function extractRequiredNumbers(query: string): string[] {
+  const matches = Array.from(query.toLowerCase().matchAll(/(?<![a-z0-9])(\d{1,4})(?![a-z0-9])/g));
+  return matches.map((m) => m[1]);
+}
+
+function candidateHasAllNumbers(title: string, numbers: string[]): boolean {
+  if (numbers.length === 0) return true;
+  const lc = title.toLowerCase();
+  return numbers.every((n) => {
+    const re = new RegExp(`(^|[^a-z0-9])${n}([^a-z0-9]|$)`);
+    return re.test(lc);
+  });
+}
+
+/* Detect product family from the user's query directly (not just
+   from category-class queries like 'phones'). Reuses the same
+   PRODUCT_FAMILIES mapping as detectFamily(title). When the query
+   names a specific product (iPhone, MacBook, Galaxy), we know the
+   family and can require candidates to match it.
+
+   Closes the cross-category bleed in the variant gate from the QA
+   re-test: 'iPhone 16 Plus' was matching 'Dell 16 Plus DB16250'
+   (laptop), 'MacBook Pro M4' was matching 'iPad Pro M4' (tablet).
+   Token overlap alone wasn't enough; we need a category guard. */
+function detectQueryFamily(query: string): string | null {
+  return detectFamily(query);
+}
+
 /* True if anchor + candidate are in incompatible families (e.g. phone vs tablet).
    Allows the case where one (or both) families are unidentified — only blocks
    when we have HIGH CONFIDENCE both items are in different known families. */
@@ -573,7 +607,18 @@ export async function pgFtsFindSimilar(
      enforce the variants from what the user actually typed so
      falling back through stripTrailingModifiers can't sneak a
      base-model SKU past a 'pro max' query. */
-  const variants = extractVariantTokens(q);
+  const variants        = extractVariantTokens(q);
+  const requiredNumbers = extractRequiredNumbers(q);
+  /* Family constraint: prefer the category-class family (qFam) when
+     the query is bare class noun like 'phones'; otherwise infer from
+     the query directly (detectQueryFamily('iPhone 16 Plus') →
+     'phone'). Either way, candidates must match the inferred family
+     so token overlap alone can't surface cross-category nonsense
+     ('iPhone 16 Plus' → Dell 16 Plus laptop, 'MacBook Pro M4' →
+     iPad Pro M4). Returning null means 'no family inferred, allow
+     anything' so freeform searches like 'gift for mum under 50'
+     aren't accidentally over-filtered. */
+  const familyConstraint = qFam ?? detectQueryFamily(q);
 
   async function pickAnchor(query: string): Promise<{ row: FtsRow; anchor: ProductGroup } | null> {
     const { data, error } = await supa!.rpc("search_products_fts", {
@@ -590,18 +635,21 @@ export async function pgFtsFindSimilar(
     const candidates = (data as FtsRow[])
       .filter((r) => !looksLikeAccessory(r.title))
       .filter((r) => !looksSuspicious(r.title))
-      .filter((r) => !qFam || detectFamily(r.title) === qFam)
+      /* Family gate covers BOTH category-class queries ('phones')
+         AND specific-product queries ('iPhone 16 Plus', 'MacBook
+         Pro M4'). Together they prevent cross-category bleed. */
+      .filter((r) => !familyConstraint || detectFamily(r.title) === familyConstraint)
       /* Variant gate (Bucket 3#3 from QA audit): when the user typed
          'pro max' / 'ultra' / 'plus' etc., the chosen anchor must
-         contain that exact variant. Without this, 'iPhone 15 Pro
-         Max' returned 'Apple iPhone 15' as the anchor — same family,
-         wrong tier, ~50% cheaper, and the 'cheaper alternatives'
-         section then surfaced even cheaper iPhone 13 / 14 / 16e
-         devices, which is misleading. If no candidate has the
-         variant, pickAnchor returns null and the caller falls
-         through to mode=empty + live search results, which can
-         still surface the Pro Max from external providers. */
+         contain that exact variant. */
       .filter((r) => candidateHasAllVariants(r.title, variants))
+      /* Numeric model gate: 'iPhone 15 Pro Max' must NOT match an
+         iPhone 16 row — the variant gate alone let that through
+         because both have 'Pro Max'. Whole-number tokens in the
+         query (15, 24, etc.) must appear as whole tokens in the
+         candidate title. M4 / S24 etc. are letter+digit and don't
+         get extracted; the variant gate already covers chip names. */
+      .filter((r) => candidateHasAllNumbers(r.title, requiredNumbers))
       .map((r) => ({ row: r, score: scoreCandidate(query, r.title) }))
       // Stable sort: score desc, then preserve original FTS rank as tiebreak
       .sort((a, b) => b.score - a.score);

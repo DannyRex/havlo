@@ -70,11 +70,28 @@ export const metadata: Metadata = {
     url: siteUrl,
     siteName: "Havlo",
     locale: "en_NG",
+    /* Default OG image for every page that doesn't override images
+       in its own openGraph block. Resolves to /opengraph-image at
+       the root level (the dark Havlo card). Per-route opengraph-
+       image.tsx files (e.g. /[country]/opengraph-image.tsx) take
+       precedence on those segments — this is the fallback for legal /
+       contact / cashback / blog post pages whose nearest opengraph-
+       image was the homepage one and didn't auto-inherit. Closes
+       the High 12/13 og:image-missing finding from the QA audit. */
+    images: [
+      {
+        url:    `${siteUrl}/opengraph-image`,
+        width:  1200,
+        height: 630,
+        alt:    "Havlo · Find similar products for less",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Havlo · Find similar products for less",
     description: "Paste a link or search anything. Cheaper alternatives across stores you already know.",
+    images: [`${siteUrl}/opengraph-image`],
     /* `site` intentionally omitted until the X / Twitter handle is
        claimed. Pointing to a non-existent @handle generates broken
        attribution links in Twitter share cards and hurts share UX. */
