@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Search, X, Sparkles, Link2, ArrowUp } from "lucide-react";
+import { useCountry } from "@/components/providers/CountryProvider";
 
 interface Suggestion { title: string; key: string; storeCount: number }
 
@@ -87,19 +88,27 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
   const [chips, setChips] = useState<string[]>(() => SUGGESTIONS_POOL.slice(0, 6));
   const prevValue = useRef(initialQuery);
 
-  /* Pull the live multi-store-backed pool on mount. Replace the
-     hand-curated pool with it when we get at least 6 candidates
-     so the rotation has variety. Anything less, keep the static
-     pool — no point swapping in a thinner list. */
+  const { country } = useCountry();
+
+  /* Pull the live multi-store-backed pool on mount AND whenever the
+     user switches country. The API filters to products with at least
+     one store in the requested country, so a UK chip pool only shows
+     items UK shoppers can actually compare locally. Replace the
+     hand-curated pool only when we get >= 6 candidates so the
+     rotation has variety; below that the thin live list would
+     immediately repeat. Static pool stays as the no-Supabase fallback
+     and the SSR/hydration baseline. */
   useEffect(() => {
-    fetch("/api/popular-suggestions")
+    const cc = country?.code ?? "ng";
+    fetch(`/api/popular-suggestions?country=${encodeURIComponent(cc)}`)
       .then((r) => r.json())
       .then((d) => {
         const items: { title: string }[] = Array.isArray(d?.items) ? d.items : [];
         if (items.length >= 6) setChipPool(items.map((i) => i.title));
+        else setChipPool(SUGGESTIONS_POOL);  // fall back if the country pool is thin
       })
-      .catch(() => { /* keep static pool on failure */ });
-  }, []);
+      .catch(() => { /* keep current pool on failure */ });
+  }, [country?.code]);
 
   /* Initial random pick from the active pool. Re-runs whenever the
      pool itself changes (i.e., when /api/popular-suggestions lands). */

@@ -1,17 +1,24 @@
-/* /api/popular-suggestions — returns product titles that have at
-   least 2 distinct stores carrying them. Used by the search-bar
-   chip pool on /compare so every chip a user taps lands on a real
-   multi-store comparison rather than a single-listing page.
+/* /api/popular-suggestions — returns product titles for the
+   search-bar chip pool. Each returned product satisfies:
+     1. AT LEAST one store carrying it is in the user's country
+        (so the comparison includes a local-shopper option)
+     2. AT LEAST 2 distinct stores total (so the comparison
+        actually compares)
 
-   Caching: edge cache for 10 min so the chip pool doesn't hit the
-   DB on every page load. The list rotates organically as the
-   catalog grows but doesn't need real-time freshness for chips.
+   Country is passed via ?country=<iso>. Defaults to 'ng' when
+   absent. The country gates rule (1): a chip's product must have
+   at least one store tagged with the user's country in our
+   stores table. Without this, chips like 'Marshall Stanmore'
+   could appear for an NG user even when no NG store carries it.
+
+   Caching: edge-keyed by country so each one gets its own 10-min
+   cache. The list rotates organically as the catalog grows.
 
    Fail-soft: returns an empty list if the RPC isn't migrated yet
    or Supabase is unreachable. The SearchBar component falls back
    to its hand-curated SUGGESTIONS_POOL in that case. */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 
 export const revalidate = 600; // 10 min edge cache
@@ -23,8 +30,13 @@ interface SuggestionRow {
   total_offers: number;
 }
 
-export async function GET() {
+const VALID_COUNTRIES = new Set(["ng", "us", "uk", "ae", "de", "in", "za"]);
+
+export async function GET(req: NextRequest) {
   const supa = getSupabaseAdmin();
+  const countryParam = req.nextUrl.searchParams.get("country")?.toLowerCase().trim();
+  const country = countryParam && VALID_COUNTRIES.has(countryParam) ? countryParam : "ng";
+
   if (!supa) {
     return NextResponse.json(
       { items: [] },
@@ -33,7 +45,8 @@ export async function GET() {
   }
 
   const { data, error } = await supa.rpc("suggest_multistore_products", {
-    max_results: 30,
+    user_country: country,
+    max_results:  30,
   });
 
   if (error) {
