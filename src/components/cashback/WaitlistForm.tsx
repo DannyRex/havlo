@@ -27,10 +27,20 @@ export default function WaitlistForm({ country }: Props) {
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
+    /* Capture form reference SYNCHRONOUSLY before any await. React's
+       SyntheticEvent gets nullified across async boundaries, so
+       e.currentTarget becomes null after the fetch even though the
+       form is still mounted. The bug surfaced as 'Cannot read
+       properties of null (reading reset)' when calling form.reset()
+       on the success path. Reading e.currentTarget into a local before
+       any await keeps the ref alive. */
+    const form = e.currentTarget;
+
     setStatus("submitting");
     setErrorMsg("");
 
-    const formData = new FormData(e.currentTarget);
+    const formData = new FormData(form);
     const email = formData.get("email")?.toString().trim();
     if (!email) {
       setStatus("error");
@@ -92,7 +102,12 @@ export default function WaitlistForm({ country }: Props) {
       }
 
       setStatus("ok");
-      e.currentTarget.reset();
+      /* Use the captured `form` ref (not e.currentTarget) — see
+         comment at top of handler. The success-state JSX replaces
+         the form anyway so reset is mostly defensive, but if a
+         future change keeps the form rendered post-success the
+         input will be cleared correctly. */
+      form.reset();
     } catch (err) {
       /* Defensive fallthrough — should never hit since each branch
          above sets status itself, but guards against future code
