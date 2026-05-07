@@ -75,21 +75,45 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
      producing different chips on each side → hydration mismatch error.
      We render the deterministic 6 for SSR + first hydration paint,
      then swap to random in the post-mount effect below. */
+  /* Pool of candidate chip strings. Starts with the hand-curated
+     fallback (deterministic for SSR), then replaced after mount
+     by a live list of products that have AT LEAST 2 distinct
+     stores carrying them. That guarantees clicking a chip always
+     leads to a real multi-store comparison rather than a single-
+     listing page. Fetched from /api/popular-suggestions which is
+     edge-cached for 10 min and falls back to [] if Supabase is
+     down — in that case we keep using the hand-curated pool. */
+  const [chipPool, setChipPool] = useState<string[]>(SUGGESTIONS_POOL);
   const [chips, setChips] = useState<string[]>(() => SUGGESTIONS_POOL.slice(0, 6));
   const prevValue = useRef(initialQuery);
 
-  /* Initial random pick — runs only on client, after hydration. */
+  /* Pull the live multi-store-backed pool on mount. Replace the
+     hand-curated pool with it when we get at least 6 candidates
+     so the rotation has variety. Anything less, keep the static
+     pool — no point swapping in a thinner list. */
   useEffect(() => {
-    setChips(pickRandom(SUGGESTIONS_POOL, 6));
+    fetch("/api/popular-suggestions")
+      .then((r) => r.json())
+      .then((d) => {
+        const items: { title: string }[] = Array.isArray(d?.items) ? d.items : [];
+        if (items.length >= 6) setChipPool(items.map((i) => i.title));
+      })
+      .catch(() => { /* keep static pool on failure */ });
   }, []);
+
+  /* Initial random pick from the active pool. Re-runs whenever the
+     pool itself changes (i.e., when /api/popular-suggestions lands). */
+  useEffect(() => {
+    setChips(pickRandom(chipPool, 6));
+  }, [chipPool]);
 
   /* Re-pick on transition non-empty → empty. */
   useEffect(() => {
     if (prevValue.current && !value) {
-      setChips(pickRandom(SUGGESTIONS_POOL, 6));
+      setChips(pickRandom(chipPool, 6));
     }
     prevValue.current = value;
-  }, [value]);
+  }, [value, chipPool]);
 
   /* Auto-rotate while chips are visible. 5s. Runs unconditionally —
      the prefers-reduced-motion guard was overzealous (that media
@@ -101,10 +125,10 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
   useEffect(() => {
     if (value.trim()) return;
     const id = setInterval(() => {
-      setChips(pickRandom(SUGGESTIONS_POOL, 6));
+      setChips(pickRandom(chipPool, 6));
     }, 5000);
     return () => clearInterval(id);
-  }, [value]);
+  }, [value, chipPool]);
 
   useEffect(() => { setValue(initialQuery); }, [initialQuery]);
 
