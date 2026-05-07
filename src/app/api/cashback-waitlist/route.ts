@@ -77,7 +77,12 @@ export async function POST(req: NextRequest) {
        so the user-facing form still shows success rather than a
        confusing error. The signup is effectively lost but UX is
        preserved during the rollout window. */
-    if (/relation .* does not exist/i.test(error.message)) {
+    /* Match both Postgres-native errors ('relation X does not exist')
+       AND PostgREST's schema-cache-miss errors ('Could not find the
+       table X in the schema cache'). Either means the migration
+       hasn't been applied yet — fail soft so the user-facing form
+       still shows success during the rollout window. */
+    if (/relation .* does not exist|could not find the table.*in the schema cache/i.test(error.message)) {
       console.warn("[cashback-waitlist] table not yet migrated:", error.message);
       return NextResponse.json({ ok: true, note: "Table pending migration" });
     }

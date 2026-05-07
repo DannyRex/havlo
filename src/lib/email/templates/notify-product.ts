@@ -45,78 +45,19 @@ export function notifyProductConfirmation({ query, country }: Args): Email {
     `This is the only email we'll send about "${query}". If you change your mind, just reply with "remove" and we'll drop you from the list.`,
   ].join("\n");
 
-  /* Light HTML. Single column, no images, table-based layout for
-     legacy email-client compatibility. Brand voice is the same as
-     the plaintext — no marketing fluff. */
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${subject}</title>
-</head>
-<body style="margin:0;padding:0;background:#f6f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7f9;padding:32px 16px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;">
-          <tr>
-            <td style="padding:32px 32px 8px 32px;">
-              <p style="margin:0 0 0 0;font-size:13px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#0057FF;">Havlo</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:16px 32px 8px 32px;">
-              <p style="margin:0;font-size:16px;line-height:1.55;color:#0f172a;">Hey,</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:8px 32px;">
-              <p style="margin:0;font-size:16px;line-height:1.55;color:#0f172a;">
-                Thanks for telling us you're after <strong>${escapeHtml(query)}</strong>.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:8px 32px;">
-              <p style="margin:0;font-size:16px;line-height:1.55;color:#0f172a;">
-                It's now on our find-list. The moment Havlo's catalog has matches at the right price, you'll get one email from this address with the offers ranked cheapest first.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:8px 32px;">
-              <p style="margin:0;font-size:16px;line-height:1.55;color:#0f172a;">
-                In the meantime, you can browse what we already have.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:16px 32px 8px 32px;">
-              <a href="${dealsUrl}" style="display:inline-block;padding:10px 20px;border-radius:9999px;background:#0f172a;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;">Browse trending deals →</a>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px 32px 8px 32px;">
-              <p style="margin:0;font-size:16px;line-height:1.55;color:#0f172a;">Cheers,</p>
-              <p style="margin:0;font-size:16px;line-height:1.55;color:#0f172a;">Daniel</p>
-              <p style="margin:0;font-size:13px;line-height:1.55;color:#64748b;">Founder, Havlo</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px 32px 32px 32px;border-top:1px solid #e5e7eb;">
-              <p style="margin:0;font-size:12px;line-height:1.55;color:#94a3b8;">
-                This is the only email we'll send about <strong>${escapeHtml(query)}</strong>. If you change your mind, just reply with "remove" and we'll drop you from the list.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`.trim();
+  /* Plain-style HTML — paragraphs only, no tables, no CTA buttons,
+     no brand-color headers. Reads as a personal note rather than a
+     marketing email, which materially improves Gmail's Inbox-vs-
+     Promotions classification for transactional sends. The link is
+     a normal underlined anchor with no button styling. */
+  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;">
+<p>Hey,</p>
+<p>Thanks for telling us you're after <strong>${escapeHtml(query)}</strong>.</p>
+<p>It's now on our find-list. The moment Havlo's catalog has matches at the right price, you'll get one email from this address with the offers ranked cheapest first.</p>
+<p>In the meantime, you can browse what we already have at <a href="${dealsUrl}" style="color:#0057FF;">havlo.io/${cc}/deals</a>.</p>
+<p>Cheers,<br/>Daniel<br/><span style="color:#64748b;">Founder, Havlo</span></p>
+<p style="color:#94a3b8;font-size:13px;margin-top:24px;">This is the only email we'll send about "${escapeHtml(query)}". If you change your mind, just reply with "remove" and we'll drop you from the list.</p>
+</div>`;
 
   return { subject, text, html };
 }
