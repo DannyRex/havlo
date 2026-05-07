@@ -10,6 +10,7 @@
 import type { Deal } from "@/types";
 import { getSupabaseAdmin } from "./db-client";
 import { buildSignature } from "@/lib/search/normalize";
+import { inferStoreCountry } from "@/lib/country";
 
 export interface IngestResult {
   fetched: number;
@@ -30,16 +31,27 @@ interface StoreRow {
 }
 
 function dealToStoreRow(d: Deal): StoreRow {
-  // Heuristic: 'USD' currency means international
+  /* `is_international` retains its original currency-based heuristic
+     (USD = international price tag) since downstream filters lean on
+     it as a proxy for 'has cross-border price'.
+
+     `country` now uses the COUNTRY_STORES roster via inferStoreCountry
+     so a UK retailer (ASOS, Currys, Argos) tags as 'UK' and a US
+     retailer (Walmart, Best Buy, Macy's) tags as 'US' instead of
+     null. The previous 'NGN → NG, USD → null' rule left every
+     non-NG retailer untagged, which broke per-country queries like
+     the chip pool RPC. Truly global cross-border stores (AliExpress,
+     DHGate, Shein, Temu) still tag null because they don't have a
+     native market. */
   const isIntl = d.currency === "USD";
   return {
-    id: d.storeId,
-    name: d.storeName,
-    country: isIntl ? null : "NG",
-    url: null,
-    logo_url: `/logos/${d.storeId}.png`,
+    id:               d.storeId,
+    name:             d.storeName,
+    country:          inferStoreCountry(d.storeId, d.storeName),
+    url:              null,
+    logo_url:         `/logos/${d.storeId}.png`,
     is_international: isIntl,
-    trusted: true,
+    trusted:          true,
   };
 }
 

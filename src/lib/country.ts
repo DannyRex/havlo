@@ -303,6 +303,40 @@ export function isStoreInCountry<T extends DealLike | OfferLike>(d: T, countryCo
   return matchesAny(id, list) || matchesAny(name, list);
 }
 
+/** Infer the country code (uppercase, ISO-3166-style) for a store
+ *  based on its storeId/name matched against COUNTRY_STORES. Returns
+ *  'NG' for NG-anchored retailers (Konga / Jumia / 3C Hub / Slot)
+ *  and uppercase code (UK / US / DE / AE / IN / ZA) when the store
+ *  matches a country roster. Returns null for truly cross-border
+ *  stores with no native market (AliExpress, DHGate, Shein, Temu).
+ *
+ *  Used by ingestion.ts to tag stores.country at write time so
+ *  per-country queries (chip pool, /deals filters) work without a
+ *  separate backfill step. The single source of truth is
+ *  NG_STORES + COUNTRY_STORES at the top of this file. */
+export function inferStoreCountry(storeId: string, storeName: string): string | null {
+  const id   = lc(storeId);
+  const name = lc(storeName);
+
+  /* NG-anchored retailers come first — these are explicit substring
+     matches against the NG_STORES list and don't overlap with the
+     COUNTRY_STORES rosters. */
+  if (matchesAny(id, NG_STORES) || matchesAny(name, NG_STORES)) return "NG";
+
+  /* Other countries — check each roster. First-match wins. The
+     iteration order matches Object.keys(COUNTRY_STORES) which is
+     insertion order from the literal — uk, us, de, ae, in, za —
+     same as the rest of the codebase. */
+  for (const code of Object.keys(COUNTRY_STORES)) {
+    const list = COUNTRY_STORES[code];
+    if (matchesAny(id, list) || matchesAny(name, list)) {
+      return code.toUpperCase();
+    }
+  }
+
+  return null;
+}
+
 /** Filter a deals list for the given country preference.
     - For NG: drop nothing locally, but still trim cross-border noise
       (Indian Flipkart shouldn't show on a Nigerian homepage)
