@@ -11,6 +11,8 @@ import type { Deal } from "@/types";
 import { getSupabaseAdmin } from "./db-client";
 import { buildSignature } from "@/lib/search/normalize";
 import { inferStoreCountry } from "@/lib/country";
+import { categoryDisagreesWithTitle } from "@/lib/categorize";
+import { categories } from "@/lib/data/categories";
 
 export interface IngestResult {
   fetched: number;
@@ -56,11 +58,30 @@ function dealToStoreRow(d: Deal): StoreRow {
 }
 
 function dealToProductRow(d: Deal, signature: string) {
+  /* Auto-correct mistagged categories at ingest time.
+
+     Why: ingest-providers.ts tags every result from a 'phones' query
+     with categorySlug='phones', regardless of whether the actual
+     result is a phone. SerpAPI's match for the query 'Phones' will
+     occasionally return a Bluetooth speaker or AI sunglasses, and
+     before this fix those rows landed in the Phones filter on /deals.
+     The QA agent flagged this as a top-of-funnel trust killer.
+
+     Logic: if title-based inference disagrees with the source slug,
+     OVERRIDE to the inferred slug. If inference returns null
+     (unrecognised), keep the source slug — better to over-tag than
+     to lose the data. */
+  const { disagrees, inferred } = categoryDisagreesWithTitle(d.categorySlug, d.title);
+  const correctedSlug = disagrees && inferred ? inferred : d.categorySlug;
+  const correctedCategory = disagrees && inferred
+    ? (categories.find((c) => c.slug === inferred)?.name ?? d.category)
+    : d.category;
+
   return {
     title: d.title,
     description: d.description ?? null,
-    category: d.category,
-    category_slug: d.categorySlug,
+    category: correctedCategory,
+    category_slug: correctedSlug,
     brand: null,
     model: null,
     image_url: d.imageUrl ?? null,

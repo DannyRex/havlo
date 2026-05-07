@@ -11,10 +11,13 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
 
     const category    = searchParams.get("category")    ?? undefined;
-    /* Floor: when no minDiscount is requested, hide items with <5% off so
-       the default /deals view feels like deals, not a generic catalog.
-       Users who explicitly want "any" can still pass minDiscount=0. */
-    const minDiscount = searchParams.get("minDiscount") ?? "5";
+    /* No discount floor by default. Earlier we required >= 5% off,
+       which hid the entire curated SerpAPI catalog (those rows ingest
+       at retail price with discount_percent=0 because the upstream
+       feed doesn't return a 'was' price). The user-facing contract
+       for /deals: show all the deals we know about. The user can
+       narrow with the tier filter (0% / 20%+ / 50%+) on the UI. */
+    const minDiscount = searchParams.get("minDiscount") ?? "0";
     const sort        = (searchParams.get("sort") as SortOption) ?? "relevance";
     const search      = searchParams.get("search")      ?? undefined;
     const originParam = searchParams.get("origin") as OriginFilter | null;

@@ -32,6 +32,12 @@ export interface StoreOffer {
   currency: "NGN";
   url: string;
   imageUrl?: string;
+  /** Product title as listed at THIS store. Differs across retailers
+   *  for the same physical product ('iPhone 15 Pro Max - 256GB' vs
+   *  'Apple iPhone 15 Pro Max — 256gb Rom — 8gb Ram'). Surfaced as
+   *  the per-row subtitle in the /compare anchor card so users can
+   *  see the proof that pooled offers really are the same item. */
+  productTitle?: string;
   originalPrice: number;
   discountPercent: number;
   rating: number;

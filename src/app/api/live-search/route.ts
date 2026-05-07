@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getActiveSearchProviders, ProviderError } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry } from "@/lib/country";
+import { detectFamily } from "@/lib/search/families";
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
@@ -114,31 +115,19 @@ export async function GET(req: NextRequest) {
       });
 
   /* Cross-family exclusion. Token-relevance is too lax for queries like
-     "iphone 15 pro max" — the bare token "pro" matches "iPad Pro 13inch
-     M4 WiFi" because both contain "pro". Detect the query's family and
-     drop candidates from incompatible families. Mirrors the same gate
-     pgFtsFindSimilar uses on the DB-backed path so live + DB results are
-     consistent. */
-  const FAMILY_TOKENS: Record<string, RegExp> = {
-    phone:      /\b(iphone|galaxy|pixel|tecno|infinix|redmi|oneplus|smartphone|phone)\b/,
-    tablet:     /\b(ipad|tablet|matepad|mediapad)\b/,
-    laptop:     /\b(macbook|thinkpad|laptop|notebook|chromebook)\b/,
-    headphones: /\b(headphones?|headset|airpods\s+max|wh-1000)\b/,
-    earbuds:    /\b(airpods|earbuds|earpods|tws)\b/,
-    tv:         /\b(smart\s*tv|qled|oled|led\s*tv|uhd\s*tv|4k\s*tv)\b/,
-  };
-  function detectQueryFamily(s: string): string | null {
-    for (const [fam, re] of Object.entries(FAMILY_TOKENS)) {
-      if (re.test(s)) return fam;
-    }
-    return null;
-  }
-  const qFam = detectQueryFamily(lowerQ);
+     'iphone 15 pro max' — the bare token 'pro' matches 'iPad Pro
+     13inch M4 WiFi' because both contain 'pro'. And for 'Nintendo
+     Switch' the old shorthand here had no 'console' family at all,
+     so a satellite-distribution Switch surfaced as a live deal
+     (QA report Bucket 4 #3). Now uses the SAME comprehensive
+     detectFamily() that /api/compare uses, sourced from
+     src/lib/search/families.ts. Same logic in both surfaces means
+     a 'Did you mean: Nintendo Switch' click can't land junk. */
+  const qFam = detectFamily(q);
   const relevant = !qFam
     ? accessoryFiltered
     : accessoryFiltered.filter((it) => {
-        const t = it.title.toLowerCase();
-        const titleFam = detectQueryFamily(t);
+        const titleFam = detectFamily(it.title);
         // Allow when title family unknown OR matches query family
         return !titleFam || titleFam === qFam;
       });

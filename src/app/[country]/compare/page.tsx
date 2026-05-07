@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { SearchX, Sparkles, ArrowDown, ExternalLink, Plane, CheckCircle, AlertCircle, Coins } from "lucide-react";
+import { SearchX, Sparkles, ArrowDown, ExternalLink, Plane, CheckCircle, AlertCircle, Coins, ChevronRight, Star } from "lucide-react";
 import Link from "next/link";
 import SearchBar from "@/components/compare/SearchBar";
 import Image from "next/image";
@@ -419,91 +419,116 @@ function CompareContent() {
                         Sorted cheapest first
                       </p>
                     </div>
-                    <ul className="space-y-2">
+                    <ul className="space-y-1.5">
                       {sorted.map((offer, i) => {
-                        const isBest    = i === 0;
-                        const savings   = offer.landedPrice - cheapest;
-                        const showLanded = offer.isInternational && offer.landedCostExtra > 0;
+                        const isBest   = i === 0;
+                        const savings  = offer.landedPrice - cheapest;
+                        const subtitle = (offer.productTitle && offer.productTitle !== result.anchor.title)
+                          ? offer.productTitle
+                          : null;
                         return (
-                          <li
-                            key={`${offer.storeId}-${offer.price}-${i}`}
-                            className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
-                              isBest
-                                ? "border-success/40 bg-success/5"
-                                : "border-border bg-bg/50 hover:border-border-strong"
-                            }`}
-                          >
-                            <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-white flex items-center justify-center">
-                              <Image
-                                src={offer.storeLogoUrl}
-                                alt={offer.storeName}
-                                width={36}
-                                height={36}
-                                className="object-contain"
-                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                              />
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-semibold text-ink">
-                                  {offer.storeName}
-                                </span>
-                                {isBest && (
-                                  <span className="text-[10px] font-bold uppercase tracking-wider text-success bg-success/15 px-1.5 py-0.5 rounded">
-                                    Best price
-                                  </span>
-                                )}
-                                {offer.isInternational && (
-                                  <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-500">
-                                    <Plane size={10} /> Cross-border
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-ink-3 mt-0.5">
-                                {offer.deliveryDays
-                                  ? `${offer.deliveryDays} ${offer.deliveryDays === 1 ? "day" : "days"} delivery`
-                                  : "Delivery varies"}
-                                {showLanded && (
-                                  <>
-                                    {" · "}
-                                    <span title="Includes ~30% landed-cost estimate (shipping + duties)">
-                                      landed price shown
-                                    </span>
-                                  </>
-                                )}
-                              </p>
-                            </div>
-
-                            <div className="text-right shrink-0">
-                              <p className={`text-base font-bold tabular-nums ${isBest ? "text-success" : "text-ink"}`}>
-                                {formatNaira(offer.landedPrice)}
-                              </p>
-                              {savings > 0 && (
-                                <p className="text-[11px] text-ink-3 tabular-nums">
-                                  +{formatNaira(savings)}
-                                </p>
-                              )}
-                            </div>
-
+                          <li key={`${offer.storeId}-${offer.price}-${i}`}>
+                            {/* Whole row is the click target — Spoken pattern.
+                                Visual chevron at the end implies 'go to this
+                                store'. Less chrome than a separate button,
+                                bigger tap area on mobile. */}
                             <a
                               href={getClickThroughUrl({ url: offer.url, id: `${result.anchor.key}-${offer.storeId}` })}
                               target="_blank"
                               rel="noopener noreferrer sponsored"
                               onClick={() => trackClick(result.anchor.key, query, i, "anchor-comparison")}
-                              className={`shrink-0 inline-flex items-center gap-1 px-3.5 py-2 rounded-full text-xs font-semibold transition-colors ${
+                              className={`group flex items-center gap-3 p-3 rounded-xl border transition-all ${
                                 isBest
-                                  ? "bg-ink text-bg hover:opacity-90"
-                                  : "bg-surface-2 text-ink hover:bg-border"
+                                  ? "border-success/40 bg-success/5 hover:bg-success/10"
+                                  : "border-border bg-bg/50 hover:border-border-strong hover:bg-surface-2/50"
                               }`}
                             >
-                              View
-                              <ExternalLink size={11} strokeWidth={2.25} />
+                              <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-white flex items-center justify-center">
+                                <Image
+                                  src={offer.storeLogoUrl}
+                                  alt={offer.storeName}
+                                  width={36}
+                                  height={36}
+                                  className="object-contain"
+                                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                                />
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {/* Star icon for best price — Spoken pattern.
+                                      Inline with the store name rather than a
+                                      separate badge, less visual noise. */}
+                                  {isBest && (
+                                    <Star
+                                      size={13}
+                                      strokeWidth={2}
+                                      className="text-success fill-success shrink-0"
+                                      aria-label="Best price"
+                                    />
+                                  )}
+                                  <span className="text-sm font-semibold text-ink truncate">
+                                    {offer.storeName}
+                                  </span>
+                                  {offer.isInternational && (
+                                    <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-500 shrink-0">
+                                      <Plane size={10} /> Cross-border
+                                    </span>
+                                  )}
+                                </div>
+                                {/* Subtitle: how the product is titled at this
+                                    store. Surfaces the proof that pooled
+                                    offers really are the same item. Falls
+                                    back to delivery info when the per-store
+                                    title matches the anchor. */}
+                                {subtitle ? (
+                                  <p className="text-[11px] text-ink-3 mt-0.5 truncate">
+                                    {subtitle}
+                                  </p>
+                                ) : (
+                                  <p className="text-[11px] text-ink-3 mt-0.5">
+                                    {offer.deliveryDays
+                                      ? `${offer.deliveryDays} ${offer.deliveryDays === 1 ? "day" : "days"} delivery`
+                                      : "Delivery varies"}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="text-right shrink-0">
+                                <p className={`text-base font-bold tabular-nums ${isBest ? "text-success" : "text-ink"}`}>
+                                  {formatNaira(offer.landedPrice)}
+                                </p>
+                                {savings > 0 && (
+                                  <p className="text-[11px] text-ink-3 tabular-nums">
+                                    +{formatNaira(savings)}
+                                  </p>
+                                )}
+                              </div>
+
+                              <ChevronRight
+                                size={16}
+                                strokeWidth={2}
+                                className="shrink-0 text-ink-3 group-hover:text-ink-2 transition-colors"
+                                aria-hidden="true"
+                              />
                             </a>
                           </li>
                         );
                       })}
                     </ul>
+
+                    {/* Always-visible landed-cost disclosure — replaces
+                        the per-row tooltip that didn't work on mobile.
+                        Single line, plain English, mobile-safe. Renders
+                        only when at least one row in the table is
+                        cross-border (otherwise it's irrelevant copy). */}
+                    {sorted.some((o) => o.isInternational && o.landedCostExtra > 0) && (
+                      <p className="mt-3 text-[11px] text-ink-3 leading-relaxed">
+                        <span className="text-amber-500">⚑</span>{" "}
+                        Cross-border prices include a ~30% landed estimate (shipping + customs).
+                        Final total varies by carrier and customs assessment.
+                      </p>
+                    )}
                   </div>
                 );
               })()}

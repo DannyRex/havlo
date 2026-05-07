@@ -98,52 +98,11 @@ function priceLooksPlausible(priceNgn: number, categorySlug: string | null): boo
   return priceNgn >= floor;
 }
 
-/* Product-family detection — token sets that should NOT cross-match.
-   When the anchor title contains a token from one family, dupe titles
-   containing tokens from a different family are rejected.
-
-   Repro this prevents:
-     • iPhone anchor → iPad / MacBook dupes (Apple cross-product)
-     • Phone anchor → Tablet / Laptop / TV dupes
-     • Headphone anchor → Speaker dupes (already partly handled by FTS)
-
-   Lightweight string-match — no regex chains, no maintenance per brand. */
-/* IMPORTANT: order matters. The first family whose tokens match wins.
-   Headphones / earbuds / desktop / tablet are listed BEFORE phone so a
-   title like "Sony WH-CH520 Wireless Headphones" detects as headphones,
-   not as phone (the substring "phone" lives inside "headphones"). */
-const PRODUCT_FAMILIES: Record<string, string[]> = {
-  headphones:  ["airpods max", "wh-1000", "headphones", "headphone", "headset", "over-ear", "over ear"],
-  earbuds:     ["airpods", "earbuds", "earpods", "tws"],
-  tablet:      ["ipad", "tablet", "tab a", "tab s", "matepad", "mediapad"],
-  desktop:     ["imac", "mac mini", "mac pro", "all-in-one"],
-  laptop:      ["macbook", "thinkpad", "xps", "pavilion", "ideapad", "zenbook", "laptop", "notebook", "chromebook"],
-  speaker:     ["speaker", "soundbar", "boombox", "home theater", "home theatre"],
-  tv:          ["smart tv", "qled", "oled", "led tv", "uhd tv", "4k tv"],
-  console:     ["playstation", "ps5", "ps4", "xbox", "nintendo", "switch"],
-  watch:       ["smartwatch", "smart watch", "apple watch", "garmin", "fitbit", "fossil"],
-  camera:      ["dslr", "mirrorless", "camcorder", "gopro"],
-  phone:       ["iphone", "galaxy", "pixel", "tecno", "infinix", "redmi", "oneplus", "smartphone", "phone"],
-};
-
-/* Single-word tokens that are dangerous as substrings (e.g. "phone"
-   inside "headphones", "buds" inside "earbuds-style"). For these we
-   require a real word boundary instead of a naive String.includes. */
-const WORD_BOUNDARY_TOKENS = new Set(["phone", "tv", "buds", "tablet", "watch"]);
-
-function tokenMatchesTitle(token: string, lowerTitle: string): boolean {
-  if (!WORD_BOUNDARY_TOKENS.has(token)) return lowerTitle.includes(token);
-  const re = new RegExp(`(^|[^a-z])${token}([^a-z]|$)`);
-  return re.test(lowerTitle);
-}
-
-function detectFamily(title: string): string | null {
-  const t = title.toLowerCase();
-  for (const [family, tokens] of Object.entries(PRODUCT_FAMILIES)) {
-    if (tokens.some((tok) => tokenMatchesTitle(tok, t))) return family;
-  }
-  return null;
-}
+/* Product-family detection lives in families.ts (shared with
+   /api/live-search). Re-exported here so existing imports of these
+   from pg-fts continue to resolve. */
+export { PRODUCT_FAMILIES, detectFamily, familiesIncompatible } from "./families";
+import { PRODUCT_FAMILIES, detectFamily, familiesIncompatible } from "./families";
 
 /* Category-class queries — bare nouns / plurals that name a product class
    rather than a specific product. When the user's literal query matches
@@ -322,6 +281,62 @@ function candidateHasAllNumbers(title: string, numbers: string[]): boolean {
   });
 }
 
+/* Extract letter-glued model tokens from the query — these are the
+   identifiers extractRequiredNumbers misses because the digit is
+   glued to a letter:
+     'Galaxy S24 Ultra'      → ['s24']
+     'Logitech MX Master 3S' → ['3s']
+     'Galaxy A55'            → ['a55']
+     'iPhone 16 Plus'        → []     (16 is bare, caught by extractRequiredNumbers)
+     'MacBook Pro M4'        → ['m4'] (also covered by extractVariantTokens)
+
+   QA agent flagged 'Galaxy S24 Ultra → Galaxy S25 Ultra' (same
+   family + same variants slipped past). The S24/S25 distinction
+   only lives in this letter-glued form, so we need a dedicated
+   gate.
+
+   Stop-list excludes connectivity flags (5G/4G/LTE), storage sizes
+   (256GB), watch sizes (44mm/45mm), display tech (OLED/QLED), and
+   chip names already enforced by the variant gate (M1–M5). Without
+   this list, requiring '5g' to appear in every candidate would drop
+   legitimate non-5G variants of the same SKU. */
+const MODEL_TOKEN_STOPLIST = new Set([
+  "5g", "4g", "3g", "2g", "lte", "wifi", "wlan", "nfc",
+  "256gb", "512gb", "128gb", "64gb", "32gb", "16gb", "8gb",
+  "1tb", "2tb", "4tb",
+  "44mm", "45mm", "46mm", "49mm", "40mm", "42mm", "41mm", "38mm",
+  "9oz", "10oz", "12oz", "14oz", "16oz", "20oz", "32oz", "40oz",
+  "oled", "qled", "uhd", "fhd", "hdr",
+  "m1", "m2", "m3", "m4", "m5",
+  "h1", "h2", "h3",
+  "4k", "8k",
+]);
+
+function extractRequiredModelTokens(query: string): string[] {
+  /* Pattern: token of length 2-8 that contains BOTH at least one
+     letter and at least one digit. Lookaheads enforce the
+     letter+digit requirement; \b anchors avoid mid-word matches.
+
+     Length cap of 8 (was 5) catches longer compound IDs like
+     '1000XM5' from 'Sony WH-1000XM5' — without this the matcher
+     anchored XM5 queries on XM6 because nothing forced the
+     specific generation marker (QA agent's 25-query script). */
+  const matches = Array.from(query.toLowerCase().matchAll(
+    /\b(?=[a-z0-9]*\d)(?=[a-z0-9]*[a-z])[a-z0-9]{2,8}\b/g,
+  ));
+  const tokens = matches.map((m) => m[0]);
+  return tokens.filter((t) => !MODEL_TOKEN_STOPLIST.has(t));
+}
+
+function candidateHasAllModelTokens(title: string, tokens: string[]): boolean {
+  if (tokens.length === 0) return true;
+  const lc = title.toLowerCase();
+  return tokens.every((tok) => {
+    const re = new RegExp(`(^|[^a-z0-9])${tok}([^a-z0-9]|$)`);
+    return re.test(lc);
+  });
+}
+
 /* Detect product family from the user's query directly (not just
    from category-class queries like 'phones'). Reuses the same
    PRODUCT_FAMILIES mapping as detectFamily(title). When the query
@@ -336,17 +351,9 @@ function detectQueryFamily(query: string): string | null {
   return detectFamily(query);
 }
 
-/* True if anchor + candidate are in incompatible families (e.g. phone vs tablet).
-   Allows the case where one (or both) families are unidentified — only blocks
-   when we have HIGH CONFIDENCE both items are in different known families. */
-function familiesIncompatible(anchorTitle: string, candTitle: string): boolean {
-  const af = detectFamily(anchorTitle);
-  const cf = detectFamily(candTitle);
-  if (!af || !cf) return false; // unknown → allow
-  return af !== cf;
-}
+/* familiesIncompatible is now imported from ./families. */
 
-function offerToStoreOffer(o: NestedOffer): StoreOffer {
+function offerToStoreOffer(o: NestedOffer, productTitle?: string): StoreOffer {
   const store = o.stores;
   const priceN = priceInNgn(o.current_price, o.currency);
   const origN = o.original_price ? priceInNgn(o.original_price, o.currency) : priceN;
@@ -361,6 +368,7 @@ function offerToStoreOffer(o: NestedOffer): StoreOffer {
     currency:       "NGN",
     url:            o.url,
     imageUrl:       undefined,
+    productTitle,
     originalPrice:  origN,
     discountPercent: o.discount_percent ?? 0,
     rating:         0,
@@ -396,7 +404,14 @@ function ftsRowToSingleOffer(r: FtsRow): StoreOffer {
 
 function buildAnchorGroup(p: AnchorProduct): ProductGroup {
   const inStock = p.offers.filter((o) => o.in_stock !== false);
-  const offers = inStock.map(offerToStoreOffer).sort((a, b) => a.landedPrice - b.landedPrice);
+  /* Pass the parent product's title down to each offer so the
+     comparison rows on /compare can show 'as titled at this store'
+     subtitles. For pooled cross-product anchors, each offer's
+     productTitle was already set in resolveAnchorFromRow before
+     they got merged in here — that field takes precedence. */
+  const offers = inStock
+    .map((o) => offerToStoreOffer(o, (o as NestedOffer & { productTitle?: string }).productTitle ?? p.title))
+    .sort((a, b) => a.landedPrice - b.landedPrice);
   const prices = offers.map((o) => o.landedPrice);
   return {
     key:            p.id,
@@ -482,6 +497,29 @@ export async function pgFtsFindDupes(
   const limit = opts?.limit ?? 16;
   const qFamily = queryFamily(query);
 
+  /* Same gate set as the main entrypoint, applied to the externally-
+     provided title (typically a paste-a-link sniff). Without these,
+     URL pasting an iPhone 15 Pro Max anchor was returning iPhone 16
+     and iPhone 14 alternatives because the dupes path didn't
+     enforce variant / number / model exactness. */
+  const variants            = extractVariantTokens(query);
+  const requiredNumbers     = extractRequiredNumbers(query);
+  const requiredModelTokens = extractRequiredModelTokens(query);
+  const familyConstraint    = qFamily ?? detectQueryFamily(query);
+
+  /* Accessory routing (QA report Bucket 4):
+     User pasted an Amazon URL for "iPhone 15 Plus Clear Case with
+     MagSafe". Returned alternatives were the actual iPhone, plus
+     two unrelated phones — because the matcher treated "iPhone 15
+     Plus" tokens as the signal and ignored "Case".
+
+     When the query title looks like an accessory, FLIP the
+     accessory filter: only candidates that ALSO look like
+     accessories pass. The parent product (the actual phone) gets
+     dropped. A shopper looking at a $5 case sees other cases, not
+     $1M phones marked as 'cheaper'. */
+  const queryIsAccessory = looksLikeAccessory(query);
+
   const { data: matches, error } = await supa.rpc("search_products_fts", {
     q: query,
     max_results: 60,
@@ -511,14 +549,24 @@ export async function pgFtsFindDupes(
        If we don't (sniff returned no price), keep all plausible matches. */
     .filter((r) => noCeiling || priceInNgn(r.current_price, r.currency) < anchorPriceNgn * 0.99)
     .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug))
-    // Drop accessory / parts / replacement noise
-    .filter((r) => !looksLikeAccessory(r.title))
+    /* Accessory match-flip: a query that's an accessory ('iPhone 15
+       Case') must only see other accessories. Otherwise, drop them. */
+    .filter((r) => queryIsAccessory ? looksLikeAccessory(r.title) : !looksLikeAccessory(r.title))
     // Drop counterfeit-looking titles ("Apple MacBook Neo A18 Pro")
     .filter((r) => !looksSuspicious(r.title))
     // Product-family gate: an iPhone anchor must not get iPad / MacBook dupes.
     .filter((r) => !familiesIncompatible(query, r.title))
-    // Category-class queries ("phones") must produce dupes in that family
-    .filter((r) => !qFamily || detectFamily(r.title) === qFamily)
+    /* Strict family match: anchor query family must equal candidate
+       family. Skipped for accessory queries because cases / cables
+       cross-fit between phones and tablets — matching by accessory
+       semantics is what we want there. */
+    .filter((r) => queryIsAccessory || !familyConstraint || detectFamily(r.title) === familyConstraint)
+    // Variant gate: 'pro max' / 'ultra' / 'plus' must be honoured.
+    .filter((r) => candidateHasAllVariants(r.title, variants))
+    // Generation gate: 'iPhone 15' must NOT match 'iPhone 16' rows.
+    .filter((r) => candidateHasAllNumbers(r.title, requiredNumbers))
+    // Model-token gate: 'Galaxy S24' must NOT match 'Galaxy S25' rows.
+    .filter((r) => candidateHasAllModelTokens(r.title, requiredModelTokens))
     .map((r) => ftsRowToDupe(r, fakeAnchor))
     /* When we have an anchor price, also drop near-zero-savings rows.
        Anything < 5% off is noise; the user wants meaningful alternatives. */
@@ -626,12 +674,23 @@ export async function pgFtsFindSimilar(
         .neq("id", row.product_id);
 
       if (siblings && siblings.length > 0) {
-        const baseOffers = (productData as unknown as AnchorProduct).offers ?? [];
+        const base = productData as unknown as AnchorProduct;
+        /* Tag each base offer with its source product's title so
+           the comparison row subtitle can show 'as titled at this
+           store'. Same for sibling offers — each carries its own
+           parent's title which differs from the chosen anchor's. */
+        const baseOffers = (base.offers ?? []).map((o) => ({
+          ...o,
+          productTitle: base.title,
+        })) as AnchorProduct["offers"];
         const siblingOffers = (siblings as unknown as AnchorProduct[]).flatMap(
-          (p) => p.offers ?? [],
-        );
+          (p) => (p.offers ?? []).map((o) => ({
+            ...o,
+            productTitle: p.title,
+          })),
+        ) as AnchorProduct["offers"];
         anchorPayload = {
-          ...(productData as unknown as AnchorProduct),
+          ...base,
           offers: [...baseOffers, ...siblingOffers],
         };
       }
@@ -657,8 +716,9 @@ export async function pgFtsFindSimilar(
      enforce the variants from what the user actually typed so
      falling back through stripTrailingModifiers can't sneak a
      base-model SKU past a 'pro max' query. */
-  const variants        = extractVariantTokens(q);
-  const requiredNumbers = extractRequiredNumbers(q);
+  const variants            = extractVariantTokens(q);
+  const requiredNumbers     = extractRequiredNumbers(q);
+  const requiredModelTokens = extractRequiredModelTokens(q);
   /* Family constraint: prefer the category-class family (qFam) when
      the query is bare class noun like 'phones'; otherwise infer from
      the query directly (detectQueryFamily('iPhone 16 Plus') →
@@ -697,12 +757,32 @@ export async function pgFtsFindSimilar(
          iPhone 16 row — the variant gate alone let that through
          because both have 'Pro Max'. Whole-number tokens in the
          query (15, 24, etc.) must appear as whole tokens in the
-         candidate title. M4 / S24 etc. are letter+digit and don't
-         get extracted; the variant gate already covers chip names. */
+         candidate title. */
       .filter((r) => candidateHasAllNumbers(r.title, requiredNumbers))
+      /* Letter-glued model gate (Galaxy S24 vs S25, MX Master 3S
+         vs G502). Catches identifiers the bare-numeric gate misses
+         because the digit is glued to a letter. */
+      .filter((r) => candidateHasAllModelTokens(r.title, requiredModelTokens))
       .map((r) => ({ row: r, score: scoreCandidate(query, r.title) }))
       // Stable sort: score desc, then preserve original FTS rank as tiebreak
       .sort((a, b) => b.score - a.score);
+
+    /* Confidence floor (P0 #2): when the top-scoring candidate
+       hasn't matched the bare minimum signal, prefer empty over
+       confidently wrong. Only fires for queries with NO known family
+       — for known families the family gate is already a strong
+       precision signal and we don't want to also penalize a
+       legitimate but imperfect lexical match (e.g. 'PlayStation 5
+       Slim' anchoring on 'PlayStation 5 Standard' when the Slim
+       SKU isn't in the DB). For unknown-family queries (e.g.
+       'summer dress'), require 2+ token hits so a 'summer rug'
+       candidate doesn't anchor on a single weak overlap. */
+    if (candidates.length === 0) return null;
+    if (!familyConstraint) {
+      const queryTokens = query.toLowerCase().split(/\s+/).filter((t) => t.length >= 2);
+      const minScore = queryTokens.length <= 1 ? 1 : 2;
+      if (candidates[0].score < minScore) return null;
+    }
 
     for (const { row } of candidates) {
       const anchor = await resolveAnchorFromRow(row);
