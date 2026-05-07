@@ -2,8 +2,14 @@ name: Refresh data (scrape + ingest)
 
 on:
   schedule:
-    # Runs every day at 6:00 AM WAT (5:00 AM UTC)
-    - cron: "0 5 * * *"
+    # Twice weekly — Monday + Thursday at 6:00 AM WAT (5:00 AM UTC).
+    # SerpAPI Starter ships 1,000 credits/month; daily fan-out
+    # (60 calls × 30 days = 1,800/month) blew the budget. Twice
+    # weekly = 60 × 8 = 480/month, leaving ~500 credits for the
+    # curated ingest + live search + buffer. Bump back to daily
+    # if you upgrade to Developer ($75/mo, 5,000 credits) or
+    # Production ($150/mo, 15,000 credits).
+    - cron: "0 5 * * 1,4"
   workflow_dispatch: # Allow manual trigger from GitHub UI
 
 # Required so the auto-injected GITHUB_TOKEN can `git push` the refreshed deals
