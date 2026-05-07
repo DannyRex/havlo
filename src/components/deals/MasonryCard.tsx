@@ -15,6 +15,7 @@ import {
   formatCompact,
   formatUSDPrice,
   getClickThroughUrl,
+  proxiedImageUrl,
   savings,
   timeAgo,
 } from "@/lib/utils";
@@ -82,10 +83,18 @@ function ResilientImage({ deal, priority }: { deal: Deal; priority: boolean }) {
      scraped titles. */
   const altText = cleanTitle(deal.title).slice(0, 120);
 
+  /* Proxy external image URLs through /api/img-proxy to avoid hotlink
+     blocks from Amazon/ASOS/AliExpress (Critical 4 in QA audit: 65
+     of 85 imgs on /ng failed to load). The proxy rewrites Referer
+     so the upstream CDN sees a request from its own merchant
+     domain. Direct-load whitelist (Konga, 3C Hub, Cloudinary, etc.)
+     skips the proxy. */
+  const imgSrc = proxiedImageUrl(deal.imageUrl);
+
   return (
     /* eslint-disable-next-line @next/next/no-img-element */
     <img
-      src={deal.imageUrl}
+      src={imgSrc}
       alt={altText}
       loading={priority ? "eager" : "lazy"}
       fetchPriority={priority ? "high" : "auto"}

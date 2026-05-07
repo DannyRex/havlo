@@ -256,6 +256,52 @@ function stripTrailingModifiers(query: string): string | null {
   return tokens.slice(0, i).join(" ");
 }
 
+/* Variant tokens that distinguish a higher-end SKU from its base
+   model. When the query contains one of these, the anchor MUST also
+   contain it — otherwise we'd surface 'iPhone 15' as the answer to
+   'iPhone 15 Pro Max' (Bucket 3#3 from QA audit, where the user
+   pays 50% more for the Pro Max but Havlo recommended the cheaper
+   base model and three even-cheaper older iPhones).
+
+   Multi-word variants ('pro max') checked as substrings; single
+   words checked with word-boundary regex so 'pro' inside 'product'
+   doesn't false-match. Order: longest first so 'pro max' matches
+   before falling through to 'pro' alone. */
+const VARIANT_TOKENS = [
+  "pro max", "ultra", "plus", "max", "pro", "mini", "lite", "se",
+  "m4", "m5", "m3", "m2", "m1",
+];
+
+function extractVariantTokens(query: string): string[] {
+  const lc = query.toLowerCase();
+  const found: string[] = [];
+  for (const v of VARIANT_TOKENS) {
+    if (v.includes(" ")) {
+      if (lc.includes(v)) found.push(v);
+    } else {
+      const re = new RegExp(`(^|[^a-z0-9])${v}([^a-z0-9]|$)`);
+      if (re.test(lc)) found.push(v);
+    }
+  }
+  /* Dedupe: if 'pro max' matched, drop 'pro' and 'max' so we don't
+     require a candidate to triple-match an inclusion that's already
+     covered by the multi-word match. */
+  if (found.includes("pro max")) {
+    return found.filter((t) => t !== "pro" && t !== "max");
+  }
+  return found;
+}
+
+function candidateHasAllVariants(title: string, variants: string[]): boolean {
+  if (variants.length === 0) return true;
+  const lc = title.toLowerCase();
+  return variants.every((v) => {
+    if (v.includes(" ")) return lc.includes(v);
+    const re = new RegExp(`(^|[^a-z0-9])${v}([^a-z0-9]|$)`);
+    return re.test(lc);
+  });
+}
+
 /* True if anchor + candidate are in incompatible families (e.g. phone vs tablet).
    Allows the case where one (or both) families are unidentified — only blocks
    when we have HIGH CONFIDENCE both items are in different known families. */
@@ -521,6 +567,14 @@ export async function pgFtsFindSimilar(
      poison the entire result. The Apple iPhone 15 Pro Max row may not
      exist; Apple iPhone 15 likely does — anchoring on the related model
      beats showing empty for the headline product family. */
+  /* Variant tokens from the ORIGINAL user query (q), not the
+     `query` arg — `query` may be a token-stripped fallback like
+     'iphone 15' which intentionally drops 'pro max'. We always
+     enforce the variants from what the user actually typed so
+     falling back through stripTrailingModifiers can't sneak a
+     base-model SKU past a 'pro max' query. */
+  const variants = extractVariantTokens(q);
+
   async function pickAnchor(query: string): Promise<{ row: FtsRow; anchor: ProductGroup } | null> {
     const { data, error } = await supa!.rpc("search_products_fts", {
       q: query,
@@ -537,6 +591,17 @@ export async function pgFtsFindSimilar(
       .filter((r) => !looksLikeAccessory(r.title))
       .filter((r) => !looksSuspicious(r.title))
       .filter((r) => !qFam || detectFamily(r.title) === qFam)
+      /* Variant gate (Bucket 3#3 from QA audit): when the user typed
+         'pro max' / 'ultra' / 'plus' etc., the chosen anchor must
+         contain that exact variant. Without this, 'iPhone 15 Pro
+         Max' returned 'Apple iPhone 15' as the anchor — same family,
+         wrong tier, ~50% cheaper, and the 'cheaper alternatives'
+         section then surfaced even cheaper iPhone 13 / 14 / 16e
+         devices, which is misleading. If no candidate has the
+         variant, pickAnchor returns null and the caller falls
+         through to mode=empty + live search results, which can
+         still surface the Pro Max from external providers. */
+      .filter((r) => candidateHasAllVariants(r.title, variants))
       .map((r) => ({ row: r, score: scoreCandidate(query, r.title) }))
       // Stable sort: score desc, then preserve original FTS rank as tiebreak
       .sort((a, b) => b.score - a.score);

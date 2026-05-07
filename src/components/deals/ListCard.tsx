@@ -11,6 +11,7 @@ import {
   formatCompact,
   formatUSDPrice,
   getClickThroughUrl,
+  proxiedImageUrl,
   savings,
   timeAgo,
   usdToNgn,
@@ -38,11 +39,14 @@ function ResilientThumb({ deal }: { deal: Deal }) {
     );
   }
 
+  /* Proxy external images so Amazon / ASOS / AliExpress hotlink-block
+     CDNs don't blank these thumbnails. See proxiedImageUrl(). */
+  const altText = cleanTitle(deal.title).slice(0, 120);
   return (
     /* eslint-disable-next-line @next/next/no-img-element */
     <img
-      src={deal.imageUrl}
-      alt=""
+      src={proxiedImageUrl(deal.imageUrl)}
+      alt={altText}
       loading="lazy"
       onError={() => setFailed(true)}
       className="w-full h-full object-contain p-1.5 group-hover:scale-[1.04] transition-transform duration-300 motion-reduce:group-hover:scale-100"

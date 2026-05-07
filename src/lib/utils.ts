@@ -29,6 +29,40 @@ export function getClickThroughUrl(item: { url: string; id?: string }): string {
   return `/api/go?${params.toString()}`;
 }
 
+/* Hosts whose images load fine when hotlinked direct from havlo.io.
+   Anything NOT in this set is wrapped through /api/img-proxy which
+   rewrites the Referer to the merchant's own domain so Amazon /
+   ASOS / AliExpress / Walmart etc. don't 4xx the request.
+   Sourced from observed-working hosts on the live catalog. */
+const DIRECT_LOAD_IMAGE_HOSTS = new Set([
+  "havlo.io",
+  "localhost",
+  "www-konga-com-res.cloudinary.com",
+  "www.3chub.com",
+  "ng.jumia.is",
+  "i.imgur.com",
+  "upload.wikimedia.org",
+  "www.google.com",
+]);
+
+/* Wrap an external image URL through /api/img-proxy unless its host
+   is on the direct-load whitelist. Same-origin URLs (already starting
+   with '/' or matching havlo.io) pass through unchanged. Malformed
+   URLs pass through unchanged so the <img> tag's onError fallback
+   can take over rather than this helper choking the render. */
+export function proxiedImageUrl(rawUrl: string | null | undefined): string {
+  if (!rawUrl) return "";
+  if (rawUrl.startsWith("/")) return rawUrl;
+  let u: URL;
+  try {
+    u = new URL(rawUrl);
+  } catch {
+    return rawUrl;
+  }
+  if (DIRECT_LOAD_IMAGE_HOSTS.has(u.hostname)) return rawUrl;
+  return `/api/img-proxy?url=${encodeURIComponent(rawUrl)}`;
+}
+
 export function formatNaira(amount: number): string {
   return new Intl.NumberFormat("en-NG", {
     style: "currency",
