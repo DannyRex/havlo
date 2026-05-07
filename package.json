@@ -19,7 +19,8 @@
     "ingest:serpapi": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-providers.ts --provider=serpapi-shopping",
     "ingest:konga": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-providers.ts --provider=konga-affiliate --country=ng",
     "ingest:aliexpress": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-providers.ts --provider=aliexpress-affiliate",
-    "ingest:scraped": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-scraped.ts"
+    "ingest:scraped": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-scraped.ts",
+    "dedup": "tsx --tsconfig tsconfig.scripts.json scripts/dedup-products.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.0",

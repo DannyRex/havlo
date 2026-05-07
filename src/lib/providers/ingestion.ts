@@ -151,15 +151,31 @@ export async function ingestDeals(
   for (const d of deals) {
     try {
       const sig = buildSignature(d.title);
-      const sigStr = JSON.stringify(sig);
 
-      // Find existing product by signature
-      const { data: existing } = await supa
-        .from("products")
-        .select("id, image_url")
-        .eq("signature", sigStr)
-        .limit(1)
-        .maybeSingle();
+      /* Use the compact `key` (brand|model[|size]) for dedup, NOT the
+         full JSON-stringified signature. The full JSON includes `norm`
+         and `tokens` which vary literally with the title text — so
+         the same iPhone 15 listed by Konga and Amazon never matched
+         even though the canonical key was identical. Caused the
+         catalog to balloon to 980 single-store products + only 2
+         multi-store. */
+      const sigStr = sig.key;
+
+      /* Skip dedup entirely when brand or model couldn't be parsed.
+         The fallback key '?|?' would otherwise collapse every
+         unbranded product into a single row, which is worse than
+         keeping them separate. Treat as always-new instead. */
+      const tryDedup = sig.brand !== null && sig.model !== null;
+
+      // Find existing product by signature (only if dedup is safe)
+      const { data: existing } = tryDedup
+        ? await supa
+            .from("products")
+            .select("id, image_url")
+            .eq("signature", sigStr)
+            .limit(1)
+            .maybeSingle()
+        : { data: null };
 
       let productId: string;
       if (existing?.id) {

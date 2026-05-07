@@ -263,18 +263,24 @@ export function buildSignature(title: string): ProductSignature {
   const color = findColor(norm);
   const tokens = tokensOf(norm);
 
-  // Build a stable key. Color is intentionally NOT in the key — color variants of the
-  // same product should still group together (price doesn't usually differ by color).
-  // Grouping key — intentionally LOOSE: brand+model only (no storage, no color).
-  // Different stores list the same phone with wildly different storage variants
-  // ("64GB+4GB & 128GB+4GB" vs just "256GB"); including storage in the key would
-  // shatter the same product into separate buckets. We surface variant detail
-  // in each offer instead.
-  // For TVs, inches IS part of identity (a 43" TV ≠ a 65" TV) so it stays.
+  // Build a stable key. Color + storage intentionally NOT in the key — both
+  // are variants of the same product and price comparison should still group
+  // them together.
+  //
+  // Inches: include ONLY for product families where size genuinely splits
+  // identity (TVs / monitors / laptops). For phones it's fixed by model
+  // and varies in title formatting between retailers ("6.1 inch" on Amazon
+  // vs no inch on Konga), which previously shattered iPhone 15 listings
+  // across product_ids despite having the exact same brand+model.
+  const inchesIsProductIdentity =
+    inches != null && (
+      inches >= 19   // 19"+ → TV / monitor / large laptop. Phones are
+                      // <8", so this also excludes phones cleanly.
+    );
   const parts = [
     brand ?? "?",
     model ?? "?",
-    inches ? `${inches}in` : null,
+    inchesIsProductIdentity ? `${inches}in` : null,
   ].filter(Boolean);
   const key = parts.join("|");
 
