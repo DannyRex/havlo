@@ -37,7 +37,8 @@ export default function ContactPage() {
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-base leading-relaxed">
             Questions, feedback, partnership ideas, or a store you want us to
-            cover. Drop a note below and we&apos;ll reply within 1–2 business days.
+            cover. Send a note below and we&apos;ll reply within 1 to 2
+            business days.
           </p>
         </header>
 

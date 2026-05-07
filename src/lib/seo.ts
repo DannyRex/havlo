@@ -17,10 +17,20 @@ export function buildHreflangAlternates(pathBelowCountry: string = ""): Record<s
   const path = pathBelowCountry.replace(/^\/+/, "");
   const alternates: Record<string, string> = {};
 
+  /* URL slug → ISO 3166-1 alpha-2 country code for hreflang.
+     'uk' is OUR routing slug but the valid ISO code is 'GB'. Google
+     silently ignores 'en-UK' as malformed, so it has to be remapped
+     to 'en-GB' for hreflang to actually work. Other countries already
+     use their ISO code as the slug. */
+  const HREFLANG_REGION: Record<string, string> = {
+    uk: "GB",
+  };
+
   for (const c of COUNTRIES) {
     /* Use language-region tag (en-NG, en-US, en-GB, en-AE, de-DE, en-IN, en-ZA)
        so Google can route the right variant to the right audience. */
-    const lang = c.code === "de" ? "de-DE" : `en-${c.code.toUpperCase()}`;
+    const region = HREFLANG_REGION[c.code] ?? c.code.toUpperCase();
+    const lang = c.code === "de" ? "de-DE" : `en-${region}`;
     alternates[lang] = `${SITE_URL}/${c.code}${path ? `/${path}` : ""}`;
   }
 
@@ -67,7 +77,7 @@ export const websiteJsonLd = {
   "@id":       `${SITE_URL}#website`,
   url:         SITE_URL,
   name:        SITE_NAME,
-  description: "Find similar products for less — paste any link or search anything.",
+  description: "Find similar products for less. Paste any link or search anything.",
   publisher:   { "@id": `${SITE_URL}#organization` },
   potentialAction: {
     "@type":  "SearchAction",

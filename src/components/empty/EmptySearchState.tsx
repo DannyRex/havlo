@@ -230,7 +230,7 @@ export default function EmptySearchState({ query, source, browseHref, suggestion
                   Tell me when you find it
                 </p>
                 <p className="text-[13px] text-ink-2 mt-0.5 leading-relaxed">
-                  Drop your email and we&apos;ll ping you when this shows up.
+                  Leave your email and we&apos;ll ping you when this shows up.
                 </p>
               </div>
             </div>

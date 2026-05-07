@@ -11,8 +11,8 @@ const sections = [
   {
     title: "Prices, products, and availability",
     paragraphs: [
-      "We work hard to surface useful pricing information, but prices, stock levels, delivery fees, and product details are ultimately controlled by each retailer and can change without notice.",
-      "You should confirm the final checkout price and any important product details directly on the retailer's website before completing a purchase.",
+      "We try to keep pricing useful and current, but prices, stock levels, delivery fees, and product details are ultimately controlled by each retailer and can change without notice.",
+      "Confirm the final checkout price and any important product details directly on the retailer's website before completing a purchase.",
     ],
   },
   {
@@ -45,6 +45,14 @@ export const metadata: Metadata = {
   title: "Terms of Use | Havlo",
   description:
     "Read the terms that apply when you use Havlo to compare prices, browse deals, and visit third-party retailers.",
+  alternates: { canonical: "/terms-of-use" },
+  openGraph: {
+    title: "Terms of Use · Havlo",
+    description:
+      "Terms that apply when you use Havlo to compare prices and visit third-party retailers.",
+    url: "/terms-of-use",
+    type: "website",
+  },
 };
 
 export default function TermsOfUsePage() {

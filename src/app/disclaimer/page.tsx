@@ -59,6 +59,14 @@ export const metadata: Metadata = {
   title: "Disclaimer | Havlo",
   description:
     "Understand the limits of the information on Havlo and why final product, price, and checkout details should be verified with each retailer.",
+  alternates: { canonical: "/disclaimer" },
+  openGraph: {
+    title: "Disclaimer · Havlo",
+    description:
+      "How Havlo sources listings, why final prices belong to each retailer, and our affiliate disclosure.",
+    url: "/disclaimer",
+    type: "website",
+  },
 };
 
 export default function DisclaimerPage() {

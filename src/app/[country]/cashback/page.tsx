@@ -80,8 +80,9 @@ export default function CashbackPage({
             <li className="flex gap-3">
               <span className="text-ink-3 font-mono shrink-0 mt-0.5">1</span>
               <span>
-                <strong className="text-ink">Make an account.</strong> Email and
-                password, 30 seconds, free.
+                <strong className="text-ink">Make an account when cashback launches.</strong>{" "}
+                Email and password, 30 seconds, free. Until then, the
+                waitlist below holds your spot.
               </span>
             </li>
             <li className="flex gap-3">
@@ -188,8 +189,7 @@ export default function CashbackPage({
               <p className="font-semibold text-ink mb-1">Is there a catch?</p>
               <p>
                 No. Retailers pay us commission whether we share it or not.
-                Sharing it back to you is the better long-term play. You shop,
-                you trust, you tell friends.
+                Sharing it back to you is the better long-term play.
               </p>
             </div>
             <div>

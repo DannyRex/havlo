@@ -182,7 +182,7 @@ export default function Hero({ storeCount }: Props) {
             className="hidden sm:block text-xs text-ink-3 mt-3 animate-fade-in text-center"
             style={{ animationDelay: "220ms" }}
           >
-            Try “iPhone 15 Pro”, “Adidas Samba”, or paste a Jumia / Amazon link
+            Try &ldquo;iPhone 15 Pro&rdquo;, &ldquo;Adidas Samba&rdquo;, or paste any product link.
           </p>
         </div>
 
