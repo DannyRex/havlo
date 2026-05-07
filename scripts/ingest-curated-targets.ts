@@ -60,6 +60,24 @@ const TARGETS = [
   "PlayStation 5", "Xbox Series X", "Nintendo Switch OLED",
   // Wearables
   "Apple Watch Series 10",
+  /* ── Non-gadget expansion ───────────────────────────────────────
+     The chip pool was gadget-heavy because every curated target
+     above lives in phones / laptops / audio / gaming. These are the
+     highest-recognition SKUs across footwear, fashion, beauty, and
+     home so the demo set spans a buyer's actual shopping basket.
+     Phones still pool tightest because buildSignature parses brand
+     + model best for electronics; fashion / beauty rely more on
+     pg-fts trigram match. Acceptable tradeoff for breadth. */
+  // Footwear
+  "Nike Air Force 1", "Adidas Samba OG", "Air Jordan 1 Mid",
+  "Nike Dunk Low", "Crocs Classic Clog",
+  // Fashion
+  "Levi's 501 Original", "Ray-Ban Wayfarer", "Calvin Klein Boxers",
+  // Beauty
+  "Maybelline Lash Sensational", "CeraVe Moisturizing Cream",
+  "The Ordinary Niacinamide", "Fenty Beauty Gloss Bomb",
+  // Home / kitchen
+  "Le Creuset Dutch Oven", "Instant Pot Duo 6QT", "Stanley Quencher 40oz",
 ];
 
 /* Country fan-out — these are the markets where SerpAPI / native
