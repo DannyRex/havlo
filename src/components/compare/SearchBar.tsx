@@ -12,6 +12,27 @@ interface Props {
   loading: boolean;
 }
 
+/* Two recognisable local stores per country, used in the
+   "Paste a {storeA}, Amazon, or AliExpress link" hint under the
+   search bar. Before this fix the hint always said
+   "Paste a Jumia, Amazon, or AliExpress link" — fine for NG users,
+   immediately wrong-region for the UK / US / DE shopper landing
+   on /uk/compare. The store the user sees here should be a brand
+   they'd recognise from their own market. */
+const HINT_STORES_BY_COUNTRY: Record<string, string> = {
+  ng: "Konga, Amazon, or AliExpress",
+  uk: "Argos, Amazon, or AliExpress",
+  us: "Walmart, Amazon, or AliExpress",
+  de: "Otto, Amazon, or AliExpress",
+  ae: "Noon, Amazon, or AliExpress",
+  in: "Flipkart, Amazon, or AliExpress",
+  za: "Takealot, Amazon, or AliExpress",
+};
+
+function hintStores(countryCode: string): string {
+  return HINT_STORES_BY_COUNTRY[countryCode] ?? "Amazon, eBay, or AliExpress";
+}
+
 /* Pool of recognizable, high-intent search terms across every
    category Havlo covers. Random 6 picked per page load → users
    see fresh chips between visits, same chips while they're on
@@ -295,7 +316,11 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
       <p className="mt-3 text-center text-[11px] sm:text-xs text-ink-3 px-4">
         {isUrlInput
           ? "We'll identify this product and find cheaper alternatives across stores."
-          : "Paste a Jumia, Amazon, or AliExpress link, or search by name."}
+          /* Country-aware hint. UK shoppers shouldn't be told to paste
+             a Jumia link — they wouldn't know the brand and it
+             undercuts trust. The HINT_STORES_BY_COUNTRY table picks
+             two recognisable local stores per market. */
+          : `Paste a ${hintStores(country.code)} link, or search by name.`}
       </p>
 
       {/* Show chips whenever the live input is empty, regardless of

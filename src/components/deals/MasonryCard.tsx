@@ -24,6 +24,7 @@ import {
   USD_FX, formatLocal, type Country,
 } from "@/lib/country";
 import { getCashbackForStore } from "@/lib/cashback";
+import InfoTip from "@/components/ui/InfoTip";
 import type { Deal } from "@/types";
 
 interface Props {
@@ -209,6 +210,12 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
             also firing, then routes to the country-aware cashback
             page imperatively via next/navigation. */}
         {cashback && (
+          /* Cashback badge — discoverability fix (QA Bucket 4 #11):
+             previously it looked like a static label and shoppers
+             didn't realise it was a shortcut to the cashback page.
+             Now: a small ChevronRight icon makes the affordance
+             obvious, and a subtle hover underline + ring on focus
+             confirms it's a button. */
           <button
             type="button"
             title={`Earn ${cashback.percent}% cashback when you shop through Havlo. Coming soon. Tap to learn more.`}
@@ -217,11 +224,27 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
               e.stopPropagation();
               router.push(`/${country.code}/cashback`);
             }}
-            className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-white shadow-sm hover:brightness-110 active:brightness-95 transition-[filter] cursor-pointer"
+            className="absolute left-2 top-2 group/cashback inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-white shadow-sm hover:brightness-110 hover:shadow-md active:brightness-95 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:outline-none"
             style={{ background: "rgba(16, 185, 129, 0.95)" }}
             aria-label={`Earn ${cashback.percent}% cashback. Open cashback details.`}
           >
-            <span>Earn {cashback.percent}%</span>
+            <span className="group-hover/cashback:underline underline-offset-2 decoration-white/80">
+              Earn {cashback.percent}%
+            </span>
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className="opacity-90 transition-transform duration-150 group-hover/cashback:translate-x-0.5"
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
           </button>
         )}
 
@@ -263,15 +286,21 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
         )}
 
         {landedFmt && (
-          <p
-            className="text-[10px] text-ink-3 mt-0.5 flex items-center gap-1"
-            title="Estimated total landed cost: product price + ~30% rough estimate for cross-border shipping and customs. Actual cost varies by carrier, weight, and customs assessment."
-          >
+          /* Cross-border total. Was "landed" with a `title=...` HTML
+             tooltip — but that doesn't render on touch devices, and
+             "landed" is logistics jargon most shoppers don't parse.
+             Now: "≈ {price} total" + a clickable Info icon that
+             explains the +30% shipping/customs assumption. Tap-friendly
+             on mobile, hover/click on desktop. */
+          <p className="text-[10px] text-ink-3 mt-0.5 flex items-center gap-1">
             <span aria-hidden="true">≈</span>
-            <span>
-              <span className="text-ink-2 font-medium">{landedFmt}</span>{" "}
-              landed
-            </span>
+            <span className="text-ink-2 font-medium">{landedFmt}</span>
+            <span>total</span>
+            <InfoTip
+              label="What's included in the total"
+              text="Estimated total: product price + ~30% for cross-border shipping and customs. Actual cost varies by carrier, weight, and customs assessment."
+              size={11}
+            />
           </p>
         )}
       </div>

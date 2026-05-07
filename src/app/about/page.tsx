@@ -95,7 +95,8 @@ export default function AboutPage() {
               <span className="text-ink-3 font-mono shrink-0 mt-0.5">1</span>
               <span>
                 <strong className="text-ink">Search or paste.</strong> Type a
-                product name, or paste a Jumia, Amazon, or AliExpress URL.
+                product name, or paste a link from any major retailer (Konga,
+                Argos, Walmart, Amazon, AliExpress, and more).
               </span>
             </li>
             <li className="flex gap-3">
