@@ -15,11 +15,13 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useState,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   COUNTRIES, COUNTRY_COOKIE, DEFAULT_COUNTRY, getCountry,
   type Country,
 } from "@/lib/country";
+
+const COUNTRY_CODES = new Set(COUNTRIES.map((c) => c.code));
 
 interface CountryContextValue {
   country:    Country;
@@ -35,7 +37,8 @@ interface Props {
 }
 
 export function CountryProvider({ initialCode, children }: Props) {
-  const router = useRouter();
+  const router   = useRouter();
+  const pathname = usePathname();
   const [code, setCode] = useState<string>(initialCode ?? DEFAULT_COUNTRY);
 
   /* If the server didn't ship an initial code (e.g. first visit before
@@ -63,11 +66,33 @@ export function CountryProvider({ initialCode, children }: Props) {
       }).catch(() => { /* analytics never breaks UX */ });
       setCode(normalized);
       writeCookie(COUNTRY_COOKIE, normalized, 365);
-      // Re-render server components so TrendingDeals etc. pick up the
-      // new cookie via getServerCountry().
-      router.refresh();
+
+      /* Refresh strategy — was just router.refresh() but users
+         reported that switching country left them on a stale page
+         (server-rendered components served from CDN cache, client
+         bundle pinned to the old country in some surfaces).
+
+         New behaviour:
+           1. If the URL has a country segment (/ng/deals, /uk/compare,
+              etc.), REWRITE that segment to the new country and
+              navigate. The /[country] route param is the source of
+              truth so this swaps the entire page context.
+           2. If no country segment is in the URL (rare — legal
+              pages, the bare /), do a hard reload via
+              window.location.reload() to bust any stale RSC payload
+              in the client cache. router.refresh() was inconsistent
+              about picking up the new cookie on these surfaces. */
+      const segments = pathname.split("/");
+      if (segments[1] && COUNTRY_CODES.has(segments[1])) {
+        segments[1] = normalized;
+        router.push(segments.join("/") || `/${normalized}`);
+      } else if (typeof window !== "undefined") {
+        window.location.reload();
+      } else {
+        router.refresh();
+      }
     },
-    [code, router],
+    [code, router, pathname],
   );
 
   const value = useMemo<CountryContextValue>(

@@ -100,7 +100,16 @@ export default function Navbar() {
               aria-current={pathname === "/" ? "page" : undefined}
               className="px-1 py-1 rounded-lg hover:bg-surface-2 transition-colors"
             >
-              <Logo size={28} />
+              {/* Smaller wordmark on mobile so the logo doesn't eat ~half
+                  the navbar width next to the menu trigger. Switches at the
+                  same `md` breakpoint that introduces the desktop link
+                  cluster on the right. */}
+              <span className="md:hidden">
+                <Logo size={22} />
+              </span>
+              <span className="hidden md:inline">
+                <Logo size={28} />
+              </span>
             </Link>
           </div>
 
@@ -163,7 +172,9 @@ export default function Navbar() {
               aria-label="Havlo home"
               onClick={() => setDrawerOpen(false)}
             >
-              <Logo size={28} />
+              {/* Drawer header — slightly smaller than desktop nav so it
+                  doesn't dominate the open menu's vertical space. */}
+              <Logo size={24} />
             </Link>
             <button
               type="button"

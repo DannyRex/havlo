@@ -48,6 +48,11 @@ const HOST_REFERER: Record<string, string> = {
   "i.imgur.com":                      "",
   "upload.wikimedia.org":             "",
   "www.google.com":                   "",
+  /* Slot Nigeria — uses api-prod.slot.ng for product images. Doesn't
+     enforce Referer based on observed responses. Without this entry
+     the proxy returned 403 for every Slot product image and cards
+     showed the gradient + emoji fallback instead of the real photo. */
+  "api-prod.slot.ng":                 "",
 };
 
 /* Reasonable upper bound for cache lifetime. Product images don't

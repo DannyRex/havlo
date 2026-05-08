@@ -9,15 +9,25 @@ import { useState } from "react";
 import {
   cleanTitle,
   formatCompact,
-  formatUSDPrice,
   getClickThroughUrl,
   proxiedImageUrl,
-  savings,
   timeAgo,
   usdToNgn,
 } from "@/lib/utils";
 import InfoTip from "@/components/ui/InfoTip";
+import { useCountry } from "@/components/providers/CountryProvider";
+import { USD_FX, formatLocal, type Country } from "@/lib/country";
 import type { Deal } from "@/types";
+
+/* Convert any Deal price (NGN or USD) into the user's preferred
+   currency. Mirrors MasonryCard's same-named helper so the two cards
+   never disagree on price. */
+function convertToUserCurrency(amount: number, dealCurrency: string, country: Country): number {
+  const dealCcy = dealCurrency as Country["currency"];
+  if (dealCcy === country.currency) return amount;
+  const inUsd = dealCcy === "USD" ? amount : amount / (USD_FX[dealCcy] ?? 1);
+  return Math.round(inUsd * (USD_FX[country.currency] ?? 1));
+}
 
 /* Same onError fallback pattern as MasonryCard's ResilientImage —
    when the image fails to load, swap to the gradient + emoji
@@ -60,30 +70,35 @@ interface Props {
 }
 
 export default function ListCard({ deal }: Props) {
-  const isUSD = deal.currency === "USD";
-  const saved = savings(deal.originalPrice, deal.salePrice);
+  const { country } = useCountry();
+  const dealCcy = deal.currency as Country["currency"];
+  const sameCcy = dealCcy === country.currency;
+
   const cleanedTitle = cleanTitle(deal.title);
 
-  const priceFmt = isUSD ? formatUSDPrice(deal.salePrice)     : formatCompact(deal.salePrice);
-  const origFmt  = isUSD ? formatUSDPrice(deal.originalPrice) : formatCompact(deal.originalPrice);
-  const saveFmt  = saved > 0
-    ? (isUSD ? formatUSDPrice(saved) : formatCompact(saved))
-    : null;
-  const ngnEquivStr = isUSD ? `≈ ${formatCompact(usdToNgn(deal.salePrice))}` : null;
+  /* Country-aware prices — fixes the user-reported bug where US
+     country was showing Naira on mobile because ListCard always
+     called formatCompact() with the deal's NGN price. Now the same
+     conversion path MasonryCard already uses applies here too. */
+  const primarySale = sameCcy ? deal.salePrice : convertToUserCurrency(deal.salePrice, deal.currency, country);
+  const primaryOrig = sameCcy ? deal.originalPrice : convertToUserCurrency(deal.originalPrice, deal.currency, country);
+  const primarySaved = primaryOrig > primarySale ? primaryOrig - primarySale : 0;
+
+  const priceFmt = formatLocal(primarySale, country);
+  const origFmt  = formatLocal(primaryOrig, country);
+  const saveFmt  = primarySaved > 0 ? formatLocal(primarySaved, country) : null;
   const hasDiscount = deal.originalPrice > deal.salePrice && deal.discountPercent > 0;
 
-  /* Cross-border total estimate. Same 30% markup as
-     MasonryCard + the /compare anchor row. ListCard is mobile-only
-     and assumes NG context (its parent toggles to mobile-list view
-     only on /[country]/deals which is country-aware via the API).
-     For USD-priced deals the total is shown as the NGN
-     equivalent + 30% — what an NG user would actually pay.
-     Was "landed" — replaced with "total" + an Info icon explainer
-     because (a) "landed" is logistics jargon, (b) hover tooltips
-     don't work on touch. */
-  const landedNgnStr = isUSD
-    ? `≈ ${formatCompact(Math.round(usdToNgn(deal.salePrice) * 1.30))}`
-    : null;
+  /* Secondary price hint — shows the deal's original currency when it
+     differs from the user's. Same idea as MasonryCard's secondaryStr. */
+  const isUSD = deal.currency === "USD";
+  const ngnEquivStr = !sameCcy && isUSD ? `≈ ${formatCompact(usdToNgn(deal.salePrice))}` : null;
+
+  /* Cross-border total estimate (price + ~30% shipping/customs).
+     Now formatted in the user's currency. Replaces the previous
+     hardcoded ₦ rendering that broke for non-NG mobile users. */
+  const isCrossBorder = !sameCcy;
+  const landedNgnStr = isCrossBorder ? `≈ ${formatLocal(Math.round(primarySale * 1.30), country)}` : null;
 
   return (
     <a

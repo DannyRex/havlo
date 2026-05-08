@@ -13,7 +13,7 @@ import EmptySearchState from "@/components/empty/EmptySearchState";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
 import DealUnavailableBanner from "@/components/feedback/DealUnavailableBanner";
-import { formatNaira, getClickThroughUrl } from "@/lib/utils";
+import { formatNaira, formatPriceForUser, getClickThroughUrl } from "@/lib/utils";
 import { trackClick } from "@/lib/trackClick";
 import { sniffToAnchor } from "@/lib/sniff-to-anchor";
 import { getCashbackForUrl } from "@/lib/cashback";
@@ -355,11 +355,16 @@ function CompareContent() {
                     return (
                       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
                         <span className="text-lg sm:text-xl font-bold text-ink">
-                          {formatNaira(cheapest?.landedPrice ?? result.anchor.bestPrice)}
+                          {/* formatPriceForUser converts the internal-NGN
+                              amount that pgFtsFindSimilar returns into the
+                              visiting user's currency. Fixes the bug
+                              where /us/compare and /uk/compare etc. were
+                              showing ₦ on cards. */}
+                          {formatPriceForUser(cheapest?.landedPrice ?? result.anchor.bestPrice, country)}
                         </span>
                         {spread > 0 && (
                           <span className="text-xs text-ink-3">
-                            Save up to <span className="text-success font-semibold">{formatNaira(spread)}</span> across stores
+                            Save up to <span className="text-success font-semibold">{formatPriceForUser(spread, country)}</span> across stores
                           </span>
                         )}
                       </div>
@@ -368,7 +373,7 @@ function CompareContent() {
 
                   {result.dupes.length > 0 && result.dupes[0].savingsPercent > 0 && (
                     <p className="mt-2 text-xs text-success font-medium">
-                      Alternatives from {formatNaira(result.dupes.reduce((min, d) => Math.min(min, d.bestPrice), Infinity))}
+                      Alternatives from {formatPriceForUser(result.dupes.reduce((min, d) => Math.min(min, d.bestPrice), Infinity), country)}
                     </p>
                   )}
                 </div>
@@ -506,11 +511,11 @@ function CompareContent() {
 
                               <div className="text-right shrink-0">
                                 <p className={`text-base font-bold tabular-nums ${isBest ? "text-success" : "text-ink"}`}>
-                                  {formatNaira(offer.landedPrice)}
+                                  {formatPriceForUser(offer.landedPrice, country)}
                                 </p>
                                 {savings > 0 && (
                                   <p className="text-[11px] text-ink-3 tabular-nums">
-                                    +{formatNaira(savings)}
+                                    +{formatPriceForUser(savings, country)}
                                   </p>
                                 )}
                               </div>

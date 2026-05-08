@@ -362,7 +362,13 @@ export default function DealFeed() {
       {category !== "all" && (() => {
         const activeCat = categories.find((c) => c.slug === category);
         if (!activeCat) return null;
-        return <CategorySubscribe categorySlug={activeCat.slug} categoryName={activeCat.name} />;
+        return (
+          <CategorySubscribe
+            categorySlug={activeCat.slug}
+            categoryName={activeCat.name}
+            categoryColor={activeCat.color}
+          />
+        );
       })()}
 
       {/* Mobile-only view-mode toggle — its own row, right-aligned, just

@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { TrendingDown, ExternalLink, Plane, ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { formatNaira, getClickThroughUrl } from "@/lib/utils";
+import { formatPriceForUser, getClickThroughUrl } from "@/lib/utils";
+import { useCountry } from "@/components/providers/CountryProvider";
 import { trackClick } from "@/lib/trackClick";
 import type { DupeResult } from "@/lib/search";
 
@@ -21,6 +22,7 @@ export default function DupeCard({
   /** Image aspect class for masonry-style varying heights */
   aspect?: string;
 }) {
+  const { country } = useCountry();
   const hasSavings = dupe.savingsPercent > 0;
   const bestOffer = dupe.offers[0];
   const extraStores = dupe.offers.length - 1;
@@ -79,11 +81,11 @@ export default function DupeCard({
         {/* Price + savings line */}
         <div className="mt-2.5 flex items-baseline gap-2">
           <span className="text-base font-bold text-ink">
-            {formatNaira(dupe.bestPrice)}
+            {formatPriceForUser(dupe.bestPrice, country)}
           </span>
           {hasSavings && (
             <span className="text-[11px] text-success font-semibold">
-              save {formatNaira(dupe.savingsVsAnchor)}
+              save {formatPriceForUser(dupe.savingsVsAnchor, country)}
             </span>
           )}
         </div>
@@ -160,7 +162,7 @@ export default function DupeCard({
                       />
                     </div>
                     <span className="text-ink-2 truncate flex-1">{offer.storeName}</span>
-                    <span className="font-semibold text-ink tabular-nums">{formatNaira(offer.price)}</span>
+                    <span className="font-semibold text-ink tabular-nums">{formatPriceForUser(offer.price, country)}</span>
                   </a>
                 ))}
               </div>

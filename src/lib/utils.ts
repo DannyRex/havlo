@@ -49,6 +49,9 @@ const DIRECT_LOAD_IMAGE_HOSTS = new Set([
   "i.imgur.com",
   "upload.wikimedia.org",
   "www.google.com",
+  /* Slot Nigeria — direct-loads cleanly, no Referer enforcement
+     observed. Skipping the proxy saves a hop per image. */
+  "api-prod.slot.ng",
 ]);
 
 /* Wrap an external image URL through /api/img-proxy unless its host
@@ -118,6 +121,36 @@ export function formatCompact(amount: number): string {
   if (amount >= 1_000_000) return `₦${(amount / 1_000_000).toFixed(1)}M`;
   if (amount >= 1_000) return `₦${(amount / 1_000).toFixed(0)}K`;
   return `₦${amount}`;
+}
+
+/* Country-aware compact formatter. Used wherever the codebase already
+   has an amount in NGN (typically because /compare's matcher
+   normalises everything to NGN internally) but the UI is being
+   rendered for a user whose currency isn't NGN.
+
+   Bug this fixes (user-reported): a US user on /us/deals or
+   /us/compare saw '₦' prices because most components called
+   formatNaira / formatCompact directly without going through the
+   country picker. Now: pass NGN amount + country and the helper
+   converts via the FX table and formats with Intl.
+
+   Imported lazily to avoid pulling country.ts into utils.ts which
+   doesn't otherwise depend on it. */
+import type { Country } from "@/lib/country";
+import { USD_FX, formatLocal } from "@/lib/country";
+
+export function formatPriceForUser(amountNgn: number, country: Country): string {
+  if (country.currency === "NGN") {
+    /* Same currency — keep the compact ₦XXk form for parity with the
+       rest of the NG-facing UI. */
+    return formatCompact(amountNgn);
+  }
+  /* NGN → USD intermediate → target currency. Same FX table used by
+     MasonryCard's price conversion so the two surfaces never disagree. */
+  const ngnPerUsd = USD_FX.NGN;
+  const amountUsd = amountNgn / ngnPerUsd;
+  const target = Math.round(amountUsd * USD_FX[country.currency]);
+  return formatLocal(target, country);
 }
 
 export function savings(original: number, sale: number): number {

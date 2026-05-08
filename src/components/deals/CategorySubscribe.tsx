@@ -39,13 +39,19 @@ interface Props {
   categorySlug: string;
   /** Display name for the category, used in the heading + confirmation. */
   categoryName: string;
+  /** Optional accent colour from categories.ts. When set, renders the
+      category name in that hue. The previous brand-blue accent felt
+      off on dark backgrounds — using the category's own colour gives
+      each filter its own identity (purple Phones, orange Audio, pink
+      Fashion, etc.) and avoids the low-contrast blue-on-dark issue. */
+  categoryColor?: string;
 }
 
 type Status = "idle" | "submitting" | "ok" | "error";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function CategorySubscribe({ categorySlug, categoryName }: Props) {
+export default function CategorySubscribe({ categorySlug, categoryName, categoryColor }: Props) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -121,7 +127,11 @@ export default function CategorySubscribe({ categorySlug, categoryName }: Props)
           id="category-subscribe-heading"
           className="text-[13px] sm:text-sm font-semibold text-ink leading-snug"
         >
-          Want fresh <span className="text-brand">{categoryName}</span> deals in your inbox?
+          Want fresh{" "}
+          <span style={categoryColor ? { color: categoryColor } : undefined} className="font-bold">
+            {categoryName}
+          </span>{" "}
+          deals in your inbox?
         </p>
         <p className="text-[11px] sm:text-[12px] text-ink-3 mt-0.5">
           One short email a day, just this category. Unsubscribe in one click.
