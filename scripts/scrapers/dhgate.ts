@@ -4,7 +4,9 @@ import { RawDeal, resolveCategory } from "./types.js";
 // DHgate affiliate: DHgate.com Affiliate Program (partner.dhgate.com)
 // Ultra-cheap wholesale goods — same audience as Temu, much better accessibility.
 //
-// Markup notes (verified via scripts/inspect-dh.ts artifact, Apr 2026):
+// Markup notes (verified Apr 2026 via a one-off inspector run that's
+// since been retired — see git history if DHgate's HTML changes and
+// you need to resurrect the inspector):
 //   • DHgate uses at least three card layouts across categories:
 //       - main grid        `div.gitem` (id="product-N")
 //       - top-of-page      `div.b-productitem`
