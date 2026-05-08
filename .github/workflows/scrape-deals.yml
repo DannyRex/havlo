@@ -10,7 +10,17 @@ on:
     # if you upgrade to Developer ($75/mo, 5,000 credits) or
     # Production ($150/mo, 15,000 credits).
     - cron: "0 5 * * 1,4"
-  workflow_dispatch: # Allow manual trigger from GitHub UI
+  workflow_dispatch:
+    # Manual run from GitHub UI. Inputs let us refresh just the
+    # free data sources (Playwright scrapers + AliExpress affiliate
+    # API) without burning ~60 SerpAPI credits when we just want to
+    # validate a scraper change.
+    inputs:
+      skip_serpapi:
+        description: "Skip the paid SerpAPI ingest (free run)"
+        type:        boolean
+        required:    false
+        default:     false
 
 # Required so the auto-injected GITHUB_TOKEN can `git push` the refreshed deals
 # back to the repo. Without this, the default token is read-only on `contents`
@@ -34,7 +44,6 @@ jobs:
     env:
       SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      KONGA_AFFILIATE_KEY:        ${{ secrets.KONGA_AFFILIATE_KEY }}
       ALIEXPRESS_APP_KEY:         ${{ secrets.ALIEXPRESS_APP_KEY }}
       ALIEXPRESS_APP_SECRET:      ${{ secrets.ALIEXPRESS_APP_SECRET }}
       SERPAPI_KEY:                ${{ secrets.SERPAPI_KEY }}
@@ -100,7 +109,6 @@ jobs:
           echo "::group::Env presence (lengths only — no values leaked)"
           echo "SUPABASE_URL=${#SUPABASE_URL}"
           echo "SUPABASE_SERVICE_ROLE_KEY=${#SUPABASE_SERVICE_ROLE_KEY}"
-          echo "KONGA_AFFILIATE_KEY=${#KONGA_AFFILIATE_KEY}"
           echo "ALIEXPRESS_APP_KEY=${#ALIEXPRESS_APP_KEY}"
           echo "ALIEXPRESS_APP_SECRET=${#ALIEXPRESS_APP_SECRET}"
           echo "SERPAPI_KEY=${#SERPAPI_KEY}"
@@ -114,11 +122,11 @@ jobs:
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
         run: npm run ingest:scraped
 
-      # ── Konga affiliate ingestion (NG-only). Free once approved.
-      # Skipped when KONGA_AFFILIATE_KEY isn't set.
-      - name: Ingest Konga affiliate deals → Supabase
-        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.KONGA_AFFILIATE_KEY != ''
-        run: npm run ingest:konga
+      # ── Konga affiliate ingestion was here; removed because the
+      # affiliate program never approved us (ghosted application).
+      # Konga deals still flow via the Playwright scraper above
+      # (scripts/scrapers/konga.ts) — no catalog gap. If the
+      # affiliate program ever opens up, restore via git history.
 
       # ── AliExpress Affiliate API ingestion (global cross-border).
       # Free via AliExpress Open Platform. Skipped when AliExpress
@@ -131,13 +139,19 @@ jobs:
       # automatically when SERPAPI_KEY isn't set so devs can run the
       # workflow on a dry repo without burning API credits.
       #
+      # ALSO skipped when the manual run sets `skip_serpapi=true`.
+      # Useful for re-running just the Playwright scrapers + AliExpress
+      # affiliate after fixing a selector without paying the ~60-credit
+      # SerpAPI tax. Cron runs always include SerpAPI (no skip flag
+      # available there).
+      #
       # --limit=50 (was the script default 20). One SerpAPI search is
       # one credit regardless of result count, so bumping the per-call
       # ceiling is free and roughly doubles the deal pool surfacing on
       # /deals + /compare each cycle. Without this, a category like
       # 'Audio' returns ~20 deals total per country, which felt sparse.
       - name: Ingest SerpAPI live deals → Supabase
-        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != ''
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
         run: npm run ingest -- --limit=50
 
       # ── Dedup pass: re-key product signatures with the compact
