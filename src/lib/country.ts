@@ -158,11 +158,51 @@ function crossBorderListFor(countryCode: string): string[] {
   return COUNTRY_CROSS_BORDER[countryCode] ?? DEFAULT_CROSS_BORDER;
 }
 
-/* Stores that are NG-anchored — never appropriate outside Nigeria. */
+/* Stores that are NG-anchored — never appropriate outside Nigeria.
+
+   Substring matching, so each entry needs to be distinctive enough
+   that it doesn't collide with global retailer names. We prefer
+   '.com.ng' / '.ng' suffixes over bare brand tokens for newer
+   additions (e.g. 'spar.com.ng' over 'spar' which could match
+   'sparepart' or 'sparkfun'). Older entries kept as-is for
+   back-compat with existing store_id strings in the DB. */
 const NG_STORES = [
+  /* Existing roster — the major online retailers most NG shoppers
+     already know. Touched widely in production data. */
   "konga", "jumia", "3c-hub", "3chub", "3c hub",
   "slot", "pointek", "fouani", "zit-trading", "hayathub",
   "ajebomarket", "kara", "obiwezy", "pricepally", "payporte",
+
+  /* Additions — well-known NG-anchored retailers across pharmacies,
+     groceries, classifieds, and second-tier electronics. Each is
+     vetted for an actual online channel in NG (mail-order or
+     full-catalog e-commerce; brick-only chains skipped). */
+
+  // Pharmacies + health — major online drug + wellness channels
+  "healthplus", "health plus", "healthplus.com.ng",
+  "medplus", "medplusnig", "medplus.com.ng",
+
+  // Supermarkets / groceries with online channels
+  "spar.com.ng", "spar nigeria",
+  "supermart", "supermart.ng",
+  "foodco", "foodco.ng",
+  "parknshop", "park n shop",
+  "addidemart",
+
+  // Classifieds + marketplaces
+  "jiji.ng", "jiji nigeria",
+
+  // Second-tier electronics retailers (under Slot / 3C Hub in scale
+  // but distinct catalogs that NG shoppers price-compare against)
+  "yudala",
+  "megaplaza", "megaplaza.com.ng",
+  "tezza", "tezza.com.ng",
+  "mobinex.ng", "mobinex nigeria",
+  "carfax.com.ng",
+  "switz electronics", "switzelectronics",
+
+  // Books + media
+  "okadabooks",
 ];
 
 /* Per-country anchored stores. The filter doesn't strictly require
