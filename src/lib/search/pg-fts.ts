@@ -584,9 +584,11 @@ export async function pgFtsFindDupes(
     // Model-token gate: 'Galaxy S24' must NOT match 'Galaxy S25' rows.
     .filter((r) => candidateHasAllModelTokens(r.title, requiredModelTokens))
     .map((r) => ftsRowToDupe(r, fakeAnchor))
-    /* When we have an anchor price, also drop near-zero-savings rows.
-       Anything < 5% off is noise; the user wants meaningful alternatives. */
-    .filter((d) => noCeiling || d.savingsPercent >= 5)
+    /* No savings floor — was '>= 5%' but the user's UX guidance is
+       'show everything, let me decide'. Even 1-2% off the anchor is
+       worth surfacing for big-ticket items. The >=85% absurdity gate
+       below still trims data-error rows (savingsPercent zeroed by
+       the builder for those). */
     // Drop the >=85% suppressed rows entirely (savingsPercent zeroed by builder)
     .filter((d) => noCeiling || d.savingsPercent > 0)
     .slice(0, limit * 2)
@@ -866,9 +868,10 @@ export async function pgFtsFindSimilar(
     // Product-family gate: an iPhone anchor must not get iPad / MacBook dupes.
     .filter((r) => !familiesIncompatible(anchor.title, r.title))
     .map((r) => ftsRowToDupe(r, anchor))
-    // Drop near-zero-savings rows (≤ 1% rounding noise) and the
-    // suppressed >=85% rows (savingsPercent zeroed by builder)
-    .filter((d) => d.savingsPercent >= 5)
+    // No savings floor — show every cheaper alternative, even 1-2% off
+    // the anchor. The >=85% suppressed-zero rows still get filtered
+    // below so absurd-discount data errors stay out.
+    .filter((d) => d.savingsPercent > 0)
     .slice(0, limit * 2) // over-sample, then re-rank
     .sort((a, b) => {
       // Blend: similarity (FTS rank) + savings, capped to avoid runaway
