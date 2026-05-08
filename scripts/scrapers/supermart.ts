@@ -1,34 +1,24 @@
-/* Supermart Nigeria — online grocery + household at supermart.ng.
-   Lagos-focused delivery network with fresh + dry goods + household
-   essentials. Different audience from the Spar / Park n Shop pure
-   hypermarket scrapers — Supermart has tighter SKU curation and
-   surfaces deals on staples that bulk-shoppers price-track.
+/* Supermart Nigeria — Lagos-focused online grocery + household at
+   supermart.ng. Runs on Shopify, so we hit the public catalog JSON
+   endpoint via _shopify-json.ts (no Playwright needed).
 
-   Catalog notes:
-     • WooCommerce-based but the theme uses '/shop/{slug}/' rather
-       than '/product-category/{slug}/'. The default link selector
-       ('a[href*="/product/"], a[href*="/shop/"]') already covers
-       both — no per-store override needed.
-     • Categories rotate seasonally (back-to-school, Christmas, etc.)
-       so we stick to the always-on staples to keep the scrape stable
-       across the year. */
+   /collections/all gets the full catalog in one chain of paginated
+   fetches. Shopify's product_type values bucket items into Havlo
+   categories automatically (no per-collection config). */
 
 import type { Page } from "playwright";
 import { RawDeal } from "./types.js";
-import { scrapeNairaWoo } from "./_generic-naira.js";
+import { scrapeShopifyCatalog } from "./_shopify-json.js";
 
-export async function scrapeSupermart(page: Page): Promise<RawDeal[]> {
-  return scrapeNairaWoo(page, {
+/* Page param unused — Shopify path is fetch-only. */
+export async function scrapeSupermart(_page: Page): Promise<RawDeal[]> {
+  return scrapeShopifyCatalog({
     name:    "Supermart",
     storeId: "supermart",
     baseUrl: "https://www.supermart.ng",
-    pages: [
-      { url: "https://www.supermart.ng/shop/groceries/",      cat: "groceries" },
-      { url: "https://www.supermart.ng/shop/beverages/",      cat: "groceries" },
-      { url: "https://www.supermart.ng/shop/household/",      cat: "home" },
-      { url: "https://www.supermart.ng/shop/personal-care/",  cat: "beauty" },
-      { url: "https://www.supermart.ng/shop/baby-care/",      cat: "home" },
-      { url: "https://www.supermart.ng/shop/health/",         cat: "beauty" },
+    collections: [
+      { handle: "all", cat: "groceries" },
     ],
+    pageLimit: 6, // Supermart's catalog is broader (groceries + household + alcohol + appliances)
   });
 }

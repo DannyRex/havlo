@@ -28,18 +28,16 @@ import { scrapeAmazon }     from "./scrapers/amazon.js";
 import { scrapePopularSkus } from "./scrapers/popular-skus.js";
 import { scrapeKara }       from "./scrapers/kara.js";
 import { scrapeObiwezy }    from "./scrapers/obiwezy.js";
-/* New NG-anchored scrapers — pharmacies, supermarkets, and
-   second-tier electronics retailers. Each is a thin config wrapper
-   over scripts/scrapers/_generic-naira.ts. ALL DISABLED pending
-   per-site verification (first cron yielded 0 deals across the
-   board). Imports left commented so reviving any one is a
-   two-line uncomment. */
-// import { scrapeHealthPlus } from "./scrapers/healthplus.js";
-// import { scrapeMedPlus }    from "./scrapers/medplus.js";
+/* Verified NG scrapers (active in the orchestrator below). */
+import { scrapeHealthPlus } from "./scrapers/healthplus.js";
+import { scrapeSupermart }  from "./scrapers/supermart.js";
+import { scrapeMedPlus }    from "./scrapers/medplus.js";
+/* Disabled NG scrapers — files retained, imports commented. To
+   revive one: verify selectors against live HTML, uncomment the
+   import + matching entry in the orchestrator below. */
 // import { scrapeMegaplaza }  from "./scrapers/megaplaza.js";
 // import { scrapeTezza }      from "./scrapers/tezza.js";
 // import { scrapeYudala }     from "./scrapers/yudala.js";
-// import { scrapeSupermart }  from "./scrapers/supermart.js";
 // import { scrapeFoodco }     from "./scrapers/foodco.js";
 // import { scrapeMobinex }    from "./scrapers/mobinex.js";
 // import { scrapeCarfax }     from "./scrapers/carfax.js";
@@ -214,27 +212,35 @@ async function main() {
        check). To re-enable: get explicit permission from PayPorte +
        relax their robots.txt for our user-agent (HavloBot). */
     { name: "Spar",       probe: "https://www.sparng.com/",                       fn: () => scrapeSpar(page) },
-    { name: "Jiji",       probe: "https://jiji.ng/",                              fn: () => scrapeJiji(page) },
-    /* ── New NG retailers — all DISABLED pending per-site verification.
-       The first cron run produced 0 deals across all 11. Manual
-       URL probes confirmed why:
-         • MedPlus — wrong /product-category/ slug pattern (404)
-         • Foodco — same (404)
-         • Yudala — 403 (anti-bot or defunct)
-         • Supermart — Shopify, not WooCommerce; needs /collections/
-         • Others (HealthPlus, Tezza, Megaplaza, Mobinex, Carfax,
-           Switz, AddideMart) — timeouts; probably IP-region
-           restricted or behind Cloudflare
-       The scraper files remain in scripts/scrapers/ ready to
-       reactivate as each is properly inspected against live HTML.
-       To revive any one, swap the slug pattern + verify the link
-       selector + uncomment the matching line below. */
-    // { name: "HealthPlus", probe: "https://www.healthplus.com.ng/",                fn: () => scrapeHealthPlus(page) },
-    // { name: "MedPlus",    probe: "https://www.medplusnig.com/",                   fn: () => scrapeMedPlus(page) },
+    /* Jiji disabled — they rolled out Cloudflare across the site
+       since the existing scraper was written, so /nigeria/* paths
+       now return a 403 challenge page. Until we get residential
+       proxies or Jiji exposes an affiliate / partner API, the
+       scraper code in scrapers/jiji.ts stays parked. */
+    // { name: "Jiji",    probe: "https://jiji.ng/",                              fn: () => scrapeJiji(page) },
+    /* ── Verified-and-revived NG retailers ─────────────────────────
+       These three were failing in the first cron run. Diagnosis +
+       fixes (May 2026):
+         • HealthPlus is on Shopify at healthplusnigeria.com — uses
+           the public products.json endpoint (no Playwright needed).
+         • Supermart is also Shopify at supermart.ng — same path.
+         • MedPlus is custom-themed WordPress at medplusnig.com,
+           rewrote using the verified .inline_product card selectors
+           and the /products?data_from=discounted&page=N URL.
+       _shopify-json.ts gives us a generic, stable approach for
+       Shopify stores going forward — every Shopify store exposes
+       the same endpoint. */
+    { name: "HealthPlus", probe: "https://healthplusnigeria.com/",                fn: () => scrapeHealthPlus(page) },
+    { name: "Supermart",  probe: "https://www.supermart.ng/",                     fn: () => scrapeSupermart(page) },
+    { name: "MedPlus",    probe: "https://medplusnig.com/",                       fn: () => scrapeMedPlus(page) },
+    /* ── Still disabled — need per-site verification ──
+       These were stamped from one template that didn't fit. Each
+       needs the same kind of investigation HealthPlus / Supermart /
+       MedPlus got: confirm the platform, verify URL pattern, check
+       anti-bot posture. Files stay in scrapers/ ready to revive. */
     // { name: "Megaplaza",  probe: "https://www.megaplaza.com.ng/",                 fn: () => scrapeMegaplaza(page) },
     // { name: "Tezza",      probe: "https://www.tezza.com.ng/",                     fn: () => scrapeTezza(page) },
     // { name: "Yudala",     probe: "https://www.yudala.com/",                       fn: () => scrapeYudala(page) },
-    // { name: "Supermart",  probe: "https://www.supermart.ng/",                     fn: () => scrapeSupermart(page) },
     // { name: "Foodco",     probe: "https://www.foodco.ng/",                        fn: () => scrapeFoodco(page) },
     // { name: "Mobinex",    probe: "https://www.mobinex.ng/",                       fn: () => scrapeMobinex(page) },
     // { name: "Carfax",     probe: "https://www.carfax.com.ng/",                    fn: () => scrapeCarfax(page) },
