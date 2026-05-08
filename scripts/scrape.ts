@@ -30,19 +30,21 @@ import { scrapeKara }       from "./scrapers/kara.js";
 import { scrapeObiwezy }    from "./scrapers/obiwezy.js";
 /* New NG-anchored scrapers — pharmacies, supermarkets, and
    second-tier electronics retailers. Each is a thin config wrapper
-   over scripts/scrapers/_generic-naira.ts so the WooCommerce-style
-   walk-up-DOM extraction stays in one place. */
-import { scrapeHealthPlus } from "./scrapers/healthplus.js";
-import { scrapeMedPlus }    from "./scrapers/medplus.js";
-import { scrapeMegaplaza }  from "./scrapers/megaplaza.js";
-import { scrapeTezza }      from "./scrapers/tezza.js";
-import { scrapeYudala }     from "./scrapers/yudala.js";
-import { scrapeSupermart }  from "./scrapers/supermart.js";
-import { scrapeFoodco }     from "./scrapers/foodco.js";
-import { scrapeMobinex }    from "./scrapers/mobinex.js";
-import { scrapeCarfax }     from "./scrapers/carfax.js";
-import { scrapeSwitz }      from "./scrapers/switz.js";
-import { scrapeAddideMart } from "./scrapers/addidemart.js";
+   over scripts/scrapers/_generic-naira.ts. ALL DISABLED pending
+   per-site verification (first cron yielded 0 deals across the
+   board). Imports left commented so reviving any one is a
+   two-line uncomment. */
+// import { scrapeHealthPlus } from "./scrapers/healthplus.js";
+// import { scrapeMedPlus }    from "./scrapers/medplus.js";
+// import { scrapeMegaplaza }  from "./scrapers/megaplaza.js";
+// import { scrapeTezza }      from "./scrapers/tezza.js";
+// import { scrapeYudala }     from "./scrapers/yudala.js";
+// import { scrapeSupermart }  from "./scrapers/supermart.js";
+// import { scrapeFoodco }     from "./scrapers/foodco.js";
+// import { scrapeMobinex }    from "./scrapers/mobinex.js";
+// import { scrapeCarfax }     from "./scrapers/carfax.js";
+// import { scrapeSwitz }      from "./scrapers/switz.js";
+// import { scrapeAddideMart } from "./scrapers/addidemart.js";
 /* scrapePayPorte intentionally not imported — their robots.txt
    site-wide disallow rules us out. */
 import { isAllowedByRobots } from "./scrapers/robots.js";
@@ -213,27 +215,31 @@ async function main() {
        relax their robots.txt for our user-agent (HavloBot). */
     { name: "Spar",       probe: "https://www.sparng.com/",                       fn: () => scrapeSpar(page) },
     { name: "Jiji",       probe: "https://jiji.ng/",                              fn: () => scrapeJiji(page) },
-    /* ── New NG retailers (added with the NG_STORES roster expansion).
-       All use the shared _generic-naira.ts WooCommerce walk-up
-       template. Each is gated on robots.txt via the shared check
-       in the loop below; per-page failures stay isolated and don't
-       cascade to the rest of the run. First-cron failure on any
-       single one is expected — selectors / category slugs were
-       inferred from common WooCommerce conventions, not verified
-       against every site's live HTML. Any that consistently return
-       0 across cron cycles can be commented out without affecting
-       the rest. */
-    { name: "HealthPlus", probe: "https://www.healthplus.com.ng/",                fn: () => scrapeHealthPlus(page) },
-    { name: "MedPlus",    probe: "https://www.medplusnig.com/",                   fn: () => scrapeMedPlus(page) },
-    { name: "Megaplaza",  probe: "https://www.megaplaza.com.ng/",                 fn: () => scrapeMegaplaza(page) },
-    { name: "Tezza",      probe: "https://www.tezza.com.ng/",                     fn: () => scrapeTezza(page) },
-    { name: "Yudala",     probe: "https://www.yudala.com/",                       fn: () => scrapeYudala(page) },
-    { name: "Supermart",  probe: "https://www.supermart.ng/",                     fn: () => scrapeSupermart(page) },
-    { name: "Foodco",     probe: "https://www.foodco.ng/",                        fn: () => scrapeFoodco(page) },
-    { name: "Mobinex",    probe: "https://www.mobinex.ng/",                       fn: () => scrapeMobinex(page) },
-    { name: "Carfax",     probe: "https://www.carfax.com.ng/",                    fn: () => scrapeCarfax(page) },
-    { name: "Switz",      probe: "https://www.switzelectronics.com/",             fn: () => scrapeSwitz(page) },
-    { name: "AddideMart", probe: "https://www.addidemart.com/",                   fn: () => scrapeAddideMart(page) },
+    /* ── New NG retailers — all DISABLED pending per-site verification.
+       The first cron run produced 0 deals across all 11. Manual
+       URL probes confirmed why:
+         • MedPlus — wrong /product-category/ slug pattern (404)
+         • Foodco — same (404)
+         • Yudala — 403 (anti-bot or defunct)
+         • Supermart — Shopify, not WooCommerce; needs /collections/
+         • Others (HealthPlus, Tezza, Megaplaza, Mobinex, Carfax,
+           Switz, AddideMart) — timeouts; probably IP-region
+           restricted or behind Cloudflare
+       The scraper files remain in scripts/scrapers/ ready to
+       reactivate as each is properly inspected against live HTML.
+       To revive any one, swap the slug pattern + verify the link
+       selector + uncomment the matching line below. */
+    // { name: "HealthPlus", probe: "https://www.healthplus.com.ng/",                fn: () => scrapeHealthPlus(page) },
+    // { name: "MedPlus",    probe: "https://www.medplusnig.com/",                   fn: () => scrapeMedPlus(page) },
+    // { name: "Megaplaza",  probe: "https://www.megaplaza.com.ng/",                 fn: () => scrapeMegaplaza(page) },
+    // { name: "Tezza",      probe: "https://www.tezza.com.ng/",                     fn: () => scrapeTezza(page) },
+    // { name: "Yudala",     probe: "https://www.yudala.com/",                       fn: () => scrapeYudala(page) },
+    // { name: "Supermart",  probe: "https://www.supermart.ng/",                     fn: () => scrapeSupermart(page) },
+    // { name: "Foodco",     probe: "https://www.foodco.ng/",                        fn: () => scrapeFoodco(page) },
+    // { name: "Mobinex",    probe: "https://www.mobinex.ng/",                       fn: () => scrapeMobinex(page) },
+    // { name: "Carfax",     probe: "https://www.carfax.com.ng/",                    fn: () => scrapeCarfax(page) },
+    // { name: "Switz",      probe: "https://www.switzelectronics.com/",             fn: () => scrapeSwitz(page) },
+    // { name: "AddideMart", probe: "https://www.addidemart.com/",                   fn: () => scrapeAddideMart(page) },
     { name: "Popular SKUs", probe: "https://www.konga.com/",                      fn: () => scrapePopularSkus(page) },
     // International stores (en-US stealth context)
     /* AliExpress scraper disabled — anti-bot wall (Cloudflare). Real
