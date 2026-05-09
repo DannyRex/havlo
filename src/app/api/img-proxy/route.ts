@@ -53,6 +53,12 @@ const HOST_REFERER: Record<string, string> = {
      the proxy returned 403 for every Slot product image and cards
      showed the gradient + emoji fallback instead of the real photo. */
   "api-prod.slot.ng":                 "",
+  /* Shopify CDN — every Shopify store (Supermart, HealthPlus,
+     Essenza, future ones) serves product images from here. Open
+     CDN, no Referer enforcement. Same fallback rationale as the
+     direct-load whitelist in lib/utils.ts; this entry is the safety
+     net for any code path that bypasses proxiedImageUrl(). */
+  "cdn.shopify.com":                  "",
 };
 
 /* Reasonable upper bound for cache lifetime. Product images don't

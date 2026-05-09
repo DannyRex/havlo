@@ -52,6 +52,13 @@ const DIRECT_LOAD_IMAGE_HOSTS = new Set([
   /* Slot Nigeria — direct-loads cleanly, no Referer enforcement
      observed. Skipping the proxy saves a hop per image. */
   "api-prod.slot.ng",
+  /* Shopify CDN — used by every Shopify-based scraper (Supermart,
+     HealthPlus, Essenza, plus any future ones). Open, no Referer
+     enforcement, served from a fast global edge. Direct-load is
+     the right call. Without this every Shopify product card was
+     falling back to the gradient/emoji because /api/img-proxy
+     blocks unwhitelisted hosts. */
+  "cdn.shopify.com",
 ]);
 
 /* Wrap an external image URL through /api/img-proxy unless its host

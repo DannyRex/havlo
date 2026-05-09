@@ -53,14 +53,21 @@ async function main() {
     ? deals.filter((d) => args.storeIds!.includes(d.storeId))
     : deals;
 
-  /* Only ingest items with a real discount. The /deals page is for
-     deals — non-discounted listings (full-price catalog rows scraped
-     from category pages) are noise here. */
-  const dealsOnly = storeFiltered.filter((d) => d.discountPercent > 0);
-  const skipped = storeFiltered.length - dealsOnly.length;
+  /* Ingest everything — let the API surface decide what to display.
+     The previous `discountPercent > 0` filter was the same trap we
+     fixed earlier in /api/deals: pre-filtering at ingest meant the
+     API's "show all" floor was meaningless for stores that don't
+     publish compare_at_price. Symptom: Shopify scrapers (HealthPlus,
+     Essenza, most of Supermart) pulled full-price catalogs that
+     got 100% stripped before reaching Supabase. With the filter
+     removed those rows ingest cleanly and the existing /api/deals
+     `minDiscount=0` default surfaces them. Discounted-only views
+     are a UI tier choice on /deals, not a data-layer cull. */
+  const dealsOnly = storeFiltered;
+  const skipped = 0;
 
   if (dealsOnly.length === 0) {
-    console.error("✗ No discounted deals matched the filter.");
+    console.error("✗ No deals matched the filter.");
     process.exit(1);
   }
 
@@ -68,7 +75,7 @@ async function main() {
 
   console.log(`▶ Ingesting scraped deals into DB`);
   console.log(`  In file:       ${storeFiltered.length}`);
-  console.log(`  Discounted:    ${dealsOnly.length}`);
+  console.log(`  Will ingest:   ${dealsOnly.length}`);
   console.log(`  Skipped (0%):  ${skipped}`);
   console.log(`  Stores:        ${Array.from(byStore.keys()).join(", ")}`);
   console.log("");
