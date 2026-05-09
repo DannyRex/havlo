@@ -50,8 +50,12 @@ export const metadata: Metadata = {
     default: "Havlo · Find similar products for less",
     template: "%s · Havlo",
   },
+  /* Meta description — what Google shows in SERP snippets. Aligned
+     with the new hero H1 ("Before you buy it, find it for less") so
+     the SERP doesn't read one thing while the page reads another.
+     Geographic keywords preserved for country-targeted SEO. */
   description:
-    "Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know in Nigeria, US, UK, UAE, Germany, India, and South Africa.",
+    "Before you buy it, find it for less. Independent price comparison across the stores you already shop in Nigeria, US, UK, UAE, Germany, India, and South Africa.",
   keywords: [
     "price comparison", "find alternatives", "dupes", "find similar products",
     "deals", "discount finder", "shopping search", "cheap alternatives",
@@ -66,7 +70,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     title: "Havlo · Find similar products for less",
-    description: "Paste a link or search anything. Cheaper alternatives across stores you already know.",
+    description: "Before you buy it, find it for less. Independent price comparison across the stores you already shop.",
     url: siteUrl,
     siteName: "Havlo",
     locale: "en_NG",
@@ -90,7 +94,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Havlo · Find similar products for less",
-    description: "Paste a link or search anything. Cheaper alternatives across stores you already know.",
+    description: "Before you buy it, find it for less. Independent price comparison across the stores you already shop.",
     images: [`${siteUrl}/opengraph-image`],
     /* `site` intentionally omitted until the X / Twitter handle is
        claimed. Pointing to a non-existent @handle generates broken

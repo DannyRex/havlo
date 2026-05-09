@@ -6,6 +6,18 @@ import { posts } from "@/lib/blog/posts";
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
 
+  /* Stable date for the brand homepages — bump only when the
+     homepage's actual structure / framing changes meaningfully.
+     Setting `lastModified: now` previously made Google treat
+     /[country] as freshly-modified content (the build runs daily)
+     and it started prefixing the SERP snippet with a date stamp
+     ("9 May 2026 — ..."), which reads like a blog post / news
+     result, not a brand site. Static brand pages don't get the
+     date treatment. /[country]/deals stays on `now` because deal
+     listings really do refresh daily — the freshness signal is
+     honest there. */
+  const HOMEPAGE_LAST_MODIFIED = new Date("2026-05-01");
+
   /* Country-scoped routes — emit one entry per country, each with
      hreflang alternates pointing at sibling country versions. Lets
      Google route the right variant to the right audience instead of
@@ -13,8 +25,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const homepages: MetadataRoute.Sitemap = COUNTRIES.map((c) => ({
     url:            `${SITE_URL}/${c.code}`,
     priority:       1.0,
-    changeFrequency: "daily",
-    lastModified:   now,
+    changeFrequency: "weekly",
+    lastModified:   HOMEPAGE_LAST_MODIFIED,
     alternates:     { languages: buildHreflangAlternates("") },
   }));
 
