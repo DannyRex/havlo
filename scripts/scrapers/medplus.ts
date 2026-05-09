@@ -3,28 +3,31 @@
    earlier).
 
    NOT on Shopify or WooCommerce. Server-renders Tailwind-themed
-   product cards with the class `inline_product`. The "discounted"
-   browse view at /products?data_from=discounted&page=N is the
-   richest single source — it lists every product currently on sale
-   across all categories. We paginate that until empty.
+   product cards inside Bootstrap grid columns. The catch-all browse
+   view at /products?page=N returns 20 products per page. Earlier
+   the scraper used /products?data_from=discounted&page=N which
+   only showed one featured discounted product per page (a hero
+   surface, not a listing).
 
    Markup notes (verified May 2026):
-     • Product card:    .inline_product
-     • Title:           .single-product-details > div > a
+     • Card container:  div.col-lg-3 (Bootstrap grid column)
+     • Image side:      .inline_product (child of the col-lg-3)
+     • Text side:       .single-product-details (sibling, not child)
+     • Title:           .single-product-details a[href*='/product/']
      • Sale price:      .product-price .text-accent
      • Original price:  .product-price strike
-     • Discount badge:  .bg-[#FFE5E5] text-[#FF0000]
+     • Discount badge:  .bg-[#FFE5E5] text-[#FF0000] (when present)
      • Link target:     /product/{slug}
-     • Image:           <img src=...> inside card
+     • Image:           <img src=...> from DigitalOcean Spaces CDN
 
-   Pagination caps at 5 pages (~120 deals) because MedPlus's
-   discounted page-N urls eventually 200 with empty results — the
-   loop exits early when a page yields zero new cards. */
+   20 products per page × 10 pages = up to 200 deals per cron run,
+   which is plenty given the broader cron also pulls Konga / 3C Hub
+   / Slot etc. Loop exits on the first empty page. */
 
 import { Page } from "playwright";
 import { RawDeal, resolveCategory } from "./types.js";
 
-const PAGE_LIMIT = 5;
+const PAGE_LIMIT = 10;
 
 export async function scrapeMedPlus(page: Page): Promise<RawDeal[]> {
   const deals: RawDeal[] = [];
@@ -33,49 +36,58 @@ export async function scrapeMedPlus(page: Page): Promise<RawDeal[]> {
   console.log("  → MedPlus...");
 
   for (let pageNum = 1; pageNum <= PAGE_LIMIT; pageNum++) {
-    const url = `https://medplusnig.com/products?data_from=discounted&page=${pageNum}`;
+    /* Catch-all listing — 20 products per page. Was
+       /products?data_from=discounted which only showed 1 featured
+       product per page. */
+    const url = `https://medplusnig.com/products?page=${pageNum}`;
     try {
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 25000 });
       await page.waitForTimeout(2000);
 
-      const items = await page.$$eval(".inline_product", (cards) =>
-        cards.map((card) => {
-          /* Title — first <a> inside .single-product-details has the
-             full product title as visible text. Trimmed because the
-             template wraps it with whitespace. */
+      /* The actual product container is the Bootstrap grid column
+         wrapping BOTH the .inline_product (image side) AND
+         .single-product-details (title/price side). They're siblings
+         inside a `col-*` div. Querying .inline_product directly
+         missed the price/title because they're outside that node.
+
+         IMPORTANT: NO inner helper functions, no default params, no
+         destructuring of optional chains. tsx + esbuild desugars
+         those into `__name()` calls that don't exist in Playwright's
+         browser context, throwing ReferenceError when $$eval runs.
+         Everything below is intentionally one inlined block. */
+      const items = await page.$$eval(
+        "div[class*='col-lg-3']:has(.inline_product)",
+        (cards) => cards.map((card) => {
+          /* Title — first /product/ link inside the card. The
+             template renders the title as visible text inside that
+             link in .single-product-details. */
           const titleLink = card.querySelector(".single-product-details a[href*='/product/']") as HTMLAnchorElement | null;
-          const title = (titleLink?.textContent ?? "").replace(/\s+/g, " ").trim();
-          const href  = titleLink?.getAttribute("href") ?? "";
+          const title = (titleLink && titleLink.textContent ? titleLink.textContent : "").replace(/\s+/g, " ").trim();
+          const href  = titleLink ? (titleLink.getAttribute("href") || "") : "";
 
           /* Price extraction — sale in .product-price .text-accent,
              original in .product-price strike. Both render as
-             '₦12,345.67' so we strip non-digits + parse. */
+             '₦12,345.67'. Inlined parsing (no helper function). */
           const saleEl = card.querySelector(".product-price .text-accent") as HTMLElement | null;
           const origEl = card.querySelector(".product-price strike") as HTMLElement | null;
-          const saleText = saleEl?.textContent ?? "";
-          const origText = origEl?.textContent ?? "";
-          const parseNgn = (s: string) => {
-            const digits = s.replace(/[^0-9]/g, "");
-            return digits ? parseInt(digits, 10) : 0;
-          };
-          /* MedPlus prices include kobo (₦12,345.67). The replace
-             strips the decimal too, so 1234567 reads as 1234567 raw.
+          const saleText = saleEl && saleEl.textContent ? saleEl.textContent : "";
+          const origText = origEl && origEl.textContent ? origEl.textContent : "";
+          const saleDigits = saleText.replace(/[^0-9]/g, "");
+          const origDigits = origText.replace(/[^0-9]/g, "");
+          /* MedPlus prices include kobo (12,345.67 → 1234567 raw).
              Divide by 100 to get back to whole Naira for storage. */
-          const salePriceRaw = parseNgn(saleText);
-          const origPriceRaw = parseNgn(origText);
-          const salePrice = Math.round(salePriceRaw / 100);
-          const originalPrice = origPriceRaw > 0 ? Math.round(origPriceRaw / 100) : salePrice;
+          const salePrice = saleDigits ? Math.round(parseInt(saleDigits, 10) / 100) : 0;
+          const originalPrice = origDigits ? Math.round(parseInt(origDigits, 10) / 100) : salePrice;
 
-          /* Image — first <img> inside the card. MedPlus serves
-             from DigitalOcean Spaces; the URL is the actual src
-             attribute (no lazy-load hop). */
+          /* Image — inside the .inline_product child. MedPlus serves
+             from DigitalOcean Spaces; src attribute is the real URL. */
           const imgEl = card.querySelector("img") as HTMLImageElement | null;
-          const imageUrl = imgEl?.getAttribute("src") ?? "";
+          const imageUrl = imgEl ? (imgEl.getAttribute("src") || "") : "";
 
-          /* Discount badge — text like "-2.5% Off". When present,
-             use it directly; otherwise derive from prices. */
+          /* Discount badge — text like "-2.5% Off". Inline regex. */
           const discBadge = card.querySelector("span[class*='FFE5E5']") as HTMLElement | null;
-          const discMatch = (discBadge?.textContent ?? "").match(/-?(\d+(?:\.\d+)?)\s*%/);
+          const discText = discBadge && discBadge.textContent ? discBadge.textContent : "";
+          const discMatch = discText.match(/-?(\d+(?:\.\d+)?)\s*%/);
           const discountFromBadge = discMatch ? Math.round(parseFloat(discMatch[1])) : 0;
 
           return { title, href, salePrice, originalPrice, imageUrl, discountFromBadge };
