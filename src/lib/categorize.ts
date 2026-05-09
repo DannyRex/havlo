@@ -79,9 +79,18 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   { pattern: /\b(apple\s*watch|smart\s*watch|smartwatch|garmin|fitbit|whoop|fossil\s*smart)\b/i, slug: "electronics", reason: "smartwatch" },
 
   // ── Beauty / personal care ──
-  { pattern: /\b(lipstick|mascara|gloss\s*bomb|concealer|foundation|lash\s*sensational|fenty\s*beauty|charlotte\s*tilbury)\b/i, slug: "beauty", reason: "makeup" },
-  { pattern: /\b(niacinamide|moisturizer|moisturiser|moisturizing\s*cream|cleanser|toner|serum|cerave|the\s*ordinary)\b/i, slug: "beauty", reason: "skincare" },
-  { pattern: /\b(perfume|cologne|fragrance|eau\s*de\s*parfum|edt|edp)\b/i, slug: "beauty", reason: "fragrance" },
+  { pattern: /\b(lipstick|mascara|gloss\s*bomb|concealer|foundation|lash\s*sensational|fenty\s*beauty|charlotte\s*tilbury|eye\s*shadow|eyeliner|blush|bronzer|highlighter|primer|setting\s*spray|brush\s*set)\b/i, slug: "beauty", reason: "makeup" },
+  { pattern: /\b(niacinamide|moisturizer|moisturiser|moisturizing\s*cream|cleanser|toner|serum|cerave|the\s*ordinary|exfoliator|face\s*mask|sunscreen|spf\s*\d+|retinol|hyaluronic|salicylic|glycolic|vitamin\s*c\s*serum)\b/i, slug: "beauty", reason: "skincare" },
+  { pattern: /\b(perfume|cologne|fragrance|eau\s*de\s*parfum|eau\s*de\s*toilette|edp|edt|afnan|montale|kayali|maison\s*margiela|ariana|tom\s*ford|jo\s*malone|creed|dior|chanel|gucci|versace)\s*(?:\d+ml|\d+\.\d+\s*oz|spray)?\b/i, slug: "beauty", reason: "fragrance" },
+  /* Pharmacy + wellness — vitamins, supplements, OTC drugs, baby
+     health. These were the bulk of HealthPlus / MedPlus product
+     types and were defaulting to "electronics" via the resolver
+     fallback. Bucket as beauty for now (the closest existing slug);
+     a dedicated "wellness" / "pharmacy" category is a separate
+     decision the user is weighing. */
+  { pattern: /\b(vitamin\s*[a-e]\d?|multivitamin|supplement|paracetamol|ibuprofen|aspirin|antacid|antihistamine|cough\s*syrup|throat\s*lozenge|pain\s*relief|first\s*aid|antiseptic|hand\s*sanitizer|antibacterial|sanitary\s*pad|baby\s*lotion|baby\s*oil|baby\s*wipes|diaper|nappy|formula\s*milk)\b/i, slug: "beauty", reason: "wellness / pharmacy" },
+  { pattern: /\b(shampoo|conditioner|hair\s*oil|hair\s*spray|leave-?in|deep\s*conditioner|edge\s*control|relaxer|texturizer|hair\s*serum|hair\s*mask|scalp\s*treatment)\b/i, slug: "beauty", reason: "hair care" },
+  { pattern: /\b(deodorant|antiperspirant|body\s*spray|body\s*wash|shower\s*gel|bar\s*soap|body\s*butter|body\s*lotion|hand\s*cream|foot\s*cream|exfoliating\s*scrub)\b/i, slug: "beauty", reason: "personal care" },
 
   // ── Fashion ──
   { pattern: /\b(nike|adidas|puma|reebok|new\s*balance|asics|under\s*armour)\s+\w*\b.*\b(shoe|sneaker|trainer|boot|sandal)\b/i, slug: "fashion", reason: "branded footwear" },
@@ -107,6 +116,16 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   { pattern: /\b(dutch\s*oven|le\s*creuset|cast\s*iron|skillet|frying\s*pan|saucepan|stock\s*pot|cookware\s*set)\b/i, slug: "home", reason: "cookware" },
   { pattern: /\b(tumbler|quencher|thermos|water\s*bottle|coffee\s*mug|drinkware)\b/i, slug: "home", reason: "drinkware" },
   { pattern: /\b(bedding|bedsheet|pillow|duvet|comforter|mattress)\b/i, slug: "home", reason: "bedding" },
+  /* Groceries + beverages + alcohol — Supermart's core catalog.
+     All bucketing as "home" for now until a dedicated "groceries"
+     category lands; same trade-off as wellness → beauty above.
+     Avoid bare 'sugar' / 'salt' — they match too many things ("Sugar
+     Free" sweetener label, "Sea Salt Spray" hair product, etc.).
+     Specific phrasings only. */
+  { pattern: /\b(rice|pasta|noodles|cereal|oats|cornflakes|biscuit|crackers|bread\s*loaf|chocolate\s*bar|cooking\s*oil|olive\s*oil|vegetable\s*oil|granulated\s*sugar|brown\s*sugar|powdered\s*sugar|table\s*salt|sea\s*salt\s*shaker|seasoning\s*cube|spice\s*mix|stock\s*cube|tomato\s*paste|tinned|canned\s*food)\b/i, slug: "home", reason: "groceries" },
+  { pattern: /\b(juice|soda|cola|fanta|sprite|coca\s*cola|pepsi|water\s*bottle|sparkling\s*water|coffee\s*beans|ground\s*coffee|tea\s*bag|tea\s*box|chai|herbal\s*tea)\b/i, slug: "home", reason: "beverages" },
+  { pattern: /\b(whisky|whiskey|vodka|gin|rum|tequila|brandy|cognac|scotch|bourbon|wine|champagne|prosecco|merlot|cabernet|sauvignon|chardonnay|beer|lager|stout|cider|alcoholic|liqueur|bitters)\b/i, slug: "home", reason: "alcohol" },
+  { pattern: /\b(detergent|fabric\s*softener|dish\s*soap|dishwashing|toilet\s*paper|kitchen\s*roll|cleaning\s*spray|disinfectant|bleach|insect\s*spray|mosquito\s*coil|air\s*freshener)\b/i, slug: "home", reason: "household" },
   { pattern: /\b(towel|bathmat|bath\s*rug|toilet\s*paper)\b/i, slug: "home", reason: "bath" },
 ];
 

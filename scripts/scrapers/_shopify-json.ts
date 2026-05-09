@@ -137,11 +137,29 @@ export async function scrapeShopifyCatalog(cfg: ShopifyConfig): Promise<RawDeal[
 
         if (salePrice <= 0) continue;
 
-        /* Category: prefer Shopify's own product_type when it's set
-           (e.g. "Vitamins", "Skincare"). Fall back to the config's
-           collection category when product_type is missing. */
-        const catRaw = p.product_type || cat;
-        const resolved = resolveCategory(catRaw);
+        /* Category: try Shopify's product_type first ("Vitamins",
+           "Skincare", "Beverages"). If our resolver doesn't know that
+           label, fall through to the config's collection category
+           (which is always one of our known slugs).
+
+           Was: const catRaw = p.product_type || cat;
+           That always preferred product_type and hit the resolver's
+           DEFAULT fallback ("electronics") for every Shopify-native
+           label our map didn't have — so HealthPlus pharmacy items
+           ("Vitamins", "Pain Relief") all bucketed as electronics,
+           Supermart groceries too. Verified May 2026 via the
+           per-store category breakdown:
+             healthplus: 494/554 in "electronics" (should be beauty)
+             supermart:  347/358 in "electronics" (should be home)
+             essenza:    138/560 in "electronics" (should be beauty)
+           This routes them correctly via the config-category fall-
+           back. The ingest-time auto-correct in ingestion.ts then
+           refines further via title-based inference. */
+        const productTypeResolved = p.product_type ? resolveCategory(p.product_type) : null;
+        const usedProductType = !!productTypeResolved && productTypeResolved.slug !== "electronics";
+        const resolved = usedProductType
+          ? productTypeResolved!
+          : resolveCategory(cat);
 
         const tagList = Array.isArray(p.tags)
           ? p.tags
