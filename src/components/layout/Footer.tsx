@@ -6,18 +6,18 @@ import CountrySelect from "@/components/layout/CountrySelect";
 /* Three-nav-column footer: Product (functional), Company (about /
    contact / brand-trust), Legal (compliance pages).
 
-   "How we make money" sits in the Company column, NOT in Legal.
-   Verified May 2026 against peer pattern (Wirecutter, NerdWallet,
-   Kayak, Skyscanner) — the leaders treat affiliate disclosure as
-   editorial transparency rather than legal compliance, and link it
-   from About / Help / inline rather than the Privacy/Terms row.
-   Slickdeals + Honey are the only major peers that put it directly
-   in the main footer; even they brand it as "Ad Disclosure", not
-   alongside Privacy/Terms.
+   "How we make money" intentionally NOT in any footer column.
+   Reachable via the About page + the inline disclosure on /compare
+   (right at the click-out point). Mirrors the Wirecutter / Strategist /
+   Skyscanner pattern — they reach the disclosure from About / inline
+   on review surfaces, never the main footer. Putting it in the
+   footer's Privacy/Terms row reads as defensive disclosure
+   ("we have to admit this"); putting it under About reads as
+   proactive transparency ("here's how the business runs").
 
-   The Legal column stays narrow — only true legal documents live
-   there. FTC clear-and-conspicuous standard is still met because
-   "How we make money" is one click away on every page. */
+   FTC clear-and-conspicuous standard still met because the inline
+   notice on /compare appears immediately above every outbound
+   click and links to the full page. */
 const footerSections = [
   {
     title: "Product",
@@ -29,10 +29,9 @@ const footerSections = [
   {
     title: "Company",
     links: [
-      { label: "About",              href: "/about" },
-      { label: "How we make money",  href: "/how-we-make-money" },
-      { label: "Blog",               href: "/blog" },
-      { label: "Contact",            href: "/contact" },
+      { label: "About",   href: "/about" },
+      { label: "Blog",    href: "/blog" },
+      { label: "Contact", href: "/contact" },
     ],
   },
   {
