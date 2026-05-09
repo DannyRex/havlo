@@ -1,139 +1,66 @@
-import { Page } from "playwright";
-import { RawDeal, resolveCategory, parseNaira } from "./types.js";
+/* 3C Hub — major NG electronics chain. Runs on Shopify at
+   www.3chub.com.
 
-// 3C Hub is Shopify. Confirmed: a[href*='/products/'] links work.
-// Product card text format: "TITLE [From] ₦SALE ₦ORIG ..."
-const THREECHUB_COLLECTIONS = [
-  { url: "https://www.3chub.com/collections/all?sort_by=best-selling&filter.p.m.custom.on_sale=true", cat: "electronics" },
-  { url: "https://www.3chub.com/collections/samsung-mobile-phone",   cat: "phones" },
-  { url: "https://www.3chub.com/collections/tecno-mobile-phone",     cat: "phones" },
-  { url: "https://www.3chub.com/collections/infinix-mobile-phone",   cat: "phones" },
-  { url: "https://www.3chub.com/collections/xiaomi-mobile-phone",    cat: "phones" },
-  { url: "https://www.3chub.com/collections/solar-products",         cat: "electronics" },
-  { url: "https://www.3chub.com/collections/iphone",                 cat: "phones" },
-  { url: "https://www.3chub.com/collections/all?sort_by=best-selling", cat: "electronics" },
-  { url: "https://www.3chub.com/collections/laptops",                cat: "computing" },
-  { url: "https://www.3chub.com/collections/televisions",            cat: "electronics" },
-  { url: "https://www.3chub.com/collections/audio",                  cat: "audio" },
-  { url: "https://www.3chub.com/collections/smart-watches",          cat: "electronics" },
-  { url: "https://www.3chub.com/collections/gaming",                 cat: "gaming" },
-  { url: "https://www.3chub.com/collections/accessories",            cat: "electronics" },
-  { url: "https://www.3chub.com/collections/tablets",                cat: "phones" },
-];
+   This used to be a Playwright collection-scrape, but the SPA-style
+   theme rendering meant the per-collection card walk-up was timing
+   out and producing only ~4 products per collection (56 deals from
+   15 collections). The QA agent flagged the resulting flagship gap:
+   "iPhone 15 Pro Max" had zero NG retailer coverage despite 3C Hub
+   stocking the 17 series.
 
-export async function scrapeThreeChub(page: Page): Promise<RawDeal[]> {
-  const deals: RawDeal[] = [];
-  const seenUrls = new Set<string>();
+   Fixed by using the Shopify Public Storefront JSON endpoint (same
+   path as HealthPlus, Supermart, Essenza, MedPlus). Same shape,
+   structured pricing, no theme-render timing. Pulls every product
+   in each named collection in one round-trip.
 
-  console.log("  → 3C Hub (Shopify)...");
+   Collection picks below are intentionally phone-and-electronics
+   heavy — that's 3C Hub's core, and the remaining accessory /
+   power-bank collections were producing low-quality cards in the old
+   scraper anyway. Easy to extend if we want broader coverage later.
 
-  for (const { url, cat } of THREECHUB_COLLECTIONS) {
-    try {
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-      await page.waitForTimeout(2000);
+   The Page parameter is unused — kept to match scrape.ts's
+   orchestrator signature. The runtime calls fetch, not Playwright,
+   which saves ~30s per cron run vs. browser-based scraping. */
 
-      // Anchor on product links, then walk up to find the card container with price
-      const items = await page.$$eval("a[href*='/products/']", (links) => {
-        const seen = new Set<string>();
-        const results: Array<{ title: string; origText: string; saleText: string; href: string; imageUrl: string }> = [];
+import type { Page } from "playwright";
+import { RawDeal } from "./types.js";
+import { scrapeShopifyCatalog } from "./_shopify-json.js";
 
-        for (const link of links) {
-          const href = link.getAttribute("href") ?? "";
-          if (!href || seen.has(href)) continue;
-          seen.add(href);
-
-          // Walk up DOM to find a container that has a price (₦)
-          let container: Element | null = link.parentElement;
-          for (let i = 0; i < 8; i++) {
-            if (!container) break;
-            const text = container.textContent ?? "";
-            if (text.includes("₦")) {
-              // Found the card — parse title and prices
-              const fullText = text.replace(/\s+/g, " ").trim();
-
-              // Extract all Naira prices
-              const prices = [...fullText.matchAll(/₦([\d,]+)/g)]
-                .map((m) => parseInt(m[1].replace(/,/g, ""), 10))
-                .filter((n) => n > 0);
-
-              const salePrice     = prices.length > 0 ? Math.min(...prices) : 0;
-              const originalPrice = prices.length > 1 ? Math.max(...prices) : salePrice;
-
-              // Title: from the link text or heading near it
-              const heading = container.querySelector("h2, h3, h4, [class*='title'], [class*='name']");
-              const title   = (heading?.textContent ?? link.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 100);
-
-              // Image: Shopify CDN images are in img[src*='cdn.shopify'] or img[srcset]
-              const imgEl   = container.querySelector("img[src*='shopify'], img[src*='cdn'], img[src*='3chub'], img");
-              const rawSrc  = imgEl?.getAttribute("src") ?? imgEl?.getAttribute("data-src") ?? "";
-              // Shopify srcset often has better resolution — grab first entry
-              const srcset  = imgEl?.getAttribute("srcset") ?? "";
-              const srcsetFirst = srcset ? srcset.split(",")[0].trim().split(" ")[0] : "";
-              const imageUrl = srcsetFirst || rawSrc;
-              // Ensure absolute URL
-              const absoluteImg = imageUrl.startsWith("//") ? `https:${imageUrl}` : imageUrl;
-
-              if (title && salePrice > 0) {
-                results.push({
-                  title,
-                  origText: originalPrice > salePrice ? String(originalPrice) : "",
-                  saleText: String(salePrice),
-                  href,
-                  imageUrl: absoluteImg,
-                });
-              }
-              break;
-            }
-            container = container.parentElement;
-          }
-        }
-
-        return results;
-      });
-
-      const slug = url.split("/collections/")[1]?.split("?")[0] ?? "collection";
-      console.log(`    3C Hub ${slug}: ${items.length} products`);
-
-      for (const item of items) {
-        const fullUrl = item.href.startsWith("http")
-          ? item.href
-          : `https://www.3chub.com${item.href}`;
-
-        if (seenUrls.has(fullUrl)) continue;
-        seenUrls.add(fullUrl);
-
-        const salePrice     = parseNaira(item.saleText);
-        const originalPrice = item.origText ? parseNaira(item.origText) : salePrice;
-        if (!salePrice || salePrice <= 0) continue;
-
-        const discountPercent = originalPrice > salePrice
-          ? Math.round(((originalPrice - salePrice) / originalPrice) * 100)
-          : 0;
-
-        const resolved = resolveCategory(cat);
-
-        deals.push({
-          title: item.title,
-          description: `${item.title} — shop at 3C Hub, Nigeria's trusted gadget store.`,
-          category: resolved.category,
-          categorySlug: resolved.slug,
-          storeId: "threechub",
-          storeName: "3C Hub",
-          originalPrice,
-          salePrice,
-          discountPercent,
-          imageUrl: item.imageUrl || undefined,
-          imageEmoji: resolved.emoji,
-          imageGradient: resolved.gradient,
-          url: fullUrl,
-          tags: ["3C Hub", resolved.category],
-        });
-      }
-    } catch (err) {
-      console.warn(`    3C Hub collection failed: ${err}`);
-    }
-  }
-
-  console.log(`  ✓ 3C Hub: ${deals.length} deals`);
-  return deals;
+export async function scrapeThreeChub(_page: Page): Promise<RawDeal[]> {
+  return scrapeShopifyCatalog({
+    name:    "3C Hub",
+    storeId: "threechub",
+    baseUrl: "https://www.3chub.com",
+    /* Phone collections first so iPhone / Galaxy / Tecno flagships
+       are guaranteed to surface. Brand-specific handles take priority
+       over the generic 'mobile-phones' bucket because they're cleaner
+       (no spillover from other brands' returns). */
+    collections: [
+      // Apple iPhone — flagship coverage
+      { handle: "iphone-17-series",       cat: "phones" },
+      { handle: "iphone-16-series",       cat: "phones" },
+      { handle: "iphone",                 cat: "phones" },
+      // Samsung — S series, Z Fold/Flip, A series
+      { handle: "samsung-mobile-phone",   cat: "phones" },
+      // Top-3 NG-popular budget brands
+      { handle: "tecno-mobile-phone",     cat: "phones" },
+      { handle: "infinix-mobile-phone",   cat: "phones" },
+      { handle: "itel-mobile-phone",      cat: "phones" },
+      // Other budget brands
+      { handle: "xiaomi-mobile-phone",    cat: "phones" },
+      { handle: "oppo",                   cat: "phones" },
+      { handle: "vivo",                   cat: "phones" },
+      { handle: "honor",                  cat: "phones" },
+      // Curated catch-all + bestsellers
+      { handle: "top-smart-phone",        cat: "phones" },
+      { handle: "smart-phone",            cat: "phones" },
+      // Adjacent categories
+      { handle: "tablets",                cat: "phones" },
+      { handle: "tvs",                    cat: "electronics" },
+      { handle: "earphone",               cat: "audio" },
+    ],
+    /* Each phone-brand collection at 3C Hub is small (3–25 products).
+       1 page × 250 covers the entire active catalog per collection. */
+    pageLimit: 1,
+  });
 }

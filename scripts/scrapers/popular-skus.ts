@@ -31,6 +31,17 @@ const POPULAR_SKUS: Array<{ q: string; cat: string }> = [
   { q: "iPhone 15 Pro Max",        cat: "phones" },
   { q: "iPhone 16",                cat: "phones" },
   { q: "iPhone 16 Pro Max",        cat: "phones" },
+  /* Current flagships as of May 2026 — added so Konga + Slot search
+     surfaces them alongside the 3C Hub Shopify-JSON ingest. The QA
+     report flagged "iPhone Pro Max" coverage gaps; the immediate
+     fix landed via 3C Hub JSON, this widens it to the other two. */
+  { q: "iPhone 17",                cat: "phones" },
+  { q: "iPhone 17 Pro",            cat: "phones" },
+  { q: "iPhone 17 Pro Max",        cat: "phones" },
+  { q: "iPhone 17 Air",            cat: "phones" },
+  { q: "Samsung Galaxy S26 Ultra", cat: "phones" },
+  { q: "Samsung Galaxy Z Fold 7",  cat: "phones" },
+  { q: "Samsung Galaxy Z Flip 7",  cat: "phones" },
 
   // TVs
   { q: "Hisense 43 inch TV",       cat: "televisions" },
@@ -88,13 +99,13 @@ const STORES: StoreSearchSpec[] = [
     cardSelector: "[class*='item'][class*='product']",
     maxPerQuery: 2,
   },
-  {
-    storeId: "threechub",
-    storeName: "3C Hub",
-    buildUrl: (q) => `https://3chub.com/search?q=${encodeURIComponent(q)}`,
-    cardSelector: "[class*='product-card'], [class*='ProductCard'], li.product, .product-item",
-    maxPerQuery: 2,
-  },
+  /* 3C Hub removed from popular-skus search in May 2026.
+     The bare host (3chub.com/search) returns 404, the www host's
+     search is JS-rendered and the popular-skus Playwright wait
+     window was too short to catch results. 3C Hub now ingests via
+     the dedicated Shopify JSON path in scrapers/threechub.ts which
+     gives full per-collection catalog coverage including all current
+     iPhone / Galaxy flagships. */
 ];
 
 // Generic card extractor — works with any of Konga/Slot/3C Hub since they all
@@ -190,9 +201,11 @@ export async function scrapePopularSkus(page: Page): Promise<RawDeal[]> {
           if (!item.title || !item.salePrice || !item.href) continue;
           if (!isRelevant(sku.q, item.title)) continue;
 
+          /* threechub branch removed alongside the STORES entry — 3C
+             Hub no longer ingests via this scraper. Slot + Konga stay. */
           const fullUrl = item.href.startsWith("http")
             ? item.href
-            : `https://www.${store.storeId === "threechub" ? "3chub.com" : store.storeId === "slot" ? "slot.ng" : "konga.com"}${item.href}`;
+            : `https://www.${store.storeId === "slot" ? "slot.ng" : "konga.com"}${item.href}`;
 
           if (seen.has(fullUrl)) continue;
           seen.add(fullUrl);

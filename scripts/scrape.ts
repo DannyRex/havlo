@@ -203,7 +203,11 @@ async function main() {
        scraper code in scrapers/jumia.ts for if/when we either get a
        residential-proxy provider OR need it as fallback. */
     // { name: "Jumia",      probe: "https://www.jumia.com.ng/mlp-flash-sales/",     fn: () => scrapeJumia(page) },
-    { name: "3C Hub",     probe: "https://3chub.com/",                            fn: () => scrapeThreeChub(page) },
+    /* 3C Hub — switched to Shopify JSON ingest in May 2026. Probe
+       points at www. host (the bare 3chub.com 404s on /search and
+       redirects oddly on /collections); the scraper itself uses
+       www.3chub.com via _shopify-json.ts. */
+    { name: "3C Hub",     probe: "https://www.3chub.com/",                        fn: () => scrapeThreeChub(page) },
     { name: "Slot",       probe: "https://slot.ng/",                              fn: () => scrapeSlot(page) },
     { name: "Konga",      probe: "https://www.konga.com/category/phones-tablets-5261", fn: () => scrapeKonga(page) },
     { name: "Kara",       probe: "https://kara.com.ng/mobile-phones",             fn: () => scrapeKara(page) },
