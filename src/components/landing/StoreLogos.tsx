@@ -37,6 +37,16 @@ const ROSTERS: Record<string, StoreEntry[]> = {
        letter chip if the favicon returns broken / wrong. */
     { name: "PayPorte",   domain: "payporte.com" },
     { name: "Spar",       domain: "sparnigeria.com" },
+    /* Newly-scraped NG retailers (May 2026 batch) — pharmacies,
+       grocery, fragrance. All four ingest into Havlo via the
+       direct scrapers in scripts/scrapers/, NOT SerpAPI. The Hero
+       trust pill ("scanning prices across N stores") reads the
+       length of this list, so adding these four bumps the count
+       from 16 → 20 honestly. */
+    { name: "HealthPlus", domain: "healthplusnigeria.com" },
+    { name: "MedPlus",    domain: "medplusnig.com" },
+    { name: "Supermart",  domain: "supermart.ng" },
+    { name: "Essenza",    domain: "essenza.ng" },
     // Cross-border, in NG-shopper preference order
     { name: "Temu",       domain: "temu.com" },
     { name: "AliExpress", domain: "aliexpress.com" },
