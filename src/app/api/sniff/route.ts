@@ -389,26 +389,47 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   let fetchFailed = false;
   try {
     /* Multi-UA fallback chain. Different anti-bot vendors whitelist
-       different social-media crawlers:
-         - facebookexternalhit: works on Amazon, Shopify, most Magento,
-           Cloudflare default rules
+       different crawlers:
+         - facebookexternalhit: works on Amazon, Shopify, most Magento
+                                (Amazon CAN reject this — see real-
+                                browser fallback at end of chain)
          - WhatsApp/2:          works on Akamai-protected sites
                                 (next.co.uk, john lewis, some banks)
          - Twitterbot/1.0:      strong on US-centric sites
-         - LinkedInBot/1.0:     last resort, narrow but distinctive UA
+         - LinkedInBot/1.0:     narrow but distinctive
+         - Mozilla/Safari:      real-browser UA — last resort.
+                                QA agent reported pasting Amazon URLs
+                                returned only "Amazon product {ASIN}"
+                                placeholder — that's the chain
+                                exhausting and falling through. Amazon
+                                started rejecting facebookexternalhit
+                                more aggressively in 2026; a Safari UA
+                                with proper browser-shape headers gets
+                                through more often.
 
        Try them in priority order. Stop at the first that returns 2xx.
-       Total worst-case latency = sum of failed timeouts (caps at ~5s
-       per attempt). For the 90% common case (facebookexternalhit
-       works), latency is unchanged. */
-    const uaChain = [
-      "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
-      "WhatsApp/2.23.20.0 A",
-      "Twitterbot/1.0",
-      "LinkedInBot/1.0 (compatible; Mozilla/5.0; +https://www.linkedin.com)",
+       Worst-case latency = sum of failed timeouts (5s × N UAs).
+       For the common case (first UA works) latency is unchanged. */
+    const uaChain: Array<{ ua: string; extraHeaders?: Record<string, string> }> = [
+      { ua: "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)" },
+      { ua: "WhatsApp/2.23.20.0 A" },
+      { ua: "Twitterbot/1.0" },
+      { ua: "LinkedInBot/1.0 (compatible; Mozilla/5.0; +https://www.linkedin.com)" },
+      /* Real-browser fallback. Headers mimic a Safari request closely
+         enough that Amazon + most retailers serve normal HTML. */
+      {
+        ua: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+        extraHeaders: {
+          "Accept-Encoding":            "gzip, deflate, br",
+          "Sec-Fetch-Dest":             "document",
+          "Sec-Fetch-Mode":             "navigate",
+          "Sec-Fetch-Site":             "none",
+          "Upgrade-Insecure-Requests":  "1",
+        },
+      },
     ];
     let res: Response | null = null;
-    for (const ua of uaChain) {
+    for (const { ua, extraHeaders } of uaChain) {
       try {
         const r = await fetch(parsedUrl.toString(), {
           headers: {
@@ -417,8 +438,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
               "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
             "Cache-Control": "no-cache",
+            ...(extraHeaders ?? {}),
           },
-          signal: AbortSignal.timeout(5_000),
+          /* Real-browser UA gets a slightly longer window — Amazon
+             can be slow to render HTML for browser requests because
+             it kicks off more SSR work than for bot UAs. */
+          signal: AbortSignal.timeout(extraHeaders ? 8_000 : 5_000),
           redirect: "follow",
         });
         if (r.ok) { res = r; break; }
@@ -490,26 +515,33 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
        anchor card with cheaper-alternatives logic running on the title. */
     const hostname = parsedUrl.hostname.replace(/^www\./, "");
     const faviconImage = `https://www.google.com/s2/favicons?domain=${hostname}&sz=128`;
+    /* Friendly placeholder when ALL extraction paths failed. The
+       ASIN-only "Amazon product {ASIN}" form was confusing — users
+       saw it as a broken card. Make the copy honest about what
+       happened so they can decide whether to try a different URL or
+       search by name instead. */
+    const friendlyTitle = asin
+      ? `Amazon product (couldn't read details)`
+      : store
+        ? `Product on ${store} (couldn't read details)`
+        : "External product (couldn't read details)";
     return NextResponse.json<SniffResult>(
       {
         ok: !!asin || !!store,
         url: rawUrl,
         store,
         rawTitle: "",
-        title: asin
-          ? `Amazon product ${asin}`
-          : store
-            ? `Product on ${store}`
-            : "External product",
+        title: friendlyTitle,
         brand: null,
         imageUrl: fallbackImage ?? faviconImage,
         price: null,
         currency: null,
         asin,
         marketplace,
-        error: !asin && !store
-          ? "We couldn't read this page's details."
-          : undefined,
+        error:
+          asin || store
+            ? "We couldn't read this page's product details. Try searching for the product name instead."
+            : "We couldn't read this page's details.",
       },
       {
         headers: {
@@ -551,14 +583,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       url: rawUrl,
       store,
       rawTitle: "",
-      title: asin ? `Amazon product ${asin}` : "",
+      title: asin ? `Amazon product (couldn't read details)` : "",
       brand: null,
       imageUrl,
       price,
       currency,
       asin,
       marketplace,
-      error: asin ? undefined : "No product title found in page metadata",
+      error: asin
+        ? "We couldn't read this Amazon page's product details. Try searching for the product name instead."
+        : "No product title found in page metadata",
     });
   }
 
