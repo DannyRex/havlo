@@ -59,6 +59,12 @@ const HOST_REFERER: Record<string, string> = {
      direct-load whitelist in lib/utils.ts; this entry is the safety
      net for any code path that bypasses proxiedImageUrl(). */
   "cdn.shopify.com":                  "",
+  /* DigitalOcean Spaces CDN — MedPlus product thumbnails live at
+     {spacename}.{region}.cdn.digitaloceanspaces.com. The host
+     allowlist matcher above falls through to subdomain-suffix
+     matching, so the bare entry covers every regional variant
+     (lon1, fra1, nyc3, sfo3, etc.) without per-region duplication. */
+  "cdn.digitaloceanspaces.com":       "",
 };
 
 /* Reasonable upper bound for cache lifetime. Product images don't
@@ -82,11 +88,23 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Unsupported scheme", { status: 400 });
   }
 
-  if (!(target.hostname in HOST_REFERER)) {
+  /* Host allowlist check — accept exact hostname match OR any
+     subdomain of a roster entry. Lets a single roster entry like
+     "cdn.digitaloceanspaces.com" cover every regional / spacename
+     variant (commercefiles.lon1.cdn.digitaloceanspaces.com etc.)
+     without per-region duplication. Mirrors the lib/utils.ts
+     direct-load matcher. */
+  function findRefererForHost(host: string): string | null {
+    if (host in HOST_REFERER) return HOST_REFERER[host];
+    for (const entry of Object.keys(HOST_REFERER)) {
+      if (host.endsWith("." + entry)) return HOST_REFERER[entry];
+    }
+    return null;
+  }
+  const referer = findRefererForHost(target.hostname);
+  if (referer === null) {
     return new NextResponse(`Host not allowed: ${target.hostname}`, { status: 403 });
   }
-
-  const referer = HOST_REFERER[target.hostname];
   const headers: HeadersInit = {
     /* Use a real-browser UA. Some CDNs short-circuit on Bot/Lib UAs. */
     "User-Agent":

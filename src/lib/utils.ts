@@ -59,6 +59,11 @@ const DIRECT_LOAD_IMAGE_HOSTS = new Set([
      falling back to the gradient/emoji because /api/img-proxy
      blocks unwhitelisted hosts. */
   "cdn.shopify.com",
+  /* DigitalOcean Spaces — MedPlus stores its product thumbnails
+     here (commercefiles.lon1.cdn.digitaloceanspaces.com). Open
+     S3-compatible CDN, no Referer enforcement. Same direct-load
+     rationale as Shopify. */
+  "cdn.digitaloceanspaces.com",
 ]);
 
 /* Wrap an external image URL through /api/img-proxy unless its host
@@ -66,6 +71,24 @@ const DIRECT_LOAD_IMAGE_HOSTS = new Set([
    with '/' or matching havlo.io) pass through unchanged. Malformed
    URLs pass through unchanged so the <img> tag's onError fallback
    can take over rather than this helper choking the render. */
+/* True if the URL's hostname is on the direct-load list. Exact
+   match OR subdomain (endsWith ".entry") so a single roster entry
+   covers every regional / spacename variant of the same CDN —
+   e.g. "cdn.digitaloceanspaces.com" matches both
+   commercefiles.lon1.cdn.digitaloceanspaces.com (MedPlus) and any
+   future store on the same provider without a per-region entry. */
+function isDirectLoadHost(hostname: string): boolean {
+  if (DIRECT_LOAD_IMAGE_HOSTS.has(hostname)) return true;
+  /* Array.from() instead of `for..of` directly because the project
+     tsconfig targets ES5 for the public bundle and Set iteration
+     needs --downlevelIteration or ES2015+. Cheap conversion, runs
+     at module load on a tiny set. */
+  for (const entry of Array.from(DIRECT_LOAD_IMAGE_HOSTS)) {
+    if (hostname.endsWith("." + entry)) return true;
+  }
+  return false;
+}
+
 export function proxiedImageUrl(rawUrl: string | null | undefined): string {
   if (!rawUrl) return "";
   if (rawUrl.startsWith("/")) return rawUrl;
@@ -75,7 +98,7 @@ export function proxiedImageUrl(rawUrl: string | null | undefined): string {
   } catch {
     return rawUrl;
   }
-  if (DIRECT_LOAD_IMAGE_HOSTS.has(u.hostname)) return rawUrl;
+  if (isDirectLoadHost(u.hostname)) return rawUrl;
   return `/api/img-proxy?url=${encodeURIComponent(rawUrl)}`;
 }
 
