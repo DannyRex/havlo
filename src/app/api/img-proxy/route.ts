@@ -65,6 +65,13 @@ const HOST_REFERER: Record<string, string> = {
      matching, so the bare entry covers every regional variant
      (lon1, fra1, nyc3, sfo3, etc.) without per-region duplication. */
   "cdn.digitaloceanspaces.com":       "",
+  /* DHgate image CDN — img1-img9.dhresource.com all serve product
+     thumbs. Open, no Referer enforcement. */
+  "dhresource.com":                   "",
+  /* Google Shopping thumbnail CDN (encrypted-tbn0.gstatic.com etc.)
+     — shows up when SerpAPI returns Google's own search-result
+     image as the product photo. */
+  "gstatic.com":                      "",
 };
 
 /* Reasonable upper bound for cache lifetime. Product images don't

@@ -64,6 +64,15 @@ const DIRECT_LOAD_IMAGE_HOSTS = new Set([
      S3-compatible CDN, no Referer enforcement. Same direct-load
      rationale as Shopify. */
   "cdn.digitaloceanspaces.com",
+  /* DHgate image CDN — multiple regional variants (img1, img2, …,
+     img4.dhresource.com etc.). The endsWith subdomain matcher
+     covers all of them via the bare parent. Open CDN, no Referer
+     enforcement. */
+  "dhresource.com",
+  /* Google Shopping thumbnail CDN — shows up in SerpAPI ingest
+     where Google's own search-results thumbnails come back as the
+     product image. Open CDN, served fast from Google's edge. */
+  "gstatic.com",
 ]);
 
 /* Wrap an external image URL through /api/img-proxy unless its host
