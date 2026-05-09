@@ -107,45 +107,67 @@ export const dbBrowseProvider: BrowseProvider = {
     if (!supa) return [];
 
     const { col, asc } = sortToOrder(q.sort);
-    let query = supa.from("product_best_offers").select("*");
 
-    if (q.categorySlug && q.categorySlug !== "all") {
-      query = query.eq("category_slug", q.categorySlug);
-    }
-    if (typeof q.minDiscount === "number" && q.minDiscount > 0) {
-      query = query.gte("discount_percent", q.minDiscount);
-    }
-    if (q.search?.trim()) {
-      query = query.ilike("title", `%${q.search.trim()}%`);
-    }
-    if (q.origin && q.origin !== "all") {
-      query = applyOriginFilter(query, q.origin);
-    }
-    /* Bumped from 500 → 2000. With the 500 cap, different sorts
-       returned different post-filter totals (897 origin-count vs
-       182 deals on Relevance vs 310 deals on Latest in the QA
-       audit, Bucket 3#5) because each sort selected a different
-       top-500 subset, then filterDealsForCountry pruned each
-       differently. At Havlo's current scale (a few thousand offers
-       across the whole DB) 2000 brings effectively every row that
-       could pass downstream filters into memory once, eliminating
-       the sort-dependent count variance. Re-evaluate when total
-       offers crosses 5000 — at that point a separate count query
-       + cursor-based pagination is the right shape. */
-    query = query.order(col, { ascending: asc }).limit(2000);
+    /* Build a query factory so we can re-apply the same filters
+       across paginated requests without duplication. */
+    const buildQuery = () => {
+      let query = supa.from("product_best_offers").select("*");
+      if (q.categorySlug && q.categorySlug !== "all") {
+        query = query.eq("category_slug", q.categorySlug);
+      }
+      if (typeof q.minDiscount === "number" && q.minDiscount > 0) {
+        query = query.gte("discount_percent", q.minDiscount);
+      }
+      if (q.search?.trim()) {
+        query = query.ilike("title", `%${q.search.trim()}%`);
+      }
+      if (q.origin && q.origin !== "all") {
+        query = applyOriginFilter(query, q.origin);
+      }
+      return query.order(col, { ascending: asc });
+    };
 
-    const { data, error } = await query;
-    if (error) {
-      console.warn("[browse-db] query error:", error.message);
-      /* Even on a DB query failure, surface the curated catalog so
-         the homepage isn't completely empty. Better than a blank
-         page when Supabase is briefly unavailable. */
+    /* PostgREST caps single responses at db-max-rows (default 1000)
+       even when .limit() requests more — verified May 2026 against
+       the live Supabase instance. With 7k+ in-stock offers post-NG-
+       expansion, the cap was silently hiding entire stores: the
+       new Shopify pharmacies + grocers (HealthPlus, Supermart,
+       MedPlus, Essenza — ~1,700 offers, all 0% discount) sat past
+       row 1000 in the discount-DESC pre-sort and never made it
+       into /api/deals.
+
+       Fix: fan out 8 parallel range() requests to pull up to 8000
+       rows in one round trip's wall time. The ~5MB total payload
+       is fine for serverless; the parallel requests amortize
+       latency. Revisit when total in-stock offers crosses 20000
+       and switch to cursor-based pagination. */
+    const PAGE = 1000;
+    const PAGES = 8; // 8000-row ceiling
+    const pageRequests = Array.from({ length: PAGES }, (_, i) =>
+      buildQuery().range(i * PAGE, (i + 1) * PAGE - 1),
+    );
+    const results = await Promise.all(pageRequests);
+
+    /* Stop on first error, surface curated as fallback so the page
+       isn't blank if Supabase had a transient hiccup mid-fan-out. */
+    const erroredResult = results.find((r) => r.error);
+    if (erroredResult?.error) {
+      console.warn("[browse-db] paginated query error:", erroredResult.error.message);
       return getCuratedDeals(q);
     }
+
+    const allRows: BestOfferRow[] = [];
+    for (const r of results) {
+      if (r.data) allRows.push(...(r.data as BestOfferRow[]));
+      /* Short page = end of dataset; no need to merge anything past
+         this point (subsequent ranges will all have come back empty
+         too). Could break early but Promise.all already fired them. */
+    }
+
     /* Drop offers whose URL points at Google Shopping (legacy SerpAPI
        ingest residue). Without SerpAPI to resolve, those clicks land
        the user on a Google search page — broken UX. */
-    const fromDb = (data as BestOfferRow[])
+    const fromDb = allRows
       .filter((r) => isUsableMerchantUrl(r.url))
       .map(rowToDeal);
     /* Merge curated Amazon catalog with the ingested data, then
