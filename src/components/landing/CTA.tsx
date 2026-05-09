@@ -179,14 +179,18 @@ export default async function CTA() {
                   Free · No account required
                 </p>
 
+                {/* Bottom CTA picks up the line that used to be the
+                    hero H1. Keeps the 'similar products for less'
+                    keyword visible on the page after the hero swap
+                    so SEO + brand-voice continuity both hold. */}
                 <h2 className="text-[32px] sm:text-5xl font-bold text-white tracking-[-0.035em] leading-[1.04] mb-5">
-                  Before you buy it,
+                  Find similar products
                   <br />
-                  <span className="text-white/75">find it for less.</span>
+                  <span className="text-white/75">for less.</span>
                 </h2>
 
                 <p className="text-white/70 text-[15px] sm:text-lg leading-relaxed max-w-md mb-8">
-                  Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know.
+                  Paste a link or search any product. We find the same item, or a cheaper alternative, at the stores you already shop.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-3">

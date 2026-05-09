@@ -93,22 +93,28 @@ export default function Hero({ storeCount }: Props) {
         </div>
 
         {/* Headline — large, editorial, single tone.
-            Note: literal whitespace between "similar" and "products" so
-            screen readers don't merge them via the line-break.
-            clamp() min lowered to 1.95rem so "products" doesn't clip at 320px. */}
+            "Before you buy it / find it for less" anchors the action
+            moment (the shopper standing at a checkout button on
+            Konga / Amazon / Argos with their finger hovering) which
+            the previous "Find similar products for less" framing
+            didn't. The 'similar products' keyword is preserved in
+            the bottom-section CTA + page metadata so the SEO
+            footprint stays intact.
+            Note: literal whitespace + line-break for screen readers.
+            clamp() min lowered to 1.95rem so "less" doesn't clip at 320px. */}
         <h1
           className="font-bold text-ink leading-[0.98] tracking-[-0.04em] mb-5 sm:mb-6 animate-fade-up"
           style={{ fontSize: "clamp(1.95rem, 8vw, 5rem)" }}
         >
-          Find similar products{" "}
-          <span className="block sm:inline">for less.</span>
+          Before you buy it,{" "}
+          <span className="block sm:inline">find it for less.</span>
         </h1>
 
         <p
           className="text-ink-2 text-[15px] sm:text-lg leading-relaxed mb-8 sm:mb-10 max-w-xl mx-auto animate-fade-up px-2"
           style={{ animationDelay: "80ms" }}
         >
-          Paste a link or search anything. We find cheaper alternatives across stores you already know.
+          Paste a link or search any product. Havlo finds cheaper alternatives across the stores you already know.
         </p>
 
         {/* Composer — mobile-optimised */}
