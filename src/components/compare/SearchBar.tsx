@@ -282,7 +282,7 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
           <button
             type="submit"
             disabled={!canSubmit}
-            aria-label={isUrlInput ? "Smart switch" : "Find dupes"}
+            aria-label={isUrlInput ? "Smart switch" : "Find cheaper"}
             className={`m-1.5 shrink-0 inline-flex items-center justify-center gap-1.5 rounded-full text-sm font-semibold transition-all
               h-10 w-10 sm:h-10 sm:w-auto sm:px-4
               ${canSubmit
@@ -302,7 +302,7 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
             ) : (
               <>
                 <ArrowUp size={16} className="sm:hidden" strokeWidth={2.5} />
-                <span className="hidden sm:inline">Find dupes</span>
+                <span className="hidden sm:inline">Find cheaper</span>
                 <Sparkles size={14} className="hidden sm:inline" />
               </>
             )}

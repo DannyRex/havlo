@@ -10,6 +10,7 @@ import {
   cleanTitle,
   formatCompact,
   getClickThroughUrl,
+  isAmazonSearchUrl,
   proxiedImageUrl,
   timeAgo,
   usdToNgn,
@@ -89,6 +90,13 @@ export default function ListCard({ deal }: Props) {
   const saveFmt  = primarySaved > 0 ? formatLocal(primarySaved, country) : null;
   const hasDiscount = deal.originalPrice > deal.salePrice && deal.discountPercent > 0;
 
+  /* Amazon search-URL deals — see MasonryCard for the full rationale.
+     The cheapest reference price is real, but the destination is a
+     search results page, not a specific item. "from " makes that
+     honest. Same flag must apply on both card layouts so the framing
+     stays consistent across grid + list views. */
+  const isPriceFromOnly = isAmazonSearchUrl(deal.url);
+
   /* Secondary price hint — shows the deal's original currency when it
      differs from the user's. Same idea as MasonryCard's secondaryStr. */
   const isUSD = deal.currency === "USD";
@@ -107,7 +115,7 @@ export default function ListCard({ deal }: Props) {
       href={getClickThroughUrl(deal)}
       target="_blank"
       rel="noopener noreferrer sponsored"
-      aria-label={`${cleanedTitle}, ${priceFmt} at ${deal.storeName}`}
+      aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${deal.storeName}`}
       className="group flex gap-3 items-start p-2.5 rounded-2xl border border-border bg-surface hover:border-border-strong hover:shadow-card transition-all"
     >
       {/* Image — square thumbnail on the left */}
@@ -142,6 +150,9 @@ export default function ListCard({ deal }: Props) {
         </p>
 
         <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
+          {isPriceFromOnly && (
+            <span className="text-[11px] font-medium text-ink-3 leading-none">from</span>
+          )}
           <span className="text-sm font-bold text-ink">{priceFmt}</span>
           {hasDiscount && (
             <span className="text-[11px] text-ink-3 line-through">{origFmt}</span>

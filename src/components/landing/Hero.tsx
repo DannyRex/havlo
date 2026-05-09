@@ -101,10 +101,26 @@ export default function Hero({ storeCount }: Props) {
             the bottom-section CTA + page metadata so the SEO
             footprint stays intact.
             Note: literal whitespace + line-break for screen readers.
-            clamp() min lowered to 1.95rem so "less" doesn't clip at 320px. */}
+
+            Mobile typography (May 2026 — QA pass):
+              QA reported the headline wrapping to 4 short lines on
+              iPhone (390x844) — "Before you / buy it, / find it for /
+              less.". Three changes:
+                1. clamp() min dropped 1.95rem → 1.65rem so the bold
+                   weight at sub-400px viewports stops overflowing
+                   the px-4 container and forcing per-word breaks.
+                2. clamp() slope eased 8vw → 7.5vw so growth from
+                   small-mobile to large-mobile is gentler — keeps
+                   the desktop crescendo at 5rem unchanged.
+                3. text-wrap: balance (Tailwind text-balance) lets
+                   the browser distribute the two-clause headline
+                   across two even lines instead of letting the
+                   first clause hog the wider line.
+              The block→inline span at sm: stays — that's what gives
+              us the explicit 2-line target on phones. */}
         <h1
-          className="font-bold text-ink leading-[0.98] tracking-[-0.04em] mb-5 sm:mb-6 animate-fade-up"
-          style={{ fontSize: "clamp(1.95rem, 8vw, 5rem)" }}
+          className="font-bold text-ink leading-[1.02] sm:leading-[0.98] tracking-[-0.04em] mb-5 sm:mb-6 animate-fade-up text-balance"
+          style={{ fontSize: "clamp(1.65rem, 7.5vw, 5rem)" }}
         >
           Before you buy it,{" "}
           <span className="block sm:inline">find it for less.</span>

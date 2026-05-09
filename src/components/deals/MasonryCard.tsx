@@ -15,6 +15,7 @@ import {
   formatCompact,
   formatUSDPrice,
   getClickThroughUrl,
+  isAmazonSearchUrl,
   proxiedImageUrl,
   savings,
   timeAgo,
@@ -132,6 +133,14 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
   const origFmt  = formatLocal(primaryOrig, country);
   const saveFmt  = primarySaved > 0 ? formatLocal(primarySaved, country) : null;
 
+  /* Amazon search-URL deals (curated catalog rows that link to
+     /s?k=... rather than a /dp/ASIN page). The displayed price is
+     the cheapest reference value we have for the product family,
+     not a guarantee for the specific item the user lands on. The
+     "from " prefix tells the user that explicitly, which is the
+     truthful framing the QA agent asked for. */
+  const isPriceFromOnly = isAmazonSearchUrl(deal.url);
+
   /* Landed-cost estimate for cross-border purchases. Uses the same
      30% markup as the /compare anchor row (offerToStoreOffer in
      pg-fts.ts) so users see consistent numbers across surfaces.
@@ -172,7 +181,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
       href={getClickThroughUrl(deal)}
       target="_blank"
       rel="noopener noreferrer sponsored"
-      aria-label={`${cleanedTitle}, ${priceFmt} at ${deal.storeName}`}
+      aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${deal.storeName}`}
       className="group block"
     >
       <div className={`relative overflow-hidden rounded-xl sm:rounded-2xl bg-surface-2 border border-border ${aspect}`}>
@@ -279,6 +288,9 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
         </p>
 
         <div className="flex items-baseline gap-1 sm:gap-1.5 flex-wrap">
+          {isPriceFromOnly && (
+            <span className="text-[10px] sm:text-[11px] font-medium text-ink-3 leading-none">from</span>
+          )}
           <span className="text-[13px] sm:text-sm font-bold text-ink">{priceFmt}</span>
           {hasDiscount && (
             <span className="text-[10px] sm:text-[11px] text-ink-3 line-through">{origFmt}</span>

@@ -35,6 +35,41 @@ export function getClickThroughUrl(item: { url: string; id?: string; title?: str
   return `/api/go?${params.toString()}`;
 }
 
+/* True if the URL points at an Amazon search-results page (e.g.
+   amazon.com/s?k=Samsung+Galaxy+S24+Ultra) rather than a specific
+   product page (/dp/ASIN, /gp/product/ASIN).
+
+   Why this exists: the curated Amazon catalog (curated-amazon.ts)
+   intentionally generates `/s?k=` URLs because ASINs rotate across
+   regional variants and refurb editions — a bad ASIN gives a 404,
+   while a search URL always 200s and Amazon's relevance scoring
+   lands the user on the canonical product. The affiliate tag still
+   attributes correctly because tag attribution works on any
+   amazon.{tld} URL.
+
+   The downside: we display a precise NGN price ("₦1,758,400") on
+   the deal card, but the destination is a *list* of products. The
+   user can't anchor that price to a specific item on the search
+   page. The QA agent flagged this as a trust issue.
+
+   Solution downstream: card components prefix the price with "from "
+   when this returns true, signalling that the displayed price is a
+   reference value for the product family, not a guarantee. The
+   precise number stays in the card as the cheapest seen, but the
+   "from" prefix removes the implied "this exact price at click". */
+export function isAmazonSearchUrl(url: string | undefined | null): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    if (!/(^|\.)amazon\./i.test(u.hostname)) return false;
+    /* Search routes: /s, /s/, /s?k=, /gp/search. Product routes (do
+       NOT match): /dp/{ASIN}, /gp/product/{ASIN}, /-/en/dp/{ASIN}. */
+    return /^\/(s|gp\/search)(\/|\?|$)/.test(u.pathname + (u.search ? "?" : ""));
+  } catch {
+    return false;
+  }
+}
+
 /* Hosts whose images load fine when hotlinked direct from havlo.io.
    Anything NOT in this set is wrapped through /api/img-proxy which
    rewrites the Referer to the merchant's own domain so Amazon /
