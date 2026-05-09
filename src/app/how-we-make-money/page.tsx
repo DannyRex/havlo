@@ -3,13 +3,16 @@ import LegalPage from "@/components/legal/LegalPage";
 
 const sections = [
   {
-    /* Lead with the affiliate disclosure so anchor links from the
-       footer ('/disclaimer#affiliate-disclosure') land users at the
-       most legally-relevant section first. Covers FTC clear-and-
-       conspicuous standard + the Amazon Associates Operating
-       Agreement requirement to include the 'qualifying purchases'
-       phrase verbatim somewhere on the site. */
-    title: "Affiliate disclosure",
+    /* Lead with the affiliate disclosure — it's the centerpiece of
+       this whole page, and the FTC clear-and-conspicuous standard
+       wants the disclosure obvious to anyone who lands here.
+       Renamed from "Affiliate disclosure" to "How we earn money"
+       so the section heading aligns with the page H1 ("How Havlo
+       makes money") and reads as editorial transparency rather
+       than legalese. Section content also satisfies the Amazon
+       Associates Operating Agreement requirement to include the
+       'qualifying purchases' phrase verbatim. */
+    title: "How we earn money",
     paragraphs: [
       "Havlo earns small commissions on qualifying purchases through some of our outbound links. This never changes the price you pay. It's the same model used by NerdWallet, Wirecutter, Skyscanner, and most other comparison platforms.",
       "As an Amazon Associate, Havlo earns from qualifying purchases. This applies to clicks that lead to amazon.com, amazon.co.uk, amazon.de, amazon.ae, amazon.in, and other Amazon marketplaces.",
@@ -56,26 +59,29 @@ const sections = [
 ];
 
 export const metadata: Metadata = {
-  title: "Disclaimer | Havlo",
+  title: "How Havlo makes money",
   description:
-    "Understand the limits of the information on Havlo and why final product, price, and checkout details should be verified with each retailer.",
-  alternates: { canonical: "/disclaimer" },
+    "How Havlo earns commissions, why our rankings stay independent of who pays us, where our listings come from, and the limits of the information shown on the site.",
+  alternates: { canonical: "/how-we-make-money" },
   openGraph: {
-    title: "Disclaimer · Havlo",
+    title: "How Havlo makes money",
     description:
-      "How Havlo sources listings, why final prices belong to each retailer, and our affiliate disclosure.",
-    url: "/disclaimer",
+      "Affiliate links, no inflated prices, no bias on results — the cheapest store still ranks first.",
+    url: "/how-we-make-money",
     type: "website",
   },
 };
 
-export default function DisclaimerPage() {
+export default function HowWeMakeMoneyPage() {
   return (
     <LegalPage
-      eyebrow="Legal"
-      title="Disclaimer"
-      description="Havlo helps you compare prices and discover deals, but the final transaction always happens with the retailer. This page explains the limits of the information shown on the site."
-      lastUpdated="27 April 2026"
+      /* Eyebrow is "About Havlo" — frames the page as editorial
+         transparency, not legal disclosure. Matches Wirecutter /
+         Kayak / Skyscanner branding for the same surface. */
+      eyebrow="About Havlo"
+      title="How Havlo makes money"
+      description="Havlo runs on affiliate commissions and is free for shoppers. This page covers exactly how we earn, why our rankings stay independent of who pays us, where our listings come from, and the limits of what we can guarantee."
+      lastUpdated="9 May 2026"
       sections={sections}
     />
   );

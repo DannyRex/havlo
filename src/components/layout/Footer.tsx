@@ -4,9 +4,20 @@ import Logo from "@/components/ui/Logo";
 import CountrySelect from "@/components/layout/CountrySelect";
 
 /* Three-nav-column footer: Product (functional), Company (about /
-   contact / brand-trust), Legal (compliance pages). About lives in
-   Company because partnership prospects and curious users look there
-   first when evaluating "is this a real, trustworthy site." */
+   contact / brand-trust), Legal (compliance pages).
+
+   "How we make money" sits in the Company column, NOT in Legal.
+   Verified May 2026 against peer pattern (Wirecutter, NerdWallet,
+   Kayak, Skyscanner) — the leaders treat affiliate disclosure as
+   editorial transparency rather than legal compliance, and link it
+   from About / Help / inline rather than the Privacy/Terms row.
+   Slickdeals + Honey are the only major peers that put it directly
+   in the main footer; even they brand it as "Ad Disclosure", not
+   alongside Privacy/Terms.
+
+   The Legal column stays narrow — only true legal documents live
+   there. FTC clear-and-conspicuous standard is still met because
+   "How we make money" is one click away on every page. */
 const footerSections = [
   {
     title: "Product",
@@ -18,23 +29,17 @@ const footerSections = [
   {
     title: "Company",
     links: [
-      { label: "About",   href: "/about" },
-      { label: "Blog",    href: "/blog" },
-      { label: "Contact", href: "/contact" },
+      { label: "About",              href: "/about" },
+      { label: "How we make money",  href: "/how-we-make-money" },
+      { label: "Blog",               href: "/blog" },
+      { label: "Contact",            href: "/contact" },
     ],
   },
   {
     title: "Legal",
     links: [
-      { label: "Privacy Policy",       href: "/privacy-policy" },
-      { label: "Terms of Use",         href: "/terms-of-use" },
-      { label: "Disclaimer",           href: "/disclaimer" },
-      /* Anchor link jumps to the disclosure section on the existing
-         Disclaimer page. FTC clear-and-conspicuous standard is met
-         by a footer link to a clearly-labelled disclosure page —
-         we don't need a heavy block on every page. Matches the
-         pattern Dupe / Spoken / NerdWallet / Wirecutter all use. */
-      { label: "Affiliate disclosure", href: "/disclaimer#affiliate-disclosure" },
+      { label: "Privacy Policy", href: "/privacy-policy" },
+      { label: "Terms of Use",   href: "/terms-of-use" },
     ],
   },
 ] as const;
@@ -94,14 +99,12 @@ export default function Footer() {
           ))}
         </div>
 
-        {/* Compliance note: the prominent disclosure block that used
-            to live here was replaced with the 'Affiliate disclosure'
-            link in the Legal column above. FTC clear-and-conspicuous
-            standard is met by a footer link to a clearly-labelled
-            disclosure page; Amazon Associates Operating Agreement is
-            satisfied by the 'as an Amazon Associate' phrase living on
-            /disclaimer. Matches the lighter-touch pattern used by
-            Dupe, Spoken, NerdWallet, Wirecutter, and Skyscanner. */}
+        {/* Compliance note: the affiliate disclosure now lives on
+            /how-we-make-money, linked from the Company column above.
+            FTC clear-and-conspicuous standard is met (one-click
+            access on every page). Amazon Associates Operating
+            Agreement is satisfied by the 'as an Amazon Associate'
+            phrase living verbatim on that page. */}
 
         <div className="pt-6 border-t border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <p className="text-xs text-ink-3">

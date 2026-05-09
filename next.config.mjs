@@ -25,6 +25,21 @@ const nextConfig = {
     ],
   },
 
+  /* URL-level redirects.
+     /disclaimer → /how-we-make-money: the page was renamed (May 2026)
+     to align with peer site naming (Wirecutter / Kayak / Skyscanner all
+     use "How we make money" rather than "Disclaimer"). 308 permanent
+     redirect preserves any existing search-index ranking + inbound
+     links pointing at the old URL. The legacy
+     #affiliate-disclosure anchor still resolves because the page's
+     first section retains its slug. */
+  async redirects() {
+    return [
+      { source: "/disclaimer",                           destination: "/how-we-make-money", permanent: true },
+      { source: "/disclaimer/:path*",                    destination: "/how-we-make-money/:path*", permanent: true },
+    ];
+  },
+
   /* Long-cache for fingerprinted static assets. Vercel sets sane defaults
      but pinning here keeps behaviour identical across self-hosted envs. */
   async headers() {

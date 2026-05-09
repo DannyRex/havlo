@@ -120,7 +120,11 @@ export default function AboutPage() {
         </section>
 
         {/* Independence + monetization — the section partnership prospects
-            and skeptical users will look for. Be transparent, plain. */}
+            and skeptical users will look for. Be transparent, plain.
+            Detailed breakdown lives on /how-we-make-money; this is the
+            one-paragraph summary with a link to dig deeper. Matches the
+            Wirecutter pattern (short summary on About, longer page
+            elsewhere). */}
         <section className="mb-12">
           <h2 className="text-xl sm:text-2xl font-bold text-ink tracking-[-0.02em] mb-3">
             How we make money, without bias
@@ -135,6 +139,15 @@ export default function AboutPage() {
               Retailers can&apos;t pay to rank higher. The cheapest option
               always shows first. We earn more when we save you more, because
               that&apos;s what gets clicked.
+            </p>
+            <p className="pt-1">
+              <Link
+                href="/how-we-make-money"
+                className="inline-flex items-center gap-1 text-brand font-medium hover:underline underline-offset-4"
+              >
+                Read the full breakdown{" "}
+                <span aria-hidden="true">→</span>
+              </Link>
             </p>
           </div>
         </section>

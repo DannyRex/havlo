@@ -544,6 +544,19 @@ function CompareContent() {
                         Final total varies by carrier and customs assessment.
                       </p>
                     )}
+                    {/* Affiliate disclosure — inline at the click-out
+                        point, the moment the FTC's clear-and-conspicuous
+                        standard most cares about. Tiny visual weight so
+                        it doesn't compete with prices, but always present
+                        on every comparison surface. Mirrors the
+                        Wirecutter / NYT pattern of putting the
+                        disclosure right where commercial action happens. */}
+                    <p className="mt-2 text-[10px] text-ink-3/85 leading-relaxed">
+                      Some links earn Havlo a commission. The price you pay doesn&apos;t change, and we never adjust ranking based on who pays us.{" "}
+                      <Link href={`/how-we-make-money`} className="underline underline-offset-2 hover:text-ink-2 transition-colors">
+                        How this works
+                      </Link>
+                    </p>
                   </div>
                 );
               })()}

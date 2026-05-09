@@ -54,7 +54,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/contact`,         priority: 0.4, changeFrequency: "yearly",  lastModified: now },
     { url: `${SITE_URL}/privacy-policy`,  priority: 0.3, changeFrequency: "monthly", lastModified: now },
     { url: `${SITE_URL}/terms-of-use`,    priority: 0.3, changeFrequency: "monthly", lastModified: now },
-    { url: `${SITE_URL}/disclaimer`,      priority: 0.3, changeFrequency: "monthly", lastModified: now },
+    /* /how-we-make-money replaces the old /disclaimer URL (308
+       permanent redirect lives in next.config.mjs). Slightly higher
+       priority than other legal pages because affiliate transparency
+       is a real surface shoppers click into, not just a
+       compliance checkbox. */
+    { url: `${SITE_URL}/how-we-make-money`, priority: 0.4, changeFrequency: "monthly", lastModified: now },
   ];
 
   /* Per-country blog index. Each country's /[country]/blog gets its
