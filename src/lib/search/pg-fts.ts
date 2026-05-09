@@ -102,8 +102,8 @@ function priceLooksPlausible(priceNgn: number, categorySlug: string | null): boo
 /* Product-family detection lives in families.ts (shared with
    /api/live-search). Re-exported here so existing imports of these
    from pg-fts continue to resolve. */
-export { PRODUCT_FAMILIES, detectFamily, familiesIncompatible } from "./families";
-import { PRODUCT_FAMILIES, detectFamily, familiesIncompatible } from "./families";
+export { PRODUCT_FAMILIES, detectFamily, familiesIncompatible, alternativeFamilyMatches } from "./families";
+import { PRODUCT_FAMILIES, detectFamily, familiesIncompatible, alternativeFamilyMatches } from "./families";
 
 /* Category-class queries — bare nouns / plurals that name a product class
    rather than a specific product. When the user's literal query matches
@@ -928,8 +928,15 @@ export async function pgFtsFindSimilar(
     .filter((r) => !looksLikeAccessory(r.title))
     // Drop counterfeit-looking titles ("Apple MacBook Neo A18 Pro")
     .filter((r) => !looksSuspicious(r.title))
-    // Product-family gate: an iPhone anchor must not get iPad / MacBook dupes.
-    .filter((r) => !familiesIncompatible(anchor.title, r.title))
+    /* Strict family match — when the anchor has a recognised family
+       (footwear, watch, earbuds, etc.), candidates must be in the
+       same family. Stops cross-family same-brand dupes like
+       "Nike Air Force 1" → "Nike Crew Socks" / "Nike Waistpack" /
+       "Nike T-Shirt" that the QA agent flagged. familiesIncompatible
+       was too permissive here (treats null candidate family as
+       compatible), so apparel items with no family classification
+       were slipping through. */
+    .filter((r) => alternativeFamilyMatches(anchor.title, r.title))
     .map((r) => ftsRowToDupe(r, anchor))
     // No savings floor — show every cheaper alternative, even 1-2% off
     // the anchor. The >=85% suppressed-zero rows still get filtered

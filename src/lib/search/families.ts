@@ -95,10 +95,30 @@ export function detectFamily(title: string): string | null {
 /* True if anchor + candidate are in incompatible families.
    Allows the case where one (or both) families are unidentified — only
    blocks when we have HIGH CONFIDENCE both items are in different
-   known families. */
+   known families. Used by the anchor-selection path where we want to
+   be permissive on uncertain candidates. */
 export function familiesIncompatible(anchorTitle: string, candTitle: string): boolean {
   const af = detectFamily(anchorTitle);
   const cf = detectFamily(candTitle);
   if (!af || !cf) return false;
   return af !== cf;
+}
+
+/* Stricter cousin of familiesIncompatible — used for ALTERNATIVES
+   ranking (the dupes pipeline) where we already KNOW the anchor's
+   family and want only same-family candidates. The QA agent caught
+   "Nike Air Force 1" returning Nike socks / waistpacks as
+   alternatives because family detection was null on the apparel
+   items, and familiesIncompatible's "treat null as compatible"
+   semantics let them through.
+
+   Rule: if the anchor has a recognised family, the candidate MUST
+   have that same family. If the anchor's family is null (rare —
+   anchor is something we don't classify), fall through to
+   familiesIncompatible's permissive semantics. */
+export function alternativeFamilyMatches(anchorTitle: string, candTitle: string): boolean {
+  const af = detectFamily(anchorTitle);
+  if (!af) return true; // anchor untyped — accept any family for the candidate
+  const cf = detectFamily(candTitle);
+  return af === cf;
 }
