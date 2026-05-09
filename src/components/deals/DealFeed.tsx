@@ -229,13 +229,16 @@ export default function DealFeed() {
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-8 sm:py-12">
 
-      {/* Header */}
+      {/* Header — country-aware. Was hardcoded "Nigerians already
+          shop" which read wrong on /uk/deals, /us/deals, etc. Now
+          uses the country's name + a generic "shoppers" so the
+          subhead localises automatically. */}
       <div className="mb-6 sm:mb-8 px-1 sm:px-0">
         <h1 className="text-[28px] sm:text-4xl font-bold text-ink tracking-[-0.03em] leading-tight">
           Deals worth checking today
         </h1>
         <p className="text-sm sm:text-base text-ink-2 mt-2 max-w-2xl">
-          Fresh price drops and standout offers from the stores Nigerians already shop. Filter fast, find the deals worth opening.
+          Fresh price drops and standout offers from the stores {country.name === "Nigeria" ? "Nigerians" : `${country.name} shoppers`} already shop. Filter fast, find the deals worth opening.
         </p>
       </div>
 
@@ -245,9 +248,14 @@ export default function DealFeed() {
           Persistent micro-copy below the input keeps the rule visible
           while the user is typing. */}
       <div className="relative mb-1.5">
-        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-3 pointer-events-none" />
+        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-3 pointer-events-none" aria-hidden="true" />
+        <label htmlFor="deals-search" className="sr-only">
+          Search deals
+        </label>
         <input
+          id="deals-search"
           type="text"
+          aria-label="Search deals or press Enter to compare"
           placeholder="Search deals or jump to compare…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}

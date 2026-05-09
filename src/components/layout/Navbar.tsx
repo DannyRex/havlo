@@ -8,6 +8,21 @@ import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import Logo from "@/components/ui/Logo";
 import CountrySelect from "@/components/layout/CountrySelect";
+import { useCountry } from "@/components/providers/CountryProvider";
+
+/* Helper: prepend /{country} to a bare href so client-side
+   navigation lands on the right country variant immediately,
+   without relying on middleware redirect (which races with cookie
+   state on client-side <Link> clicks). The QA pass surfaced this
+   as: clicking 'Cashback' from /ng went to /uk/cashback because
+   the bare /cashback href deferred to middleware which used a
+   stale cookie value. */
+function countryHref(href: string, countryCode: string): string {
+  if (href === "/") return `/${countryCode}`;
+  /* Already prefixed (defensive — shouldn't happen with our nav) */
+  if (/^\/[a-z]{2}\//.test(href)) return href;
+  return `/${countryCode}${href}`;
+}
 
 /* Mobile drawer navigation. Primary navigational destinations;
    Blog lives in the footer only (reference content, less frequently
@@ -34,6 +49,12 @@ const desktopLinks = navLinks.filter((l) => DESKTOP_LINK_HREFS.has(l.href));
 export default function Navbar() {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  /* Reads the country state set by CountryProvider — primed from
+     the cookie at SSR so first-paint hrefs match the user's country
+     (no hydration mismatch). Used by countryHref() below to prefix
+     bare nav links so client-side navigation lands on the right
+     country variant. */
+  const { country } = useCountry();
 
   /* Active matcher accounts for country-prefixed routes. /deals
      is active for /ng/deals, /uk/deals etc. Same for /compare and
@@ -95,7 +116,7 @@ export default function Navbar() {
             </button>
 
             <Link
-              href="/"
+              href={countryHref("/", country.code)}
               aria-label="Havlo home"
               aria-current={pathname === "/" ? "page" : undefined}
               className="px-1 py-1 rounded-lg hover:bg-surface-2 transition-colors"
@@ -118,10 +139,11 @@ export default function Navbar() {
             <div className="hidden md:flex items-center gap-1 mr-2">
               {desktopLinks.map(({ href, label }) => {
                 const active = isActive(href);
+                const cHref = countryHref(href, country.code);
                 return (
                   <Link
                     key={href}
-                    href={href}
+                    href={cHref}
                     aria-current={active ? "page" : undefined}
                     className={cn(
                       "px-3.5 py-2 rounded-full text-sm font-medium transition-colors",
@@ -168,7 +190,7 @@ export default function Navbar() {
           {/* Header — logo + close */}
           <div className="flex items-center justify-between mb-6">
             <Link
-              href="/"
+              href={countryHref("/", country.code)}
               aria-label="Havlo home"
               onClick={() => setDrawerOpen(false)}
             >
@@ -204,7 +226,7 @@ export default function Navbar() {
               return (
                 <Link
                   key={href}
-                  href={href}
+                  href={countryHref(href, country.code)}
                   aria-current={active ? "page" : undefined}
                   onClick={() => setDrawerOpen(false)}
                   className={cn(

@@ -45,7 +45,7 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   // ── Audio (headphones, earbuds, speakers) ──
   { pattern: /\bairpods?\s*(pro|max|2|3|4)?\b/i, slug: "audio", reason: "AirPods" },
   { pattern: /\b(headphone|headphones|headset|earbuds|earpods|earphone|tws)\b/i, slug: "audio", reason: "ear-worn audio" },
-  { pattern: /\b(soundbar|home\s*theatre|home\s*theater|boombox|bluetooth\s*speaker|wireless\s*speaker|portable\s*speaker)\b/i, slug: "audio", reason: "speaker form factor" },
+  { pattern: /\b(soundbar|home\s*theatre|home\s*theater|boombox|bluetooth\s*speaker|wireless\s*speaker|portable\s*speaker|party\s*speaker|party\s*box)\b/i, slug: "audio", reason: "speaker form factor" },
   { pattern: /\b(jbl|bose|sonos|harman\s*kardon|marshall|wh-1000|qc(35|45|ultra)|quietcomfort)\b/i, slug: "audio", reason: "audio brand+model" },
 
   // ── Phones (after computing rules so iPad doesn't slip in) ──
@@ -59,6 +59,12 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   { pattern: /\b(qled|oled|uhd|smart\s*tv|led\s*tv|4k\s*tv|8k\s*tv)\b/i, slug: "electronics", reason: "TV tech" },
   { pattern: /\b(television)\b/i, slug: "electronics", reason: "television" },
   { pattern: /\b(\d{2})\s*("?inch|"?-inch|"?in)\b.*\b(tv|hisense|lg|samsung|tcl|sony|bravia)\b/i, slug: "electronics", reason: "TV size+brand" },
+  /* Electrical accessories that frequently get scraped from
+     "phones" category pages on retailers and end up mis-tagged.
+     Route to electronics so the Phones filter stays clean. */
+  { pattern: /\b(power\s*strip|surge\s*protector|extension\s*cord|smart\s*plug|wall\s*charger|car\s*charger|wireless\s*charger|wall\s*adapter)\b/i, slug: "electronics", reason: "electrical accessory" },
+  { pattern: /\b(usb\s*(adapter|hub|extender|extension|dock|cable|drive|stick)|hdmi\s*(cable|adapter|switch))\b/i, slug: "electronics", reason: "USB/HDMI accessory" },
+  { pattern: /\b(power\s*bank|portable\s*charger|solar\s*charger)\b/i, slug: "electronics", reason: "power bank" },
 
   // ── Gaming ──
   { pattern: /\b(playstation|ps[345]|xbox\s*(series|one)|nintendo\s*switch|oled\s*switch)\b/i, slug: "gaming", reason: "console" },

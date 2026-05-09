@@ -313,6 +313,50 @@ const MODEL_TOKEN_STOPLIST = new Set([
   "4k", "8k",
 ]);
 
+/* Brand gate (added May 2026 after QA report flagged an LG OLED 55
+   query anchoring on a Samsung TV).
+
+   When the query contains a recognisable manufacturer brand name,
+   every candidate must contain the same brand. Stops cross-brand
+   matches inside the same family (LG → Samsung TV, Sony → Bose
+   headphones, etc.). Brands that share family but compete head-to-
+   head shouldn't substitute for each other.
+
+   Conservative list — only major brands where users genuinely
+   shop by brand identity. Non-brand queries (e.g. "55 inch TV"
+   without a brand name) bypass this gate. */
+const KNOWN_BRANDS = new Set([
+  // Phones / electronics — typed by users when they want THAT brand
+  "samsung", "lg", "sony", "hisense", "tcl", "philips", "panasonic",
+  "apple", "google", "xiaomi", "oneplus", "motorola", "nokia", "huawei",
+  "tecno", "infinix", "itel", "oppo", "realme", "vivo", "honor",
+  // Audio
+  "bose", "jbl", "marshall", "sonos", "sennheiser", "beats", "anker",
+  // Computing
+  "dell", "hp", "lenovo", "asus", "acer", "msi", "razer",
+  // Cameras / smart
+  "gopro", "fitbit", "garmin", "nest", "ring",
+  // Appliances
+  "dyson", "shark", "ninja", "kitchenaid", "bosch", "miele", "lg", "samsung",
+  // Footwear / fashion
+  "nike", "adidas", "puma", "reebok", "vans", "converse", "newbalance",
+  // Beauty / fragrance
+  "fenty", "rimmel", "maybelline", "loreal", "estee", "clinique",
+]);
+
+function extractQueryBrand(query: string): string | null {
+  const tokens = query.toLowerCase().split(/\s+/);
+  for (const tok of tokens) {
+    if (KNOWN_BRANDS.has(tok)) return tok;
+  }
+  return null;
+}
+
+function candidateHasBrand(title: string, brand: string | null): boolean {
+  if (!brand) return true;
+  return title.toLowerCase().includes(brand);
+}
+
 function extractRequiredModelTokens(query: string): string[] {
   /* Pattern: token of length 2-8 that contains BOTH at least one
      letter and at least one digit. Lookaheads enforce the
@@ -419,9 +463,21 @@ function buildAnchorGroup(p: AnchorProduct): ProductGroup {
      comparison rows on /compare can show 'as titled at this store'
      subtitles. For pooled cross-product anchors, each offer's
      productTitle was already set in resolveAnchorFromRow before
-     they got merged in here — that field takes precedence. */
+     they got merged in here — that field takes precedence.
+
+     Per-offer plausibility filter (added May 2026 after QA report):
+     dedup pooling sometimes merges accessory listings (e.g. Konga
+     "Galaxy S24 Ultra Wallet Case" at ~₦5K) under the same
+     signature as the actual phone (~₦1.3M). Without filtering
+     individual offers by category-floor, bestPrice = the case
+     price → priceLooksPlausible at the anchor level rejects the
+     entire product → /compare returns empty for searches that
+     SHOULD have anchored on the real phone. Filtering at the
+     offer level keeps the phone offers and drops the accessory
+     ones. */
   const offers = inStock
     .map((o) => offerToStoreOffer(o, (o as NestedOffer & { productTitle?: string }).productTitle ?? p.title))
+    .filter((o) => priceLooksPlausible(o.price, p.category_slug ?? "general"))
     .sort((a, b) => a.landedPrice - b.landedPrice);
   const prices = offers.map((o) => o.landedPrice);
   return {
@@ -737,6 +793,7 @@ export async function pgFtsFindSimilar(
   const variants            = extractVariantTokens(q);
   const requiredNumbers     = extractRequiredNumbers(q);
   const requiredModelTokens = extractRequiredModelTokens(q);
+  const queryBrand          = extractQueryBrand(q);
   /* Family constraint: prefer the category-class family (qFam) when
      the query is bare class noun like 'phones'; otherwise infer from
      the query directly (detectQueryFamily('iPhone 16 Plus') →
@@ -781,6 +838,12 @@ export async function pgFtsFindSimilar(
          vs G502). Catches identifiers the bare-numeric gate misses
          because the digit is glued to a letter. */
       .filter((r) => candidateHasAllModelTokens(r.title, requiredModelTokens))
+      /* Brand gate: queries naming a known manufacturer (LG, Sony,
+         Bose, Nike, etc.) must anchor on candidates from the same
+         brand. Stops cross-brand matches like "LG OLED 55 inch TV"
+         → "Samsung 55 Inch Smart TV". Bypassed when the query
+         doesn't include any recognized brand. */
+      .filter((r) => candidateHasBrand(r.title, queryBrand))
       .map((r) => ({ row: r, score: scoreCandidate(query, r.title) }))
       // Stable sort: score desc, then preserve original FTS rank as tiebreak
       .sort((a, b) => b.score - a.score);

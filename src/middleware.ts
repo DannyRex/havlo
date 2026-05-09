@@ -56,15 +56,29 @@ const COUNTRY_SCOPED = new Set(["", "deals", "compare", "blog", "cashback"]);
 
 /* Pages that exist OUTSIDE /[country]/ — global, no redirect. */
 const GLOBAL_PAGES = new Set([
-  "contact", "privacy-policy", "terms-of-use", "disclaimer",
+  "about", "contact", "privacy-policy", "terms-of-use",
+  "disclaimer", "how-we-make-money",
 ]);
 
 export function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const seg = path.split("/")[1]?.toLowerCase() ?? "";
 
-  /* Case 1: URL has a valid country prefix → sync cookie if it differs */
+  /* Case 1: URL has a valid country prefix → sync cookie if it
+     differs. Special-case for accidental /ng/about, /uk/contact
+     etc. — those global pages don't have a /[country]/ variant
+     and Next would 404 them. Strip the country prefix and redirect
+     to the canonical /global-page so the cookie still gets set
+     (via the redirect target's own pass through middleware) and
+     the user lands on a working page. The QA agent flagged
+     /ng/about returning a raw Next.js 404. */
   if (SUPPORTED.has(seg)) {
+    const secondSeg = path.split("/")[2]?.toLowerCase() ?? "";
+    if (secondSeg && GLOBAL_PAGES.has(secondSeg)) {
+      const target = req.nextUrl.clone();
+      target.pathname = `/${path.split("/").slice(2).join("/")}`;
+      return NextResponse.redirect(target, 307);
+    }
     const cookieVal = req.cookies.get(COUNTRY_COOKIE)?.value;
     if (cookieVal === seg) return NextResponse.next();
 
