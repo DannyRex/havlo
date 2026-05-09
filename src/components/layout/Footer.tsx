@@ -54,8 +54,14 @@ export default function Footer() {
             <Link href="/" className="inline-block mb-4" aria-label="Havlo home">
               <Logo size={28} />
             </Link>
+            {/* Footer blurb — brand statement, not a re-pitch. The hero
+                H1 + bottom-CTA already cover the 'paste a link / find
+                it for less' action copy; repeating it here was triple-
+                hammering the same line on a single page. Now: a single
+                sentence on what Havlo IS so the footer reads like a
+                brand block, not a sales caption. */}
             <p className="text-sm text-ink-2 leading-relaxed max-w-xs">
-              Find similar products for less. Paste a link or search anything, we find cheaper alternatives across the stores you already know.
+              Independent price comparison across the stores you already shop. Free, no account, no spam.
             </p>
             <a
               href="https://instagram.com/havlo.io"
