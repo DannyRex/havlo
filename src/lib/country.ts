@@ -430,13 +430,30 @@ export function filterDealsForCountry<T extends DealLike>(deals: T[], country: C
       return isCrossBorderStore(d, "ng");
     }
 
-    /* Non-NG path */
+    /* Non-NG path. Order is intentional:
+         1. Drop NG-anchored retailers outright.
+         2. Accept stores explicitly on this country's cross-border
+            allowlist (AliExpress / Shein / Temu for UK, etc.).
+         3. Accept stores on this country's native retail roster
+            (Argos / Currys / Amazon UK for UK).
+         4. Accept rows tagged with this country (SerpAPI + curated).
+         5. PREVIOUSLY: untagged rows passed unconditionally, which
+            leaked Walmart US, Best Buy US, Target US into UK / DE /
+            ZA pools because the intl scrapers (AliExpress / Shein /
+            ASOS / DHgate) all currency-stamp as USD with no country
+            tag. QA agent flagged "UK shows ~same intl count as NG"
+            despite UK's cross-border allowlist being 5 stores vs NG's
+            ~80. Now an untagged row only passes if its currency is
+            this country's local currency, which is a strong "actually
+            relevant here" signal. Curated USD rows are caught at
+            step 4 via their explicit country: tag, so this doesn't
+            regress the curated catalog. */
     if (isNigerianStore(d)) return false;
     if (isCrossBorderStore(d, country.code)) return true;
     if (isStoreInCountry(d, country.code)) return true;
     const tag = dealCountryTag(d);
     if (tag === country.code) return true;
-    if (tag === null) return true;
+    if (tag === null && d.currency === country.currency) return true;
     return false;
   });
 
@@ -471,5 +488,12 @@ export function isOfferAllowedForCountry<T extends OfferLike>(o: T, country: Cou
   if (matchesAny(idLc, NG_STORES) || matchesAny(nameLc, NG_STORES)) return false;
   if (o.isInternational === false) return false;
 
-  return true;
+  /* Symmetric tightening with filterDealsForCountry. Was `return true`
+     which meant any unmatched intl offer slipped into non-NG /compare
+     pools. Now: an offer that didn't match cross-border, country
+     roster, or country tag is rejected unless it has an explicit
+     non-international flag. Removes Walmart-US / Best-Buy-US offers
+     from /compare for UK / DE / ZA shoppers who can't realistically
+     buy from those retailers. */
+  return false;
 }
