@@ -1,50 +1,26 @@
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { Store } from "lucide-react";
+import { getTrendingMultiStoreTitles, type MultiStoreChip } from "@/lib/trending-multi-store";
 
 /* ──────────────────────────────────────────────────────────────────
-   Realistic pool of 60+ queries Nigerians actually search for —
-   spanning phones, audio, computing, gaming, fashion, home, beauty,
-   wearables. Curated to feel believable; expand any time.
-   The renderer draws ~14 at random per 5-min bucket, with believable
-   power-law-distributed trend percentages (most modest, few viral).
+   Chip pool sourcing (round-3 QA refactor):
+     The previous pool was a hardcoded ~60 aspirational queries
+     (iPhone 15 Pro Max, Drunk Elephant Bronzing Drops, etc.). Many
+     of them returned "Nothing in our local index" or anchored on
+     a 1-store result — clicking a chip felt like a teaser, not a
+     useful shortcut.
+
+     Replaced with a data-driven pool: titles from products that
+     have ≥2 distinct in-stock store offers in the DB. If we can
+     compare it across stores, it qualifies. Otherwise we don't show
+     it (yet — once a second store carries the SKU, it auto-
+     enters the pool on the next 5-min cache cycle).
+
+     Cached at the module level (unstable_cache, 5 min TTL) so all
+     homepage renders in the rotation window share one DB round
+     trip. Falls back to hiding the section if the catalog has no
+     multi-store products (early-launch market or DB outage).
    ────────────────────────────────────────────────────────────────── */
-
-const SEARCH_POOL = [
-  // Phones
-  "iPhone 15 Pro Max", "iPhone 15 Pro", "iPhone 14", "iPhone 13", "iPhone 12",
-  "Galaxy S24 Ultra", "Galaxy S24", "Galaxy A15", "Galaxy A06", "Galaxy Z Flip 5",
-  "Tecno Spark 30", "Tecno Camon 30", "Infinix Hot 50", "Infinix Note 40",
-  "Pixel 8", "Pixel 9", "OnePlus 12", "Redmi Note 13",
-
-  // Audio
-  "AirPods Pro 2", "AirPods Max", "Beats Solo 4", "Sony WH-1000XM5", "Bose QC Ultra",
-  "JBL Charge 5", "JBL Flip 6", "Marshall Stanmore", "Galaxy Buds 3 Pro", "Soundcore Q45",
-
-  // Computing
-  "MacBook Air M3", "MacBook Pro M3", "Dell XPS 15", "HP Pavilion", "Lenovo ThinkPad",
-  "iPad Pro M4", "iPad Air", "Surface Pro 11",
-
-  // Gaming
-  "PS5 Slim", "Xbox Series X", "Nintendo Switch OLED", "Steam Deck", "DualSense controller",
-  "Logitech G Pro", "Razer Blackwidow",
-
-  // TV / Display
-  "55 inch OLED TV", "Hisense U7N", "Samsung QN90D", "LG C4 TV", "65 inch QLED TV",
-
-  // Fashion / Sneakers
-  "Adidas Samba", "Nike Dunk Low", "Air Jordan 1", "Yeezy Boost 350", "New Balance 530",
-  "Air Force 1", "Vans Old Skool", "Asics Gel-Kayano",
-
-  // Home / Kitchen
-  "Dyson V15", "Ninja Foodi air fryer", "Smeg kettle", "Philips espresso machine",
-  "Bosch washing machine",
-
-  // Beauty
-  "Drunk Elephant Bronzing Drops", "CeraVe moisturiser", "La Roche-Posay sunscreen",
-
-  // Wearables / misc
-  "Apple Watch Series 10", "Garmin Forerunner 265", "Kindle Paperwhite", "Ray-Ban Wayfarer",
-];
 
 /* ── 5-min seeded PRNG (mulberry32) ──────────────────────────────── */
 const ROTATION_MS = 5 * 60 * 1000;
@@ -79,23 +55,24 @@ function seededShuffle<T>(items: T[], rng: () => number): T[] {
   return arr;
 }
 
-/* Power-law trend %:
-   - 70% modest:  5-49%
-   - 25% strong:  50-149%
-   - 5% viral:    150-299% */
-function realisticTrend(rng: () => number): number {
-  const r = rng();
-  if (r < 0.70) return Math.floor(rng() * 45) + 5;
-  if (r < 0.95) return Math.floor(rng() * 100) + 50;
-  return Math.floor(rng() * 150) + 150;
-}
+/* The fake "trend %" function and arrow icon are gone. The QA
+   feedback was right — both the bare percentage and the up-arrow
+   were synthetic signals with no real data behind them. The chip
+   pool is now driven by ACTUAL cross-store coverage; show the real
+   store count next to each chip instead. */
 
 const VISIBLE_COUNT = 14;
 
-export default function TrendingSearches() {
+export default async function TrendingSearches() {
+  /* Pull the current cross-store-overlap pool. Cached 5 min at the
+     module level so multiple homepage renders in the same rotation
+     window share one DB round trip. Empty pool → hide the section
+     (better than showing chips that 404 into "no results"). */
+  const pool = await getTrendingMultiStoreTitles();
+  if (pool.length === 0) return null;
+
   const rng = makeRng(freshnessSeed());
-  const shuffled = seededShuffle(SEARCH_POOL, rng).slice(0, VISIBLE_COUNT);
-  const items = shuffled.map((q) => ({ q, trend: realisticTrend(rng) }));
+  const items: MultiStoreChip[] = seededShuffle(pool, rng).slice(0, VISIBLE_COUNT);
 
   return (
     <section className="py-12 sm:py-16 bg-surface-2/50">
@@ -104,34 +81,42 @@ export default function TrendingSearches() {
         <div className="flex items-end justify-between mb-5 sm:mb-6 gap-4">
           <div>
             <p className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-1.5">
-              Popular this week
+              Cross-store coverage
             </p>
+            {/* Heading + framing match what the chips ACTUALLY are
+                now: products where we can show real cross-store
+                price differences. Was "What people are searching
+                for" with a "Popular this week" eyebrow — both
+                implied user-activity data we don't actually have.
+                Founder voice: name the thing accurately. */}
             <h2 className="text-[22px] sm:text-2xl font-bold text-ink tracking-[-0.02em] leading-tight">
-              What people are searching for
+              Real comparisons in your country
             </h2>
+            <p className="text-[13px] text-ink-2 mt-1.5 max-w-xl">
+              Each chip below opens a side-by-side of the actual stores carrying it. No teasers.
+            </p>
           </div>
         </div>
 
         {/* Chip rail — full-bleed scroll on mobile, wrap on desktop */}
         <div className="-mx-4 sm:mx-0">
           <div className="flex gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar px-4 sm:px-0 sm:flex-wrap">
-            {items.map(({ q, trend }) => (
+            {items.map(({ title, storeCount }) => (
               <Link
-                key={q}
-                href={`/compare?q=${encodeURIComponent(q)}&mode=similar`}
+                key={title}
+                href={`/compare?q=${encodeURIComponent(title)}&mode=similar`}
                 className="group inline-flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-bg border border-border hover:border-border-strong hover:shadow-card transition-all whitespace-nowrap shrink-0 active:scale-95"
-                /* aria-label gives screen readers the "trending +N%
-                   this week" context the visual trend arrow implies. */
-                aria-label={`${q}, trending up ${trend}% in searches this week`}
+                aria-label={`${title}, available across ${storeCount.toLocaleString()} stores — open price comparison`}
               >
-                <span className="text-[13px] sm:text-sm font-medium text-ink">{q}</span>
-                {/* Trend chip simplified: arrow only, no bare percent.
-                    QA noted that "Razer Blackwidow 107%" reads as a
-                    code with no unit — shoppers don't know what the
-                    number describes. The up-arrow alone communicates
-                    "this is gaining momentum" without the math. The
-                    percent stays in the aria-label for context. */}
-                <ArrowUpRight size={11} strokeWidth={2.5} className="text-success" aria-hidden="true" />
+                <span className="text-[13px] sm:text-sm font-medium text-ink">{title}</span>
+                {/* Real store count, not a fake trend %. Tells the
+                    user exactly how many merchants we'll show prices
+                    from when they click — the actual value of the
+                    chip. */}
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink-3 tabular-nums">
+                  <Store size={11} strokeWidth={2.25} aria-hidden="true" />
+                  {storeCount.toLocaleString()}
+                </span>
               </Link>
             ))}
           </div>
