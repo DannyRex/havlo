@@ -329,8 +329,13 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
                   highlighted === i ? "bg-surface-2" : "hover:bg-surface-2"
                 }`}
               >
-                <span className="text-ink line-clamp-2 leading-snug">{s.title}</span>
-                <span className="text-[11px] text-ink-3 shrink-0 mt-0.5">
+                {/* flex-1 + min-w-0 lets the title shrink to fit the
+                    available row width on narrow viewports (was
+                    intrinsically sized, which forced "Apple iPhone..."
+                    truncation when the parent flex constrained it).
+                    line-clamp-2 then wraps cleanly to two lines. */}
+                <span className="text-ink line-clamp-2 leading-snug flex-1 min-w-0">{s.title}</span>
+                <span className="text-[11px] text-ink-3 shrink-0 mt-0.5 whitespace-nowrap">
                   {s.storeCount.toLocaleString()} store{s.storeCount > 1 ? "s" : ""}
                 </span>
               </button>
@@ -345,8 +350,11 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
           /* Country-aware hint. UK shoppers shouldn't be told to paste
              a Jumia link — they wouldn't know the brand and it
              undercuts trust. The HINT_STORES_BY_COUNTRY table picks
-             two recognisable local stores per market. */
-          : `Paste a ${hintStores(country.code)} link, or search by name.`}
+             two recognisable local stores per market.
+             Phrased as "Paste a link to X" to sidestep the a/an
+             grammar issue ("Paste a Argos" vs "Paste an Argos") that
+             round-3 QA caught on /uk/compare. */
+          : `Paste a link to ${hintStores(country.code)}, or search by name.`}
       </p>
 
       {/* Show chips whenever the live input is empty, regardless of

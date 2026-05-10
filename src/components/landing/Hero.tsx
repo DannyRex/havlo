@@ -130,8 +130,15 @@ export default function Hero({ storeCount }: Props) {
                   between the two lines; back to 0.98 from sm: where
                   the H1 returns to its single-line editorial form. */}
         <h1
-          className="font-bold text-ink leading-[1.06] sm:leading-[0.98] tracking-[-0.04em] mb-5 sm:mb-6 animate-fade-up max-w-[18ch] mx-auto sm:max-w-none"
-          style={{ fontSize: "clamp(1.5rem, 7vw, 5rem)" }}
+          /* Hero v4 (round-3 QA): v3 max-w-[18ch] still wrapped to 3
+             lines on iPhone 14 Pro because at 7vw font-size the bold
+             weight pushed each "before you buy it" / "find it for
+             less" closer to 19ch in actual width. Tightened to
+             max-w-[16ch] AND dropped clamp slope to 6.5vw so the
+             font is small enough at 390px to comfortably fit 18 chars
+             on one line. Desktop unchanged (max-w-none). */
+          className="font-bold text-ink leading-[1.08] sm:leading-[0.98] tracking-[-0.04em] mb-5 sm:mb-6 animate-fade-up max-w-[16ch] mx-auto sm:max-w-none"
+          style={{ fontSize: "clamp(1.4rem, 6.5vw, 5rem)" }}
         >
           Before you buy it, find it for less.
         </h1>
@@ -167,7 +174,12 @@ export default function Hero({ storeCount }: Props) {
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               rows={1}
-              placeholder="Paste a product link, or search anything…"
+              /* Shortened in round-3 QA: original "Paste a product
+                 link, or search anything…" wrapped to 2 lines on
+                 iPhone 14 Pro and the second line was clipped
+                 mid-comma. Compact form fits on one line at the
+                 textarea's mobile width. */
+              placeholder="Search or paste a product link…"
               className="w-full"
               style={{
                 minHeight: "52px",

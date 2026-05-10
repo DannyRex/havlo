@@ -9,6 +9,7 @@ import {
   usdToNgn,
 } from "@/lib/utils";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
+import { useCountry } from "@/components/providers/CountryProvider";
 import type { Deal } from "@/types";
 
 interface Props {
@@ -169,8 +170,18 @@ function SkeletonColumn({
 
 /* ── Section ──────────────────────────────────────────────────────── */
 export default function LiveResults({ items, loading, providers }: Props) {
+  const { country } = useCountry();
   // Don't render anything if not loading and zero results
   if (!loading && items.length === 0) return null;
+
+  /* Caption is country-aware. The original "Prices in USD, ships to
+     Nigeria." was hardcoded — it appeared on every country's /compare
+     page including UK / DE / etc., where it was misleading (a UK
+     shopper doesn't ship from the US to Nigeria). QA round 3 caught
+     this on /uk/compare. */
+  const caption = country.code === "ng"
+    ? "Prices in USD, ships to Nigeria."
+    : "Prices shown in USD for cross-border comparison.";
 
   return (
     <section className="mt-12 sm:mt-16">
@@ -192,7 +203,7 @@ export default function LiveResults({ items, loading, providers }: Props) {
             : "Live deals from global stores"}
         </h3>
         <p className="text-xs sm:text-sm text-ink-2 mt-0.5">
-          Prices in USD, ships to Nigeria.
+          {caption}
         </p>
       </div>
 

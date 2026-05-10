@@ -11,28 +11,36 @@
    See /api/go/route.ts for the resolution flow this helper guards. */
 
 /* True if the stored URL points at a real merchant rather than a
-   Google relay. Used as a pre-filter so deals with un-clickable URLs
-   never reach the user.
+   Google relay we can't resolve. Used as a pre-filter so deals with
+   un-clickable URLs never reach the user.
 
-   Cases handled:
-     1. /api/go?url=https://google.com/...    → reject
-     2. /api/go?url=https://merchant.com/... → keep
-     3. https://google.com/...               → reject
-     4. https://merchant.com/...             → keep
-     5. malformed / weird URLs               → keep (defensive — let
-        /api/go's downstream logic handle it rather than over-filter) */
+   Cases handled (May 2026 — relaxed wrapped-URL handling after
+   round-3 QA):
+     1. /api/go?url=...                       → keep (always)
+     2. https://google.com/...   (unwrapped)  → reject
+     3. https://merchant.com/... (unwrapped)  → keep
+     4. malformed / weird URLs                → keep (defensive — let
+        /api/go's downstream logic handle it rather than over-filter)
+
+   Why /api/go?url=https://google.com/... is now KEPT:
+   The /api/go route resolves Google relay URLs via SerpAPI's
+   product-detail endpoint (cached 30 days in resolved_clicks), so
+   the click flow lands users on the actual merchant page. The QA
+   round-3 pass surfaced the cost of the previous strict reject:
+   100+ UK retailer rows (Argos, Currys, JL, Very, Boots, AO, M&S,
+   Selfridges) had Google-relay URLs as their offer URL because
+   SerpAPI's `link` field was empty for those results. The strict
+   reject hid every one of them from /uk/deals.
+
+   With the resolver active, accepting these costs ~1 SerpAPI
+   credit per unique URL per 30 days (~100 / month for the UK
+   retailer pool, well within budget). The user-facing win: UK
+   retailers finally surface on /uk/deals + /uk/compare. */
 export function isUsableMerchantUrl(url: string): boolean {
-  /* Internal /api/go redirect — peek at the underlying URL and reject
-     when it points at Google. */
+  /* Internal /api/go wrapper — always keep. Resolver handles
+     relay URLs at click time. */
   if (url.startsWith("/api/go?url=")) {
-    try {
-      const encoded = url.slice("/api/go?url=".length).split("&")[0];
-      const inner   = decodeURIComponent(encoded);
-      const host    = new URL(inner).hostname.toLowerCase();
-      return host !== "google.com" && !host.endsWith(".google.com");
-    } catch {
-      return true; // malformed → keep, /api/go can still handle it
-    }
+    return true;
   }
   /* Direct Google URL (shouldn't appear in the DB but defend anyway). */
   try {
