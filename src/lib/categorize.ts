@@ -44,7 +44,11 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
 
   // ── Audio (headphones, earbuds, speakers) ──
   { pattern: /\bairpods?\s*(pro|max|2|3|4)?\b/i, slug: "audio", reason: "AirPods" },
-  { pattern: /\b(headphone|headphones|headset|earbuds|earpods|earphone|tws)\b/i, slug: "audio", reason: "ear-worn audio" },
+  { pattern: /\b(headphones?|headsets?|earbuds?|earpods?|earphones?|tws)\b/i, slug: "audio", reason: "ear-worn audio" },
+  /* AliExpress junk noise that landed as phones (round 3 leftover):
+     screwdriver sets, mystery boxes, tool kits. Pure spam — no real
+     phone catalog uses these phrases. */
+  { pattern: /\b(screwdriver\s*set|precision\s*screwdriver|tool\s*kit|mystery\s*box|lucky\s*box|blind\s*box|surprise\s*pack|tool\s*case)\b/i, slug: "electronics", reason: "tool/mystery accessory junk" },
   { pattern: /\b(soundbar|home\s*theatre|home\s*theater|boombox|bluetooth\s*speaker|wireless\s*speaker|portable\s*speaker|party\s*speaker|party\s*box)\b/i, slug: "audio", reason: "speaker form factor" },
   { pattern: /\b(jbl|bose|sonos|harman\s*kardon|marshall|wh-1000|qc(35|45|ultra)|quietcomfort)\b/i, slug: "audio", reason: "audio brand+model" },
 
@@ -74,14 +78,59 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
      "with case included" — handled by the accessory regex above. */
   { pattern: /\b(tripod|gimbal|monopod|selfie\s*stick|gooseneck|cradle|car\s*mount|wall\s*mount|desk\s*mount|magnetic\s*mount|suction\s*mount|dashboard\s*mount|vent\s*mount|windshield\s*mount)\b.*\bphone\b|\bphone\b.*\b(tripod|gimbal|monopod|selfie\s*stick|gooseneck|cradle|car\s*mount|wall\s*mount|desk\s*mount|magnetic\s*mount|suction\s*mount|dashboard\s*mount|vent\s*mount|windshield\s*mount)\b/i, slug: "electronics", reason: "mount hardware + phone keyword" },
 
-  // ── Phones (after computing rules so iPad doesn't slip in, AND
-  //    after the accessory exclusions above so accessories don't
-  //    fall through to the bare-phone rule). ──
-  { pattern: /\b(iphone|galaxy\s*(s|a|m|note|z)\d|pixel\s*\d|tecno|infinix|redmi|oneplus|smartphone)\b/i, slug: "phones", reason: "phone model" },
-  // Generic 'phone' last — the word 'phone' appears in 'headphone',
-  // 'earphone', 'megaphone', etc. Use word boundaries + negative
-  // lookahead for known compound prefixes.
-  { pattern: /(^|[^a-z])(?<!head|ear|micro|mega|saxo)phone(?!\w)/i, slug: "phones", reason: "bare phone word" },
+  /* ── More accessory + electronic-junk rules MOVED to BEFORE the
+        phones section (was previously after, in the TV/Electronics
+        block). The bare 'phone' rule at line ~80 was matching
+        AliExpress titles like "Phone Non-slip ... Finger Sleeve"
+        and "10pcs/Lot USB Male to ... Adapter ... Mobile" before
+        these more-specific rules could fire. Order in this file is
+        first-match-wins, so anything that should override 'phone' /
+        'mobile' classification has to come EARLIER. ── */
+  /* Broader catch for AliExpress-style "USB Male to ... Adapter"
+     titles where USB and Adapter are far apart. */
+  { pattern: /\b(usb|hdmi|micro\s*usb|usb-c|type-c)\b.*\b(adapter|connector|extension|hub|dock|extender|converter|breakout|jack|socket|port|pin)\b/i, slug: "electronics", reason: "USB/HDMI accessory (windowed)" },
+  /* OBD / car diagnostic scanners. */
+  { pattern: /\b(obd|obd2|obdii|obd-ii)\b.*\b(scanner|reader|diagnostic|tool)\b|\b(car\s*diagnostic|vehicle\s*scanner|engine\s*scan\s*tool)\b/i, slug: "electronics", reason: "automotive diagnostic" },
+  /* Recording glasses / smart glasses / spy cameras posing as
+     eyewear. */
+  { pattern: /\b(recording|spy|hidden|video|camera)\s*(glasses|eyewear|sunglasses)\b|\b(smart\s*glasses)\b/i, slug: "electronics", reason: "wearable camera" },
+  /* Gaming finger sleeves — titles like "Phone Non-slip Breathable
+     Touch Screen Sweatproof Gaming Finger Sleeve" match the bare
+     'phone' rule unless this fires first. */
+  { pattern: /\b(finger\s*sleeves?|gaming\s*sleeves?|touch\s*screen\s*sleeves?|thumb\s*sleeves?|sweat-?proof\s*sleeves?|finger\s*cots?|fingertips?\s*covers?)\b/i, slug: "electronics", reason: "gaming finger sleeve" },
+  /* GENERIC: any title with both a phone-related word AND an
+     accessory/hardware noun → electronics. Word-order-agnostic.
+     Catches "Cable Organizer Clip Data Cable Stand Mobile Phone",
+     "Double Side Silicone Suction Pad For Mobile Phone Fixture",
+     "Wireless Charger for Phone", etc. The rule tolerates anything
+     between the two anchors so AliExpress's keyword-stuffed titles
+     can't sneak past with a particular word order.
+
+     Real phone listings (which we want to KEEP in phones) have a
+     brand+model that already matched the phone-model rule earlier,
+     so they never reach this rule. Generic "Mobile Phone" listings
+     without a brand DO get classified as electronics here, which
+     is the intended trade-off — we'd rather miss the rare unbranded
+     real phone than keep ingesting accessory junk. */
+  { pattern: /\b(mobile|phone|smartphone|cellphone|cell\s*phone)\b.*\b(cable|charger|holder|stand|cradle|mount|bracket|adapter|organizer|connector|suction|fixture|grip|popsocket|ring\s*holder|kickstand|car\s*hook|magnetic\s*plate|tempered|hydrogel|skin|sticker|wireless\s*charger|fast\s*charger)\b|\b(cable|charger|holder|stand|cradle|mount|bracket|adapter|organizer|connector|suction|fixture|grip|popsocket|ring\s*holder|kickstand|car\s*hook|magnetic\s*plate|wireless\s*charger|fast\s*charger)\b.*\b(mobile|phone|smartphone|cellphone|cell\s*phone)\b/i, slug: "electronics", reason: "phone-adjacent accessory (broad)" },
+
+  // ── Phones — explicit brand+model only. ──
+  // The bare "phone" rule was REMOVED in QA round 3 because it
+  // matched far more spam ("Cable Organizer Stand Mobile Phone",
+  // "Phone Non-slip Touch Screen Sleeve", "10pcs/Lot USB Adapter
+  // with Welded Mobile Phone") than legitimate generic phone
+  // listings. Real phones in our catalog all carry a recognised
+  // brand+model (iphone / galaxy / pixel / tecno / infinix / redmi /
+  // oneplus / xiaomi / huawei / motorola / nokia / smartphone).
+  // Generic-phone titles without those tokens fall through to the
+  // null category and won't surface as phones — better than the 152+
+  // false positives we caught.
+  { pattern: /\b(iphone|galaxy\s*(s|a|m|note|z)\d|pixel\s*\d|tecno|infinix|redmi|oneplus|xiaomi|huawei|motorola|moto\s*g|moto\s*e|nokia|smartphone)\b/i, slug: "phones", reason: "phone model" },
+  // Branded-phone fallback: a title with "phone" + one of these
+  // explicit phone-spec markers (RAM/storage/network) is real phone.
+  // Keeps generic flagship-y titles like "5G Phone 8GB+256GB" as
+  // phones while still rejecting accessory junk.
+  { pattern: /\bphone\b.*\b(\d+\s*gb\s*\+?\s*\d+\s*gb|\d+\s*gb\s*ram|5g|4g\s*lte|dual\s*sim|fingerprint\s*sensor)\b|\b(\d+\s*gb\s*\+?\s*\d+\s*gb|\d+\s*gb\s*ram|5g|4g\s*lte|dual\s*sim|fingerprint\s*sensor)\b.*\bphone\b/i, slug: "phones", reason: "phone + spec marker" },
 
   // ── TV / Electronics ──
   { pattern: /\b(qled|oled|uhd|smart\s*tv|led\s*tv|4k\s*tv|8k\s*tv)\b/i, slug: "electronics", reason: "TV tech" },
@@ -92,6 +141,10 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
      Route to electronics so the Phones filter stays clean. */
   { pattern: /\b(power\s*strip|surge\s*protector|extension\s*cord|smart\s*plug|wall\s*charger|car\s*charger|wireless\s*charger|wall\s*adapter)\b/i, slug: "electronics", reason: "electrical accessory" },
   { pattern: /\b(usb\s*(adapter|hub|extender|extension|dock|cable|drive|stick)|hdmi\s*(cable|adapter|switch))\b/i, slug: "electronics", reason: "USB/HDMI accessory" },
+  /* USB-windowed, OBD scanner, recording glasses, finger sleeves
+     MOVED to before the phones section (line ~75) to outrank the
+     bare 'phone' / 'mobile' rules — they're more specific and the
+     QA agent caught them being misclassified into phones. */
   { pattern: /\b(power\s*bank|portable\s*charger|solar\s*charger)\b/i, slug: "electronics", reason: "power bank" },
 
   // ── Gaming ──
@@ -141,8 +194,16 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   { pattern: /\b(maxi\s*dress|midi\s*dress|sundress|cocktail\s*dress|wedding\s*dress|gown)\b/i, slug: "fashion", reason: "dress" },
   /* Bags + small leather goods. 'wallet' alone matched 'Galaxy S24
      Wallet Case' in retag dry-run. Disambiguate by excluding case /
-     phone contexts: when title contains 'case' or 'cover', skip. */
-  { pattern: /\b(handbag|backpack|tote\s*bag|crossbody|messenger\s*bag)\b/i, slug: "fashion", reason: "bag" },
+     phone contexts: when title contains 'case' or 'cover', skip.
+
+     QA round-3 caught: "Women's shoulder Handbags Bag for 2025 women
+     Shopper bag Female luxury" (20 dupes, all $0.78, all tagged
+     phones) was returning NULL from inferCategoryFromTitle because
+     `\bhandbag\b` didn't match "Handbags" (no word boundary after
+     the trailing s). Now uses `handbags?` to allow optional plural,
+     plus broader bag vocab so any obvious bag-product gets routed
+     to fashion. */
+  { pattern: /\b(handbags?|backpacks?|tote\s*bags?|crossbody|messenger\s*bags?|shoulder\s*bags?|shopper\s*bags?|clutch|clutches|satchels?|duffels?|fanny\s*packs?|waist\s*packs?|purses?)\b/i, slug: "fashion", reason: "bag" },
   { pattern: /\b(leather\s*wallet|bifold\s*wallet|trifold\s*wallet|cardholder\s*wallet)\b/i, slug: "fashion", reason: "leather wallet" },
   { pattern: /\b(sunglasses|eyeglasses|wayfarer|aviator|ray-ban|raybans)\b/i, slug: "fashion", reason: "eyewear" },
 

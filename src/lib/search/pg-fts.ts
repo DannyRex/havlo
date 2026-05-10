@@ -94,7 +94,94 @@ const CATEGORY_PRICE_FLOOR_NGN: Record<string, number> = {
   sports:       2_500,
 };
 
-function priceLooksPlausible(priceNgn: number, categorySlug: string | null): boolean {
+/* Per-flagship-line price floors. Catches counterfeit listings that
+   pass the category floor but are way below the legitimate retail
+   range for that specific product. Each entry is a lowercase
+   substring → minimum NGN price.
+
+   QA round 3 caught:
+     • Apple AirPods Pro 2 anchored at ₦30K — real is ₦300K+
+     • iPhone 17 Pro DHgate $27.55 (~₦42K) — real is ₦1.5M+
+     • Galaxy S26 Ultra DHgate counterfeits passing audio floor
+     • Adidas Samba ₦7K — real is ~₦150K
+   These weren't caught by the category floor (audio ₦5K, phones
+   ₦40K) because the floor is set to allow legitimate cheap audio /
+   phones / fashion. Per-flagship floors are the only way to draw
+   a sharper line for products with a well-known retail range.
+
+   Match on substring of the LOWERCASED title. First-match-wins by
+   declaration order (longer / more specific keys go first). */
+const FLAGSHIP_PRICE_FLOOR_NGN: Array<[string, number]> = [
+  // Apple — flagship phones
+  ["iphone 17 pro max",   1_500_000],
+  ["iphone 17 pro",       1_300_000],
+  ["iphone 17",             900_000],
+  ["iphone 16 pro max",   1_200_000],
+  ["iphone 16 pro",       1_000_000],
+  ["iphone 16",             750_000],
+  ["iphone 15 pro max",     900_000],
+  ["iphone 15 pro",         750_000],
+  ["iphone 15",             600_000],
+  // Apple — audio
+  ["airpods max",           300_000],
+  ["airpods pro 2",         150_000],
+  ["airpods pro",           120_000],
+  ["airpods 4",             100_000],
+  ["airpods 3",              80_000],
+  // Apple — laptops
+  ["macbook pro m4",      1_500_000],
+  ["macbook pro m3",      1_200_000],
+  ["macbook air m3",        900_000],
+  ["macbook air m2",        700_000],
+  ["ipad pro m4",         1_000_000],
+  ["ipad air m2",           600_000],
+  // Samsung — flagship phones
+  ["galaxy z fold 7",     1_500_000],
+  ["galaxy z fold 6",     1_300_000],
+  ["galaxy z flip 7",       900_000],
+  ["galaxy z flip 6",       800_000],
+  ["galaxy s26 ultra",      900_000],
+  ["galaxy s26",            600_000],
+  ["galaxy s25 ultra",      700_000],
+  ["galaxy s24 ultra",      600_000],
+  // Pixel
+  ["pixel 10 pro",          700_000],
+  ["pixel 10",              500_000],
+  ["pixel 9 pro",           500_000],
+  // Audio — premium headphones
+  ["wh-1000xm5",            150_000],
+  ["wh-1000xm4",            100_000],
+  ["bose quietcomfort ultra",150_000],
+  ["bose quietcomfort 45",  120_000],
+  // Gaming — current consoles
+  ["playstation 5 slim",    400_000],
+  ["playstation 5",         350_000],
+  ["xbox series x",         400_000],
+  ["xbox series s",         200_000],
+  ["nintendo switch oled",  250_000],
+  // Footwear flagships — real Nike retail
+  ["air jordan 1",           80_000],
+  ["nike dunk low",          70_000],
+  ["air force 1",            45_000],
+  ["adidas samba",           80_000],
+  ["yeezy",                 100_000],
+];
+
+function flagshipFloorFor(title: string): number | null {
+  const lc = title.toLowerCase();
+  for (const [key, floor] of FLAGSHIP_PRICE_FLOOR_NGN) {
+    if (lc.includes(key)) return floor;
+  }
+  return null;
+}
+
+function priceLooksPlausible(priceNgn: number, categorySlug: string | null, title?: string): boolean {
+  /* Flagship floor wins when present — sharper signal than the
+     category floor for products with a known retail range. */
+  if (title) {
+    const flagshipFloor = flagshipFloorFor(title);
+    if (flagshipFloor !== null) return priceNgn >= flagshipFloor;
+  }
   const floor = categorySlug ? (CATEGORY_PRICE_FLOOR_NGN[categorySlug] ?? 1_000) : 1_000;
   return priceNgn >= floor;
 }
@@ -477,7 +564,11 @@ function buildAnchorGroup(p: AnchorProduct): ProductGroup {
      ones. */
   const offers = inStock
     .map((o) => offerToStoreOffer(o, (o as NestedOffer & { productTitle?: string }).productTitle ?? p.title))
-    .filter((o) => priceLooksPlausible(o.price, p.category_slug ?? "general"))
+    /* Pass the product title so the per-flagship floor catches
+       counterfeits (AirPods Pro 2 ₦30K, iPhone 17 Pro DHgate ₦42K)
+       that the category floor misses. The signal is conservative
+       — only kicks in when the title matches a known flagship line. */
+    .filter((o) => priceLooksPlausible(o.price, p.category_slug ?? "general", p.title))
     .sort((a, b) => a.landedPrice - b.landedPrice);
   const prices = offers.map((o) => o.landedPrice);
   return {
@@ -615,7 +706,7 @@ export async function pgFtsFindDupes(
     /* If we have an anchor price, strict cheaper-only (≤ 99% of anchor).
        If we don't (sniff returned no price), keep all plausible matches. */
     .filter((r) => noCeiling || priceInNgn(r.current_price, r.currency) < anchorPriceNgn * 0.99)
-    .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug))
+    .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug, r.title))
     /* URL usability — drop Google-relay rows that /api/go can't
        reliably resolve to a real merchant. Without this, paste-a-link
        dupes were occasionally returning offers that bounced to
@@ -772,7 +863,8 @@ export async function pgFtsFindSimilar(
 
     const a = buildAnchorGroup(anchorPayload);
     if (a.offers.length === 0) return null;
-    if (!priceLooksPlausible(a.bestPrice, a.category)) return null;
+    /* Pass title so flagship floor catches counterfeit anchors. */
+    if (!priceLooksPlausible(a.bestPrice, a.category, a.title)) return null;
     return a;
   }
 
@@ -920,8 +1012,11 @@ export async function pgFtsFindSimilar(
     // Strict cheaper-only — the anchor's own offer leaks through with
     // equal price otherwise; allow ≤ 99% of anchor so true sub-100% only.
     .filter((r) => priceInNgn(r.current_price, r.currency) < anchor.bestPrice * 0.99)
-    // Implausibly low prices are almost always upstream data errors.
-    .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug))
+    // Implausibly low prices are almost always upstream data errors
+    // OR counterfeits. Pass title so per-flagship floor catches the
+    // AirPods Pro 2 ₦8K / Apple iPhone 17 Pro ₦42K cases that the
+    // category floor misses.
+    .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug, r.title))
     // URL usability — drop Google-relay rows /api/go can't resolve.
     .filter((r) => isUsableMerchantUrl(r.url))
     // Drop accessory / parts / replacement noise

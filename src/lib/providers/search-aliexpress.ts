@@ -134,6 +134,40 @@ function parseNumeric(s: string | undefined): number {
   return isFinite(n) ? n : 0;
 }
 
+/* Junk-title detector for AliExpress feed. The Open Platform API
+   returns SEO-stuffed titles like "Women's shoulder Handbags Bag
+   for 2025 women Shopper bag Female luxury designer ladies fashion"
+   which:
+     1. Aren't useful product names for shoppers,
+     2. Spam multiple categories per query (a handbag returned for
+        a 'phones' query),
+     3. Trip ingestion's no-brand fallback path → 20+ duplicate rows
+        in the DB after a few cron cycles.
+   Drop them at the source. Heuristic: count junk-signal tokens; 3+
+   means "wholesale spam description, not a real product listing".
+   Also drops titles longer than 110 chars — legitimate product
+   titles are rarely that long; AliExpress padding is. */
+const JUNK_SIGNAL_TOKENS = [
+  "wholesale", "free shipping", "dropshipping", "drop shipping",
+  "factory direct", "oem", "/lot", "pcs/", "10pcs", "20pcs", "50pcs", "100pcs",
+  "hot sale", "for 2025", "for 2026", "best gift",
+  "female luxury", "ladies luxury", "designer luxury", "luxury designer",
+  "fashion ladies", "ladies fashion", "men women", "women men",
+  "high quality", "high-end", "top quality",
+];
+function looksLikeJunkAliExpressTitle(title: string): boolean {
+  const lc = title.toLowerCase();
+  if (lc.length > 110) return true;          // SEO-stuffed length
+  let hits = 0;
+  for (const tok of JUNK_SIGNAL_TOKENS) {
+    if (lc.includes(tok)) {
+      hits++;
+      if (hits >= 3) return true;
+    }
+  }
+  return false;
+}
+
 function mapToDeal(p: AliexProduct, i: number, country: string): Deal | null {
   const title = p.product_title?.trim();
   /* Prefer the pre-tracked promotion_link when AliExpress includes it
@@ -141,6 +175,13 @@ function mapToDeal(p: AliexProduct, i: number, country: string): Deal | null {
      /api/go path will wrap via the URL converter. */
   const url = p.promotion_link?.trim() || p.product_detail_url?.trim();
   if (!title || !url) return null;
+
+  /* Junk-title gate. Drops the SEO-stuffed wholesale spam that the
+     QA agent caught surfacing as 12 duplicate rows in /ng/deals?
+     category=phones. Real branded products (which is what we want
+     in our pool) survive this gate easily — only the no-brand
+     keyword-stuffed listings get dropped. */
+  if (looksLikeJunkAliExpressTitle(title)) return null;
 
   const sale     = parseNumeric(p.target_sale_price);
   const original = parseNumeric(p.target_original_price) || sale;
