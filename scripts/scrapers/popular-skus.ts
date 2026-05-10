@@ -60,15 +60,23 @@ const POPULAR_SKUS: Array<{ q: string; cat: string }> = [
   { q: "AirPods Pro 2",            cat: "audio" },
   { q: "Sony WH-1000XM5",          cat: "audio" },
 
-  // Laptops
+  // Laptops — current Apple silicon flagships first, then NG-popular
+  // mid-range laptops that Konga / Slot actually carry.
+  { q: "MacBook Pro M4",           cat: "computing" },
+  { q: "MacBook Air M3",           cat: "computing" },
   { q: "MacBook Air M2",           cat: "computing" },
+  { q: "iPad Pro M4",              cat: "computing" },
+  { q: "iPad Air M2",              cat: "computing" },
   { q: "HP Pavilion 15",           cat: "computing" },
   { q: "Dell Inspiron 15",         cat: "computing" },
   { q: "Lenovo IdeaPad 3",         cat: "computing" },
 
-  // Gaming
+  // Gaming — added current Xbox flagship + Switch (Konga carries both).
   { q: "PlayStation 5",            cat: "electronics" },
+  { q: "PlayStation 5 Slim",       cat: "electronics" },
+  { q: "Xbox Series X",            cat: "electronics" },
   { q: "Xbox Series S",            cat: "electronics" },
+  { q: "Nintendo Switch OLED",     cat: "electronics" },
 
   // Appliances
   { q: "Hisense Refrigerator",     cat: "appliances" },
@@ -82,22 +90,44 @@ interface StoreSearchSpec {
   cardSelector: string;
   // Returns at most N items per query — we keep search noise out
   maxPerQuery: number;
+  /* Time after domcontentloaded to wait before reading cards.
+     Konga's lazy <img> next/image needs ~3.5s for the first six cards.
+     Slot is a Vite SPA that fetches search results client-side after
+     bundle execution; needs ~4s for the cards to paint. Tuned per
+     store after observing flagship coverage gaps in production. */
+  waitMs: number;
+  /* Optional explicit selector to wait for. If present, Playwright
+     races the selector against waitMs and returns whichever wins,
+     so fast renders aren't artificially slowed. */
+  waitForSelector?: string;
 }
 
 const STORES: StoreSearchSpec[] = [
   {
-    storeId: "konga",
-    storeName: "Konga",
-    buildUrl: (q) => `https://www.konga.com/search?search=${encodeURIComponent(q)}`,
-    cardSelector: "article",
-    maxPerQuery: 2,
+    storeId:         "konga",
+    storeName:       "Konga",
+    buildUrl:        (q) => `https://www.konga.com/search?search=${encodeURIComponent(q)}`,
+    cardSelector:    "article",
+    maxPerQuery:     2,
+    /* Konga renders fast (server-side) but next/image lazy-loads the
+       product photos. The post-load scroll loop below kicks the
+       lazy-loader; 3.5s is enough for the first 6 images to settle. */
+    waitMs:          3500,
+    waitForSelector: "article",
   },
   {
-    storeId: "slot",
-    storeName: "Slot",
-    buildUrl: (q) => `https://www.slot.ng/?s=${encodeURIComponent(q)}&post_type=product`,
-    cardSelector: "[class*='item'][class*='product']",
-    maxPerQuery: 2,
+    storeId:         "slot",
+    storeName:       "Slot",
+    buildUrl:        (q) => `https://www.slot.ng/?s=${encodeURIComponent(q)}&post_type=product`,
+    cardSelector:    "[class*='item'][class*='product']",
+    maxPerQuery:     2,
+    /* Slot is a Vite SPA. Every URL returns the same 13KB shell HTML;
+       the bundle then reads the URL, fetches search results from
+       Slot's API, and renders product cards into the DOM. End-to-end
+       this typically takes 3.5-4.5s on a clean Chromium. We wait up to
+       4s OR until product cards appear, whichever comes first. */
+    waitMs:          4000,
+    waitForSelector: "[class*='item'][class*='product']",
   },
   /* 3C Hub removed from popular-skus search in May 2026.
      The bare host (3chub.com/search) returns 404, the www host's
@@ -180,15 +210,29 @@ export async function scrapePopularSkus(page: Page): Promise<RawDeal[]> {
       const url = store.buildUrl(sku.q);
       try {
         await page.goto(url, { waitUntil: "domcontentloaded", timeout: 25000 });
-        await page.waitForTimeout(1500);
 
-        // For Konga's lazy-loaded next/image, scroll cards into view
+        /* Race a selector check against the per-store wait budget so
+           fast renders aren't artificially slowed AND slow SPA renders
+           still get a chance to paint. Without the selector race,
+           Slot's 1.5s wait was missing the 3.5-4.5s bundle execution
+           window and returning zero cards every time. */
+        if (store.waitForSelector) {
+          await page
+            .waitForSelector(store.waitForSelector, { timeout: store.waitMs })
+            .catch(() => { /* fall through to time-based wait */ });
+        } else {
+          await page.waitForTimeout(store.waitMs);
+        }
+
+        // For Konga's lazy-loaded next/image, scroll cards into view.
+        // Bumped the per-card delay 100ms → 200ms because the lazy
+        // loader was occasionally racing the next scroll.
         if (store.storeId === "konga") {
           await page.evaluate(async () => {
             const cards = Array.from(document.querySelectorAll("article")).slice(0, 6);
             for (const c of cards) {
               c.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
-              await new Promise((r) => setTimeout(r, 100));
+              await new Promise((r) => setTimeout(r, 200));
             }
           });
         }
