@@ -89,7 +89,7 @@ export default function Hero({ storeCount }: Props) {
             <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 animate-ping" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
           </span>
-          <span>Live · scanning prices across {storeCount} stores</span>
+          <span>Live · scanning prices across {storeCount.toLocaleString()} stores</span>
         </div>
 
         {/* Headline — large, editorial, single tone.

@@ -58,7 +58,7 @@ export default function PriceResults({
               </div>
             )}
             <div className="text-xs text-ink-3">
-              {storeCount} store{storeCount > 1 ? "s" : ""}
+              {storeCount.toLocaleString()} store{storeCount > 1 ? "s" : ""}
             </div>
           </div>
         </div>

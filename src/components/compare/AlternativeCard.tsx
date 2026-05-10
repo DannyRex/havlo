@@ -80,7 +80,7 @@ export default function AlternativeCard({ alt }: Props) {
         {/* Store info */}
         <div className="flex items-center gap-1.5 text-[11px] text-ink-3 mb-3">
           <Store size={11} />
-          From {alt.topStore} · {alt.storeCount} stores
+          From {alt.topStore} · {alt.storeCount.toLocaleString()} stores
         </div>
 
         {/* CTA */}

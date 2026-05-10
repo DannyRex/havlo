@@ -419,7 +419,7 @@ function CompareContent() {
                   <div className="mt-5 pt-5 border-t border-border">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-3">
-                        Across {sorted.length} {sorted.length === 1 ? "store" : "stores"}
+                        Across {sorted.length.toLocaleString()} {sorted.length === 1 ? "store" : "stores"}
                       </p>
                       <p className="text-[11px] text-ink-3">
                         Sorted cheapest first
@@ -569,7 +569,7 @@ function CompareContent() {
                 <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-success/10 border border-success/20">
                   <ArrowDown size={12} className="text-success" />
                   <span className="text-xs font-semibold text-success">
-                    {result.dupes.length} alternative{result.dupes.length > 1 ? "s" : ""} found
+                    {result.dupes.length.toLocaleString()} alternative{result.dupes.length > 1 ? "s" : ""} found
                   </span>
                 </div>
               </div>

@@ -188,7 +188,7 @@ export default function LiveResults({ items, loading, providers }: Props) {
         </div>
         <h3 className="text-lg sm:text-xl font-bold text-ink tracking-[-0.02em]">
           {items.length > 0
-            ? `${items.length} live deals from global stores`
+            ? `${items.length.toLocaleString()} live deals from global stores`
             : "Live deals from global stores"}
         </h3>
         <p className="text-xs sm:text-sm text-ink-2 mt-0.5">

@@ -55,7 +55,12 @@ export default function OriginToggle({ active, onChange, counts }: Props) {
                     : "bg-surface-2 text-ink-2",
                 )}
               >
-                {count}
+                {/* toLocaleString adds locale-appropriate thousands
+                    separators ("3,193" vs "3193"). The badges sit
+                    next to "All / Local / Intl" labels and frequently
+                    show 4-digit deal counts; without commas the
+                    number reads as a code, not a quantity. */}
+                {count.toLocaleString()}
               </span>
             )}
           </button>

@@ -24,7 +24,7 @@ export default function GroupCard({ g }: { g: ProductGroup }) {
         )}
         {g.storeCount > 1 && (
           <span className="absolute right-1.5 top-1.5 rounded-md bg-bg/80 px-1.5 py-0.5 text-[10px] font-semibold text-ink">
-            {g.storeCount} stores
+            {g.storeCount.toLocaleString()} stores
           </span>
         )}
       </div>

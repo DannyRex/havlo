@@ -323,7 +323,7 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
               >
                 <span className="text-ink truncate">{s.title}</span>
                 <span className="text-[11px] text-ink-3 shrink-0">
-                  {s.storeCount} store{s.storeCount > 1 ? "s" : ""}
+                  {s.storeCount.toLocaleString()} store{s.storeCount > 1 ? "s" : ""}
                 </span>
               </button>
             ))}
