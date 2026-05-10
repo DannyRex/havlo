@@ -8,7 +8,6 @@ import {
   PhoneIcon, LaptopIcon, SneakerIcon, EarbudsIcon, TvIcon,
   HomeIcon, FashionIcon, BeautyIcon, GamingIcon, FurnitureIcon,
 } from "@/components/ui/CategoryIcons";
-import { Coins } from "lucide-react";
 import { useCountry } from "@/components/providers/CountryProvider";
 import type { ComponentType } from "react";
 
@@ -242,28 +241,13 @@ export default function Hero({ storeCount }: Props) {
           </p>
         </div>
 
-        {/* Cashback announcement strip — sits between composer and
-            category chips. Visible on every Hero render so users
-            discover the program even if they never click a card.
-            Marked 'Coming soon' so we don't over-promise (Phase 2
-            accounts + payouts ship in a follow-up). Links to the
-            country-aware /[country]/cashback explainer page. */}
-        <div
-          className="mt-5 sm:mt-6 animate-fade-in"
-          style={{ animationDelay: "240ms" }}
-        >
-          <Link
-            href={`/${country.code}/cashback`}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs sm:text-[13px] bg-success/10 border border-success/30 text-ink hover:bg-success/15 transition-colors"
-          >
-            <Coins size={14} className="text-success" aria-hidden="true" />
-            <span>
-              <span className="font-semibold">Coming soon:</span>{" "}
-              earn up to 5% cashback when you shop through Havlo
-            </span>
-            <span className="text-ink-3 hidden sm:inline" aria-hidden="true">→</span>
-          </Link>
-        </div>
+        {/* Cashback announcement strip REMOVED in round-3 QA pass.
+            QA flagged it as duplicating the Cashback nav link AND
+            competing with the search composer for above-the-fold
+            attention on mobile. The /[country]/cashback page is
+            still reachable via the navbar link, so removing this
+            doesn't lose the funnel — it just stops eating vertical
+            space on the most important screen. */}
 
         {/* Category chips — full-bleed on mobile for proper edge fade */}
         <div

@@ -17,7 +17,7 @@ import {
 } from "@/lib/utils";
 import InfoTip from "@/components/ui/InfoTip";
 import { useCountry } from "@/components/providers/CountryProvider";
-import { USD_FX, formatLocal, type Country } from "@/lib/country";
+import { USD_FX, formatLocal, inferStoreCountry, type Country } from "@/lib/country";
 import type { Deal } from "@/types";
 
 /* Convert any Deal price (NGN or USD) into the user's preferred
@@ -105,7 +105,13 @@ export default function ListCard({ deal }: Props) {
   /* Cross-border total estimate (price + ~30% shipping/customs).
      Now formatted in the user's currency. Replaces the previous
      hardcoded ₦ rendering that broke for non-NG mobile users. */
-  const isCrossBorder = !sameCcy;
+  /* Cross-border check uses store country (not currency) — same fix
+     applied in MasonryCard. SerpAPI normalises all UK retailer
+     prices to USD, so a currency-only check would mark every Argos
+     row as cross-border for UK users. */
+  const dealStoreCountry = inferStoreCountry(deal.storeId, deal.storeName);
+  const storeIsLocalToUser = dealStoreCountry !== null && dealStoreCountry.toLowerCase() === country.code.toLowerCase();
+  const isCrossBorder = !storeIsLocalToUser && !sameCcy;
   const landedNgnStr = isCrossBorder ? `≈ ${formatLocal(Math.round(primarySale * 1.30), country)}` : null;
 
   return (

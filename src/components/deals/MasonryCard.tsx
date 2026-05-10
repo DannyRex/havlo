@@ -22,7 +22,7 @@ import {
 } from "@/lib/utils";
 import { useCountry } from "@/components/providers/CountryProvider";
 import {
-  USD_FX, formatLocal, type Country,
+  USD_FX, formatLocal, inferStoreCountry, type Country,
 } from "@/lib/country";
 import { getCashbackForStore } from "@/lib/cashback";
 import InfoTip from "@/components/ui/InfoTip";
@@ -166,11 +166,22 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
     else secondaryStr = `≈ ${formatLocal(deal.salePrice, { ...country, currency: dealCcy } as Country)}`;
   }
 
-  /* "INTL" chip = the deal isn't from the user's country.
-     For NG users: USD-priced deals are intl (existing behavior).
-     For others: NGN-priced deals are intl (rare after country filter
-     removes NG stores), or any deal whose currency != user's. */
-  const showIntl = showOriginBadge && !sameCcy;
+  /* "INTL" chip = the deal's store isn't anchored in the user's
+     country. Was: dealCcy !== userCcy. That broke for UK users
+     because SerpAPI normalises all prices to USD before storing,
+     so an Argos row in the UK pool has currency=USD even though
+     the store is UK-local. Result: every UK retailer card showed
+     "INTL" on /uk/deals.
+
+     Fix: check the store's country via the store-name → country
+     inference. Argos / Currys / Boots → "UK" → matches UK user
+     → no INTL badge. AliExpress / Shein → null → cross-border →
+     INTL badge stays. The currency-mismatch is now a fall-back
+     signal only when store country is unknown. */
+  const dealStoreCountry = inferStoreCountry(deal.storeId, deal.storeName);
+  const storeIsLocalToUser = dealStoreCountry !== null && dealStoreCountry.toLowerCase() === country.code.toLowerCase();
+  const isCrossBorderForUser = !storeIsLocalToUser && !sameCcy;
+  const showIntl = showOriginBadge && isCrossBorderForUser;
 
   return (
     <a

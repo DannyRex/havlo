@@ -264,11 +264,12 @@ export default function CashbackPage({
           </div>
           <div className="p-5 rounded-2xl border border-border bg-surface">
             <Shield size={20} className="text-success mb-3" />
-            <h3 className="font-bold text-ink text-[15px] mb-2">No bias on results</h3>
+            <h3 className="font-bold text-ink text-[15px] mb-2">The cheapest still wins</h3>
             <p className="text-ink-2 text-sm leading-relaxed">
-              Cashback doesn&apos;t change the order of your search results. The
-              cheapest verified offer still ranks first, even when the next one
-              down pays us more. Cashback is a bonus, not a bribe.
+              Cashback never changes the search order. The cheapest verified
+              offer ranks first, even when the next one down pays us more. We
+              chose this rule on day one, and we wrote it down so we can&apos;t
+              quietly change our minds. Cashback is a bonus, not a bribe.
             </p>
           </div>
         </section>
