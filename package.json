@@ -20,6 +20,7 @@
     "ingest:aliexpress": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-providers.ts --provider=aliexpress-affiliate",
     "ingest:scraped": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-scraped.ts",
     "ingest:curated": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-curated-targets.ts",
+    "ingest:uk-retailers": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-uk-retailers.ts",
     "dedup": "tsx --tsconfig tsconfig.scripts.json scripts/dedup-products.ts",
     "test:matcher": "tsx --tsconfig tsconfig.scripts.json scripts/test-matcher.ts",
     "retag": "tsx --tsconfig tsconfig.scripts.json scripts/retag-categories.ts"
