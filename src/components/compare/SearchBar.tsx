@@ -317,12 +317,20 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
                 type="button"
                 onMouseDown={(e) => { e.preventDefault(); submit(s.title); }}
                 onMouseEnter={() => setHighlighted(i)}
-                className={`w-full text-left px-4 py-3 flex items-center justify-between gap-3 text-sm transition-colors ${
+                /* QA second pass: typeahead truncated to "Apple i..."
+                   on mobile because the row used `truncate` and the
+                   storeCount on the right was eating most of the
+                   width. Now: title wraps to up to 2 lines (line-
+                   clamp-2 keeps the suggestion list visually compact
+                   while showing enough of the title to recognise the
+                   product), storeCount stays right-aligned but the
+                   title gets primary read order. */
+                className={`w-full text-left px-4 py-3 flex items-start justify-between gap-3 text-sm transition-colors ${
                   highlighted === i ? "bg-surface-2" : "hover:bg-surface-2"
                 }`}
               >
-                <span className="text-ink truncate">{s.title}</span>
-                <span className="text-[11px] text-ink-3 shrink-0">
+                <span className="text-ink line-clamp-2 leading-snug">{s.title}</span>
+                <span className="text-[11px] text-ink-3 shrink-0 mt-0.5">
                   {s.storeCount.toLocaleString()} store{s.storeCount > 1 ? "s" : ""}
                 </span>
               </button>

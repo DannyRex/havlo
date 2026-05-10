@@ -120,12 +120,18 @@ export default function TrendingSearches() {
                 key={q}
                 href={`/compare?q=${encodeURIComponent(q)}&mode=similar`}
                 className="group inline-flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-bg border border-border hover:border-border-strong hover:shadow-card transition-all whitespace-nowrap shrink-0 active:scale-95"
+                /* aria-label gives screen readers the "trending +N%
+                   this week" context the visual trend arrow implies. */
+                aria-label={`${q}, trending up ${trend}% in searches this week`}
               >
                 <span className="text-[13px] sm:text-sm font-medium text-ink">{q}</span>
-                <span className="inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-semibold text-success tabular-nums">
-                  <ArrowUpRight size={11} strokeWidth={2.5} />
-                  {trend}%
-                </span>
+                {/* Trend chip simplified: arrow only, no bare percent.
+                    QA noted that "Razer Blackwidow 107%" reads as a
+                    code with no unit — shoppers don't know what the
+                    number describes. The up-arrow alone communicates
+                    "this is gaining momentum" without the math. The
+                    percent stays in the aria-label for context. */}
+                <ArrowUpRight size={11} strokeWidth={2.5} className="text-success" aria-hidden="true" />
               </Link>
             ))}
           </div>

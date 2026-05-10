@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { ArrowUp, Camera, Link2 } from "lucide-react";
+import { ArrowUp, Link2 } from "lucide-react";
 import Link from "next/link";
 import {
   PhoneIcon, LaptopIcon, SneakerIcon, EarbudsIcon, TvIcon,
@@ -81,15 +81,21 @@ export default function Hero({ storeCount }: Props) {
 
       <div className="relative max-w-3xl mx-auto px-4 sm:px-6 text-center">
 
-        {/* Trust pill */}
+        {/* Trust pill — copy splits short / long across breakpoints
+            so the pill stays one line on iPhone-mini through XL. The
+            QA second pass reported the long copy wrapping to 3 lines
+            on 390x844, which combined with the H1 + subhead pushed
+            the search box below the fold. Short form on mobile keeps
+            the credibility signal but doesn't eat vertical space. */}
         <div
-          className="inline-flex items-center gap-2 mb-7 sm:mb-8 px-3 py-1.5 rounded-full bg-surface-2 border border-border text-xs sm:text-sm text-ink-2 animate-fade-in"
+          className="inline-flex items-center gap-2 mb-5 sm:mb-8 px-3 py-1.5 rounded-full bg-surface-2 border border-border text-xs sm:text-sm text-ink-2 animate-fade-in"
         >
           <span className="relative flex h-2 w-2" aria-hidden="true">
             <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 animate-ping" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
           </span>
-          <span>Live · scanning prices across {storeCount.toLocaleString()} stores</span>
+          <span className="sm:hidden">Live · {storeCount.toLocaleString()} stores</span>
+          <span className="hidden sm:inline">Live · scanning prices across {storeCount.toLocaleString()} stores</span>
         </div>
 
         {/* Headline — large, editorial, single tone.
@@ -100,37 +106,49 @@ export default function Hero({ storeCount }: Props) {
             didn't. The 'similar products' keyword is preserved in
             the bottom-section CTA + page metadata so the SEO
             footprint stays intact.
-            Note: literal whitespace + line-break for screen readers.
 
-            Mobile typography (May 2026 — QA pass):
-              QA reported the headline wrapping to 4 short lines on
-              iPhone (390x844) — "Before you / buy it, / find it for /
-              less.". Three changes:
-                1. clamp() min dropped 1.95rem → 1.65rem so the bold
-                   weight at sub-400px viewports stops overflowing
-                   the px-4 container and forcing per-word breaks.
-                2. clamp() slope eased 8vw → 7.5vw so growth from
-                   small-mobile to large-mobile is gentler — keeps
-                   the desktop crescendo at 5rem unchanged.
-                3. text-wrap: balance (Tailwind text-balance) lets
-                   the browser distribute the two-clause headline
-                   across two even lines instead of letting the
-                   first clause hog the wider line.
-              The block→inline span at sm: stays — that's what gives
-              us the explicit 2-line target on phones. */}
+            Mobile typography (v3, May 2026 — second QA pass):
+              v1 (clamp 1.95→8vw) wrapped to 4 lines on iPhone.
+              v2 dropped clamp min to 1.65rem and added text-balance.
+              QA retest reported v2 STILL wrapped to 4 lines —
+              text-balance interacted weirdly with the block→inline
+              span trick (it was reflowing the two text nodes into
+              4 balanced micro-lines instead of using the explicit
+              break at the span boundary).
+
+              v3 abandons text-balance, drops the span, and uses a
+              ch-unit max-width to constrain the H1 to a width that
+              MUST wrap to 2 lines on mobile and 1 line on desktop:
+                • max-w-[18ch]: at the mobile font size, 18 chars is
+                  exactly the longer of the two clauses ('Before you
+                  buy it,' = 18 chars). Browser wraps at the word
+                  boundary, producing a clean 2-line layout regardless
+                  of viewport width or font-rendering quirks.
+                • clamp() lowered to (1.5rem, 7vw, 5rem) so even on
+                  320px iPhone SE the first clause fits on one line.
+                • leading bumped to 1.06 on mobile for breathing room
+                  between the two lines; back to 0.98 from sm: where
+                  the H1 returns to its single-line editorial form. */}
         <h1
-          className="font-bold text-ink leading-[1.02] sm:leading-[0.98] tracking-[-0.04em] mb-5 sm:mb-6 animate-fade-up text-balance"
-          style={{ fontSize: "clamp(1.65rem, 7.5vw, 5rem)" }}
+          className="font-bold text-ink leading-[1.06] sm:leading-[0.98] tracking-[-0.04em] mb-5 sm:mb-6 animate-fade-up max-w-[18ch] mx-auto sm:max-w-none"
+          style={{ fontSize: "clamp(1.5rem, 7vw, 5rem)" }}
         >
-          Before you buy it,{" "}
-          <span className="block sm:inline">find it for less.</span>
+          Before you buy it, find it for less.
         </h1>
 
+        {/* Subhead. QA second pass said this wrapped to 6 short lines
+            on mobile because (a) the prior text was 100+ chars at
+            15px in a px-4 container, and (b) the H1 mis-wrap above
+            was still pushing it. Mobile copy now ~70 chars so it
+            wraps to a clean 2 lines on iPhone. Desktop keeps the
+            longer "stores you already know" framing for full SEO
+            footprint of the founder line. */}
         <p
-          className="text-ink-2 text-[15px] sm:text-lg leading-relaxed mb-8 sm:mb-10 max-w-xl mx-auto animate-fade-up px-2"
+          className="text-ink-2 text-[15px] sm:text-lg leading-snug sm:leading-relaxed mb-6 sm:mb-10 max-w-xl mx-auto animate-fade-up px-2"
           style={{ animationDelay: "80ms" }}
         >
-          Paste a link or search any product. Havlo finds cheaper alternatives across the stores you already know.
+          <span className="sm:hidden">Paste a link or search any product. We find it cheaper.</span>
+          <span className="hidden sm:inline">Paste a link or search any product. Havlo finds cheaper alternatives across the stores you already know.</span>
         </p>
 
         {/* Composer — mobile-optimised */}
@@ -168,18 +186,14 @@ export default function Hero({ storeCount }: Props) {
                     Link detected
                   </span>
                 ) : (
-                  <button
-                    type="button"
-                    title="Image search (coming soon)"
-                    disabled
-                    className="inline-flex items-center gap-1.5 text-ink-3 disabled:cursor-not-allowed"
-                  >
-                    <Camera size={14} />
-                    <span className="hidden xs:inline sm:inline">Image search</span>
-                    <span className="text-[10px] text-ink-3 border border-border-strong rounded px-1 py-0.5">
-                      soon
-                    </span>
-                  </button>
+                  /* Subtle hint — replaces the disabled "Image search
+                     · soon" button QA flagged. We don't ship UI for
+                     features that don't exist; the "soon" tag also
+                     read as marketing-fluff in the founder voice
+                     review. When image search lands, restore here. */
+                  <span className="text-ink-3">
+                    Search anything, or paste a link.
+                  </span>
                 )}
               </div>
 
@@ -188,13 +202,21 @@ export default function Hero({ storeCount }: Props) {
                 onClick={submit}
                 disabled={!hasInput}
                 aria-label="Search"
-                className={`shrink-0 h-11 w-11 sm:h-10 sm:w-10 rounded-full inline-flex items-center justify-center transition-all duration-200 ${
+                className={`shrink-0 inline-flex items-center justify-center gap-1.5 transition-all duration-200 rounded-full
+                  h-11 w-11 sm:h-10 sm:w-auto sm:px-4 ${
                   hasInput
                     ? "bg-brand text-white hover:bg-brand-hover shadow-brand active:scale-95"
                     : "bg-ink/8 text-ink-3 cursor-not-allowed"
                 }`}
               >
-                <ArrowUp size={20} strokeWidth={2.5} />
+                <ArrowUp size={20} strokeWidth={2.5} className="sm:hidden" />
+                <ArrowUp size={16} strokeWidth={2.5} className="hidden sm:inline" />
+                {/* Visible label on desktop only — QA A6 follow-up:
+                    the icon-only button on the homepage was the one
+                    surface that didn't match the /compare button's
+                    "Find cheaper" verbal label. Mobile stays icon-
+                    only so the search box keeps its width. */}
+                <span className="hidden sm:inline text-sm font-semibold">Search</span>
               </button>
             </div>
           </div>
