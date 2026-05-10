@@ -139,7 +139,22 @@ function isGoogleRelayUrl(u: string): boolean {
 function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | null {
   const saleNative = r.extracted_price;
   const originalNative = r.extracted_old_price;     // undefined ⇒ not on sale
-  const url = r.product_link ?? r.link;
+  /* Prefer `link` (direct merchant URL) over `product_link` (Google
+     Shopping relay). Was the wrong way around — the May 2026 UK
+     retailer ingest landed 100+ Currys / John Lewis / Argos / Very
+     rows in the DB but EVERY ONE of them got a Google relay URL
+     because we picked product_link first. browse-db's
+     isUsableMerchantUrl filter then dropped them all (correctly —
+     they would land users on a Google search page, not the
+     merchant). The diagnostic showed 0 UK retailer rows in the pool
+     even though the ingest reported 68 successful upserts.
+
+     SerpAPI returns `link` as the direct merchant URL when it can
+     extract one from the Google Shopping result; `product_link` is
+     always Google's tracking-wrapped URL. Picking link first means
+     direct merchant URLs go through cleanly and only the unresolved
+     cases fall back to the relay+/api/go path. */
+  const url = r.link ?? r.product_link;
   const store = r.source;
   const title = r.title;
 
