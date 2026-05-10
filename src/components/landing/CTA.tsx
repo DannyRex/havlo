@@ -41,6 +41,38 @@ function seededShuffle<T>(items: T[], rng: () => number): T[] {
   return arr;
 }
 
+/* Pick `n` items from an already-shuffled list, constrained to one
+   per unique store. Without this constraint the collage can show 3
+   AliExpress cards (UK pool is 72% AliExpress) or 3 Essenza cards
+   (NG pool is heavy on the recently-added Shopify retailers) — which
+   reads as "Havlo only knows about one store" rather than the
+   intended "Havlo aggregates across many stores".
+
+   Two-pass: first pick one per unique storeId, then if we couldn't
+   reach `n` distinct stores (rare — happens in narrow markets like
+   ZA where 100% of intl is AliExpress), backfill from the remaining
+   shuffled pool so the collage still gets 3 cards rather than 1 or 2. */
+function pickDistinctStores<T extends { storeId: string }>(items: T[], n: number): T[] {
+  const picked: T[] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (picked.length >= n) break;
+    if (seen.has(item.storeId)) continue;
+    picked.push(item);
+    seen.add(item.storeId);
+  }
+  /* Backfill — if catalog is too narrow to fill `n` distinct stores,
+     keep the card count by allowing repeats from the shuffled tail. */
+  if (picked.length < n) {
+    for (const item of items) {
+      if (picked.length >= n) break;
+      if (picked.includes(item)) continue;
+      picked.push(item);
+    }
+  }
+  return picked;
+}
+
 /* Pick three country-appropriate product images, fresh every 5-min
    rotation. Server-rendered → SSR and CSR see the same picks (no
    hydration mismatch).
@@ -89,7 +121,12 @@ async function pickCollage(country: { code: string; name: string }): Promise<Dea
 
   if (candidates.length < 3) return candidates;
   const rng = makeRng(freshnessSeed());
-  return seededShuffle(candidates, rng).slice(0, 3);
+  /* Distinct-store constraint replaces the previous .slice(0, 3).
+     Without it, dominant stores (AliExpress in UK, Essenza in NG)
+     would land all three picks on the same brand. With it, the
+     collage rotates across the full retailer mix Havlo aggregates,
+     which is the actual product proof the homepage needs to make. */
+  return pickDistinctStores(seededShuffle(candidates, rng), 3);
 }
 
 /* Reusable mini product card used in the collage */
