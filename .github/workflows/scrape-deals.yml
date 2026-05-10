@@ -28,7 +28,32 @@ on:
 permissions:
   contents: write
 
+# ── Architecture (May 2026 refactor — parallel multi-job) ─────────
+#
+# Old: single 'scrape' job ran everything sequentially → 35-45 min.
+#
+# New: 5 jobs with a needs-chain that lets the 4 independent ingests
+# run in parallel against the slow Playwright scrape. Wall-time drops
+# to ~34 min and individual ingests can be retried without re-running
+# the whole 30-min scrape.
+#
+#   scrape ────────┐
+#   ingest-ali ────┤
+#   ingest-serpapi ┼─→ dedup
+#   ingest-uk ─────┘
+#
+# Each job re-runs the same checkout + Node + npm ci preamble. ~3-5 min
+# overhead per job, but the jobs run in parallel so wall-time wins
+# anyway. Total compute minutes stay roughly the same as the old
+# sequential workflow (~50 billable min) but completion is faster.
+
 jobs:
+
+  # ── Job 1: Playwright scrape + commit refreshed deals.ts +
+  #          ingest scraped → DB. These three steps stay in one
+  #          job because (a) the commit needs the same checkout
+  #          that ran the scrape, and (b) ingest:scraped reads the
+  #          freshly-generated deals.ts before it's pushed. ──
   scrape:
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -38,15 +63,9 @@ jobs:
     # the step's own env block is applied — so referencing
     # env.SECRET_X in a step's if always returns empty string when
     # the env is only declared on that same step.
-    #
-    # With job-level env, every step (including their if conditions)
-    # can read env.SECRET_X reliably.
     env:
       SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      ALIEXPRESS_APP_KEY:         ${{ secrets.ALIEXPRESS_APP_KEY }}
-      ALIEXPRESS_APP_SECRET:      ${{ secrets.ALIEXPRESS_APP_SECRET }}
-      SERPAPI_KEY:                ${{ secrets.SERPAPI_KEY }}
 
     steps:
       - name: Checkout repo
@@ -96,55 +115,72 @@ jobs:
             git rebase origin/main
           done
 
-      # ── Diagnostic: prints LENGTHS (never values) of every secret-
-      # backed env var so we can see exactly what the runner has
-      # populated. If a length shows 0, that secret is missing or
-      # empty in repo Settings → Secrets and variables → Actions →
-      # Repository secrets. If lengths are nonzero but the conditional
-      # ingest steps below still skip, the `env.X` evaluation in
-      # step-level `if:` is the bug — switch those `if:` conditions
-      # to use the `secrets` context directly.
-      - name: Debug — env presence check
-        run: |
-          echo "::group::Env presence (lengths only — no values leaked)"
-          echo "SUPABASE_URL=${#SUPABASE_URL}"
-          echo "SUPABASE_SERVICE_ROLE_KEY=${#SUPABASE_SERVICE_ROLE_KEY}"
-          echo "ALIEXPRESS_APP_KEY=${#ALIEXPRESS_APP_KEY}"
-          echo "ALIEXPRESS_APP_SECRET=${#ALIEXPRESS_APP_SECRET}"
-          echo "SERPAPI_KEY=${#SERPAPI_KEY}"
-          echo "::endgroup::"
-
       # ── Ingestion: pushes the refreshed deals.ts into Supabase so the
-      # app's DB-backed providers serve fresh rows immediately. All env
-      # vars come from the job-level env block above — no per-step
-      # mappings needed.
+      # app's DB-backed providers serve fresh rows immediately. Stays in
+      # this job because it reads the just-generated deals.ts.
       - name: Ingest scraped deals → Supabase
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
         run: npm run ingest:scraped
 
-      # ── Konga affiliate ingestion was here; removed because the
-      # affiliate program never approved us (ghosted application).
-      # Konga deals still flow via the Playwright scraper above
-      # (scripts/scrapers/konga.ts) — no catalog gap. If the
-      # affiliate program ever opens up, restore via git history.
+  # ── Job 2: AliExpress affiliate ingest. Independent API call to
+  #          the AliExpress Open Platform — doesn't depend on the
+  #          Playwright scrape. Runs in parallel with the scrape job.
+  #          Free (no SerpAPI credits), ~2-3 min of work + 2-3 min
+  #          npm ci overhead. ──
+  ingest-aliexpress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ALIEXPRESS_APP_KEY:         ${{ secrets.ALIEXPRESS_APP_KEY }}
+      ALIEXPRESS_APP_SECRET:      ${{ secrets.ALIEXPRESS_APP_SECRET }}
 
-      # ── AliExpress Affiliate API ingestion (global cross-border).
-      # Free via AliExpress Open Platform. Skipped when AliExpress
-      # credentials aren't set.
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Ingest AliExpress affiliate deals → Supabase
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.ALIEXPRESS_APP_KEY != '' && env.ALIEXPRESS_APP_SECRET != ''
         run: npm run ingest:aliexpress
 
-      # ── Live SerpAPI ingestion: 6 countries × 10 categories. Skipped
-      # automatically when SERPAPI_KEY isn't set so devs can run the
-      # workflow on a dry repo without burning API credits.
-      #
-      # ALSO skipped when the manual run sets `skip_serpapi=true`.
-      # Useful for re-running just the Playwright scrapers + AliExpress
-      # affiliate after fixing a selector without paying the ~60-credit
-      # SerpAPI tax. Cron runs always include SerpAPI (no skip flag
-      # available there).
-      #
+  # ── Job 3: SerpAPI standard ingest. 6 countries × 10 categories ×
+  #          50-result limit = 60 calls per run. Independent of the
+  #          Playwright scrape — runs in parallel.
+  #          Skipped automatically when SERPAPI_KEY is unset (dev
+  #          checkout) OR when the manual run sets skip_serpapi=true.
+  #          Cron always runs it (~480 credits/month against the
+  #          1,000-credit Starter plan). ──
+  ingest-serpapi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SERPAPI_KEY:                ${{ secrets.SERPAPI_KEY }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
       # --limit=50 (was the script default 20). One SerpAPI search is
       # one credit regardless of result count, so bumping the per-call
       # ceiling is free and roughly doubles the deal pool surfacing on
@@ -154,27 +190,78 @@ jobs:
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
         run: npm run ingest -- --limit=50
 
-      # ── UK retailer-biased SerpAPI ingest. Standard ingest above
-      # uses category names ("Phones", "Laptops") which Google Shopping
-      # UK ranks Amazon-first for, leaving the UK pool dominated by
-      # Amazon UK + cross-border. This step queries SerpAPI with
-      # retailer-prefixed SKUs ("Argos iPhone 17", "Currys MacBook
-      # Pro M4") and filters to keep only on-target retailer rows.
-      # ~48 SerpAPI credits per run (8 retailers × 6 effective SKUs).
-      # Twice-weekly cron = ~96/month, fits under the 1,000-credit
-      # Starter plan alongside the standard ingest's ~480/month.
+  # ── Job 4: UK retailer-biased SerpAPI ingest. Standard ingest above
+  #          uses category names ("Phones", "Laptops") which Google
+  #          Shopping UK ranks Amazon-first for, leaving the UK pool
+  #          dominated by Amazon UK + cross-border. This step queries
+  #          SerpAPI with retailer-prefixed SKUs ("Argos iPhone 17",
+  #          "Currys MacBook Pro M4") and filters to keep only on-
+  #          target retailer rows.
+  #          ~96 SerpAPI credits per run (8 retailers × 14 SKUs, after
+  #          dedup against the standard ingest). Twice-weekly cron =
+  #          ~192/month, fits under the 1,000-credit Starter plan
+  #          alongside the standard ingest's ~480/month. ──
+  ingest-uk-retailers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SERPAPI_KEY:                ${{ secrets.SERPAPI_KEY }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Ingest UK retailer deals → Supabase
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
         run: npm run ingest:uk-retailers
 
-      # ── Dedup pass: re-key product signatures with the compact
-      # 'brand|model[|inches]' form and merge any near-duplicates the
-      # ingest steps just created. Zero API credits — pure DB work.
-      # Always runs (not gated on a provider key) so even runs with
-      # only the scraped/Konga ingest stay canonical. Without this,
-      # each retailer creates fresh product_ids and the cross-store
-      # comparison comes from bigger and bigger un-merged trees over
-      # time. See scripts/dedup-products.ts for the full rationale.
+  # ── Job 5: Dedup pass. Re-keys product signatures with the compact
+  #          'brand|model[|inches]' form and merges any near-
+  #          duplicates the four ingest jobs just created. Pure DB
+  #          work, no API credits, ~1-2 min.
+  #          MUST run after all four ingest jobs land their data,
+  #          otherwise it dedups against an incomplete catalog and
+  #          leaves cross-source duplicates lying around.
+  #          if: always() so dedup still runs even if an upstream
+  #          ingest failed — better to dedup the partial catalog than
+  #          skip the merge entirely. ──
+  dedup:
+    needs: [scrape, ingest-aliexpress, ingest-serpapi, ingest-uk-retailers]
+    # success() || failure() runs dedup whenever the workflow ran to
+    # completion (any combo of pass/fail across upstream jobs), but
+    # NOT when the workflow was manually cancelled — that would waste
+    # ~3 min of runner time on a no-op dedup.
+    if: success() || failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Dedup products
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
         run: npm run dedup
