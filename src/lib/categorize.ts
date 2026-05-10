@@ -48,7 +48,35 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   { pattern: /\b(soundbar|home\s*theatre|home\s*theater|boombox|bluetooth\s*speaker|wireless\s*speaker|portable\s*speaker|party\s*speaker|party\s*box)\b/i, slug: "audio", reason: "speaker form factor" },
   { pattern: /\b(jbl|bose|sonos|harman\s*kardon|marshall|wh-1000|qc(35|45|ultra)|quietcomfort)\b/i, slug: "audio", reason: "audio brand+model" },
 
-  // ── Phones (after computing rules so iPad doesn't slip in) ──
+  // ── Phone accessories (route to electronics so the Phones filter
+  //    stays clean). MUST come before the bare 'phone' rule below so
+  //    titles like "Mount Phone Holder", "Phone Stand", "Phone Case"
+  //    don't false-match into the Phones category.
+  //    The QA agent flagged this: /ng/deals?category=phones surfaced
+  //    "Motorcycle Rearview Mirror Bracket Tool ... For Car Mount
+  //    Phone ATV Bar CNC Aluminum" 10+ times as the cheapest "Phones"
+  //    results. The product is a phone holder for ATVs, not a phone.
+  //    First-pass regex assumed adjacency ("phone holder" / "for
+  //    phone") — the QA case interleaves "Mount Phone ATV" so word-
+  //    order-sensitive rules missed it. Broader rules below. ──
+  { pattern: /\b(phone|smartphone)\s*(case|cover|skin|sticker|ring|popsocket|grip|stand|holder|mount|bracket|tripod|gimbal|charger|cable|adapter|protector|screen\s*protector|tempered\s*glass|pouch|sleeve|wallet\s*case)\b/i, slug: "electronics", reason: "phone accessory (named after)" },
+  { pattern: /\b(case|cover|stand|holder|mount|bracket|tripod|gimbal|protector|tempered\s*glass|pouch|sleeve)\s*for\s*(phone|smartphone|iphone|galaxy|pixel)\b/i, slug: "electronics", reason: "phone accessory (for X)" },
+  /* Vehicle context + phone keyword anywhere in the title. Catches
+     "Motorcycle ... Phone ...", "Bicycle Mount ... Phone Holder",
+     "ATV ... Phone Cradle", regardless of word order. Real iPhone /
+     Galaxy listings never mention motorcycle/ATV/bicycle, so this is
+     safe. Cars get a stricter check (see next rule) because legitimate
+     "iPhone Car Mode" features exist. */
+  { pattern: /\b(motorcycle|atv|bicycle|bike|scooter|jeep|suv|truck|van|kayak|skateboard|treadmill)\b.*\b(phone|smartphone|iphone|galaxy|pixel)\b|\b(phone|smartphone|iphone|galaxy|pixel)\b.*\b(motorcycle|atv|bicycle|bike|scooter|jeep|suv|truck)\b/i, slug: "electronics", reason: "vehicle context + phone keyword (mount/holder)" },
+  /* Mounting / holding hardware context + phone keyword. Same word-
+     order-agnostic pattern. Excludes 'case' / 'cover' from the
+     accessory side because flagship phone listings sometimes say
+     "with case included" — handled by the accessory regex above. */
+  { pattern: /\b(tripod|gimbal|monopod|selfie\s*stick|gooseneck|cradle|car\s*mount|wall\s*mount|desk\s*mount|magnetic\s*mount|suction\s*mount|dashboard\s*mount|vent\s*mount|windshield\s*mount)\b.*\bphone\b|\bphone\b.*\b(tripod|gimbal|monopod|selfie\s*stick|gooseneck|cradle|car\s*mount|wall\s*mount|desk\s*mount|magnetic\s*mount|suction\s*mount|dashboard\s*mount|vent\s*mount|windshield\s*mount)\b/i, slug: "electronics", reason: "mount hardware + phone keyword" },
+
+  // ── Phones (after computing rules so iPad doesn't slip in, AND
+  //    after the accessory exclusions above so accessories don't
+  //    fall through to the bare-phone rule). ──
   { pattern: /\b(iphone|galaxy\s*(s|a|m|note|z)\d|pixel\s*\d|tecno|infinix|redmi|oneplus|smartphone)\b/i, slug: "phones", reason: "phone model" },
   // Generic 'phone' last — the word 'phone' appears in 'headphone',
   // 'earphone', 'megaphone', etc. Use word boundaries + negative

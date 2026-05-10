@@ -124,7 +124,17 @@ export const dbBrowseProvider: BrowseProvider = {
       if (q.origin && q.origin !== "all") {
         query = applyOriginFilter(query, q.origin);
       }
-      return query.order(col, { ascending: asc });
+      /* Tiebreaker on offer_id is non-negotiable for the paginated
+         fan-out below to be safe. Without it, PostgreSQL may return
+         tied rows (same price / discount / scraped_at) in different
+         orders across different .range() requests, so a row at
+         position 999 in page 1 can re-appear at position 1000 in
+         page 2 of the SAME logical sort. The QA agent caught this:
+         /ng/deals?category=phones&sort=price_asc surfaced the same
+         AliExpress accessory 11 times because its ₦62K price tied
+         with many sibling listings and PostgreSQL bounced the row
+         across page boundaries on every fetch. */
+      return query.order(col, { ascending: asc }).order("offer_id", { ascending: true });
     };
 
     /* PostgREST caps single responses at db-max-rows (default 1000)
@@ -157,8 +167,21 @@ export const dbBrowseProvider: BrowseProvider = {
     }
 
     const allRows: BestOfferRow[] = [];
+    const seenOfferIds = new Set<string>();
     for (const r of results) {
-      if (r.data) allRows.push(...(r.data as BestOfferRow[]));
+      if (!r.data) continue;
+      for (const row of r.data as BestOfferRow[]) {
+        /* Defensive dedup. The .order(col, asc).order(offer_id, true)
+           tiebreaker above SHOULD make this unnecessary, but if the
+           underlying view ever changes its identity column name, or
+           if a future schema migration breaks the stable sort, we
+           still don't want to surface the same listing 11 times like
+           the QA agent caught. Set membership check is O(1) so the
+           cost is negligible vs the safety it gives. */
+        if (seenOfferIds.has(row.offer_id)) continue;
+        seenOfferIds.add(row.offer_id);
+        allRows.push(row);
+      }
       /* Short page = end of dataset; no need to merge anything past
          this point (subsequent ranges will all have come back empty
          too). Could break early but Promise.all already fired them. */
