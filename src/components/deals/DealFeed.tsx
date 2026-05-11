@@ -312,8 +312,8 @@ export default function DealFeed() {
         <input
           id="deals-search"
           type="text"
-          aria-label="Filter by product or store, or press Enter to compare across stores"
-          placeholder="Filter by product or store…"
+          aria-label="Filter these deals by name or store, or press Enter to search across all stores"
+          placeholder="Filter these deals — try 'iPhone' or 'Currys'…"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={(e) => {
@@ -339,7 +339,7 @@ export default function DealFeed() {
         )}
       </div>
       <p className="text-[11px] text-ink-3 mb-4 px-4">
-        Type a product or store to filter the list. Press Enter to compare across stores.
+        Type to filter the deals shown below. Press Enter to search across every store for a fresh comparison.
       </p>
 
       {/* Invalid-category info chip — addresses Bucket 2#17 from QA
