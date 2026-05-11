@@ -24,6 +24,22 @@ export function generateStaticParams() {
   return COUNTRIES.map((c) => ({ country: c.code }));
 }
 
+/* Per-country meta description. Previous template lived inline and
+   came out ~110-120 chars — under Google's 150-160 sweet spot, which
+   caused the snippet to run short with empty space in SERPs. Each
+   string here names 2-3 stores the visitor recognises in their
+   country, lifting both length and click-through relevance.
+   Length budget per entry: 145-160 chars. */
+const META_DESCRIPTIONS: Record<string, string> = {
+  ng: "Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know in Nigeria, including Konga, Jumia, Amazon, and 20+ more.",
+  uk: "Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know in the UK, including Currys, John Lewis, and 20+ more.",
+  us: "Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know in the US, including Amazon, Walmart, and 20+ more.",
+  de: "Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know in Germany, including Amazon, MediaMarkt, and 20+ more.",
+  ae: "Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know in the UAE, including noon, Amazon, and 20+ more.",
+  in: "Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know in India, including Flipkart, Amazon, and 20+ more.",
+  za: "Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know in South Africa, including Takealot, and 20+ more.",
+};
+
 export async function generateMetadata({
   params,
 }: {
@@ -31,7 +47,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const country = getCountry(params.country);
   const title = `Find similar products for less in ${country.name}`;
-  const description = `Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know in ${country.name}.`;
+  const description = META_DESCRIPTIONS[country.code]
+    ?? `Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know in ${country.name}.`;
   const url = `${SITE_URL}/${country.code}`;
 
   return {
@@ -82,7 +99,7 @@ export default function HomePage({ params }: { params: { country: string } }) {
       <Suspense fallback={null}>
         <DealUnavailableBanner />
       </Suspense>
-      <Hero storeCount={storeCount} />
+      <Hero storeCount={storeCount} countryCode={country.code} countryName={country.name} />
       <TrendingDeals />
       {/* Cashback teaser — restores the pre-launch signup hook that
           was previously a hero strip (removed in c9954c9 because it

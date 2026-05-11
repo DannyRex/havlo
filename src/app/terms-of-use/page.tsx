@@ -22,6 +22,14 @@ const sections = [
     ],
   },
   {
+    title: "Affiliate links and commission",
+    paragraphs: [
+      "Some links to retailers on Havlo are affiliate links: when you click through and complete a purchase, the retailer pays Havlo a small commission. This is how we keep the site free to use.",
+      "The price you pay is the retailer's price. Affiliate links do not change what you pay at checkout. Havlo does not adjust search results, deal rankings, or comparison ordering based on which retailers pay us a commission. Our cheapest-first rule applies regardless of affiliate status.",
+      "For more on the commission model and the retailers we currently earn from, see havlo.io/how-we-make-money.",
+    ],
+  },
+  {
     title: "Acceptable use",
     paragraphs: [
       "You may not misuse the site, interfere with its operation, attempt to gain unauthorized access, or use Havlo in a way that could harm the platform, its data, or other users.",

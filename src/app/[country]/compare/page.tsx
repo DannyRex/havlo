@@ -220,9 +220,16 @@ function CompareContent() {
            too so back/forward doesn't surface a stale query. Prior
            results are deliberately NOT cleared — user can still see
            them below the chip rail until they pick a new comparison. */
+        /* Full reset on X click — previous behaviour preserved the
+           anchor card "below the chip rail" but that left users
+           confused: the input was empty yet a stale anchor product
+           still hung around. QA flagged this as P1-3. */
         onClear={() => {
           setQuery("");
           setSniffResult(null);
+          setResult(null);
+          setLiveResults([]);
+          setLiveProviders([]);
           router.replace(`/${country.code}/compare`, { scroll: false });
         }}
       />

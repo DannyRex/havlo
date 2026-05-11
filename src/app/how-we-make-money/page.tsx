@@ -16,7 +16,7 @@ const sections = [
     paragraphs: [
       "Havlo earns small commissions on qualifying purchases through some of our outbound links. This never changes the price you pay. It's the same model used by NerdWallet, Wirecutter, Skyscanner, and most other comparison platforms.",
       "As an Amazon Associate, Havlo earns from qualifying purchases. This applies to clicks that lead to amazon.com, amazon.co.uk, amazon.de, amazon.ae, amazon.in, and other Amazon marketplaces.",
-      "Active affiliate relationships: Amazon Associates and Skimlinks (a network covering around 48,000 retailers). Pending approvals: Konga, AliExpress Advanced API, and Awin. New partners get added as their approvals come through. Higher-paying retailers do not rank higher in search; the cheapest option always shows first.",
+      "Active affiliate relationships: Amazon Associates, AliExpress (Advanced API, full attribution), Konga, and Skimlinks (a network covering around 48,000 retailers). Pending approvals: Awin. New partners get added as their approvals come through. Higher-paying retailers do not rank higher in search; the cheapest option always shows first.",
     ],
   },
   {

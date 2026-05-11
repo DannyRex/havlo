@@ -31,9 +31,30 @@ interface Props {
       pill copy so the displayed count matches the marquee below
       instead of being a hardcoded "12+" guess. */
   storeCount: number;
+  /** ISO-2 country code from the URL param (e.g. "ng", "uk"). Passed
+      from the server-rendered country page so the hero subhead
+      mentions the right country during SSR — useCountry() doesn't
+      resolve until after hydration, which would otherwise show
+      "We find it cheaper in" with an empty trailer. */
+  countryCode: string;
+  /** Full display name ("Nigeria", "United Kingdom"). */
+  countryName: string;
 }
 
-export default function Hero({ storeCount }: Props) {
+/* Country-with-article phrase. The UK / US / UAE read better with
+   "the" prefix in prose; bare country names ("Nigeria", "Germany",
+   "India", "South Africa") don't. Falls back to the full name when
+   the code isn't in the map. */
+function countryPhrase(code: string, fullName: string): string {
+  switch (code) {
+    case "uk": return "the UK";
+    case "us": return "the US";
+    case "ae": return "the UAE";
+    default:   return fullName;
+  }
+}
+
+export default function Hero({ storeCount, countryCode, countryName }: Props) {
   const router = useRouter();
   const { country } = useCountry();
   const [query, setQuery] = useState("");
@@ -138,8 +159,15 @@ export default function Hero({ storeCount }: Props) {
           className="text-ink-2 text-[15px] sm:text-lg leading-snug sm:leading-relaxed mb-6 sm:mb-10 max-w-xl mx-auto animate-fade-up px-2"
           style={{ animationDelay: "80ms" }}
         >
-          <span className="sm:hidden">Paste a link or search any product. We find it cheaper.</span>
-          <span className="hidden sm:inline">Paste a link or search any product. Havlo finds cheaper alternatives across the stores you already know.</span>
+          {/* Country-aware subhead — "the UK" / "the US" / "the UAE"
+              get the article, others stand on their own. Replaces
+              the prior country-agnostic copy that caused /uk and
+              /ng to look identical (QA P1-7). */}
+          {/* Uses the server-passed country (not useCountry) so the
+              phrase is present in SSR — useCountry wouldn't resolve
+              until hydration. */}
+          <span className="sm:hidden">Paste a link or search any product. We find it cheaper in {countryPhrase(countryCode, countryName)}.</span>
+          <span className="hidden sm:inline">Paste a link or search any product. Havlo finds cheaper alternatives across the stores you already know in {countryPhrase(countryCode, countryName)}.</span>
         </p>
 
         {/* Composer — mobile-optimised */}
@@ -222,7 +250,7 @@ export default function Hero({ storeCount }: Props) {
             className="hidden sm:block text-xs text-ink-3 mt-3 animate-fade-in text-center"
             style={{ animationDelay: "220ms" }}
           >
-            Try &ldquo;iPhone 15 Pro&rdquo;, &ldquo;Adidas Samba&rdquo;, or paste any product link.
+            Try &ldquo;iPhone 17 Pro&rdquo;, &ldquo;Adidas Samba&rdquo;, or paste any product link.
           </p>
         </div>
 

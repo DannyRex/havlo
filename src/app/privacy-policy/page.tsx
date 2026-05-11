@@ -48,9 +48,9 @@ const sections = [
     ],
   },
   {
-    title: "Your rights",
+    title: "Your rights under GDPR, POPIA, and similar laws",
     paragraphs: [
-      "Wherever you live, you can ask us to:",
+      "If you're in the EU or UK, GDPR gives you specific rights over the data we hold about you. South African residents have equivalent rights under POPIA, and similar protections exist in many other jurisdictions. Wherever you live, you can ask us to:",
     ],
     bullets: [
       "Show you what data we have about you.",
