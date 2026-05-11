@@ -8,12 +8,10 @@
 import { useState } from "react";
 import {
   cleanTitle,
-  formatCompact,
   getClickThroughUrl,
   isAmazonSearchUrl,
   proxiedImageUrl,
   timeAgo,
-  usdToNgn,
 } from "@/lib/utils";
 import InfoTip from "@/components/ui/InfoTip";
 import { useCountry } from "@/components/providers/CountryProvider";
@@ -97,10 +95,18 @@ export default function ListCard({ deal }: Props) {
      stays consistent across grid + list views. */
   const isPriceFromOnly = isAmazonSearchUrl(deal.url);
 
-  /* Secondary price hint — shows the deal's original currency when it
-     differs from the user's. Same idea as MasonryCard's secondaryStr. */
+  /* Secondary price hint — shows the deal's NATIVE currency (what
+     the merchant actually charges) when the user's display currency
+     is different. Was hardcoded to NGN, which surfaced "≈ ₦806K" on
+     /uk/deals — a non-sequitur for a UK shopper looking at a Currys
+     listing. Round-4 QA caught. The primary already shows the user's
+     local currency (via convertToUserCurrency above); the secondary
+     reveals the merchant's actual charge so the user knows what
+     they'll see at checkout. */
   const isUSD = deal.currency === "USD";
-  const ngnEquivStr = !sameCcy && isUSD ? `≈ ${formatCompact(usdToNgn(deal.salePrice))}` : null;
+  const ngnEquivStr = !sameCcy && isUSD
+    ? `≈ $${deal.salePrice.toFixed(2)}`
+    : null;
 
   /* Cross-border total estimate (price + ~30% shipping/customs).
      Now formatted in the user's currency. Replaces the previous

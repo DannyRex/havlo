@@ -317,25 +317,22 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
                 type="button"
                 onMouseDown={(e) => { e.preventDefault(); submit(s.title); }}
                 onMouseEnter={() => setHighlighted(i)}
-                /* QA second pass: typeahead truncated to "Apple i..."
-                   on mobile because the row used `truncate` and the
-                   storeCount on the right was eating most of the
-                   width. Now: title wraps to up to 2 lines (line-
-                   clamp-2 keeps the suggestion list visually compact
-                   while showing enough of the title to recognise the
-                   product), storeCount stays right-aligned but the
-                   title gets primary read order. */
-                className={`w-full text-left px-4 py-3 flex items-start justify-between gap-3 text-sm transition-colors ${
+                /* Round-4 QA: round-3 horizontal flex (title + count
+                   side-by-side) was still clipping titles to "Apple
+                   i..." on mobile because the input itself was too
+                   narrow for the storeCount badge AND a readable
+                   title to coexist on one row. Vertical stack:
+                   title on its own line (gets full row width),
+                   storeCount badge below as small metadata. The
+                   title wraps cleanly to up to 2 lines via line-
+                   clamp-2 and the user sees enough to recognise the
+                   product before tapping. */
+                className={`w-full text-left px-4 py-2.5 flex flex-col items-start gap-1 text-sm transition-colors ${
                   highlighted === i ? "bg-surface-2" : "hover:bg-surface-2"
                 }`}
               >
-                {/* flex-1 + min-w-0 lets the title shrink to fit the
-                    available row width on narrow viewports (was
-                    intrinsically sized, which forced "Apple iPhone..."
-                    truncation when the parent flex constrained it).
-                    line-clamp-2 then wraps cleanly to two lines. */}
-                <span className="text-ink line-clamp-2 leading-snug flex-1 min-w-0">{s.title}</span>
-                <span className="text-[11px] text-ink-3 shrink-0 mt-0.5 whitespace-nowrap">
+                <span className="text-ink line-clamp-2 leading-snug w-full">{s.title}</span>
+                <span className="text-[10px] text-ink-3 whitespace-nowrap">
                   {s.storeCount.toLocaleString()} store{s.storeCount > 1 ? "s" : ""}
                 </span>
               </button>

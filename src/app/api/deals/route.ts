@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
-import { filterDealsForCountry, getCountry } from "@/lib/country";
+import { filterDealsForCountry, getCountry, inferStoreCountry } from "@/lib/country";
 import type { OriginFilter, SortOption } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -68,11 +68,29 @@ export async function GET(req: NextRequest) {
     /* Country store filter — pure-function, runs over Deal[] */
     const allFiltered = filterDealsForCountry(allRawAcrossOrigins, country);
 
-    /* Bucket by currency-as-origin so the toggle counts and items
-       always match. NGN-priced items count as local; USD/other count
-       as intl. Same heuristic the dealToStoreRow ingestion uses. */
-    const localFiltered = allFiltered.filter((d) => d.currency === "NGN");
-    const intlFiltered  = allFiltered.filter((d) => d.currency !== "NGN");
+    /* Bucket by store COUNTRY (not currency). Round-4 QA caught
+       /uk/deals showing "Local stores: 0" even though John Lewis,
+       Argos, Currys cards were visible. Root cause: SerpAPI
+       normalises all UK retailer prices to USD before storing, so
+       the old `currency === "NGN"` heuristic counted every UK
+       retailer as INTL.
+
+       Now: a deal is "local" if its store is anchored in the user's
+       country. Argos / Currys / John Lewis → "UK" → local for UK
+       shoppers. Konga / 3C Hub / Slot → "NG" → local for NG
+       shoppers. AliExpress / Shein / Temu / DHgate → no anchor
+       → INTL for everyone. Falls back to the currency check when
+       the store can't be inferred (rare, niche scrapers). */
+    const isLocalToUser = (d: typeof allFiltered[0]): boolean => {
+      const storeCountry = inferStoreCountry(d.storeId, d.storeName);
+      if (storeCountry !== null) {
+        return storeCountry.toLowerCase() === country.code.toLowerCase();
+      }
+      // Fallback to currency match when store country can't be inferred
+      return d.currency === country.currency;
+    };
+    const localFiltered = allFiltered.filter(isLocalToUser);
+    const intlFiltered  = allFiltered.filter((d) => !isLocalToUser(d));
     const originCounts = {
       all:   allFiltered.length,
       local: localFiltered.length,

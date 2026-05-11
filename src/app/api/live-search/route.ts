@@ -16,7 +16,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getActiveSearchProviders, ProviderError } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry } from "@/lib/country";
-import { detectFamily } from "@/lib/search/families";
+import { detectFamily, alternativeFamilyMatches } from "@/lib/search/families";
+import { priceLooksPlausibleForLiveDeal } from "@/lib/search/price-floor";
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
@@ -114,23 +115,18 @@ export async function GET(req: NextRequest) {
         });
       });
 
-  /* Cross-family exclusion. Token-relevance is too lax for queries like
-     'iphone 15 pro max' — the bare token 'pro' matches 'iPad Pro
-     13inch M4 WiFi' because both contain 'pro'. And for 'Nintendo
-     Switch' the old shorthand here had no 'console' family at all,
-     so a satellite-distribution Switch surfaced as a live deal
-     (QA report Bucket 4 #3). Now uses the SAME comprehensive
-     detectFamily() that /api/compare uses, sourced from
-     src/lib/search/families.ts. Same logic in both surfaces means
-     a 'Did you mean: Nintendo Switch' click can't land junk. */
-  const qFam = detectFamily(q);
-  const relevant = !qFam
-    ? accessoryFiltered
-    : accessoryFiltered.filter((it) => {
-        const titleFam = detectFamily(it.title);
-        // Allow when title family unknown OR matches query family
-        return !titleFam || titleFam === qFam;
-      });
+  /* Cross-family exclusion. Round-4 QA caught: query "Yeezy Boost
+     350" surfaced "Boat Stone 350" (Bluetooth speaker, substring
+     match on '350') as a live deal. The previous family check
+     allowed any candidate where titleFam is null OR matches —
+     'Boat Stone' has no recognised family so it slipped through.
+
+     Now uses alternativeFamilyMatches: when the query has a
+     recognised family (footwear for Yeezy, audio for AirPods, etc.)
+     the candidate MUST share that family. Null-family candidates
+     get dropped. Identical semantics to the /compare alternatives
+     filter so the two surfaces stay in sync. */
+  const relevant = accessoryFiltered.filter((it) => alternativeFamilyMatches(q, it.title));
 
   /* Country store filter — same pure helper used elsewhere. Drops
      NG-anchored stores (Konga/Jumia/3C Hub) for non-NG users; keeps
@@ -138,9 +134,23 @@ export async function GET(req: NextRequest) {
      AliExpress, Wish, DHgate). */
   const countryFiltered = filterDealsForCountry(relevant, cookieCountry);
 
+  /* Counterfeit price floor. Round-4 QA flagged: DHgate iPhone 17
+     Pro $27.55, AliExpress Yeezy fakes $89, AliExpress AirPods Pro
+     $4.06 all surfaced in the live-deals section. The floor was
+     applied to /compare anchor + alternatives but never to live
+     deals — same surface to a user, but a different code path
+     served unfiltered. Plug the gap.
+
+     priceLooksPlausibleForLiveDeal converts USD → NGN before
+     applying the FLAGSHIP_PRICE_FLOOR_NGN. Real flagship listings
+     pass easily; counterfeits don't. */
+  const priceFiltered = countryFiltered.filter(
+    (it) => priceLooksPlausibleForLiveDeal(it.salePrice, it.title),
+  );
+
   return NextResponse.json(
     {
-      items: countryFiltered.slice(0, limit),
+      items: priceFiltered.slice(0, limit),
       providers: providers.map((p) => p.id),
     },
     { headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=900" } },

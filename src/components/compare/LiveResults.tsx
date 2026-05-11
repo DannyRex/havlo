@@ -6,10 +6,10 @@ import {
   savings,
   formatCompact,
   getClickThroughUrl,
-  usdToNgn,
 } from "@/lib/utils";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import { useCountry } from "@/components/providers/CountryProvider";
+import { USD_FX, formatLocal } from "@/lib/country";
 import type { Deal } from "@/types";
 
 interface Props {
@@ -20,12 +20,20 @@ interface Props {
 
 /* ── Single live-result card — compact, image-first, varied aspect ── */
 function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
+  const { country } = useCountry();
   const isUSD = deal.currency === "USD";
   const saved = savings(deal.originalPrice, deal.salePrice);
   const priceFmt = isUSD ? formatUSDPrice(deal.salePrice)     : formatCompact(deal.salePrice);
   const origFmt  = isUSD ? formatUSDPrice(deal.originalPrice) : formatCompact(deal.originalPrice);
   const saveFmt  = saved > 0 ? (isUSD ? formatUSDPrice(saved) : formatCompact(saved)) : null;
-  const ngnEquiv = isUSD ? `≈ ${formatCompact(usdToNgn(deal.salePrice))}` : null;
+  /* Secondary hint — converts USD primary to the USER'S local
+     currency. Was hardcoded to NGN, which surfaced "≈ ₦806K" on
+     /uk/compare for a UK shopper (round-4 QA). Now NG sees ₦, UK
+     sees £, DE sees €, etc. Skipped when there's no conversion to
+     do (USD shopper looking at USD deal). */
+  const ngnEquiv = isUSD && country.currency !== "USD"
+    ? `≈ ${formatLocal(Math.round(deal.salePrice * USD_FX[country.currency]), country)}`
+    : null;
   const hasDiscount = deal.originalPrice > deal.salePrice && deal.discountPercent > 0;
 
   /* Country chip — show the specific code when SerpAPI tagged it
@@ -35,7 +43,10 @@ function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
      across all live cards instead of appearing/disappearing. */
   const countryTag = deal.tags.find((t) => t.startsWith("country:"))?.split(":")[1];
   const isIntl = deal.tags.includes("intl") || deal.tags.includes("live");
-  const country = countryTag
+  /* Renamed from `country` (collided with the user-country from
+     useCountry above, added during the round-4 currency-display
+     fix). */
+  const dealCountryChip = countryTag
     ? countryTag.toUpperCase()
     : (isIntl ? "INTL" : null);
 
@@ -89,13 +100,13 @@ function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
         )}
 
         {/* Country chip — subtle, bottom-left */}
-        {country && (
+        {dealCountryChip && (
           <span
             className="absolute left-2 bottom-2 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-white/95 backdrop-blur-sm"
             style={{ background: "rgba(0,0,0,0.55)" }}
           >
             <Globe size={9} />
-            {country}
+            {dealCountryChip}
           </span>
         )}
       </div>
