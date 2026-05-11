@@ -55,6 +55,15 @@ function looksLikeChipJunk(title: string): boolean {
   if (/\b(case|cover|protector|sleeve|cradle|holder|mount|bracket|tripod|gimbal|adapter|connector|organizer|silicone|headband\s*head\s*beam|head\s*band\s*protector|dust\s*plug|screen\s*film)\b/i.test(title)) return true;
   /* Spam-stuffed keyword titles (AliExpress wholesale signals). */
   if (/\b(wholesale|\/lot|pcs\/|10pcs|20pcs|50pcs|100pcs|drop\s*shipping)\b/i.test(title)) return true;
+  /* Multi-pack / multi-piece titles that start with a quantity.
+     Round-4 user-reported case: "10 Pcs Stainless Steel Colored
+     Handi Set" friendlified to "10 Pcs Stainless Steel Colored" —
+     ugly chip label, single-store product, and the search itself
+     matched too loosely. Drop quantity-led titles from the chip
+     pool entirely. Catches "10 Pcs", "5 Pack", "20 Count", "12 Ct",
+     "3 in 1 Pack", "Set of 4", etc. */
+  if (/^\s*\d+\s*(pcs?|pack|piece|count|ct|in\s*1\s*pack|x)\b/i.test(title)) return true;
+  if (/\bset\s+of\s+\d+\b/i.test(title)) return true;
   /* Titles that include a product spec like "Size: 7.23 oz" — these
      are imported listings with junk metadata in the title field. */
   if (/\b(size|weight|color):\s*[0-9]/i.test(title)) return true;

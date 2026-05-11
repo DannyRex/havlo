@@ -823,9 +823,19 @@ export async function pgFtsFindSimilar(
     /* Cross-product pool: only when the chosen product has a usable
        compact signature (brand+model parsed). The signature column
        was rewritten from JSON.stringify(sig) to sig.key by the dedup
-       backfill — it's now either 'brand|model' or null. */
+       backfill — it's now either 'brand|model' or '?|?' (fallback
+       when brand or model couldn't be parsed).
+
+       Round-4 user-reported bug: searching "10 Pcs Stainless Steel
+       Colored Handi Set" returned an anchor with 804 offers. Root
+       cause: this check used to be just `if (signature)` which was
+       truthy for "?|?". That made EVERY brand-less product pool
+       with every OTHER brand-less product. The single 1-offer
+       Handi Set anchor was pooling with ~800 unrelated generic-
+       title products' offers. Skip the pool when signature is
+       null OR "?|?". */
     const signature = (productData as { signature: string | null }).signature;
-    if (signature) {
+    if (signature && signature !== "?|?") {
       const { data: siblings } = await supa!
         .from("products")
         .select(`
