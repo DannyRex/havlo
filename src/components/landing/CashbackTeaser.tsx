@@ -58,15 +58,18 @@ export default function CashbackTeaser() {
             Money back on the deals you&apos;d buy anyway.
           </h2>
 
-          {/* Body — tight summary + Learn more link. The full
-              mechanic + rate breakdown lives on /[country]/cashback;
-              this teaser is for the high-level pitch. Inline Link
-              styled as a subtle underline so it reads as part of the
-              copy rather than a competing CTA against the waitlist
-              form below. */}
+          {/* Body — direct value prop in the genre convention, with
+              an honest "select stores" qualifier so the claim isn't
+              over-promising. Founder-voice differentiation lives on
+              /[country]/cashback + in the confirmation email; on a
+              teaser the genre wording reads faster.
+
+              Hardcoded "5%" rather than {topRate} so a future rate
+              shuffle can't accidentally mis-quote the headline number
+              without a deliberate copy edit. */}
           <p className="text-sm sm:text-base text-ink-2 max-w-xl mx-auto mb-6 sm:mb-8 leading-relaxed">
-            Buy through our links and we share what the merchants pay
-            us. Up to 5% back, in cash.{" "}
+            Earn up to 5% cashback when you shop through select stores
+            on Havlo.{" "}
             <Link
               href={`/${country.code}/cashback`}
               className="text-ink font-medium underline underline-offset-2 hover:text-ink-2 transition-colors"
