@@ -30,18 +30,27 @@ export async function GET(req: NextRequest) {
        cookie fallback covers direct API consumers / curl. */
     const countryParam = searchParams.get("country");
     const country = countryParam ? getCountry(countryParam) : getServerCountry();
-    const isNG = country.code === "ng";
     const provider = await getActiveBrowseProvider();
 
-    /* For non-NG users, override the origin filter to "intl" — Konga /
-       Jumia / 3C Hub aren't shoppable from the UK / US / etc. Even
-       within the intl pool we then run filterDealsForCountry to drop
-       NG-anchored stores and keep only the user's country + cross-
-       border globals. NG users keep the full origin choice (toggle
-       between local / intl / all on the /deals UI). */
-    const effectiveOrigin: OriginFilter = !isNG && origin === "local"
-      ? "intl"
-      : (!isNG ? "intl" : origin);
+    /* Pass through the user's origin choice for every country.
+
+       The previous override forced non-NG users to "intl" regardless
+       of what they clicked. Reasoning was "Konga / Jumia / 3C Hub
+       aren't shoppable from UK / US", but filterDealsForCountry +
+       the inferStoreCountry-based bucket below already handle that.
+       The override added nothing and silently broke the UK "Local
+       stores" tab: clicking it counted UK retailers in the badge
+       (932) but the displayed items were still the cross-border
+       intl bucket because effectiveOrigin was being clamped to
+       "intl". Retest May 2026 caught the UK default view showing
+       a wall of AliExpress with no UK retailers.
+
+       After this change:
+         - UK default "All deals"  → returns UK retailers + cross-border
+         - UK "Local stores" tab    → returns UK retailers only
+         - UK "International" tab   → returns cross-border only
+         NG paths unchanged — user choice was already passed through. */
+    const effectiveOrigin: OriginFilter = origin;
 
     /* Bucket 3#5 fix from QA audit — origin counts and result counts
        were both derived but from different pipelines:
