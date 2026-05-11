@@ -38,7 +38,10 @@ const SORTS: { value: SortOption; label: string }[] = [
   { value: "relevance",  label: "Relevance" },
   { value: "newest",     label: "Latest" },
   { value: "discount",   label: "Top discount" },
-  { value: "popular",    label: "Most popular" },
+  /* "Most popular" removed — DB had no real click signal tied to
+     offers, so the sort was a no-op (DB path fell back to scraped_at,
+     JS path sorted by hardcoded clicks=0). Re-add when click
+     aggregation is wired through to offer_id. */
   { value: "price_asc",  label: "Price: low → high" },
   { value: "price_desc", label: "Price: high → low" },
 ];
@@ -60,7 +63,7 @@ function SkeletonTile({ aspect }: { aspect: string }) {
 /* Whitelist of valid filter values from the URL — defends against
    junk params (e.g. /deals?tier=DROP%20TABLE) silently breaking state. */
 const VALID_TIERS = new Set<DiscountTier>(["all", "10", "20", "30", "50"]);
-const VALID_SORTS = new Set<SortOption>(["relevance", "newest", "discount", "popular", "price_asc", "price_desc"]);
+const VALID_SORTS = new Set<SortOption>(["relevance", "newest", "discount", "price_asc", "price_desc"]);
 const VALID_ORIGINS = new Set<OriginFilter>(["all", "local", "intl"]);
 
 export default function DealFeed() {

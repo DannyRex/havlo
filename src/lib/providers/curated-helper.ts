@@ -122,9 +122,6 @@ export function sortDeals(deals: Deal[], sort: SortOption | undefined): Deal[] {
     case "discount":
       sorted.sort((a, b) => b.discountPercent - a.discountPercent);
       return sorted;
-    case "popular":
-      sorted.sort((a, b) => b.clicks - a.clicks);
-      return sorted;
     case "newest":
       sorted.sort(
         (a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime(),

@@ -389,9 +389,6 @@ export function getDeals(params?: {
     case "discount":
       result.sort((a, b) => b.discountPercent - a.discountPercent);
       break;
-    case "popular":
-      result.sort((a, b) => b.clicks - a.clicks);
-      break;
     default:
       result.sort((a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime());
   }

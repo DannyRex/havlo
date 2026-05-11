@@ -74,7 +74,6 @@ function sortToOrder(s: SortOption | undefined): { col: string; asc: boolean } {
     case "discount":   return { col: "discount_percent", asc: false };
     case "price_asc":  return { col: "current_price",    asc: true };
     case "price_desc": return { col: "current_price",    asc: false };
-    case "popular":    return { col: "scraped_at",       asc: false };  // placeholder until popularity tracked
     case "newest":     return { col: "scraped_at",       asc: false };
     case "relevance":
     default:           return { col: "discount_percent", asc: false };
