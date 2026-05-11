@@ -8,7 +8,7 @@ import { getSupabaseAdmin } from "./db-client";
 import { getCuratedDeals, sortDeals } from "./curated-helper";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 import { isUsableMerchantUrl } from "@/lib/url-helpers";
-import { getPopularityMap } from "@/lib/popularity";
+import { getPopularityRecord, type PopularityRecord } from "@/lib/popularity";
 
 interface BestOfferRow {
   product_id: string;
@@ -29,7 +29,7 @@ interface BestOfferRow {
   store_logo_url: string | null;
 }
 
-function rowToDeal(r: BestOfferRow, popularity?: Map<string, number>): Deal {
+function rowToDeal(r: BestOfferRow, popularity?: PopularityRecord): Deal {
   const original = r.original_price ?? r.current_price;
   return {
     id: r.offer_id,
@@ -55,8 +55,11 @@ function rowToDeal(r: BestOfferRow, popularity?: Map<string, number>): Deal {
     /* Click count from the rolling 30-day popularity window. 0 when
        the product has no recorded clicks in that window OR when the
        popularity RPC is unavailable (migration not yet applied). The
-       "Most popular" sort uses this field; other sorts ignore it. */
-    clicks: popularity?.get(r.product_id) ?? 0,
+       "Most popular" sort uses this field; other sorts ignore it.
+       Defensive guard: confirm popularity is an object before
+       indexing — a stale cache from a deploy mid-rollout could in
+       theory return something unexpected. */
+    clicks: (popularity && typeof popularity === "object" && popularity[r.product_id]) || 0,
     postedAt: r.scraped_at.slice(0, 10),
   };
 }
@@ -164,17 +167,19 @@ export const dbBrowseProvider: BrowseProvider = {
        and switch to cursor-based pagination. */
     const PAGE = 1000;
     const PAGES = 8; // 8000-row ceiling
-    /* Fetch the popularity map (product_id → 30d click count) in
+    /* Fetch the popularity record (product_id → 30d click count) in
        parallel with the offers fan-out. Cached for 5 min on the JS
-       side so this is a single DB call per cache window. Empty map
-       returned on RPC errors so "Most popular" gracefully falls back
-       to discount-desc ordering when migration 0015 isn't applied. */
+       side so this is a single DB call per cache window. Empty
+       record returned on RPC errors so "Most popular" gracefully
+       falls back to discount-desc ordering when migration 0015
+       isn't applied. Record (not Map) because unstable_cache
+       serialises via JSON — a Map round-trips to {}. */
     const pageRequests = Array.from({ length: PAGES }, (_, i) =>
       buildQuery().range(i * PAGE, (i + 1) * PAGE - 1),
     );
     const [results, popularity] = await Promise.all([
       Promise.all(pageRequests),
-      getPopularityMap(),
+      getPopularityRecord(),
     ]);
 
     /* Stop on first error, surface curated as fallback so the page
