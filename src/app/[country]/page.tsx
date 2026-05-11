@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import Hero from "@/components/landing/Hero";
 import TrendingDeals from "@/components/landing/TrendingDeals";
+import CashbackTeaser from "@/components/landing/CashbackTeaser";
 import CategoryGrid from "@/components/landing/CategoryGrid";
 import StoreLogos, { getStoreCountForCountry } from "@/components/landing/StoreLogos";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
@@ -83,6 +84,13 @@ export default function HomePage({ params }: { params: { country: string } }) {
       </Suspense>
       <Hero storeCount={storeCount} />
       <TrendingDeals />
+      {/* Cashback teaser — restores the pre-launch signup hook that
+          was previously a hero strip (removed in c9954c9 because it
+          duplicated the nav link and pushed the search input down).
+          Sits below the fold so visitors who scroll see it; carries
+          its own inline email capture so signup is one step, not
+          "click → land on /cashback → submit". */}
+      <CashbackTeaser />
       {/* TrendingSearches moved to /compare in round-4 QA. The
           chips work better as a "try a comparison" rail next to the
           search input than as a standalone homepage section that

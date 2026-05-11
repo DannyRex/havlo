@@ -17,11 +17,21 @@ interface Props {
   /** ISO 3166-1 alpha-2 lowercase. Stored alongside the email so we
       know which market each waitlist signup is from. */
   country: string;
+  /** Tag distinguishing where the signup originated. Defaults to
+      "cashback-page" so the existing /cashback explainer surface
+      keeps its current attribution. Pass "homepage-cashback" (or
+      any other tag) when reusing this form on another surface so
+      conversion can be measured per entry point. */
+  source?: string;
+  /** Optional compact mode — drops the success-state copy down to a
+      single sentence so the form takes less vertical space when
+      embedded in a denser surface (e.g. homepage teaser section). */
+  compact?: boolean;
 }
 
 type Status = "idle" | "submitting" | "ok" | "error";
 
-export default function WaitlistForm({ country }: Props) {
+export default function WaitlistForm({ country, source = "cashback-page", compact = false }: Props) {
   const [status, setStatus]     = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -61,7 +71,7 @@ export default function WaitlistForm({ country }: Props) {
         res = await fetch("/api/cashback-waitlist", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({ email, country, source: "cashback-page" }),
+          body:    JSON.stringify({ email, country, source }),
         });
       } catch (err) {
         /* (a) — fetch itself threw. Genuinely network-level. */
@@ -127,11 +137,17 @@ export default function WaitlistForm({ country }: Props) {
         <Check className="text-success shrink-0 mt-0.5" size={20} />
         <div>
           <p className="text-ink font-semibold mb-1">You&apos;re on the list.</p>
-          <p className="text-ink-2 text-sm leading-relaxed">
-            We&apos;ll email you the moment cashback launches. Until then, keep
-            shopping through Havlo and the rates above will apply retroactively
-            to clicks made while you&apos;re signed up at launch.
-          </p>
+          {compact ? (
+            <p className="text-ink-2 text-sm leading-relaxed">
+              We&apos;ll email you the moment cashback launches.
+            </p>
+          ) : (
+            <p className="text-ink-2 text-sm leading-relaxed">
+              We&apos;ll email you the moment cashback launches. Until then, keep
+              shopping through Havlo and the rates above will apply retroactively
+              to clicks made while you&apos;re signed up at launch.
+            </p>
+          )}
         </div>
       </div>
     );
