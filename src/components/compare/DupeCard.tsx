@@ -110,7 +110,11 @@ export default function DupeCard({
             className="mt-3 inline-flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-ink text-bg text-xs font-semibold hover:opacity-90 transition-opacity"
           >
             <span className="inline-flex items-center gap-1.5 min-w-0">
-              <span className="w-4 h-4 rounded overflow-hidden bg-white shrink-0 flex items-center justify-center">
+              {/* bg-surface-2 instead of bg-white — logos with
+                  white/light marks on transparent bg were invisible
+                  in both modes against the white container. Same
+                  fix applied in PriceResults + compare anchor rows. */}
+              <span className="w-4 h-4 rounded overflow-hidden bg-surface-2 shrink-0 flex items-center justify-center">
                 <Image
                   src={bestOffer.storeLogoUrl}
                   alt=""

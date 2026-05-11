@@ -516,18 +516,20 @@ function CompareContent() {
                                   : "border-border bg-bg/50 hover:border-border-strong hover:bg-surface-2/50"
                               }`}
                             >
-                              {/* border-border keeps the white logo
-                                  container visually delimited in
-                                  light mode (where the page bg is
-                                  also near-white and the container
-                                  would otherwise blend in, making
-                                  the logo look "missing"). */}
-                              <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-white border border-border flex items-center justify-center">
+                              {/* bg-surface-2 instead of bg-white so
+                                  logos with a transparent bg + white/
+                                  light mark (designed for dark navbars)
+                                  still render visibly. bg-white was
+                                  hiding those in both modes. p-1.5
+                                  gives the logo breathing room inside
+                                  the cell. Matches the PriceResults
+                                  single-mode pattern. */}
+                              <div className="w-10 h-10 rounded-lg shrink-0 bg-surface-2 p-1.5 flex items-center justify-center">
                                 <Image
                                   src={offer.storeLogoUrl}
                                   alt={offer.storeName}
-                                  width={36}
-                                  height={36}
+                                  width={28}
+                                  height={28}
                                   className="object-contain"
                                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                                 />
