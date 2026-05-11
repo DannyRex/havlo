@@ -29,6 +29,7 @@
 import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { inferCategoryFromTitle } from "@/lib/categorize";
+import { friendlifyChipTitle } from "@/lib/chip-titles";
 
 interface OfferRow { product_id: string; store_id: string }
 interface ProductRow { id: string; title: string }
@@ -83,8 +84,13 @@ const MIN_STORES_FOR_CHIP = 2;
 const MAX_PRODUCTS_RETURNED = 200;
 
 export interface MultiStoreChip {
-  title:      string;
-  storeCount: number;
+  /** Friendlified consumer label ("iPhone 17 Pro", "AirPods 4"). */
+  title:        string;
+  /** Raw DB title — used as the search query when the chip is
+      clicked, since FTS hits all token forms. The friendlified
+      label is for display, the raw is for the URL. */
+  searchQuery:  string;
+  storeCount:   number;
 }
 
 async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
@@ -144,18 +150,32 @@ async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
       .map((p) => [p.id, p.title]),
   );
 
-  return qualified
-    .map(([id, set]) => {
-      const title = titleById.get(id);
-      if (!title) return null;
-      /* Drop accessory junk + ultra-long SEO-stuffed titles. The
-         chip pool is supposed to surface PRODUCTS users want to
-         compare across stores, not silicone covers and phone
-         mounts that happen to sit at multiple storefronts. */
-      if (looksLikeChipJunk(title)) return null;
-      return { title, storeCount: set.size } satisfies MultiStoreChip;
-    })
-    .filter((c): c is MultiStoreChip => c !== null);
+  /* Friendlify titles for display + dedup on the friendlified form
+     so we don't surface the same product under three slightly-
+     different raw titles ("Samsung Galaxy A26", "SAMSUNG Galaxy
+     A26 5g - 128gb Rom", "Samsung Galaxy A26 5G Dual Sim") when
+     they all friendlify to "Samsung Galaxy A26 5G". Keep the
+     highest-store-count entry per friendlified label. */
+  const seenFriendly = new Map<string, MultiStoreChip>();
+  for (const [id, set] of qualified) {
+    const raw = titleById.get(id);
+    if (!raw) continue;
+    if (looksLikeChipJunk(raw)) continue;
+    const friendly = friendlifyChipTitle(raw);
+    if (!friendly || friendly.length < 4) continue;
+    const existing = seenFriendly.get(friendly);
+    if (existing && existing.storeCount >= set.size) continue;
+    seenFriendly.set(friendly, {
+      title:       friendly,
+      searchQuery: raw,
+      storeCount:  set.size,
+    });
+  }
+  /* Re-sort by store count desc since the dedup map can change
+     ordering. */
+  return Array.from(seenFriendly.values()).sort(
+    (a, b) => b.storeCount - a.storeCount,
+  );
 }
 
 /* unstable_cache wraps the helper with Next's request-deduped + ISR

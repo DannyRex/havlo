@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import Hero from "@/components/landing/Hero";
 import TrendingDeals from "@/components/landing/TrendingDeals";
-import TrendingSearches from "@/components/landing/TrendingSearches";
 import CategoryGrid from "@/components/landing/CategoryGrid";
 import StoreLogos, { getStoreCountForCountry } from "@/components/landing/StoreLogos";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
@@ -84,7 +83,11 @@ export default function HomePage({ params }: { params: { country: string } }) {
       </Suspense>
       <Hero storeCount={storeCount} />
       <TrendingDeals />
-      <TrendingSearches />
+      {/* TrendingSearches moved to /compare in round-4 QA. The
+          chips work better as a "try a comparison" rail next to the
+          search input than as a standalone homepage section that
+          competed with TrendingDeals + CategoryGrid for the same
+          attention. */}
       <CategoryGrid />
       <StoreLogos />
       <NewsletterStrip />

@@ -10,6 +10,7 @@ import PriceResults from "@/components/compare/PriceResults";
 import DupeCard from "@/components/compare/DupeCard";
 import LiveResults from "@/components/compare/LiveResults";
 import EmptySearchState from "@/components/empty/EmptySearchState";
+import TrendingChipRail from "@/components/compare/TrendingChipRail";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
 import DealUnavailableBanner from "@/components/feedback/DealUnavailableBanner";
@@ -196,6 +197,19 @@ function CompareContent() {
         onSearch={handleSearch}
         loading={loading || sniffLoading}
       />
+
+      {/* Popular comparisons chip rail. Visible ONLY in the empty
+          state (no query yet) so it doesn't compete with active
+          search results below. Moved here from the homepage in
+          round-4 QA — chips work better as a "try a comparison"
+          shortcut on the page where users are about to search than
+          as a standalone homepage section that competed with
+          TrendingDeals + CategoryGrid. */}
+      {!query.trim() && !sniffLoading && !loading && (
+        <div className="max-w-2xl mx-auto">
+          <TrendingChipRail countryCode={country.code} limit={10} />
+        </div>
+      )}
 
       {/* ── Sniff loading ── */}
       {sniffLoading && (
