@@ -32,7 +32,7 @@ import { inferCategoryFromTitle } from "@/lib/categorize";
 import { friendlifyChipTitle } from "@/lib/chip-titles";
 
 interface OfferRow { product_id: string; store_id: string }
-interface ProductRow { id: string; title: string }
+interface ProductRow { id: string; title: string; category_slug: string | null }
 
 /* QA round-4 caught: the chip pool surfaced "Universal Headphone
    Headband Head beam Silicone Cover for Sony WH-1000XM5 Headset
@@ -97,7 +97,29 @@ export interface MultiStoreChip {
       compare API do a direct lookup when FTS returns empty. */
   productId:    string;
   storeCount:   number;
+  /** Category slug — used by callers (TrendingChipRail) for
+      per-category balancing on display. Optional because
+      database-side categorisation isn't always present. */
+  categorySlug?: string | null;
 }
+
+/* Per-category cap so phones don't dominate the rail. Without it,
+   60% of the pool was tech (phones/computing/audio) because that's
+   where the catalog has the most cross-store overlap. User
+   feedback: "Popular comparisons shows only gadgets, can you
+   include products from other categories... Add more and randomise". */
+const PER_CATEGORY_CAP = 12;
+
+/* Thin-coverage categories that rarely hit ≥2 stores. We relax to
+   ≥1 store for these so the rail can show beauty / fashion / home
+   / appliances at all. Honest framing: the chip badge still shows
+   the real store count, so users know up-front whether it's a real
+   "compare across N stores" or a "1 store, popular item". */
+const THIN_COVERAGE_CATEGORIES = new Set([
+  "beauty", "fashion", "home", "appliances", "sports", "books",
+  "groceries", "garden", "pets", "music", "automotive", "tv",
+]);
+const MIN_DISCOUNT_FOR_THIN_CAT = 25;  // %, only show meaningfully-discounted single-store items
 
 async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
   const supa = getSupabaseAdmin();
@@ -144,45 +166,109 @@ async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
   const ids = qualified.map(([id]) => id);
   const { data: products } = await supa
     .from("products")
-    .select("id, title")
+    .select("id, title, category_slug")
     .in("id", ids);
 
-  /* Join back with the store counts. Maintains the title-cleanliness
-     check (drop products where the title is empty or whitespace-only,
-     which sometimes happens for poorly-ingested SerpAPI rows). */
-  const titleById = new Map<string, string>(
+  const productById = new Map<string, ProductRow>(
     ((products ?? []) as ProductRow[])
       .filter((p) => typeof p.title === "string" && p.title.trim().length > 0)
-      .map((p) => [p.id, p.title]),
+      .map((p) => [p.id, p]),
   );
 
-  /* Friendlify titles for display + dedup on the friendlified form
-     so we don't surface the same product under three slightly-
-     different raw titles ("Samsung Galaxy A26", "SAMSUNG Galaxy
-     A26 5g - 128gb Rom", "Samsung Galaxy A26 5G Dual Sim") when
-     they all friendlify to "Samsung Galaxy A26 5G". Keep the
-     highest-store-count entry per friendlified label. */
+  /* Build multi-store chip entries grouped by category for per-
+     category capping. Dedup on the friendlified form so the same
+     product under three raw titles ("Samsung Galaxy A26",
+     "SAMSUNG Galaxy A26 5g - 128gb Rom", "Samsung Galaxy A26 5G
+     Dual Sim") collapses to one chip. */
   const seenFriendly = new Map<string, MultiStoreChip>();
   for (const [id, set] of qualified) {
-    const raw = titleById.get(id);
-    if (!raw) continue;
-    if (looksLikeChipJunk(raw)) continue;
-    const friendly = friendlifyChipTitle(raw);
+    const product = productById.get(id);
+    if (!product) continue;
+    if (looksLikeChipJunk(product.title)) continue;
+    const friendly = friendlifyChipTitle(product.title);
     if (!friendly || friendly.length < 4) continue;
     const existing = seenFriendly.get(friendly);
     if (existing && existing.storeCount >= set.size) continue;
     seenFriendly.set(friendly, {
-      title:       friendly,
-      searchQuery: raw,
-      productId:   id,
-      storeCount:  set.size,
+      title:        friendly,
+      searchQuery:  product.title,
+      productId:    id,
+      storeCount:   set.size,
+      categorySlug: product.category_slug,
     });
   }
-  /* Re-sort by store count desc since the dedup map can change
-     ordering. */
-  return Array.from(seenFriendly.values()).sort(
-    (a, b) => b.storeCount - a.storeCount,
-  );
+  const multiStoreChips = Array.from(seenFriendly.values());
+
+  /* Top up the pool with single-store products from thin-coverage
+     categories (beauty / fashion / home / appliances / sports / etc.)
+     that have a meaningful discount. Without this the rail is 60%
+     phones because that's where the catalog overlaps. Honest framing:
+     the badge still shows the real store count, so a "1" tells users
+     it's a single-store popular item rather than a multi-store
+     comparison. */
+  const topUp: MultiStoreChip[] = [];
+  /* For each thin-coverage category, pull a small top-discount slice. */
+  for (const cat of Array.from(THIN_COVERAGE_CATEGORIES)) {
+    const { data: catRows } = await supa
+      .from("product_best_offers")
+      .select("product_id, title, category_slug, discount_percent")
+      .eq("category_slug", cat)
+      .gte("discount_percent", MIN_DISCOUNT_FOR_THIN_CAT)
+      .order("discount_percent", { ascending: false })
+      .limit(20);
+    if (!catRows) continue;
+    for (const r of catRows as Array<{ product_id: string; title: string; category_slug: string | null }>) {
+      if (!r.title || looksLikeChipJunk(r.title)) continue;
+      const friendly = friendlifyChipTitle(r.title);
+      if (!friendly || friendly.length < 4) continue;
+      /* Don't double-count products already in the multi-store pool. */
+      if (seenFriendly.has(friendly)) continue;
+      const stores = productStores.get(r.product_id)?.size ?? 1;
+      topUp.push({
+        title:        friendly,
+        searchQuery:  r.title,
+        productId:    r.product_id,
+        storeCount:   stores,
+        categorySlug: r.category_slug,
+      });
+      seenFriendly.set(friendly, topUp[topUp.length - 1]);
+    }
+  }
+
+  /* Group by category, cap each, then merge. Round-robin across
+     categories so the final pool order is interleaved (phones,
+     beauty, computing, fashion, audio, home, gaming, appliances,
+     phones, ...) — TrendingChipRail picks 10 random from this
+     pre-mixed pool so the visible chips look diverse even before
+     the rotation kicks in. */
+  const combined = [...multiStoreChips, ...topUp];
+  const byCategory = new Map<string, MultiStoreChip[]>();
+  for (const c of combined) {
+    const cat = c.categorySlug ?? "other";
+    const arr = byCategory.get(cat) ?? [];
+    arr.push(c);
+    byCategory.set(cat, arr);
+  }
+  /* Sort each category bucket by store count desc, then take top N. */
+  const capped = new Map<string, MultiStoreChip[]>();
+  for (const [cat, items] of Array.from(byCategory.entries())) {
+    const sorted = items
+      .sort((a: MultiStoreChip, b: MultiStoreChip) => b.storeCount - a.storeCount)
+      .slice(0, PER_CATEGORY_CAP);
+    capped.set(cat, sorted);
+  }
+  /* Round-robin interleave categories. */
+  const result: MultiStoreChip[] = [];
+  const buckets = Array.from(capped.values());
+  let added = true;
+  while (added) {
+    added = false;
+    for (const items of buckets) {
+      const next = items.shift();
+      if (next) { result.push(next); added = true; }
+    }
+  }
+  return result;
 }
 
 /* unstable_cache wraps the helper with Next's request-deduped + ISR
@@ -191,6 +277,9 @@ async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
    in the background while serving the stale set. */
 export const getTrendingMultiStoreTitles = unstable_cache(
   fetchMultiStoreTitlesUncached,
-  ["trending-multi-store-v1"],
+  /* v2 cache key bumped when the pool composition logic changed
+     (per-category cap + thin-category top-up). Old v1 cache entries
+     get bypassed automatically. */
+  ["trending-multi-store-v2"],
   { revalidate: REVALIDATE_S, tags: [CACHE_TAG] },
 );
