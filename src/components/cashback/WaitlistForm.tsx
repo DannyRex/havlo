@@ -10,7 +10,7 @@
    state. Keeping this as its own client component lets the parent
    stay server-rendered (better for metadata + initial paint). */
 
-import { useState, type FormEvent } from "react";
+import { useState, useRef, type FormEvent } from "react";
 import { ArrowRight, Check, Loader2, AlertTriangle } from "lucide-react";
 
 interface Props {
@@ -35,8 +35,24 @@ export default function WaitlistForm({ country, source = "cashback-page", compac
   const [status, setStatus]     = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
+  /* Synchronous double-submit guard. status === "submitting" already
+     disables the button, but there's a brief window between a click
+     and React's re-render where a second rapid click could still
+     fire (caught in retest as P1-1: "/ng/cashback waitlist requires
+     two clicks"). A ref-based flag updates synchronously and short-
+     circuits the second call immediately, regardless of render
+     timing. Reset in the finally-equivalent path on every exit
+     branch. */
+  const inFlight = useRef(false);
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
+    /* Synchronous in-flight guard — bails out on a second click that
+       lands before the status-driven disabled state has rendered.
+       Set BEFORE any other work so even a triple-click can't race. */
+    if (inFlight.current) return;
+    inFlight.current = true;
 
     /* Capture form reference SYNCHRONOUSLY before any await. React's
        SyntheticEvent gets nullified across async boundaries, so
@@ -55,6 +71,7 @@ export default function WaitlistForm({ country, source = "cashback-page", compac
     if (!email) {
       setStatus("error");
       setErrorMsg("Email required.");
+      inFlight.current = false;
       return;
     }
 
@@ -124,6 +141,11 @@ export default function WaitlistForm({ country, source = "cashback-page", compac
          changes accidentally re-introducing the silent error. */
       setStatus("error");
       setErrorMsg(`Unexpected error: ${(err as Error).message}`);
+    } finally {
+      /* Release the in-flight guard on every exit path (success,
+         each error branch, defensive catch). Without this a failed
+         submit would lock the form against retry. */
+      inFlight.current = false;
     }
   }
 
