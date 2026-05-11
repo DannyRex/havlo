@@ -8,6 +8,7 @@ import SearchBar from "@/components/compare/SearchBar";
 import Image from "next/image";
 import PriceResults from "@/components/compare/PriceResults";
 import DupeCard from "@/components/compare/DupeCard";
+import StoreLogo from "@/components/compare/StoreLogo";
 import LiveResults from "@/components/compare/LiveResults";
 import EmptySearchState from "@/components/empty/EmptySearchState";
 import TrendingChipRail from "@/components/compare/TrendingChipRail";
@@ -516,24 +517,17 @@ function CompareContent() {
                                   : "border-border bg-bg/50 hover:border-border-strong hover:bg-surface-2/50"
                               }`}
                             >
-                              {/* bg-surface-2 instead of bg-white so
-                                  logos with a transparent bg + white/
-                                  light mark (designed for dark navbars)
-                                  still render visibly. bg-white was
-                                  hiding those in both modes. p-1.5
-                                  gives the logo breathing room inside
-                                  the cell. Matches the PriceResults
-                                  single-mode pattern. */}
-                              <div className="w-10 h-10 rounded-lg shrink-0 bg-surface-2 p-1.5 flex items-center justify-center">
-                                <Image
-                                  src={offer.storeLogoUrl}
-                                  alt={offer.storeName}
-                                  width={28}
-                                  height={28}
-                                  className="object-contain"
-                                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                                />
-                              </div>
+                              {/* Shared <StoreLogo> handles bg + border
+                                  + letter fallback when the logo file
+                                  404s (long-tail SerpAPI seller
+                                  storeIds like walmart-techmate-intl,
+                                  93mobiles, etc.). */}
+                              <StoreLogo
+                                storeId={offer.storeId}
+                                storeName={offer.storeName}
+                                storeLogoUrl={offer.storeLogoUrl}
+                                size={40}
+                              />
 
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5 flex-wrap">

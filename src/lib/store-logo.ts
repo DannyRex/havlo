@@ -29,5 +29,11 @@ export function resolveStoreLogoUrl(
   if (storeId.startsWith("amazon-") || storeId === "amazon") {
     return "/logos/amazon.png";
   }
+  /* Walmart marketplace seller variants (walmart-techmate-intl,
+     walmart-dac-enterprises, walmart-jsg2dak1, etc.) — all sell
+     under the same Walmart storefront, so reuse /logos/walmart.png. */
+  if (storeId.startsWith("walmart-") || storeId === "walmart") {
+    return "/logos/walmart.png";
+  }
   return dbLogoUrl ?? `/logos/${storeId}.png`;
 }
