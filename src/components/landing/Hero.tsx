@@ -234,18 +234,37 @@ export default function Hero({ storeCount }: Props) {
             doesn't lose the funnel — it just stops eating vertical
             space on the most important screen. */}
 
-        {/* Category chips — full-bleed on mobile for proper edge fade */}
+        {/* Category chips — 2-column wrap on mobile, single-row
+            flex-wrap on tablet+.
+
+            Previous: horizontal-scroll rail on mobile (-mx-4 / px-4 /
+            overflow-x-auto / no-scrollbar). User feedback was that
+            scrolling hid the long-tail categories — most visitors
+            only saw the first 3-4 pills (Phones / Laptops / Sneakers)
+            and didn't realise Beauty / Gaming / Furniture were also
+            options. A wrapped grid surfaces everything in the first
+            viewport.
+
+            Mobile (grid-cols-2): 10 pills = 5 rows. Each pill fills
+            its cell (w-full + justify-center) so the rows align
+            cleanly. 2 cols not 3 because 3 cols on iPhone SE (288px
+            container) leaves ~90px per cell which would clip
+            "Furniture" + the icon.
+
+            Tablet+ (sm:flex sm:flex-wrap): pills sit at their natural
+            width and wrap as needed — works because the container
+            widens enough that all 10 fit in 1-2 rows. */}
         <div
-          className="mt-6 sm:mt-8 -mx-4 sm:mx-0 animate-fade-in"
+          className="mt-6 sm:mt-8 animate-fade-in"
           style={{ animationDelay: "280ms" }}
         >
-          <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 sm:px-0 sm:justify-center sm:flex-wrap sm:gap-2.5">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-2.5">
             {CATEGORIES.map(({ label, q, Icon }) => (
               <button
                 key={q}
                 type="button"
                 onClick={() => router.push(`/compare?q=${encodeURIComponent(q)}&mode=similar`)}
-                className="cat-pill flex-shrink-0 active:scale-95"
+                className="cat-pill w-full sm:w-auto justify-center active:scale-95"
               >
                 <Icon size={16} className="text-ink-2 group-hover:text-ink shrink-0" />
                 {label}
