@@ -133,7 +133,13 @@ export const dbBrowseProvider: BrowseProvider = {
         query = query.gte("discount_percent", q.minDiscount);
       }
       if (q.search?.trim()) {
-        query = query.ilike("title", `%${q.search.trim()}%`);
+        /* Dual-purpose filter: matches product title OR store name
+           so a user can type "iPhone" to filter to iPhone listings
+           OR type "Konga" to filter to all Konga deals. PostgREST
+           .or() takes a comma-separated list of column filters and
+           returns rows where ANY clause matches. */
+        const escaped = q.search.trim().replace(/[(),]/g, " ");
+        query = query.or(`title.ilike.%${escaped}%,store_name.ilike.%${escaped}%`);
       }
       if (q.origin && q.origin !== "all") {
         query = applyOriginFilter(query, q.origin);
@@ -262,7 +268,12 @@ export const dbBrowseProvider: BrowseProvider = {
       let chain = qb.select("*", { count: "exact", head: true });
       if (q.categorySlug && q.categorySlug !== "all") chain = chain.eq("category_slug", q.categorySlug);
       if (typeof q.minDiscount === "number") chain = chain.gte("discount_percent", q.minDiscount);
-      if (q.search?.trim()) chain = chain.ilike("title", `%${q.search.trim()}%`);
+      if (q.search?.trim()) {
+        /* Same dual title/store_name filter as fetchDeals so origin
+           counts agree with the displayed list. */
+        const escaped = q.search.trim().replace(/[(),]/g, " ");
+        chain = chain.or(`title.ilike.%${escaped}%,store_name.ilike.%${escaped}%`);
+      }
       return chain;
     };
 
