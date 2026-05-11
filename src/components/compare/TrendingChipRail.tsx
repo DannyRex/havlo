@@ -145,14 +145,18 @@ export default function TrendingChipRail({
             Popular comparisons
           </span>
         </div>
-        {/* Skeleton mirrors the real-state layout (3-col grid on
-            mobile, flex-wrap on desktop) so there's no layout jump
-            when the fetched chips replace the placeholders. */}
-        <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-          {Array.from({ length: 6 }).map((_, i) => (
+        {/* Skeleton mirrors the real-state layout (flex-wrap with
+            natural-width chips) so there's no layout jump when the
+            fetched chips replace the placeholders. Mixed widths
+            approximate the eventual ragged-edge rhythm.
+
+            Class names listed statically so Tailwind's JIT picks
+            them up — dynamic interpolation (w-${w}) doesn't work. */}
+        <div className="flex flex-wrap gap-2">
+          {["w-24", "w-28", "w-20", "w-32", "w-24", "w-20"].map((w, i) => (
             <span
               key={i}
-              className="h-8 rounded-full bg-surface-2 animate-pulse w-full sm:w-24"
+              className={`h-8 rounded-full bg-surface-2 animate-pulse ${w}`}
               aria-hidden="true"
             />
           ))}
@@ -171,24 +175,16 @@ export default function TrendingChipRail({
           Popular comparisons
         </span>
       </div>
-      {/* Layout: 3-column grid that wraps on mobile (so the full set
-          of popular chips is visible at-a-glance without swiping);
-          natural flex-wrap on tablet+.
+      {/* Layout: natural-width chips with flex-wrap on every
+          breakpoint. Names render in full (no ellipsis), rows wrap
+          as needed when long chip names push beyond the row.
+          User direction after iterating through scroll + grid
+          variants — full names beat fixed-grid alignment.
 
-          Iteration history:
-            - Original: flex-wrap on every breakpoint → 3-4 ragged
-              rows on mobile when chip names varied in length.
-            - Phase 2: horizontal scroll, each chip 1/3 viewport, snap-x.
-              Clean swipe rail but the long-tail chips were hidden
-              behind a swipe gesture most visitors didn't make.
-            - Phase 3 (this pass): grid-cols-3 on mobile, chips
-              truncate long names within their 1/3-width cells. With
-              the default 10-chip limit that's 3 full rows of 3 + 1
-              orphan — the full set is visible without scrolling.
-
-          Tablet+ (sm:flex sm:flex-wrap): chips revert to natural
-          width and wrap as needed in the wider container. */}
-      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+          Trade-off: rows are ragged when chip lengths vary widely.
+          Acceptable because the value of each chip is the product
+          name being legible at a glance. */}
+      <div className="flex flex-wrap gap-2">
         {visible.map((chip) => (
           <Link
             /* Key includes the rotation tick so each rotation mounts
@@ -204,16 +200,11 @@ export default function TrendingChipRail({
                Round-4 QA: user clicked a chip and got "Nothing in
                our local index" because of exactly that timing gap. */
             href={`/${countryCode}/compare?q=${encodeURIComponent(chip.searchQuery)}&pid=${chip.productId}&mode=similar`}
-            /* w-full on mobile so each chip fills its 1/3-width
-               grid cell (otherwise the inline-flex shrinks to text
-               width and leaves dead space). sm:w-auto restores
-               natural width in the desktop flex-wrap.
-               min-w-0 keeps the truncate working on long titles. */
-            className="inline-flex items-center justify-between gap-2 px-3 py-1.5 rounded-full bg-surface border border-border hover:border-border-strong hover:shadow-card transition-all active:scale-95 animate-fade-in min-w-0 w-full sm:w-auto"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface border border-border hover:border-border-strong hover:shadow-card transition-all whitespace-nowrap active:scale-95 animate-fade-in"
             aria-label={`${chip.title}, available across ${chip.storeCount.toLocaleString()} stores`}
           >
-            <span className="text-[13px] font-medium text-ink truncate">{chip.title}</span>
-            <span className="text-[10px] font-semibold text-ink-3 tabular-nums shrink-0">
+            <span className="text-[13px] font-medium text-ink">{chip.title}</span>
+            <span className="text-[10px] font-semibold text-ink-3 tabular-nums">
               {chip.storeCount}
             </span>
           </Link>
