@@ -40,14 +40,23 @@ export async function POST(req: NextRequest) {
 
     if (!dealId) return new NextResponse(null, { status: 204 });
 
+    /* Logs to outbound_clicks (created by migration 0015). The old
+       `clicks` table from the AI-search experiment FK'd against
+       deals_index, which our production deal_ids don't appear in —
+       so every prior insert silently failed (verified May 2026:
+       0 rows in the legacy table despite the route being live).
+       The new table is polymorphic on deal_id (no FK) and the
+       popular_products() RPC handles the join resolution at read
+       time, attributing each click to either the offer's product
+       OR the directly-named product. */
     await getSupa()
-      .from("clicks")
+      .from("outbound_clicks")
       .insert({
         deal_id:  dealId,
         query:    (query ?? "").slice(0, 300),
         position: position ?? null,
         mode:     mode ?? null,
-        // `clicked_at` defaults to now() in the schema
+        // `clicked_at` defaults to now()
       });
   } catch {
     // Swallow all errors — telemetry must never impact UX

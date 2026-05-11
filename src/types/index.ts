@@ -95,10 +95,8 @@ export interface SearchResult {
 
 export type DiscountTier = "all" | "10" | "20" | "30" | "50";
 
-/* "popular" was removed in May 2026 — implementation was a placeholder
-   (DB path fell back to scraped_at, JS path sorted by hardcoded
-   clicks=0). Re-add when there's a coherent click-aggregation pipeline
-   tied back to offer_id. */
-export type SortOption = "relevance" | "discount" | "price_asc" | "price_desc" | "newest";
+/* "popular" restored May 2026 (migration 0015 + lib/popularity.ts).
+   Backed by the popular_products() RPC over a 30d rolling window. */
+export type SortOption = "relevance" | "discount" | "price_asc" | "price_desc" | "newest" | "popular";
 
 export type OriginFilter = "all" | "local" | "intl";

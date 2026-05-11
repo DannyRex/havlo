@@ -127,6 +127,18 @@ export function sortDeals(deals: Deal[], sort: SortOption | undefined): Deal[] {
         (a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime(),
       );
       return sorted;
+    case "popular":
+      /* Primary: 30d click count populated by browse-db's
+         rowToDeal from the popular_products() RPC.
+         Tiebreaker: discount % (so a 0-clicks 40%-off row beats a
+         0-clicks full-price row when traffic is sparse). Stable JS
+         sort preserves DB-side discount_percent desc order within
+         each (clicks, discount) tier. */
+      sorted.sort((a, b) => {
+        if (b.clicks !== a.clicks) return b.clicks - a.clicks;
+        return b.discountPercent - a.discountPercent;
+      });
+      return sorted;
     case "relevance":
     default:
       /* Score → sort desc → space-by-store. The store-spacing pass

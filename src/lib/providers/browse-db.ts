@@ -8,6 +8,7 @@ import { getSupabaseAdmin } from "./db-client";
 import { getCuratedDeals, sortDeals } from "./curated-helper";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 import { isUsableMerchantUrl } from "@/lib/url-helpers";
+import { getPopularityMap } from "@/lib/popularity";
 
 interface BestOfferRow {
   product_id: string;
@@ -28,7 +29,7 @@ interface BestOfferRow {
   store_logo_url: string | null;
 }
 
-function rowToDeal(r: BestOfferRow): Deal {
+function rowToDeal(r: BestOfferRow, popularity?: Map<string, number>): Deal {
   const original = r.original_price ?? r.current_price;
   return {
     id: r.offer_id,
@@ -51,7 +52,11 @@ function rowToDeal(r: BestOfferRow): Deal {
     isFeatured: false,
     tags: [r.store_name, r.category_slug ?? ""].filter(Boolean),
     saves: 0,
-    clicks: 0,
+    /* Click count from the rolling 30-day popularity window. 0 when
+       the product has no recorded clicks in that window OR when the
+       popularity RPC is unavailable (migration not yet applied). The
+       "Most popular" sort uses this field; other sorts ignore it. */
+    clicks: popularity?.get(r.product_id) ?? 0,
     postedAt: r.scraped_at.slice(0, 10),
   };
 }
@@ -75,6 +80,13 @@ function sortToOrder(s: SortOption | undefined): { col: string; asc: boolean } {
     case "price_asc":  return { col: "current_price",    asc: true };
     case "price_desc": return { col: "current_price",    asc: false };
     case "newest":     return { col: "scraped_at",       asc: false };
+    /* `popular` can't be expressed as a single column on
+       product_best_offers — clicks live in outbound_clicks and get
+       aggregated by popularity.ts. We pre-fetch the same discount-
+       desc top-N here so the JS-side popularity sort gets a high-
+       quality candidate pool, then re-rank by clicks (desc) with
+       discount as the tiebreaker (curated-helper.ts → sortDeals). */
+    case "popular":    return { col: "discount_percent", asc: false };
     case "relevance":
     default:           return { col: "discount_percent", asc: false };
   }
@@ -152,10 +164,18 @@ export const dbBrowseProvider: BrowseProvider = {
        and switch to cursor-based pagination. */
     const PAGE = 1000;
     const PAGES = 8; // 8000-row ceiling
+    /* Fetch the popularity map (product_id → 30d click count) in
+       parallel with the offers fan-out. Cached for 5 min on the JS
+       side so this is a single DB call per cache window. Empty map
+       returned on RPC errors so "Most popular" gracefully falls back
+       to discount-desc ordering when migration 0015 isn't applied. */
     const pageRequests = Array.from({ length: PAGES }, (_, i) =>
       buildQuery().range(i * PAGE, (i + 1) * PAGE - 1),
     );
-    const results = await Promise.all(pageRequests);
+    const [results, popularity] = await Promise.all([
+      Promise.all(pageRequests),
+      getPopularityMap(),
+    ]);
 
     /* Stop on first error, surface curated as fallback so the page
        isn't blank if Supabase had a transient hiccup mid-fan-out. */
@@ -191,7 +211,7 @@ export const dbBrowseProvider: BrowseProvider = {
        the user on a Google search page — broken UX. */
     const fromDb = allRows
       .filter((r) => isUsableMerchantUrl(r.url))
-      .map(rowToDeal);
+      .map((r) => rowToDeal(r, popularity));
     /* Merge curated Amazon catalog with the ingested data, then
        re-apply the requested sort to the combined array. Lets
        curated entries compete on the same sort criteria as scraped
