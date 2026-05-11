@@ -38,7 +38,7 @@ export function notifyProductConfirmation({ query, country }: Args): Email {
     `Havlo`,
     ``,
     `--`,
-    `This is the only email about "${query}". Reply "remove" to drop off the list.`,
+    `Reply "remove" anytime to drop off the list.`,
   ].join("\n");
 
   /* Plain-style HTML — paragraphs only, no tables, no CTA buttons,
@@ -51,7 +51,7 @@ export function notifyProductConfirmation({ query, country }: Args): Email {
 <p>We're watching for <strong>${escapeHtml(query)}</strong>. When something matching surfaces at a real discount, I'll email you the offers, cheapest first.</p>
 <p>Browse what's already in today: <a href="${dealsUrl}" style="color:#0057FF;">havlo.io/${cc}/deals</a></p>
 <p>Daniel<br/><span style="color:#64748b;">Havlo</span></p>
-<p style="color:#94a3b8;font-size:13px;margin-top:24px;">This is the only email about "${escapeHtml(query)}". Reply "remove" to drop off the list.</p>
+<p style="color:#94a3b8;font-size:13px;margin-top:24px;">Reply &ldquo;remove&rdquo; anytime to drop off the list.</p>
 </div>`;
 
   return { subject, text, html };

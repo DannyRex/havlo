@@ -70,7 +70,7 @@ export function notifyProductMatchFound({ query, country, offers }: Args): Email
     `Havlo`,
     ``,
     `--`,
-    `This is the only email about "${query}". Reply "remove" to drop off the list.`,
+    `Reply "remove" anytime to drop off the list.`,
   ].join("\n");
 
   /* HTML version: paragraphs + a list of offer rows. Each row is a
@@ -92,7 +92,7 @@ ${offerRows}
 </div>
 <p>See all matches: <a href="${escapeAttr(compareUrl)}" style="color:#0057FF;">havlo.io/${cc}/compare</a></p>
 <p>Daniel<br/><span style="color:#64748b;">Havlo</span></p>
-<p style="color:#94a3b8;font-size:13px;margin-top:24px;">This is the only email about "${escapeHtml(query)}". Reply "remove" to drop off the list.</p>
+<p style="color:#94a3b8;font-size:13px;margin-top:24px;">Reply &ldquo;remove&rdquo; anytime to drop off the list.</p>
 </div>`;
 
   return { subject, text, html };
