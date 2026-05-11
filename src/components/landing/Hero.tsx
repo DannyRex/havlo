@@ -102,20 +102,26 @@ export default function Hero({ storeCount }: Props) {
             moment (the shopper standing at a checkout button on
             Konga / Amazon / Argos with their finger hovering).
 
-            Sizing reverted (May 2026) to the original
-            clamp(1.95rem, 8vw, 5rem) + block-on-mobile span. The
-            preceding shrink iterations (v2→v5) chased a 2-lines-on-
-            iPhone target at the cost of looking too small for an
-            editorial hero. Going back to the bigger, hierarchy-first
-            size — the block-span trick still forces a clean 2-line
-            stack on mobile, and at 390px the first clause ("Before
-            you buy it,") fits inside the 358px container at this
-            font size with a few px of headroom. iPhone SE (320px)
-            may bump to 3 lines on the first clause; acceptable
-            trade-off vs. shrinking the type. */}
+            Sizing (final, May 2026): clamp(1.625rem, 7vw, 5rem).
+              • 1.625rem (26px) floor — the lowest size that still
+                reads as editorial hero on iPhone SE. Anything under
+                24px starts looking like body copy.
+              • 7vw slope — lands at 27–30px across iPhone 14 Pro /
+                Plus / Pro Max where most mobile traffic is, while
+                staying under SE's 288px container for the longer
+                "Before you buy it," clause (no 3-line wrap risk).
+              • 5rem (80px) ceiling — unchanged editorial cap on
+                desktop.
+              • leading-[1.05] mobile — breathing room between the
+                two stacked clauses; tightens to 0.98 on sm+ where
+                the H1 returns to a single line.
+              • The block-on-mobile span keeps the explicit line
+                break at the clause boundary. Without it, browsers
+                sometimes split mid-word ("Before you / buy it,")
+                on narrower viewports. */}
         <h1
           className="font-bold text-ink leading-[1.05] sm:leading-[0.98] tracking-[-0.04em] mb-5 sm:mb-6 animate-fade-up"
-          style={{ fontSize: "clamp(1.95rem, 8vw, 5rem)" }}
+          style={{ fontSize: "clamp(1.625rem, 7vw, 5rem)" }}
         >
           Before you buy it,{" "}
           <span className="block sm:inline">find it for less.</span>
