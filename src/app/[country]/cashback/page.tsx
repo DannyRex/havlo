@@ -45,7 +45,11 @@ export async function generateMetadata({
   const title = `Cashback on the deals you'd buy anyway | Havlo ${country.name}`;
   /* 154–158 chars. Names the country for local-search relevance,
      ends with the conversion ask (waitlist). */
-  const description = `Get paid to shop the deals you'd already buy. Cashback launches soon at Havlo ${country.name}. Join the waitlist for the launch announcement and an early account.`;
+  /* SEO description aligned with the H1 voice. "Get paid to shop"
+     was the same flagged genre cliché the H1 carried; surfaces in
+     Google SERPs + social-share previews so it counts as a visible
+     surface, not just SEO scaffolding. */
+  const description = `Money back on the deals you'd already buy. Cashback launches soon at Havlo ${country.name}. Join the waitlist for the launch announcement and an early account.`;
   const ogImage = `${SITE_URL}/og/cashback.png`;
 
   return {
@@ -172,13 +176,23 @@ export default function CashbackPage({
             <Coins size={12} />
             <span>Cashback · Coming Soon</span>
           </p>
+          {/* H1 + subhead aligned with the founder-voice rules: no
+              "Get paid to shop" genre cliché in the headline (lives
+              on the homepage teaser too as "Money back on the deals
+              you'd buy anyway."), and no three-part negative list
+              in the body. The earlier "No coupon hunting, no extra
+              apps, no points that expire." cadence violated the
+              brand-voice spec the same way "No app, no points, no
+              expiry" did on the previous teaser pass. Restated as
+              a single positive sentence about where the money
+              actually lands. */}
           <h1 className="text-3xl sm:text-5xl font-bold text-ink tracking-[-0.025em] leading-[1.05] mb-5">
-            Get paid to shop the deals you&apos;d buy anyway.
+            Money back on the deals you&apos;d buy anyway.
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-lg leading-relaxed max-w-2xl">
             When you click through Havlo to a partner store, the store pays us a
-            small commission. Soon, we&apos;ll send most of that straight to you.
-            No coupon hunting, no extra apps, no points that expire.
+            small commission. Soon, we&apos;ll pass most of that straight back
+            to you as cash to your bank.
           </p>
         </header>
 
