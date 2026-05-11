@@ -63,6 +63,31 @@ function seededShuffle<T>(items: T[], rng: () => number): T[] {
 
 const VISIBLE_COUNT = 14;
 
+/* One chip — extracted so mobile (horizontal scroll) and desktop
+   (flex-wrap grid) layouts can both render it without JSX
+   duplication. Round-4 QA also flagged "no separator between title
+   and count" — adding mx-1 between the title text and the count
+   pill so the gap is visually obvious even when icon rendering
+   varies across browsers. */
+function ChipLink({ title, storeCount }: MultiStoreChip) {
+  return (
+    <Link
+      href={`/compare?q=${encodeURIComponent(title)}&mode=similar`}
+      className="group inline-flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-bg border border-border hover:border-border-strong hover:shadow-card transition-all whitespace-nowrap shrink-0 active:scale-95"
+      aria-label={`${title}, available across ${storeCount.toLocaleString()} stores — open price comparison`}
+    >
+      <span className="text-[13px] sm:text-sm font-medium text-ink">{title}</span>
+      <span
+        className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink-3 tabular-nums px-2 py-0.5 rounded-full bg-surface-2"
+        title={`${storeCount} stores carry this`}
+      >
+        <Store size={11} strokeWidth={2.25} aria-hidden="true" />
+        {storeCount.toLocaleString()}
+      </span>
+    </Link>
+  );
+}
+
 export default async function TrendingSearches() {
   /* Pull the current cross-store-overlap pool. Cached 5 min at the
      module level so multiple homepage renders in the same rotation
@@ -98,26 +123,26 @@ export default async function TrendingSearches() {
           </div>
         </div>
 
-        {/* Chip rail — full-bleed scroll on mobile, wrap on desktop */}
+        {/* Chip rail — horizontal scroll on mobile, wrap to multi-row
+            grid on desktop. Was `flex overflow-x-auto sm:flex-wrap`
+            which broke on desktop because overflow-x-auto and
+            flex-wrap can conflict — desktop showed a single row that
+            scrolled instead of wrapping (one ultra-long chip filled
+            the entire viewport with the rest hidden). Round-4 QA
+            caught this.
+
+            Now: separate mobile and desktop layout via two display
+            modes. Mobile keeps the scroll affordance; desktop is a
+            true wrap grid with no horizontal overflow. */}
         <div className="-mx-4 sm:mx-0">
-          <div className="flex gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar px-4 sm:px-0 sm:flex-wrap">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 sm:hidden">
             {items.map(({ title, storeCount }) => (
-              <Link
-                key={title}
-                href={`/compare?q=${encodeURIComponent(title)}&mode=similar`}
-                className="group inline-flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-bg border border-border hover:border-border-strong hover:shadow-card transition-all whitespace-nowrap shrink-0 active:scale-95"
-                aria-label={`${title}, available across ${storeCount.toLocaleString()} stores — open price comparison`}
-              >
-                <span className="text-[13px] sm:text-sm font-medium text-ink">{title}</span>
-                {/* Real store count, not a fake trend %. Tells the
-                    user exactly how many merchants we'll show prices
-                    from when they click — the actual value of the
-                    chip. */}
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink-3 tabular-nums">
-                  <Store size={11} strokeWidth={2.25} aria-hidden="true" />
-                  {storeCount.toLocaleString()}
-                </span>
-              </Link>
+              <ChipLink key={title} title={title} storeCount={storeCount} />
+            ))}
+          </div>
+          <div className="hidden sm:flex sm:flex-wrap gap-2.5">
+            {items.map(({ title, storeCount }) => (
+              <ChipLink key={title} title={title} storeCount={storeCount} />
             ))}
           </div>
         </div>

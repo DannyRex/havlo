@@ -183,22 +183,38 @@ export async function GET(req: NextRequest) {
   }
 
   /* Last resort — Google relay we couldn't resolve.
-     If we have a title hint, send the user to /compare?q=<title>
-     so they see ALTERNATIVE listings for the same product rather
-     than a 'deal_unavailable' message with nowhere to go. Better
-     UX than the previous bounce-home-with-flag pattern (which
-     was the user-reported bug — open a new tab, immediately
-     redirect to /ng?deal_unavailable=1, no recovery path).
+     Round-4 QA caught: every UK retailer click was bouncing to
+     /uk?deal_unavailable=1 because the new SerpAPI Google Shopping
+     relay URLs use ?q=<category>+deals rather than the older
+     ?prds=catalogid:X format the resolver knows how to parse. The
+     resolver returns null → we used to redirect to a havlo error
+     page → user sees a bounce, not a merchant.
 
-     Without a title hint we still fall back to the homepage flag
-     because /compare with no query is just an empty page. */
+     Better fallback: send the user to the Google Shopping URL
+     itself. It's literally a Google Shopping search-results page
+     for the product — not the direct merchant page we wanted, but
+     a useful destination with real product listings. Round 3
+     already did this implicitly (it didn't filter relay URLs at
+     all); round 4 over-corrected with the error bounce.
+
+     Trade-off: we lose affiliate attribution on this fallback (no
+     merchant tag wraps a Google search URL). Acceptable cost vs
+     the alternative of bouncing every UK click to an error page.
+
+     Title hint still wins when available — /compare?q=<title> is
+     better than Google Shopping for known products. Only the
+     no-title relay falls through to Google. */
   if (titleHint) {
     const compareUrl = new URL(`${req.nextUrl.origin}/${country.code}/compare`);
     compareUrl.searchParams.set("q", titleHint);
-    compareUrl.searchParams.set("deal_unavailable", "1");
+    /* Don't set deal_unavailable — this is a positive recovery
+       (showing alternative listings for the same product), not an
+       error state. The flag previously triggered an apology banner
+       on /compare that confused users. */
     return NextResponse.redirect(compareUrl, 307);
   }
-  const home = new URL(`${req.nextUrl.origin}/${country.code}`);
-  home.searchParams.set("deal_unavailable", "1");
-  return NextResponse.redirect(home, 307);
+  /* No title, can't resolve, can't compare. Send the user to the
+     Google relay URL directly so they at least see a Google Shopping
+     page for the product instead of a havlo error page. */
+  return NextResponse.redirect(target, 307);
 }

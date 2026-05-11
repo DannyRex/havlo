@@ -28,9 +28,46 @@
 
 import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
+import { inferCategoryFromTitle } from "@/lib/categorize";
 
 interface OfferRow { product_id: string; store_id: string }
 interface ProductRow { id: string; title: string }
+
+/* QA round-4 caught: the chip pool surfaced "Universal Headphone
+   Headband Head beam Silicone Cover for Sony WH-1000XM5 Headset
+   Headband Protectors with Zipper Cover3" (a counterfeit accessory)
+   as the lead chip. Two filters needed at the chip-promotion level:
+
+   1. Length cap. Real flagship product titles fit in ~70 chars.
+      AliExpress SEO-stuffed accessory titles run 100+. Anything
+      past the cap is almost certainly keyword junk.
+   2. Accessory exclusion. If inferCategoryFromTitle says the title
+      is a phone/audio accessory (case, cover, sleeve, headband,
+      bracket, etc.), it might still have multi-store coverage but
+      it's not what users want when clicking a homepage chip
+      promising "real comparisons". They want the actual product. */
+const MAX_CHIP_TITLE_LENGTH = 70;
+function looksLikeChipJunk(title: string): boolean {
+  if (title.length > MAX_CHIP_TITLE_LENGTH) return true;
+  /* Strong accessory/junk signals — same matchers used in
+     categorize.ts but applied as a NEGATIVE filter here. */
+  if (/\b(case|cover|protector|sleeve|cradle|holder|mount|bracket|tripod|gimbal|adapter|connector|organizer|silicone|headband\s*head\s*beam|head\s*band\s*protector|dust\s*plug|screen\s*film)\b/i.test(title)) return true;
+  /* Spam-stuffed keyword titles (AliExpress wholesale signals). */
+  if (/\b(wholesale|\/lot|pcs\/|10pcs|20pcs|50pcs|100pcs|drop\s*shipping)\b/i.test(title)) return true;
+  /* Titles that include a product spec like "Size: 7.23 oz" — these
+     are imported listings with junk metadata in the title field. */
+  if (/\b(size|weight|color):\s*[0-9]/i.test(title)) return true;
+  /* Inferred-category sanity check: the chip is meant to surface
+     the product, not its accessories. If the classifier says the
+     title is "electronics" but it contains a clear phone/audio
+     keyword, it's likely an accessory and we drop it.
+     (Real phones / audio classify as "phones" / "audio".) */
+  const cat = inferCategoryFromTitle(title);
+  if (cat === "electronics" && /\b(phone|smartphone|airpods|headphone|earbud|earphone)\b/i.test(title)) {
+    return true;
+  }
+  return false;
+}
 
 const CACHE_TAG    = "trending-multi-store";
 const REVALIDATE_S = 300; // 5 min — matches the chip-rotation bucket
@@ -111,6 +148,11 @@ async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
     .map(([id, set]) => {
       const title = titleById.get(id);
       if (!title) return null;
+      /* Drop accessory junk + ultra-long SEO-stuffed titles. The
+         chip pool is supposed to surface PRODUCTS users want to
+         compare across stores, not silicone covers and phone
+         mounts that happen to sit at multiple storefronts. */
+      if (looksLikeChipJunk(title)) return null;
       return { title, storeCount: set.size } satisfies MultiStoreChip;
     })
     .filter((c): c is MultiStoreChip => c !== null);
