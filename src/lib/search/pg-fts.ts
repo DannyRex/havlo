@@ -18,6 +18,7 @@
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { usdToNgn } from "@/lib/utils";
 import { isUsableMerchantUrl } from "@/lib/url-helpers";
+import { resolveStoreLogoUrl } from "@/lib/store-logo";
 import type {
   SearchOutput, ProductGroup, StoreOffer, DupeResult, SearchSuggestion,
 } from "./index";
@@ -494,7 +495,7 @@ function offerToStoreOffer(o: NestedOffer, productTitle?: string): StoreOffer {
   return {
     storeId:        o.store_id,
     storeName:      store?.name ?? o.store_id,
-    storeLogoUrl:   store?.logo_url ?? `/logos/${o.store_id}.png`,
+    storeLogoUrl:   resolveStoreLogoUrl(o.store_id, store?.logo_url),
     storeColor:     "#0057FF",
     price:          priceN,
     currency:       "NGN",
@@ -518,7 +519,7 @@ function ftsRowToSingleOffer(r: FtsRow): StoreOffer {
   return {
     storeId:        r.store_id,
     storeName:      r.store_name,
-    storeLogoUrl:   r.store_logo_url ?? `/logos/${r.store_id}.png`,
+    storeLogoUrl:   resolveStoreLogoUrl(r.store_id, r.store_logo_url),
     storeColor:     "#0057FF",
     price:          priceN,
     currency:       "NGN",

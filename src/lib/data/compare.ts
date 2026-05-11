@@ -1,6 +1,7 @@
 import type { SearchResult, PriceResult, Alternative, Deal } from "@/types";
 import { deals } from "./deals";
 import { usdToNgn } from "@/lib/utils";
+import { resolveStoreLogoUrl } from "@/lib/store-logo";
 
 /* ── Store metadata (aligned with /public/logos/) ── */
 const storeMeta: Record<
@@ -99,7 +100,7 @@ function dealToPriceResult(deal: Deal): PriceResult {
     storeName: meta.name,
     storeLogo: meta.logo,
     storeColor: meta.color,
-    storeLogoUrl: `/logos/${deal.storeId}.png`,
+    storeLogoUrl: resolveStoreLogoUrl(deal.storeId),
     price: toNgn(deal),
     currency: "NGN",
     inStock: true,

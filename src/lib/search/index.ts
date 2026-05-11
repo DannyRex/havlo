@@ -20,6 +20,7 @@ import { deals } from "@/lib/data/deals";
 import { usdToNgn } from "@/lib/utils";
 import { buildSignature, extractedSignature, type ProductSignature } from "./normalize";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
+import { resolveStoreLogoUrl } from "@/lib/store-logo";
 
 /* ── Public types ─────────────────────────────────────────────────── */
 
@@ -144,7 +145,7 @@ function dealToOffer(d: Deal): StoreOffer {
   return {
     storeId: d.storeId,
     storeName: meta.name,
-    storeLogoUrl: `/logos/${d.storeId}.png`,
+    storeLogoUrl: resolveStoreLogoUrl(d.storeId),
     storeColor: meta.color,
     price,
     currency: "NGN",
