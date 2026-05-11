@@ -294,9 +294,8 @@ export default function CashbackPage({
             Get notified when cashback launches.
           </h2>
           <p className="text-ink-2 text-[15px] leading-relaxed mb-5">
-            Phase 2 ships in the coming weeks. Drop your email and you&apos;ll be
-            one of the first accounts created when we open in {country.name}. No
-            spam, no other lists, just one email when cashback goes live.
+            Havlo cashback ships in the coming weeks. Drop your email and you&apos;ll be
+            one of the first accounts created when we open in {country.name}.
           </p>
           <WaitlistForm country={country.code} />
         </section>
