@@ -56,7 +56,13 @@ jobs:
   #          freshly-generated deals.ts before it's pushed. ──
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # Bumped 40 → 60 (May 2026) after the Monday Mon 11 cron hit the
+    # 40m cap mid-ingest. The Playwright pass came in at ~19m, but
+    # the URL-first dedup added in commit 44c77d0 made ingest:scraped
+    # take 20m+ (N+1 SELECT-by-(store_id, url) lookups before each
+    # upsert). 60m gives 20m headroom over today's actual elapsed
+    # time. Profile the ingest path separately to lower it back.
+    timeout-minutes: 60
 
     # Job-level env mapping. Secrets MUST be lifted here (not just per
     # step) because GitHub Actions evaluates step-level `if:` before
