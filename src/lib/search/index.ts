@@ -296,22 +296,111 @@ export async function suggest(
   const rows = data as Array<{ product_id: string; title: string }>;
   if (rows.length === 0) return [];
 
-  // One quick count query so each suggestion shows a real "N stores" badge
-  const ids = rows.map((r) => r.product_id);
-  const { data: offers } = await supa
-    .from("offers")
-    .select("product_id")
-    .in("product_id", ids)
-    .eq("in_stock", true);
+  /* Store-count badge must match what /compare actually surfaces, or
+     the user sees "1 store" in the dropdown and gets a comparison
+     with many. User-reported case (May 2026): "Nike Men's Dunk Low
+     Retro Sneakers" suggestion said "1 store" but /compare showed
+     several different stores.
 
-  const counts = new Map<string, number>();
-  ((offers ?? []) as Array<{ product_id: string }>).forEach((o) => {
-    counts.set(o.product_id, (counts.get(o.product_id) ?? 0) + 1);
+     Two bugs in the prior implementation:
+       1. Counted OFFER ROWS, not distinct stores. Two offers from
+          the same store (e.g. different size variants) double-counted.
+       2. Counted only the literal product_id's offers. /compare
+          pools by signature (brand|model) and shows offers across
+          ALL products with the same signature. The dropdown didn't
+          pool, so the badge undercounted.
+
+     New flow mirrors /compare exactly (pg-fts.ts pgFtsFindSimilar):
+       a. Fetch signatures for the suggested products.
+       b. For products with a usable signature (not null, not "?|?"),
+          fetch all sibling product_ids sharing that signature.
+       c. Count DISTINCT store_ids across the full pool (suggested
+          product + siblings). Products with no usable signature
+          stand alone.
+
+     Cost: +2 DB queries (signature lookup + sibling lookup). All
+     indexed. ~30-50ms overhead on a typeahead that's already
+     debounced — acceptable for accuracy. */
+  const ids = rows.map((r) => r.product_id);
+
+  /* Step 1: signatures for the suggested products. */
+  const { data: products } = await supa
+    .from("products")
+    .select("id, signature")
+    .in("id", ids);
+  const sigByProductId = new Map<string, string | null>();
+  for (const p of (products ?? []) as Array<{ id: string; signature: string | null }>) {
+    sigByProductId.set(p.id, p.signature);
+  }
+
+  /* Step 2: gather all usable signatures, then fetch every product_id
+     that shares one. Treat "?|?" as solo — that's the placeholder
+     for "couldn't parse brand+model", so pooling those together
+     would mix unrelated products (the same bug fixed in pg-fts.ts
+     commit a34eb9d for the "10 Pcs Handi Set" case). */
+  /* Array.from(Map.values()) instead of for-of so the TS target in
+     this repo (downlevelIteration off) accepts it. forEach pattern
+     matches what the older offer-count code used. */
+  const usableSigs = new Set<string>();
+  Array.from(sigByProductId.values()).forEach((sig) => {
+    if (sig && sig !== "?|?") usableSigs.add(sig);
+  });
+  const siblingsBySig = new Map<string, string[]>();
+  if (usableSigs.size > 0) {
+    const { data: siblings } = await supa
+      .from("products")
+      .select("id, signature")
+      .in("signature", Array.from(usableSigs));
+    for (const s of (siblings ?? []) as Array<{ id: string; signature: string | null }>) {
+      if (!s.signature) continue;
+      const arr = siblingsBySig.get(s.signature) ?? [];
+      arr.push(s.id);
+      siblingsBySig.set(s.signature, arr);
+    }
+  }
+
+  /* Step 3: build the full pool per suggestion. */
+  const poolByProductId = new Map<string, string[]>();
+  for (const r of rows) {
+    const sig = sigByProductId.get(r.product_id);
+    if (sig && sig !== "?|?" && siblingsBySig.has(sig)) {
+      poolByProductId.set(r.product_id, siblingsBySig.get(sig)!);
+    } else {
+      poolByProductId.set(r.product_id, [r.product_id]);
+    }
+  }
+
+  /* Step 4: fetch (product_id, store_id) for every pooled product and
+     count distinct stores per suggestion. */
+  const allPooledIds = new Set<string>();
+  Array.from(poolByProductId.values()).forEach((pool) => {
+    pool.forEach((id) => allPooledIds.add(id));
   });
 
-  return rows.map((r) => ({
-    title: r.title,
-    key: r.product_id,
-    storeCount: counts.get(r.product_id) ?? 1,
-  }));
+  const { data: offers } = await supa
+    .from("offers")
+    .select("product_id, store_id")
+    .in("product_id", Array.from(allPooledIds))
+    .eq("in_stock", true);
+
+  const storesByProductId = new Map<string, Set<string>>();
+  for (const o of (offers ?? []) as Array<{ product_id: string; store_id: string }>) {
+    let set = storesByProductId.get(o.product_id);
+    if (!set) { set = new Set(); storesByProductId.set(o.product_id, set); }
+    set.add(o.store_id);
+  }
+
+  return rows.map((r) => {
+    const pool = poolByProductId.get(r.product_id) ?? [r.product_id];
+    const stores = new Set<string>();
+    pool.forEach((pid) => {
+      const s = storesByProductId.get(pid);
+      if (s) Array.from(s).forEach((sid) => stores.add(sid));
+    });
+    return {
+      title: r.title,
+      key: r.product_id,
+      storeCount: Math.max(1, stores.size),
+    };
+  });
 }
