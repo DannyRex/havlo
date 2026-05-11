@@ -22,6 +22,7 @@
    leans on "no exaggeration", and over-claiming partners on a
    pre-launch teaser would undercut that. */
 
+import Link from "next/link";
 import { Coins } from "lucide-react";
 import { getServerCountry } from "@/lib/country-server";
 import { getAllCashbackRates } from "@/lib/cashback";
@@ -39,14 +40,12 @@ export default function CashbackTeaser() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center text-center">
 
-          {/* Eyebrow — "next up" instead of "coming soon" to drop the
-              universal marketing-page phrasing. Founder voice rule:
-              "soon" by itself reads as evasive; "next up" implies an
-              actual roadmap. */}
+          {/* Eyebrow — back to "coming soon" after the earlier "next
+              up" rewrite. Clearer about timing, less obscure. */}
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-success/10 border border-success/30 mb-4">
             <Coins size={12} className="text-success" aria-hidden="true" />
             <span className="text-[11px] font-semibold text-success uppercase tracking-[0.1em]">
-              Cashback · next up
+              Cashback · coming soon
             </span>
           </div>
 
@@ -59,19 +58,21 @@ export default function CashbackTeaser() {
             Money back on the deals you&apos;d buy anyway.
           </h2>
 
+          {/* Body — tight summary + Learn more link. The full
+              mechanic + rate breakdown lives on /[country]/cashback;
+              this teaser is for the high-level pitch. Inline Link
+              styled as a subtle underline so it reads as part of the
+              copy rather than a competing CTA against the waitlist
+              form below. */}
           <p className="text-sm sm:text-base text-ink-2 max-w-xl mx-auto mb-6 sm:mb-8 leading-relaxed">
-            {/* Rates are hardcoded in the founder-voice claim rather
-                than interpolated from the rate map. The map could
-                shift order if a higher-paying partner lights up
-                (then AliExpress wouldn't be "top"). The pills below
-                stay dynamic and show the live truth; the body
-                copy is a hand-authored statement of today's two
-                anchor partners. Update both copy + RATES together
-                if the pairing changes. */}
-            Buy through our links and we share what the merchants pay us.
-            5% at AliExpress, 2% at Amazon today. More stores as we sign
-            them on. Paid in cash to your bank. Not points. Not store
-            credit.
+            Buy through our links and we share what the merchants pay
+            us. Up to 5% back, in cash.{" "}
+            <Link
+              href={`/${country.code}/cashback`}
+              className="text-ink font-medium underline underline-offset-2 hover:text-ink-2 transition-colors"
+            >
+              Learn more →
+            </Link>
           </p>
 
           {/* Active rates pills — concrete proof, not marketing copy.
