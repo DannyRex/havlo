@@ -145,14 +145,19 @@ export default function TrendingChipRail({
             Popular comparisons
           </span>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <span
-              key={i}
-              className="h-8 w-24 rounded-full bg-surface-2 animate-pulse"
-              aria-hidden="true"
-            />
-          ))}
+        {/* Skeleton mirrors the real-state layout exactly (horizontal
+            scroll on mobile, wrap on desktop) so there's no visual
+            jump when the fetched chips replace the skeletons. */}
+        <div className="-mx-4 sm:mx-0">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 sm:px-0 sm:flex-wrap">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <span
+                key={i}
+                className="h-8 w-24 rounded-full bg-surface-2 animate-pulse shrink-0"
+                aria-hidden="true"
+              />
+            ))}
+          </div>
         </div>
       </section>
     );
@@ -168,31 +173,49 @@ export default function TrendingChipRail({
           Popular comparisons
         </span>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {visible.map((chip) => (
-          <Link
-            /* Key includes the rotation tick so each rotation mounts
-               a fresh DOM node and re-plays the fade-in animation.
-               Same pattern as the SearchBar "Try:" chips. */
-            key={`${chip.title}-${tick}`}
-            /* searchQuery is the RAW DB title (better FTS hit) used
-               for display + URL sharing. pid is the product_id
-               backstop — if the catalog shifts between chip-pool
-               generation and this click (orphan cleanup, signature
-               merge), /api/compare falls back to direct lookup so
-               the user ALWAYS sees the comparison the chip promised.
-               Round-4 QA: user clicked a chip and got "Nothing in
-               our local index" because of exactly that timing gap. */
-            href={`/${countryCode}/compare?q=${encodeURIComponent(chip.searchQuery)}&pid=${chip.productId}&mode=similar`}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface border border-border hover:border-border-strong hover:shadow-card transition-all whitespace-nowrap active:scale-95 animate-fade-in"
-            aria-label={`${chip.title}, available across ${chip.storeCount.toLocaleString()} stores`}
-          >
-            <span className="text-[13px] font-medium text-ink">{chip.title}</span>
-            <span className="text-[10px] font-semibold text-ink-3 tabular-nums">
-              {chip.storeCount}
-            </span>
-          </Link>
-        ))}
+      {/* Layout: horizontal scroll on mobile, wrap on desktop.
+
+          Previous `flex flex-wrap` on every breakpoint blew up on
+          mobile — a few long chip names ("ASUS ROG Phone 9 Pro
+          512GB") made the row break into a ragged 3–4 line stack
+          that ate too much vertical space and looked broken.
+
+          Mobile (default): full-bleed horizontal scroll. -mx-4 and
+          px-4 cancel the parent container's px-4 so the strip
+          extends edge-to-edge; users swipe through chips like
+          iOS app rails. no-scrollbar hides the native bar (Tailwind
+          plugin already in use elsewhere — see Hero category pills).
+
+          Desktop (sm+): regain flex-wrap so chips fill the available
+          width naturally without forcing horizontal scroll on a
+          larger container. */}
+      <div className="-mx-4 sm:mx-0">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 sm:px-0 sm:flex-wrap">
+          {visible.map((chip) => (
+            <Link
+              /* Key includes the rotation tick so each rotation mounts
+                 a fresh DOM node and re-plays the fade-in animation.
+                 Same pattern as the SearchBar "Try:" chips. */
+              key={`${chip.title}-${tick}`}
+              /* searchQuery is the RAW DB title (better FTS hit) used
+                 for display + URL sharing. pid is the product_id
+                 backstop — if the catalog shifts between chip-pool
+                 generation and this click (orphan cleanup, signature
+                 merge), /api/compare falls back to direct lookup so
+                 the user ALWAYS sees the comparison the chip promised.
+                 Round-4 QA: user clicked a chip and got "Nothing in
+                 our local index" because of exactly that timing gap. */
+              href={`/${countryCode}/compare?q=${encodeURIComponent(chip.searchQuery)}&pid=${chip.productId}&mode=similar`}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface border border-border hover:border-border-strong hover:shadow-card transition-all whitespace-nowrap active:scale-95 animate-fade-in shrink-0"
+              aria-label={`${chip.title}, available across ${chip.storeCount.toLocaleString()} stores`}
+            >
+              <span className="text-[13px] font-medium text-ink">{chip.title}</span>
+              <span className="text-[10px] font-semibold text-ink-3 tabular-nums">
+                {chip.storeCount}
+              </span>
+            </Link>
+          ))}
+        </div>
       </div>
     </section>
   );

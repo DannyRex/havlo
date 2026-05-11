@@ -147,6 +147,20 @@ export default function ListCard({ deal }: Props) {
             <span className="text-[7px] font-bold uppercase tracking-[0.05em] mt-0.5 opacity-90">off</span>
           </div>
         )}
+
+        {/* INTL badge — bottom-left of the thumbnail. Same visual
+            language as MasonryCard so list + grid views stay
+            consistent. Shows when the deal's store isn't anchored
+            in the user's country (via inferStoreCountry). Was
+            missing on list view; only the masonry view had it. */}
+        {isCrossBorder && (
+          <span
+            className="absolute left-1 bottom-1 inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-medium text-white/95 backdrop-blur-sm"
+            style={{ background: "rgba(0,0,0,0.55)" }}
+          >
+            INTL
+          </span>
+        )}
       </div>
 
       {/* Right column — store · time, title, price row */}
