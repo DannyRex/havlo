@@ -62,7 +62,10 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "ASOS",       domain: "asos.com" },
     { name: "Argos",      domain: "argos.co.uk" },
     { name: "Currys",     domain: "currys.co.uk" },
-    { name: "John Lewis", domain: "johnlewis.com" },
+    /* John Lewis favicon is monochrome dark vertical stripes on a
+       transparent bg — invisible against the dark mode chip bg
+       without the invert. */
+    { name: "John Lewis", domain: "johnlewis.com", darkLogo: true },
     { name: "Boots",      domain: "boots.com" },
     { name: "Next",       domain: "next.co.uk" },
     { name: "M&S",        domain: "marksandspencer.com" },

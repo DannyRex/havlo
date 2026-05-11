@@ -35,6 +35,11 @@ export interface StoreEntry {
   /** White-on-transparent assets get inverted in light mode so they
       read on the white chip background. */
   whiteLogo?: boolean;
+  /** Dark-on-transparent assets get inverted in DARK mode so they
+      read on the dark chip background. Symmetric to whiteLogo.
+      Use for monochrome dark wordmarks like the John Lewis
+      vertical-stripe pattern that vanish on a dark bg-bg chip. */
+  darkLogo?: boolean;
   /** Wide horizontal wordmark logos (3chub, Marks & Spencer, etc.)
       need a wider chip + different sizing so the wordmark stays
       readable. Without this, object-contain shrinks them to a few
@@ -86,7 +91,9 @@ export function StoreLogoChip({
             unoptimized={isRemote}
             onError={() => setImgFailed(true)}
             className={`${imgSize} object-contain grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300 ${
-              store.whiteLogo ? "invert dark:invert-0" : ""
+              store.whiteLogo ? "invert dark:invert-0"
+              : store.darkLogo ? "dark:invert"
+              : ""
             }`}
           />
         ) : (
