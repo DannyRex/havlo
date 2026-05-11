@@ -60,13 +60,20 @@ export default async function TrendingDeals() {
   /* Composition is now bucket-based, not origin-based.
 
      Buckets:
-       local      → everything that isn't Amazon or AliExpress.
-                    For NG: Konga, Jumia, 3C Hub, Slot, etc.
-                    For non-NG: country-native stores (Currys, ASOS,
-                    Best Buy, Walmart, John Lewis, …).
+       local      → country-native retailers the visitor can shop
+                    same-day. For NG: only is_international=false rows
+                    (Konga, Jumia, 3C Hub, Slot, HealthPlus, Supermart).
+                    For non-NG: anything not Amazon/AliExpress in the
+                    country-filtered intl pool (Currys, ASOS, Best Buy,
+                    John Lewis, …).
        amazon     → all amazon-* marketplaces (.com, .co.uk, .de, .ae,
                     .in). The biggest commission stream we have.
        aliexpress → just the one storeId. Cross-border tail.
+       intl-other → NG-only. Non-monetised cross-border retailers
+                    (Best Buy, Currys, ASOS, Macy's, …). NG shoppers
+                    DO use these via freight forwarders, but they
+                    shouldn't crowd same-day NG retailers out of the
+                    primary 'local' quota. Backfill-only.
 
      Target mix: 50% local, ~37.5% Amazon, ~12.5% AliExpress (8 / 6 / 2
      of 16). Reasoning:
@@ -109,14 +116,35 @@ export default async function TrendingDeals() {
   if (pool.length === 0) return null;
 
   /* Bucket the pool by classification, then shuffle each bucket
-     within the rotation window so picks rotate every 5 min. */
-  const bucketed: Record<"local" | "amazon" | "aliexpress", Deal[]> = {
-    local: [], amazon: [], aliexpress: [],
+     within the rotation window so picks rotate every 5 min.
+
+     NG nuance: classifyDeal treats anything-not-Amazon-not-AliExpress
+     as "local", which works for non-NG countries (the pool is pre-
+     filtered to country-appropriate stores by filterDealsForCountry).
+     For NG it leaks — Best Buy, Currys, ASOS, John Lewis, etc. all
+     fall into 'local' and crowd actual NG retailers (Konga, 3C Hub,
+     HealthPlus, …) out of the 8-slot local quota. Audit found
+     ~14% of the NG 'local' bucket was actually NG-local.
+
+     Fix: for NG, route non-monetised intl rows into a separate
+     intl-other bucket. Backfill-only so they can still surface when
+     the primary buckets are thin, but they don't take from the local
+     quota up-front. */
+  const bucketed: Record<"local" | "amazon" | "aliexpress" | "intl-other", Deal[]> = {
+    local: [], amazon: [], aliexpress: [], "intl-other": [],
   };
-  for (const d of pool) bucketed[classifyDeal(d)].push(d);
-  bucketed.local      = seededShuffle(bucketed.local,      rng);
-  bucketed.amazon     = seededShuffle(bucketed.amazon,     rng);
-  bucketed.aliexpress = seededShuffle(bucketed.aliexpress, rng);
+  for (const d of pool) {
+    const base = classifyDeal(d);
+    if (isNG && base === "local" && d.currency !== "NGN") {
+      bucketed["intl-other"].push(d);
+    } else {
+      bucketed[base].push(d);
+    }
+  }
+  bucketed.local        = seededShuffle(bucketed.local,        rng);
+  bucketed.amazon       = seededShuffle(bucketed.amazon,       rng);
+  bucketed.aliexpress   = seededShuffle(bucketed.aliexpress,   rng);
+  bucketed["intl-other"] = seededShuffle(bucketed["intl-other"], rng);
 
   const seen = new Set<string>();
   const storeCount: Record<string, number> = {};
@@ -163,10 +191,16 @@ export default async function TrendingDeals() {
 
   /* Backfill cascade — ordered by what we'd rather show if a bucket
      under-filled. Local first (trust + same-day delivery), then Amazon
-     (highest commission), then AliExpress. Use a generous per-store
+     (highest commission), then AliExpress, then intl-other (NG only,
+     non-monetised cross-border retailers). Use a generous per-store
      cap during backfill so a thin pool can still reach 16. */
   if (picks.length < TARGET_TOTAL) {
-    for (const bucket of [bucketed.local, bucketed.amazon, bucketed.aliexpress]) {
+    for (const bucket of [
+      bucketed.local,
+      bucketed.amazon,
+      bucketed.aliexpress,
+      bucketed["intl-other"],
+    ]) {
       for (const d of bucket) {
         if (picks.length >= TARGET_TOTAL) break;
         tryPush(d, 4);
