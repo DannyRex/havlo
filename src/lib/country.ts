@@ -147,6 +147,11 @@ const COUNTRY_CROSS_BORDER: Record<string, string[]> = {
     "river island", "river-island", "sports direct", "sportsdirect",
     "screwfix", "wickes", "halfords", "primark", "matalan",
     "house of fraser", "debenhams", "ebay.co.uk",
+    /* v2 additions — same retailers added to COUNTRY_STORES.uk
+       so NG cross-border buyers see them in the freight-forwarder
+       set. */
+    "b&q", "diy.com", "jd sports", "jdsports", "dunelm",
+    "smyths", "smyths toys",
     /* Cross-region globals NG buyers also reach. */
     "wish.com", "alibaba.com", "lightinthebox", "geekbuying",
   ],
@@ -218,11 +223,21 @@ const NG_STORES = [
    substring on storeId/storeName. */
 export const COUNTRY_STORES: Record<string, string[]> = {
   uk: [
-    "amazon.co.uk", "amazon-co-uk", "argos", "currys", "john lewis", "johnlewis",
+    "amazon.co.uk", "amazon-co-uk", "amazon uk", "amazon-uk",
+    "argos", "currys", "john lewis", "johnlewis",
     "very", "asos", "boots", "next", "marks-spencer", "marks and spencer",
     "selfridges", "ao.com", "ao-com", "screwfix", "wickes", "halfords",
     "sports direct", "sportsdirect", "river island", "primark", "matalan",
     "house of fraser", "debenhams", "tesco", "sainsbury", "ebay.co.uk",
+    /* v2 additions (May 2026): gap-fillers from the post-launch UK
+       pool audit. Each entry must match the storeId or storeName
+       substring SerpAPI returns. B&Q comes through as "b&q" or
+       "diy.com"; JD Sports as "jd sports" / "jdsports"; Smyths as
+       just "smyths". Dunelm is unambiguous. */
+    "b&q", "b-q", "diy.com", "diy-com",
+    "jd sports", "jd-sports", "jdsports",
+    "dunelm",
+    "smyths", "smyths toys",
   ],
   us: [
     "amazon.com", "walmart", "best buy", "bestbuy", "target", "newegg",
