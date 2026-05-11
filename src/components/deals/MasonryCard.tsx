@@ -239,7 +239,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
              confirms it's a button. */
           <button
             type="button"
-            title={`Earn ${cashback.percent}% cashback when you shop through Havlo. Coming soon. Tap to learn more.`}
+            title={`${cashback.percent}% back here when cashback goes live. Tap for details.`}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();

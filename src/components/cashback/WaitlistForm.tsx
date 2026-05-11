@@ -139,7 +139,7 @@ export default function WaitlistForm({ country, source = "cashback-page", compac
           <p className="text-ink font-semibold mb-1">You&apos;re on the list.</p>
           {compact ? (
             <p className="text-ink-2 text-sm leading-relaxed">
-              We&apos;ll email you the moment cashback launches.
+              We&apos;ll email you when it goes live.
             </p>
           ) : (
             <p className="text-ink-2 text-sm leading-relaxed">

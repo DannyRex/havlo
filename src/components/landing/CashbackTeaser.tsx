@@ -39,21 +39,24 @@ export default function CashbackTeaser() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center text-center">
 
-          {/* Eyebrow — matches the "Coming soon" framing used on
-              /cashback so users who later click through see continuous
-              messaging, not contradictory positioning. */}
+          {/* Eyebrow — "next up" instead of "coming soon" to drop the
+              universal marketing-page phrasing. Founder voice rule:
+              "soon" by itself reads as evasive; "next up" implies an
+              actual roadmap. */}
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-success/10 border border-success/30 mb-4">
             <Coins size={12} className="text-success" aria-hidden="true" />
             <span className="text-[11px] font-semibold text-success uppercase tracking-[0.1em]">
-              Cashback · Coming soon
+              Cashback · next up
             </span>
           </div>
 
+          {/* Headline — drops the "Get paid to shop" cashback-genre
+              cliché. Same observational beat, no trope. */}
           <h2
             id="cashback-teaser-heading"
             className="text-[24px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight mb-3 sm:mb-4"
           >
-            Get paid to shop the deals you&apos;d buy anyway.
+            Money back on the deals you&apos;d buy anyway.
           </h2>
 
           <p className="text-sm sm:text-base text-ink-2 max-w-xl mx-auto mb-6 sm:mb-8 leading-relaxed">
@@ -100,7 +103,7 @@ export default function CashbackTeaser() {
           <div className="w-full max-w-md">
             <WaitlistForm country={country.code} source="homepage-cashback" compact />
             <p className="mt-3 text-[11px] text-ink-3 leading-relaxed">
-              One email at launch. No newsletter, no spam.
+              One email when it goes live. Nothing else.
             </p>
           </div>
 
