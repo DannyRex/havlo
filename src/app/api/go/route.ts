@@ -245,19 +245,16 @@ export async function GET(req: NextRequest) {
   }
 
   /* Step 2: smart fallback for long-tail merchants not in the
-     curated table. Strategies:
-       a) storeName / storeId looks like a domain → direct homepage.
-          ("x-kom.de" → "https://x-kom.de").
-       b) Otherwise, Google search with "<merchantName> <title>" so
-          the user lands on the merchant via search engine results.
-          (The earlier 400 from consent.google.com was specific to
-          Google Shopping relay URLs with massive prds= payloads
-          getting double-encoded. A plain google.com/search query
-          doesn't hit that failure mode — EU/UK users see a one-
-          time consent dialog and get normal results; other regions
-          skip it entirely.)
-     The catalog has hundreds of SerpAPI long-tail stores; this is
-     the path that catches them. */
+     curated table. Strategies (per user feedback: never bounce to
+     Google, because that defeats Havlo's value prop — a shopper
+     could've gone to Google themselves):
+       a) storeName / storeId looks like a domain → merchant
+          homepage. ("x-kom.de" → "https://x-kom.de".)
+       b) storeName looks like a plausible multi-word brand →
+          try "<slug>.com". ("Cricket Wireless" →
+          "https://cricketwireless.com". Best-effort: most real
+          retailers own their obvious brand domain.)
+     When neither fires, fall through to Havlo /compare. */
   if (storeIdHint || storeNameHint) {
     const m = smartFallbackUrl(storeIdHint, storeNameHint, titleHint);
     if (m) {

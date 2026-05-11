@@ -178,37 +178,58 @@ export function merchantHomepage(
 /* Smart fallback for merchants NOT in the curated MERCHANTS table.
    The catalog has hundreds of long-tail SerpAPI-ingested stores
    ("Big Apple Buddy", "Cricket Wireless", "x-kom.de", "wmf.com/de",
-   "Sony Store Online UK", etc.). For these, we use two strategies
-   in order:
+   "Sony Store Online UK", etc.).
 
-     1. If the storeName looks like a domain (contains a dot AND
-        no spaces in the candidate portion), construct a homepage
-        URL from it. "x-kom.de" → "https://x-kom.de",
-        "wmf.com/de" → "https://wmf.com/de".
+   Strategy (user feedback: "i prefer it to go to the merchant
+   website ... rather than google, because what then is the point
+   of havlo since a user can go directly to google"):
 
-     2. Otherwise, search Bing for "<storeName> <product title>".
-        Bing's consent flow is more permissive than Google's
-        (no double-encoded continue URL 400s, works in most
-        regions). User sees the merchant + product in results
-        and can click through. Worst-case-still-useful UX.
+     1. storeName / storeId looks like a domain → merchant homepage.
+        ("x-kom.de" → "https://x-kom.de", "wmf.com/de" → that path).
+     2. storeName looks like a plausible brand slug (letters +
+        spaces only, no special chars) → try the slugified domain.
+        "Cricket Wireless" → "https://cricketwireless.com". This is
+        a best-effort guess; the merchant might not own that exact
+        domain. Better than nothing because (a) a 404 still leaves
+        the user with a recognisable URL bar and (b) most real
+        retailers DO own their obvious brand domain.
 
-   Returns null only when we have nothing — caller falls back to
-   the Havlo /compare or /deals path. */
+   Returns null when neither strategy fires. Caller then falls
+   through to /compare for alternatives — staying inside Havlo
+   instead of bouncing to Google (which would undermine Havlo's
+   value prop entirely). */
 function looksLikeDomain(s: string): boolean {
   return /^[a-z0-9][a-z0-9\-.]*\.[a-z]{2,}(\/[a-z0-9/_-]*)?$/i.test(s.trim());
+}
+
+/* Plausible brand slug: letters + spaces only, no special chars.
+   Catches "Verizon", "Cricket Wireless", "Cellucity", "Unihertz",
+   "Justmylook" — all real retailers that own their obvious .com
+   domain. Rejects "AT&T", "Juvia's Place", "Kaufland.de - Red-
+   Tech-" (the special chars produce a wrong slug or a confusing
+   URL). Min 5 chars so 2-3 letter inputs ("EE", "BT") don't
+   generate noisy guesses. */
+function looksLikeSimpleBrand(s: string): boolean {
+  const trimmed = s.trim();
+  if (trimmed.length < 5) return false;
+  // Letters + spaces only (single or multi-word both fine)
+  return /^[a-z][a-z\s]+[a-z]$/i.test(trimmed);
+}
+
+function brandSlug(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, "");
 }
 
 export function smartFallbackUrl(
   storeId: string | null | undefined,
   storeName: string | null | undefined,
-  query: string,
+  _query: string,
 ): { url: string; merchantName: string } | null {
   const sid = (storeId ?? "").trim();
   const sname = (storeName ?? "").trim();
   if (!sid && !sname) return null;
 
-  /* Strategy 1: storeName looks like a domain. Use it as the
-     destination directly. */
+  /* Strategy 1: storeName / storeId IS a domain. Use directly. */
   if (sname && looksLikeDomain(sname)) {
     const url = sname.startsWith("http") ? sname : `https://${sname}`;
     return { url, merchantName: sname };
@@ -218,21 +239,14 @@ export function smartFallbackUrl(
     return { url, merchantName: sid };
   }
 
-  /* Strategy 2: Google search with merchant name + product title.
-     Previously used Bing here — that was an overcorrection from a
-     separate bug. The earlier 400 from consent.google.com was
-     specific to Google SHOPPING relay URLs (ibp=oshop with massive
-     prds= payloads getting double-encoded). A plain
-     google.com/search?q=<query> has none of that — EU/UK users see
-     a one-time consent dialog, dismiss it, get normal results.
-     Other regions skip the dialog entirely. Google's product
-     result quality is materially better than Bing's, and it's the
-     dominant search engine across all our launch markets. */
-  if (query && query.trim() && (sname || sid)) {
-    const merchantName = sname || sid;
-    const q = `${merchantName} ${query}`.trim();
-    const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
-    return { url, merchantName };
+  /* Strategy 2: storeName looks like a multi-word brand. Try
+     "<slug>.com" — most real retailers own their obvious brand
+     domain. If they don't, the user sees a clear 404 on a
+     recognisable URL rather than a search engine page that
+     defeats Havlo's purpose. */
+  if (sname && looksLikeSimpleBrand(sname)) {
+    const url = `https://${brandSlug(sname)}.com`;
+    return { url, merchantName: sname };
   }
 
   return null;
