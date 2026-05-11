@@ -421,12 +421,13 @@ function CompareContent() {
                 </div>
               </div>
 
-              {/* ── Price comparison rows ──────────────────────────
-                  Only render when there's actually a comparison to
-                  show (>=2 offers). Each offer becomes a row with the
-                  store logo, price, delivery info, and a real 'View'
-                  CTA — replacing the old emoji-pill chips that didn't
-                  show prices and weren't useful for comparison.
+              {/* ── Store row(s) ───────────────────────────────────
+                  Always render at least one row so the user can
+                  click through to the merchant. When there are 2+
+                  offers, render the full comparison; when there's
+                  exactly one store, render a single clean "go to
+                  store" row (no 'Best price' framing, since there's
+                  nothing to compare it against).
 
                   Deduped by (storeId, landedPrice rounded to nearest
                   ₦100): when the query-time signature pool gathers
@@ -440,8 +441,9 @@ function CompareContent() {
                   at different prices, and those are real choices).
 
                   Sorted by landedPrice ascending (cheapest first);
-                  the top row gets a 'Best price' badge. */}
-              {result.anchor.offers.length > 1 && (() => {
+                  in multi-store mode the top row gets a 'Best price'
+                  badge. */}
+              {result.anchor.offers.length >= 1 && (() => {
                 /* Dedup pass first: collapse same-store + same-price
                    rows. Round to nearest ₦100 so trivial FX-rounding
                    differences don't leak through as separate rows. */
@@ -455,21 +457,32 @@ function CompareContent() {
                     return true;
                   });
                 const sorted = deduped.sort((a, b) => a.landedPrice - b.landedPrice);
-                if (sorted.length < 2) return null;
+                if (sorted.length === 0) return null;
                 const cheapest = sorted[0].landedPrice;
+                /* Single-store mode: render a clean go-to-store row.
+                   Drop the green 'Best price' treatment + the star
+                   + the right-side 'Sorted cheapest first' caption
+                   so the row reads as a CTA, not a comparison
+                   winner. User feedback: "if there's only one store,
+                   then show the store". */
+                const isSingleStore = sorted.length === 1;
                 return (
                   <div className="mt-5 pt-5 border-t border-border">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-3">
-                        Across {sorted.length.toLocaleString()} {sorted.length === 1 ? "store" : "stores"}
+                        {isSingleStore
+                          ? "Available at"
+                          : `Across ${sorted.length.toLocaleString()} stores`}
                       </p>
-                      <p className="text-[11px] text-ink-3">
-                        Sorted cheapest first
-                      </p>
+                      {!isSingleStore && (
+                        <p className="text-[11px] text-ink-3">
+                          Sorted cheapest first
+                        </p>
+                      )}
                     </div>
                     <ul className="space-y-1.5">
                       {sorted.map((offer, i) => {
-                        const isBest   = i === 0;
+                        const isBest   = !isSingleStore && i === 0;
                         const savings  = offer.landedPrice - cheapest;
                         const subtitle = (offer.productTitle && offer.productTitle !== result.anchor.title)
                           ? offer.productTitle
