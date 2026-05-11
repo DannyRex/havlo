@@ -74,6 +74,50 @@ export async function generateMetadata({
   };
 }
 
+/* ── Skeleton fallbacks for streamed sections ──────────────────────
+   Kept inline (vs imported from a separate file) so the relationship
+   between the real section's layout and the placeholder stays
+   obvious during future edits. Heights tuned to roughly match the
+   real components so the page doesn't jump when content resolves. */
+
+function TrendingDealsSkeleton() {
+  return (
+    <section className="py-12 sm:py-20 bg-bg" aria-hidden="true">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-baseline justify-between mb-6 sm:mb-8 px-1 sm:px-0">
+          <div className="skeleton h-8 sm:h-10 w-64 rounded-lg" />
+          <div className="skeleton h-5 w-20 rounded hidden sm:block" />
+        </div>
+        <div className="flex gap-3 sm:gap-5 overflow-hidden">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="shrink-0 w-44 sm:w-60">
+              <div className="skeleton aspect-[4/5] rounded-xl sm:rounded-2xl mb-2.5" />
+              <div className="skeleton h-3 w-1/3 rounded mb-1.5" />
+              <div className="skeleton h-3.5 w-3/4 rounded mb-1.5" />
+              <div className="skeleton h-3 w-1/2 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CategoryGridSkeleton() {
+  return (
+    <section className="py-12 sm:py-20 bg-bg" aria-hidden="true">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="skeleton h-8 sm:h-10 w-56 rounded-lg mb-6 sm:mb-8" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="skeleton aspect-[5/3] rounded-xl" />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage({ params }: { params: { country: string } }) {
   const country = getCountry(params.country);
   if (!COUNTRIES.some((c) => c.code === country.code)) notFound();
@@ -100,7 +144,15 @@ export default function HomePage({ params }: { params: { country: string } }) {
         <DealUnavailableBanner />
       </Suspense>
       <Hero storeCount={storeCount} countryCode={country.code} countryName={country.name} />
-      <TrendingDeals />
+      {/* TrendingDeals + CategoryGrid both fan out to several DB
+          queries to assemble their content (3-10 parallel reads
+          each). Wrapping them in Suspense lets the page shell +
+          Hero stream to the browser immediately — the visitor sees
+          the search input and the trust pill within ~200ms instead
+          of waiting 1-3s for every section to resolve. */}
+      <Suspense fallback={<TrendingDealsSkeleton />}>
+        <TrendingDeals />
+      </Suspense>
       {/* Cashback teaser — restores the pre-launch signup hook that
           was previously a hero strip (removed in c9954c9 because it
           duplicated the nav link and pushed the search input down).
@@ -113,7 +165,9 @@ export default function HomePage({ params }: { params: { country: string } }) {
           search input than as a standalone homepage section that
           competed with TrendingDeals + CategoryGrid for the same
           attention. */}
-      <CategoryGrid />
+      <Suspense fallback={<CategoryGridSkeleton />}>
+        <CategoryGrid />
+      </Suspense>
       <StoreLogos />
       <NewsletterStrip />
       <CTA />
