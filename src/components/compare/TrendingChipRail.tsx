@@ -106,13 +106,32 @@ export default function TrendingChipRail({
 
   /* Visible chips. First render (tick=0) uses a seeded shuffle so
      SSR + first hydration agree on the same order. Subsequent ticks
-     use Math.random() for genuine rotation variety. */
+     use Math.random() for genuine rotation variety.
+
+     Prioritisation: chips with ≥2 stores fill the rail first, then
+     single-store chips backfill remaining slots. Multi-store chips
+     click into a real cross-store comparison (which is the chip
+     rail's whole value prop); single-store chips are useful for
+     category diversity (beauty / fashion / home rarely have ≥2
+     merchants), but only when there aren't enough multi-store
+     chips to fill the rail. */
   const visible = useMemo<MultiStoreChip[]>(() => {
     if (items.length === 0) return [];
-    if (items.length <= limit) return items;
-    return tick === 0
-      ? seededShuffle(items, items.length).slice(0, limit)
-      : pickRandom(items, limit);
+    const multi  = items.filter((c) => c.storeCount >= 2);
+    const single = items.filter((c) => c.storeCount <  2);
+
+    if (tick === 0) {
+      /* Seeded shuffle keeps SSR + first hydration in sync. Order
+         within each tier is shuffled independently, then the tiers
+         concatenate so multi always renders first. */
+      const shuffledMulti  = seededShuffle(multi,  multi.length || 1);
+      const shuffledSingle = seededShuffle(single, single.length || 1);
+      return [...shuffledMulti, ...shuffledSingle].slice(0, limit);
+    }
+    const pickedMulti = pickRandom(multi, Math.min(limit, multi.length));
+    const remaining   = limit - pickedMulti.length;
+    if (remaining <= 0) return pickedMulti;
+    return [...pickedMulti, ...pickRandom(single, remaining)];
   }, [items, tick, limit]);
 
   /* Loading skeleton — small placeholder chips so the layout doesn't
