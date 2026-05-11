@@ -209,6 +209,11 @@ function CompareContent() {
         initialQuery={query}
         onSearch={handleSearch}
         loading={loading || sniffLoading}
+        /* /compare renders TrendingChipRail below — Popular
+           comparisons section serves the same role as the SearchBar
+           "Try:" chips. Suppress the inline chip rail to avoid two
+           competing suggestion lists for the same task. */
+        hideTrendingChips
       />
 
       {/* Popular comparisons chip rail. Visible ONLY in the empty

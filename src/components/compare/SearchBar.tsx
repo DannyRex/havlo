@@ -11,6 +11,12 @@ interface Props {
   initialQuery: string;
   onSearch: (query: string) => void;
   loading: boolean;
+  /* When true, the "Try:" chip rail under the input is hidden.
+     Set on /compare where the dedicated TrendingChipRail above
+     already surfaces the same multi-store-backed suggestions
+     with friendlified labels — two chip rails competing for the
+     same attention was the round-4 user complaint. */
+  hideTrendingChips?: boolean;
 }
 
 /* Two recognisable local stores per country, used in the
@@ -79,7 +85,7 @@ function looksLikeUrl(v: string): boolean {
   return /^https?:\/\//i.test(t) || /^(www\.|[a-z]+\.(com|ng|co))/i.test(t);
 }
 
-export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
+export default function SearchBar({ initialQuery, onSearch, loading, hideTrendingChips = false }: Props) {
   const [value, setValue] = useState(initialQuery);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -354,11 +360,12 @@ export default function SearchBar({ initialQuery, onSearch, loading }: Props) {
           : `Paste a link to ${hintStores(country.code)}, or search by name.`}
       </p>
 
-      {/* Show chips whenever the live input is empty, regardless of
-          whether initialQuery was set. Clearing the field returns the
-          chips. (Old condition checked initialQuery, which stays set
-          even after clear, so chips never came back.) */}
-      {!value.trim() && suggestions.length === 0 && (
+      {/* Try-chips rail. Hidden when hideTrendingChips=true (set on
+          /compare, where the dedicated TrendingChipRail above
+          already surfaces multi-store-backed suggestions with
+          friendlified labels — two chip rails was redundant per
+          round-4 user feedback). */}
+      {!hideTrendingChips && !value.trim() && suggestions.length === 0 && (
         <div className="mt-5 flex flex-wrap justify-center gap-2 px-2">
           <span className="text-xs text-ink-3 self-center mr-1">Try:</span>
           {chips.map((s) => (
