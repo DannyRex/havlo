@@ -17,6 +17,13 @@ interface Props {
      with friendlified labels — two chip rails competing for the
      same attention was the round-4 user complaint. */
   hideTrendingChips?: boolean;
+  /* Optional clear-callback. Fired when the user clicks the X
+     in the input. Lets the parent (e.g. /compare) clear its own
+     query state so dependent UI (chip rails, empty states) can
+     re-render. Without this, the X only cleared SearchBar's
+     internal value and the parent kept its stale query → the
+     Popular comparisons chip rail wouldn't reappear. */
+  onClear?: () => void;
 }
 
 /* Two recognisable local stores per country, used in the
@@ -85,7 +92,7 @@ function looksLikeUrl(v: string): boolean {
   return /^https?:\/\//i.test(t) || /^(www\.|[a-z]+\.(com|ng|co))/i.test(t);
 }
 
-export default function SearchBar({ initialQuery, onSearch, loading, hideTrendingChips = false }: Props) {
+export default function SearchBar({ initialQuery, onSearch, loading, hideTrendingChips = false, onClear }: Props) {
   const [value, setValue] = useState(initialQuery);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -276,7 +283,12 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
           {value && (
             <button
               type="button"
-              onClick={() => { setValue(""); setSuggestions([]); }}
+              /* Clearing the input fires onClear so the parent
+                 page can drop its own query state (and the chip
+                 rail re-renders). Previous results are left
+                 untouched — user can scroll between fresh chips
+                 above and prior results below. */
+              onClick={() => { setValue(""); setSuggestions([]); onClear?.(); }}
               aria-label="Clear search"
               className="p-2 text-ink-3 hover:text-ink shrink-0"
             >

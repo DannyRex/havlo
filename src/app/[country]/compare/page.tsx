@@ -214,6 +214,16 @@ function CompareContent() {
            "Try:" chips. Suppress the inline chip rail to avoid two
            competing suggestion lists for the same task. */
         hideTrendingChips
+        /* When the user clicks X to clear the input, drop the query
+           state so the chip rail reappears. The URL is cleaned up
+           too so back/forward doesn't surface a stale query. Prior
+           results are deliberately NOT cleared — user can still see
+           them below the chip rail until they pick a new comparison. */
+        onClear={() => {
+          setQuery("");
+          setSniffResult(null);
+          router.replace(`/${country.code}/compare`, { scroll: false });
+        }}
       />
 
       {/* Popular comparisons chip rail. Visible ONLY in the empty
