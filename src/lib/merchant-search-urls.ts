@@ -218,16 +218,20 @@ export function smartFallbackUrl(
     return { url, merchantName: sid };
   }
 
-  /* Strategy 2: Bing search with merchant name + product title.
-     Picks Bing over Google because Bing's consent / age-gate flow
-     is more permissive in most regions — Google routinely 400s
-     when the relay URL has been double-encoded in transit.
-     Includes the storeName as a literal search term to bias Bing
-     toward results from that merchant. */
+  /* Strategy 2: Google search with merchant name + product title.
+     Previously used Bing here — that was an overcorrection from a
+     separate bug. The earlier 400 from consent.google.com was
+     specific to Google SHOPPING relay URLs (ibp=oshop with massive
+     prds= payloads getting double-encoded). A plain
+     google.com/search?q=<query> has none of that — EU/UK users see
+     a one-time consent dialog, dismiss it, get normal results.
+     Other regions skip the dialog entirely. Google's product
+     result quality is materially better than Bing's, and it's the
+     dominant search engine across all our launch markets. */
   if (query && query.trim() && (sname || sid)) {
     const merchantName = sname || sid;
     const q = `${merchantName} ${query}`.trim();
-    const url = `https://www.bing.com/search?q=${encodeURIComponent(q)}`;
+    const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
     return { url, merchantName };
   }
 

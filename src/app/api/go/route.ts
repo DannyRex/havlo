@@ -248,10 +248,14 @@ export async function GET(req: NextRequest) {
      curated table. Strategies:
        a) storeName / storeId looks like a domain → direct homepage.
           ("x-kom.de" → "https://x-kom.de").
-       b) Otherwise, Bing search with "<merchantName> <title>" so
+       b) Otherwise, Google search with "<merchantName> <title>" so
           the user lands on the merchant via search engine results.
-          (Picked Bing over Google because Google's consent flow
-          routinely 400s on encoded continue URLs.)
+          (The earlier 400 from consent.google.com was specific to
+          Google Shopping relay URLs with massive prds= payloads
+          getting double-encoded. A plain google.com/search query
+          doesn't hit that failure mode — EU/UK users see a one-
+          time consent dialog and get normal results; other regions
+          skip it entirely.)
      The catalog has hundreds of SerpAPI long-tail stores; this is
      the path that catches them. */
   if (storeIdHint || storeNameHint) {
