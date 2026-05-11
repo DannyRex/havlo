@@ -57,25 +57,43 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "eBay",       domain: "ebay.com" },
   ],
   uk: [
-    // Local UK retailers
-    { name: "Amazon UK",  domain: "amazon.co.uk" },
-    { name: "ASOS",       domain: "asos.com" },
-    { name: "Argos",      domain: "argos.co.uk" },
-    { name: "Currys",     domain: "currys.co.uk" },
+    // Local UK retailers — department / general
+    { name: "Amazon UK",     domain: "amazon.co.uk" },
+    { name: "Argos",         domain: "argos.co.uk" },
+    { name: "Currys",        domain: "currys.co.uk" },
     /* John Lewis favicon is monochrome dark vertical stripes on a
        transparent bg — invisible against the dark mode chip bg
        without the invert. */
-    { name: "John Lewis", domain: "johnlewis.com", darkLogo: true },
-    { name: "Boots",      domain: "boots.com" },
-    { name: "Next",       domain: "next.co.uk" },
-    { name: "M&S",        domain: "marksandspencer.com" },
-    { name: "Very",       domain: "very.co.uk" },
-    { name: "AO.com",     domain: "ao.com" },
+    { name: "John Lewis",    domain: "johnlewis.com", darkLogo: true },
+    { name: "Boots",         domain: "boots.com" },
+    { name: "Next",          domain: "next.co.uk" },
+    { name: "M&S",           domain: "marksandspencer.com" },
+    { name: "Very",          domain: "very.co.uk" },
+    { name: "AO.com",        domain: "ao.com" },
+    { name: "Selfridges",    domain: "selfridges.com" },
+    { name: "Debenhams",     domain: "debenhams.com" },
+    // Local UK retailers — fashion / sport
+    { name: "ASOS",          domain: "asos.com" },
+    { name: "JD Sports",     domain: "jdsports.com" },
+    { name: "Sports Direct", domain: "sportsdirect.com" },
+    // Local UK retailers — home / DIY / auto / toys
+    /* Added May 2026 alongside the per-retailer SerpAPI ingest in
+       scripts/ingest-uk-retailers.ts. Each one fills a category gap
+       the post-launch UK pool audit flagged: zero DIY (B&Q), zero
+       auto/cycling (Halfords), thin home & kitchen (Dunelm),
+       Argos-only toys (Smyths). The marquee count drives the Hero
+       trust pill ("scanning prices across N stores"), so adding
+       them here keeps the homepage figure honest with what /uk/deals
+       actually surfaces. */
+    { name: "Dunelm",        domain: "dunelm.com" },
+    { name: "Halfords",      domain: "halfords.com" },
+    { name: "B&Q",           domain: "diy.com" },
+    { name: "Smyths Toys",   domain: "smythstoys.com" },
     // Cross-border UK shoppers actually use
-    { name: "AliExpress", domain: "aliexpress.com" },
-    { name: "SHEIN",      domain: "shein.com" },
-    { name: "Temu",       domain: "temu.com" },
-    { name: "DHgate",     domain: "dhgate.com" },
+    { name: "AliExpress",    domain: "aliexpress.com" },
+    { name: "SHEIN",         domain: "shein.com" },
+    { name: "Temu",          domain: "temu.com" },
+    { name: "DHgate",        domain: "dhgate.com" },
   ],
   us: [
     { name: "Amazon",     domain: "amazon.com" },
