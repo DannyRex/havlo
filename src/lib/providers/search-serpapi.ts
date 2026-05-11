@@ -78,6 +78,29 @@ function canonicaliseSource(raw: string): string {
     return "Amazon";
   }
 
+  /* JD Sports — Google Shopping returns "JD Sports - Global" for the
+     international shipping arm, and would create a separate store
+     row from "JD Sports". Same retailer, same logo, same affiliate
+     network — collapse to one. */
+  if (lc.startsWith("jd sports") || lc.startsWith("jdsports")) {
+    return "JD Sports";
+  }
+
+  /* Currys — "Currys Business" is the B2B subdomain. Stocks the same
+     catalogue at the same prices for retail buyers; the B2B framing
+     is purely a different checkout flow. Collapsing keeps the UK
+     pool cleaner. */
+  if (lc.startsWith("currys")) {
+    return "Currys";
+  }
+
+  /* John Lewis — "John Lewis & Partners" is the rebranded name; the
+     same retailer also appears as bare "John Lewis" from older
+     SerpAPI snapshots. Collapse to the current trading name. */
+  if (lc.startsWith("john lewis")) {
+    return "John Lewis & Partners";
+  }
+
   return raw;
 }
 
