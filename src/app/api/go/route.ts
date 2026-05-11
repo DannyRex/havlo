@@ -20,7 +20,7 @@ import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { wrapWithAffiliate } from "@/lib/affiliate";
 import { convertAliexpressUrl, aliexpressApiActive } from "@/lib/aliexpress-converter";
 import { getServerCountry } from "@/lib/country-server";
-import { merchantSearchUrl, merchantHomepage } from "@/lib/merchant-search-urls";
+import { merchantSearchUrl, merchantHomepage, smartFallbackUrl } from "@/lib/merchant-search-urls";
 
 interface ResolvedRow {
   resolved_url: string;
@@ -235,19 +235,34 @@ export async function GET(req: NextRequest) {
             fail do we fall back to havlo: /compare?q=<title> when
             we have one, or /deals as last resort. */
 
-  /* Step 1: merchant search URL when we know the store + title. */
+  /* Step 1: curated merchant search URL when we know the store +
+     title and the store is in our hand-built table. */
   if (titleHint && (storeIdHint || storeNameHint)) {
     const m = merchantSearchUrl(storeIdHint, storeNameHint, titleHint);
     if (m) {
-      /* Wrap with affiliate so commission flows through if the user
-         buys. The affiliate wrapper is a no-op for merchants we
-         don't have programs with — safe to apply unconditionally. */
       return NextResponse.redirect(wrapWithAffiliate(m.url, ctx), 307);
     }
   }
 
-  /* Step 2: merchant homepage when we know the store but title is
-     missing or the merchant search builder said no. */
+  /* Step 2: smart fallback for long-tail merchants not in the
+     curated table. Strategies:
+       a) storeName / storeId looks like a domain → direct homepage.
+          ("x-kom.de" → "https://x-kom.de").
+       b) Otherwise, Bing search with "<merchantName> <title>" so
+          the user lands on the merchant via search engine results.
+          (Picked Bing over Google because Google's consent flow
+          routinely 400s on encoded continue URLs.)
+     The catalog has hundreds of SerpAPI long-tail stores; this is
+     the path that catches them. */
+  if (storeIdHint || storeNameHint) {
+    const m = smartFallbackUrl(storeIdHint, storeNameHint, titleHint);
+    if (m) {
+      return NextResponse.redirect(wrapWithAffiliate(m.url, ctx), 307);
+    }
+  }
+
+  /* Step 3: merchant homepage from the curated table when we have a
+     store but no title and smart fallback didn't fire. */
   if (storeIdHint || storeNameHint) {
     const m = merchantHomepage(storeIdHint, storeNameHint);
     if (m) {
@@ -255,18 +270,18 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  /* Step 3: havlo /compare when we have a title but no known
-     merchant. Better than nothing — user sees alternatives for
-     the same product. */
+  /* Step 4: havlo /compare when we have a title but absolutely no
+     merchant signal. User sees alternative listings for the same
+     product — still useful. */
   if (titleHint) {
     const compareUrl = new URL(`${req.nextUrl.origin}/${country.code}/compare`);
     compareUrl.searchParams.set("q", titleHint);
     return NextResponse.redirect(compareUrl, 307);
   }
 
-  /* Step 4: last resort — havlo /deals so the user lands on a real
-     Havlo destination. Reached only when we have neither merchant
-     nor title information AND can't resolve the relay URL. */
+  /* Step 5: absolute last resort — havlo /deals. Reached only when
+     we have neither merchant nor title information AND can't resolve
+     the relay URL. Rare. */
   return NextResponse.redirect(
     new URL(`/${country.code}/deals`, req.nextUrl.origin),
     307,

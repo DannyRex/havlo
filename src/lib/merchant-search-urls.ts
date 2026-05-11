@@ -174,3 +174,62 @@ export function merchantHomepage(
   }
   return null;
 }
+
+/* Smart fallback for merchants NOT in the curated MERCHANTS table.
+   The catalog has hundreds of long-tail SerpAPI-ingested stores
+   ("Big Apple Buddy", "Cricket Wireless", "x-kom.de", "wmf.com/de",
+   "Sony Store Online UK", etc.). For these, we use two strategies
+   in order:
+
+     1. If the storeName looks like a domain (contains a dot AND
+        no spaces in the candidate portion), construct a homepage
+        URL from it. "x-kom.de" → "https://x-kom.de",
+        "wmf.com/de" → "https://wmf.com/de".
+
+     2. Otherwise, search Bing for "<storeName> <product title>".
+        Bing's consent flow is more permissive than Google's
+        (no double-encoded continue URL 400s, works in most
+        regions). User sees the merchant + product in results
+        and can click through. Worst-case-still-useful UX.
+
+   Returns null only when we have nothing — caller falls back to
+   the Havlo /compare or /deals path. */
+function looksLikeDomain(s: string): boolean {
+  return /^[a-z0-9][a-z0-9\-.]*\.[a-z]{2,}(\/[a-z0-9/_-]*)?$/i.test(s.trim());
+}
+
+export function smartFallbackUrl(
+  storeId: string | null | undefined,
+  storeName: string | null | undefined,
+  query: string,
+): { url: string; merchantName: string } | null {
+  const sid = (storeId ?? "").trim();
+  const sname = (storeName ?? "").trim();
+  if (!sid && !sname) return null;
+
+  /* Strategy 1: storeName looks like a domain. Use it as the
+     destination directly. */
+  if (sname && looksLikeDomain(sname)) {
+    const url = sname.startsWith("http") ? sname : `https://${sname}`;
+    return { url, merchantName: sname };
+  }
+  if (sid && looksLikeDomain(sid)) {
+    const url = sid.startsWith("http") ? sid : `https://${sid}`;
+    return { url, merchantName: sid };
+  }
+
+  /* Strategy 2: Bing search with merchant name + product title.
+     Picks Bing over Google because Bing's consent / age-gate flow
+     is more permissive in most regions — Google routinely 400s
+     when the relay URL has been double-encoded in transit.
+     Includes the storeName as a literal search term to bias Bing
+     toward results from that merchant. */
+  if (query && query.trim() && (sname || sid)) {
+    const merchantName = sname || sid;
+    const q = `${merchantName} ${query}`.trim();
+    const url = `https://www.bing.com/search?q=${encodeURIComponent(q)}`;
+    return { url, merchantName };
+  }
+
+  return null;
+}

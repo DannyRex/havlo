@@ -20,25 +20,44 @@ export function cn(...inputs: ClassValue[]) {
    catalog. The /api/go route is the affiliate chokepoint and must
    be in every deal click path. */
 export function getClickThroughUrl(item: { url: string; id?: string; title?: string; storeId?: string; storeName?: string }): string {
-  /* Already wrapped (legacy SerpAPI rows, AliExpress converter
-     output, anything else that pre-encoded). Don't double-wrap. */
-  if (item.url.startsWith("/api/go")) return item.url;
+  /* Already-wrapped URLs (SerpAPI Google relays stored in the DB
+     as `/api/go?url=...`, AliExpress converter output, etc.) used
+     to short-circuit here — `return item.url` as-is. But that
+     meant the title / storeId / storeName fields we now need for
+     the merchant-fallback chain in /api/go never got attached.
+     User feedback was "all clicks still redirect to havlo" even
+     after I shipped the merchant-search-URL fallback — root cause
+     was this short-circuit.
+
+     New behavior: when the URL is already wrapped, AUGMENT it with
+     the missing hint params instead of bypassing. The inner ?url=
+     stays untouched. */
+  if (item.url.startsWith("/api/go?")) {
+    try {
+      const u = new URL(item.url, "https://havlo.io");
+      if (item.id        && !u.searchParams.get("id"))        u.searchParams.set("id",        item.id);
+      if (item.title     && !u.searchParams.get("title"))     u.searchParams.set("title",     item.title.slice(0, 120));
+      if (item.storeId   && !u.searchParams.get("store"))     u.searchParams.set("store",     item.storeId);
+      if (item.storeName && !u.searchParams.get("storeName")) u.searchParams.set("storeName", item.storeName);
+      /* Return as a path-only URL so it stays same-origin. */
+      return u.pathname + (u.search ? u.search : "");
+    } catch {
+      /* Malformed wrap — bail to the original, downstream /api/go
+         will handle the missing param path gracefully. */
+      return item.url;
+    }
+  }
 
   const params = new URLSearchParams({ url: item.url });
   if (item.id) params.set("id", item.id);
   /* Title hint — when /api/go can't resolve a Google-relay URL at
-     click time, it now uses this to build a MERCHANT search URL
+     click time, it uses this to build a MERCHANT search URL
      (Argos / Currys / etc.) so the user still lands on the actual
-     retailer's site, just on a search results page instead of the
-     specific product. Beats the previous fallback of bouncing back
-     to havlo. Truncated to keep URL length reasonable. */
+     retailer's site. Beats bouncing back to havlo. */
   if (item.title) params.set("title", item.title.slice(0, 120));
-  /* Store hint — let /api/go know WHICH merchant the click came
+  /* Store hint — let /api/go know which merchant the click came
      from. With the storeId we can construct a merchant-specific
-     search URL (argos.co.uk/search?q=..., currys.co.uk/...). Round-4
-     user feedback: "there's no reason this shouldn't point to the
-     actual website even if it means taking them to the product
-     search page". */
+     search URL. Round-4 user feedback. */
   if (item.storeId)   params.set("store",     item.storeId);
   if (item.storeName) params.set("storeName", item.storeName);
   return `/api/go?${params.toString()}`;
