@@ -20,6 +20,7 @@ import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { wrapWithAffiliate } from "@/lib/affiliate";
 import { convertAliexpressUrl, aliexpressApiActive } from "@/lib/aliexpress-converter";
 import { getServerCountry } from "@/lib/country-server";
+import { merchantSearchUrl, merchantHomepage } from "@/lib/merchant-search-urls";
 
 interface ResolvedRow {
   resolved_url: string;
@@ -146,6 +147,14 @@ export async function GET(req: NextRequest) {
      to see alternative listings for the same product instead of
      a 'deal_unavailable' message with no recovery path. */
   const titleHint = req.nextUrl.searchParams.get("title")?.trim() ?? "";
+  /* Store hints (round-4 fallback improvement). When the Google
+     relay resolver fails, we use these to build a merchant search
+     URL — argos.co.uk/search?q=<title> rather than bouncing to
+     havlo. User feedback: "there's no reason this shouldn't point
+     to the actual website even if it means taking them to the
+     product search page". */
+  const storeIdHint   = req.nextUrl.searchParams.get("store")?.trim()     ?? "";
+  const storeNameHint = req.nextUrl.searchParams.get("storeName")?.trim() ?? "";
   const country = getServerCountry();
   const ctx = { country: country.code };
 
@@ -208,27 +217,56 @@ export async function GET(req: NextRequest) {
        Round 3: redirected to /[country]?deal_unavailable=1 → bad
          UX, user saw an apology banner with no next step.
        Round 4 (first try): redirected to the Google relay URL
-         itself → Google's consent gate (consent.google.com)
-         double-encoded the continue URL and returned 400. The
-         user's report on this exact failure mode triggered the
-         current fix.
-       Round 4 (final): always redirect to a Havlo destination.
-         With a title hint, send to /compare?q=<title> (alternative
-         listings). Without a title hint, send to /[country]/deals
-         (browse fresh deals). Never redirect to a Google URL —
-         consent.google.com is unreliable across regions and
-         routinely 400s on encoded continue params. */
+         itself → Google's consent gate 400'd on the encoded
+         continue param.
+       Round 4 (second try): redirected back to havlo /compare or
+         /deals → user feedback: "bringing the user back to havlo
+         is quite unusable; even taking them to the product search
+         page on the merchant would be better".
+       Round 4 (current): MERCHANT-FIRST fallback chain.
+         1. Build a merchant-specific search URL using the storeId
+            + title hint (e.g. argos.co.uk/search/iPhone+17+Pro/,
+            currys.co.uk/search?q=Galaxy+S26+Ultra). User lands on
+            the actual retailer's site even if not on the specific
+            product page.
+         2. If we know the merchant but have no title to search
+            with, send them to the merchant's homepage.
+         3. Only if BOTH the merchant lookup AND the title hint
+            fail do we fall back to havlo: /compare?q=<title> when
+            we have one, or /deals as last resort. */
+
+  /* Step 1: merchant search URL when we know the store + title. */
+  if (titleHint && (storeIdHint || storeNameHint)) {
+    const m = merchantSearchUrl(storeIdHint, storeNameHint, titleHint);
+    if (m) {
+      /* Wrap with affiliate so commission flows through if the user
+         buys. The affiliate wrapper is a no-op for merchants we
+         don't have programs with — safe to apply unconditionally. */
+      return NextResponse.redirect(wrapWithAffiliate(m.url, ctx), 307);
+    }
+  }
+
+  /* Step 2: merchant homepage when we know the store but title is
+     missing or the merchant search builder said no. */
+  if (storeIdHint || storeNameHint) {
+    const m = merchantHomepage(storeIdHint, storeNameHint);
+    if (m) {
+      return NextResponse.redirect(wrapWithAffiliate(m.url, ctx), 307);
+    }
+  }
+
+  /* Step 3: havlo /compare when we have a title but no known
+     merchant. Better than nothing — user sees alternatives for
+     the same product. */
   if (titleHint) {
     const compareUrl = new URL(`${req.nextUrl.origin}/${country.code}/compare`);
     compareUrl.searchParams.set("q", titleHint);
-    /* Positive recovery (show alternatives), not an error — no
-       deal_unavailable flag. */
     return NextResponse.redirect(compareUrl, 307);
   }
-  /* No title, can't resolve. Send to the country /deals page so
-     the user lands on a real Havlo destination (browse fresh deals)
-     and can continue shopping. Strictly better than the Google
-     consent 400 the previous fallback caused. */
+
+  /* Step 4: last resort — havlo /deals so the user lands on a real
+     Havlo destination. Reached only when we have neither merchant
+     nor title information AND can't resolve the relay URL. */
   return NextResponse.redirect(
     new URL(`/${country.code}/deals`, req.nextUrl.origin),
     307,

@@ -96,8 +96,13 @@ export default function DupeCard({
             href={getClickThroughUrl({
               url: bestOffer.url,
               id: `${dupe.key}-${bestOffer.storeId}`,
-              /* Title hint for /api/go fallback recovery. */
-              title: dupe.title,
+              /* Title + store hints for /api/go fallback. When the
+                 Google-relay resolver fails, /api/go uses these to
+                 send the user to the merchant's search page (round-4
+                 fix). */
+              title:     dupe.title,
+              storeId:   bestOffer.storeId,
+              storeName: bestOffer.storeName,
             })}
             target="_blank"
             rel="noopener noreferrer sponsored"
@@ -144,7 +149,12 @@ export default function DupeCard({
                     href={getClickThroughUrl({
                       url: offer.url,
                       id: `${dupe.key}-${offer.storeId}`,
-                      title: dupe.title,
+                      /* Pass storeId/Name so /api/go can fall back
+                         to a merchant search URL when relay
+                         resolution fails (round-4 fix). */
+                      title:     dupe.title,
+                      storeId:   offer.storeId,
+                      storeName: offer.storeName,
                     })}
                     target="_blank"
                     rel="noopener noreferrer sponsored"

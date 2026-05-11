@@ -474,12 +474,15 @@ function CompareContent() {
                               href={getClickThroughUrl({
                                 url: offer.url,
                                 id: `${result.anchor.key}-${offer.storeId}`,
-                                /* Title hint lets /api/go fall back to
-                                   /compare?q=<title> if Google-relay
-                                   resolution fails — user sees alternative
-                                   listings instead of bouncing home with
-                                   ?deal_unavailable=1. */
-                                title: result.anchor.title,
+                                /* Title + store hints let /api/go fall
+                                   back to the merchant's own search URL
+                                   when Google-relay resolution fails
+                                   (round-4 fix). User lands on the
+                                   actual retailer, not a havlo error
+                                   page or a Google consent gate. */
+                                title:     result.anchor.title,
+                                storeId:   offer.storeId,
+                                storeName: offer.storeName,
                               })}
                               target="_blank"
                               rel="noopener noreferrer sponsored"
