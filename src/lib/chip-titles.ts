@@ -67,7 +67,12 @@ function titleCaseBrand(s: string): string {
 }
 
 export function friendlifyChipTitle(raw: string): string {
-  let t = raw.trim();
+  /* Strip embedded HTML markup before any other rule fires. DHgate /
+     SerpAPI seller feeds occasionally include <strong>keyword</strong>
+     tags inside titles; without this strip, the rules below try to
+     "friendlify" content like "<strong>shoes</strong>" and leave junk
+     in the chip label. */
+  let t = raw.replace(/<[^>]*>/g, "").trim();
 
   /* 1. Cut at spec metadata. The regex is anchored on whole-word
      boundaries so "G4" stays intact while "with 64gb" gets dropped. */

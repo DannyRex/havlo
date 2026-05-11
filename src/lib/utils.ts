@@ -267,6 +267,17 @@ export function savings(original: number, sale: number): number {
    separators. Safe to call multiple times. */
 export function cleanTitle(raw: string): string {
   return raw
+    /* Strip embedded HTML tags. DHgate (and some SerpAPI seller feeds)
+       ingest titles with <strong>keyword</strong> markup intact — React's
+       default text escaping then shows the literal "<strong>" / "</strong>"
+       characters to the user. User-reported case (May 2026): a DHgate
+       sneaker listing showed up in autocomplete with two <strong>shoes</strong>
+       tags rendered as plain text in the dropdown.
+
+       Catches <strong>, <b>, <em>, <i>, <span>, <br>, etc. — anything
+       tag-shaped. Five-char entity unescape isn't needed since we're
+       stripping tags entirely, not interpreting them. */
+    .replace(/<[^>]*>/g, "")
     .replace(/[–—|\-]+(\s*[–—|\-]+)+/g, " – ") // collapse runs
     .replace(/^\s*[–—|\-]+\s*/, "")                       // trim leading
     .replace(/\s*[–—|\-]+\s*$/, "")                       // trim trailing

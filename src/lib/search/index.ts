@@ -17,7 +17,7 @@
 
 import type { Deal } from "@/types";
 import { deals } from "@/lib/data/deals";
-import { usdToNgn } from "@/lib/utils";
+import { usdToNgn, cleanTitle } from "@/lib/utils";
 import { buildSignature, extractedSignature, type ProductSignature } from "./normalize";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { resolveStoreLogoUrl } from "@/lib/store-logo";
@@ -399,7 +399,10 @@ export async function suggest(
       if (s) Array.from(s).forEach((sid) => stores.add(sid));
     });
     return {
-      title: r.title,
+      /* cleanTitle strips HTML tags + collapses dirty separators so
+         autocomplete entries don't render with literal "<strong>"
+         text from DHgate / SerpAPI seller feeds. */
+      title: cleanTitle(r.title),
       key: r.product_id,
       storeCount: Math.max(1, stores.size),
     };

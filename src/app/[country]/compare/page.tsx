@@ -516,7 +516,13 @@ function CompareContent() {
                                   : "border-border bg-bg/50 hover:border-border-strong hover:bg-surface-2/50"
                               }`}
                             >
-                              <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-white flex items-center justify-center">
+                              {/* border-border keeps the white logo
+                                  container visually delimited in
+                                  light mode (where the page bg is
+                                  also near-white and the container
+                                  would otherwise blend in, making
+                                  the logo look "missing"). */}
+                              <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-white border border-border flex items-center justify-center">
                                 <Image
                                   src={offer.storeLogoUrl}
                                   alt={offer.storeName}
