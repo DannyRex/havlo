@@ -3,7 +3,8 @@ import { ArrowUpRight } from "lucide-react";
 import { categories } from "@/lib/data/categories";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
-import { filterDealsForCountry } from "@/lib/country";
+import { filterDealsForCountry, inferStoreCountry } from "@/lib/country";
+import type { Deal } from "@/types";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
   BeautyIcon, SportsIcon, EarbudsIcon, AppliancesIcon, ElectronicsIcon,
@@ -30,46 +31,67 @@ const browsable = categories.filter((c) => c.slug !== "all");
 export default async function CategoryGrid() {
   /* Counts MUST match what /deals?category=X actually shows.
 
-     Three filters /deals applies that we need to mirror:
-       1. minDiscount=5 default (hide <5% off)
-       2. effectiveOrigin="intl" for non-NG users (drop Konga/Jumia/etc.)
-       3. filterDealsForCountry country gate
+     This component was last revised to fetch with `minDiscount: 5`
+     and `origin: 'intl'` for non-NG, which DIDN'T match /api/deals.
+     /api/deals defaults to `minDiscount: 0` (since the curated
+     SerpAPI catalog ingests with discount_percent=0 by design) and
+     uses an in-memory `inferStoreCountry`-based bucket for the
+     local/intl split (not the DB-level `is_international` flag,
+     which is a USD-currency proxy and treats UK retailers stored
+     as USD as 'international' too).
 
-     PLUS the subtle one that bit us: the DB provider's fetchDeals has
-     a .limit(500) cap. If we fetch ALL deals globally and bucket by
-     category client-side, that 500-cap is split across all categories
-     and undercounts each one. The /deals page doesn't have this
-     problem because it always queries per-category, so the 500 cap
-     applies per category not globally.
+     The combined mismatch undercounted every tile by hundreds to
+     thousands of deals (worst: Beauty NG ~1600 short, Fashion NG
+     ~1400 short). Verified May 2026 via
+     scripts/diagnose-category-counts.ts.
 
-     Fix: fan out one fetch per browsable category in parallel, with
-     the same filters /api/deals applies, then count each category's
-     filtered length. Each fetch hits the 500 cap independently which
-     is way above any realistic single-category inventory size, so
-     counts now match what /deals returns as its `total` field.
+     Fix: mirror /api/deals' exact pipeline:
+       1. Fetch per category with minDiscount=0, origin=all.
+       2. filterDealsForCountry (country gate).
+       3. For non-NG: apply effectiveOrigin='intl' via inferStoreCountry
+          (drop stores anchored in the user's own country, since the
+          default /deals view shows cross-border for non-NG).
+       4. For NG: use the full country-filtered count (effectiveOrigin
+          stays 'all' for NG by default).
 
-     Cost: ~10 parallel Supabase queries. With revalidate=300 on the
-     country home page, that's ~120 queries/hour worst case — trivial. */
+     Per-category fan-out (not single global) preserves the 8000-row
+     page cap per category — important for high-inventory slugs like
+     fashion / beauty / home. Cost is ~10 parallel queries; with
+     revalidate=300 on the country home, ~120 q/hr worst case. */
   const country = getServerCountry();
   const isNG = country.code === "ng";
   const provider = await getActiveBrowseProvider();
-  const origin = isNG ? "all" : "intl";
 
   const slugs = browsable.map((c) => c.slug);
   const perCategory = await Promise.all(
     slugs.map((slug) =>
       provider.fetchDeals({
         categorySlug: slug,
-        minDiscount: 5,
-        origin,
+        minDiscount:  0,
+        origin:       "all",
       }),
     ),
   );
 
+  /* Same isLocalToUser logic as /api/deals — store-roster-based with
+     currency fallback. Keep these two in sync; the next refactor
+     should extract into a shared helper. */
+  const isLocalToUser = (d: Deal): boolean => {
+    const sc = inferStoreCountry(d.storeId, d.storeName);
+    if (sc !== null) return sc.toLowerCase() === country.code.toLowerCase();
+    return d.currency === country.currency;
+  };
+
   const counts: Record<string, number> = {};
   for (let i = 0; i < slugs.length; i++) {
-    const visible = filterDealsForCountry(perCategory[i], country);
-    counts[slugs[i]] = visible.length;
+    const countryFiltered = filterDealsForCountry(perCategory[i], country);
+    /* /api/deals computes effectiveOrigin = !isNG ? 'intl' : origin.
+       For non-NG with default origin=all, that's 'intl' → only items
+       NOT local to the user. For NG default origin=all → all items. */
+    const finalCount = isNG
+      ? countryFiltered.length
+      : countryFiltered.filter((d) => !isLocalToUser(d)).length;
+    counts[slugs[i]] = finalCount;
   }
 
   return (
