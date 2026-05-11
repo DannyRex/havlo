@@ -145,15 +145,16 @@ export default function TrendingChipRail({
             Popular comparisons
           </span>
         </div>
-        {/* Skeleton mirrors the real-state layout exactly (horizontal
-            scroll on mobile, wrap on desktop) so there's no visual
-            jump when the fetched chips replace the skeletons. */}
+        {/* Skeleton mirrors the real-state layout exactly (3 chips
+            per visible row on mobile via basis-[calc((100%-1rem)/3)],
+            wrap on desktop) so there's no visual jump when fetched
+            chips replace the skeletons. */}
         <div className="-mx-4 sm:mx-0">
-          <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 sm:px-0 sm:flex-wrap">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 sm:px-0 sm:flex-wrap snap-x">
             {Array.from({ length: 6 }).map((_, i) => (
               <span
                 key={i}
-                className="h-8 w-24 rounded-full bg-surface-2 animate-pulse shrink-0"
+                className="h-8 rounded-full bg-surface-2 animate-pulse shrink-0 snap-start basis-[calc((100%-1rem)/3)] sm:basis-24"
                 aria-hidden="true"
               />
             ))}
@@ -173,24 +174,32 @@ export default function TrendingChipRail({
           Popular comparisons
         </span>
       </div>
-      {/* Layout: horizontal scroll on mobile, wrap on desktop.
+      {/* Layout: horizontal scroll on mobile with chips locked to
+          1/3 viewport width (so exactly 3 fit per visible row);
+          natural flex-wrap on desktop.
 
-          Previous `flex flex-wrap` on every breakpoint blew up on
-          mobile — a few long chip names ("ASUS ROG Phone 9 Pro
-          512GB") made the row break into a ragged 3–4 line stack
-          that ate too much vertical space and looked broken.
+          Iteration history:
+            - Original: flex-wrap on every breakpoint → 3-4 ragged
+              rows on mobile when chip names varied in length.
+            - Mid-iteration: full overflow-x-auto with natural chip
+              widths → too few chips visible per swipe; long names
+              dominated the strip.
+            - Final (this pass): keep horizontal scroll but pin each
+              chip to ~33% width with snap-x. Three chips visible at
+              a time; swipe right reveals the next three. Long names
+              truncate cleanly within the cell.
 
-          Mobile (default): full-bleed horizontal scroll. -mx-4 and
-          px-4 cancel the parent container's px-4 so the strip
-          extends edge-to-edge; users swipe through chips like
-          iOS app rails. no-scrollbar hides the native bar (Tailwind
-          plugin already in use elsewhere — see Hero category pills).
+          Math: container width after the -mx-4 / px-4 cancel = the
+          parent's content width. With gap-2 (0.5rem) between chips,
+          two gaps fit before the third chip, so each chip is
+          calc((100% - 1rem) / 3). On iPhone 14 Pro (358px content
+          width) that's ~114px per chip — enough for ~12-15 chars at
+          13px text. Names beyond that truncate via the inner span.
 
-          Desktop (sm+): regain flex-wrap so chips fill the available
-          width naturally without forcing horizontal scroll on a
-          larger container. */}
+          Desktop (sm+): chips revert to natural width + flex-wrap
+          so the wider container fits a single row of all chips. */}
       <div className="-mx-4 sm:mx-0">
-        <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 sm:px-0 sm:flex-wrap">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 sm:px-0 sm:flex-wrap snap-x">
           {visible.map((chip) => (
             <Link
               /* Key includes the rotation tick so each rotation mounts
@@ -206,11 +215,11 @@ export default function TrendingChipRail({
                  Round-4 QA: user clicked a chip and got "Nothing in
                  our local index" because of exactly that timing gap. */
               href={`/${countryCode}/compare?q=${encodeURIComponent(chip.searchQuery)}&pid=${chip.productId}&mode=similar`}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface border border-border hover:border-border-strong hover:shadow-card transition-all whitespace-nowrap active:scale-95 animate-fade-in shrink-0"
+              className="inline-flex items-center justify-between gap-2 px-3 py-1.5 rounded-full bg-surface border border-border hover:border-border-strong hover:shadow-card transition-all active:scale-95 animate-fade-in shrink-0 snap-start basis-[calc((100%-1rem)/3)] sm:basis-auto"
               aria-label={`${chip.title}, available across ${chip.storeCount.toLocaleString()} stores`}
             >
-              <span className="text-[13px] font-medium text-ink">{chip.title}</span>
-              <span className="text-[10px] font-semibold text-ink-3 tabular-nums">
+              <span className="text-[13px] font-medium text-ink truncate">{chip.title}</span>
+              <span className="text-[10px] font-semibold text-ink-3 tabular-nums shrink-0">
                 {chip.storeCount}
               </span>
             </Link>
