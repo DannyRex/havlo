@@ -35,5 +35,25 @@ export function resolveStoreLogoUrl(
   if (storeId.startsWith("walmart-") || storeId === "walmart") {
     return "/logos/walmart.png";
   }
+  /* Currys variants — "currys-business" surfaces alongside the
+     regular consumer "currys" in SerpAPI results. Same brand,
+     same logo. */
+  if (storeId.startsWith("currys-") || storeId === "currys") {
+    return "/logos/currys.png";
+  }
+  /* eBay regional variants — ebay-us, ebay-co-uk, ebay-de, etc.
+     all share the same wordmark. */
+  if (storeId.startsWith("ebay-") || storeId === "ebay") {
+    return "/logos/ebay.png";
+  }
+  /* Dell regional + business variants — dell-uk, dell-de,
+     dell-small-business, etc. */
+  if (storeId.startsWith("dell-") || storeId === "dell") {
+    return "/logos/dell.png";
+  }
+  /* QVC US + UK channels share the same wordmark. */
+  if (storeId.startsWith("qvc-") || storeId === "qvc") {
+    return "/logos/qvc.png";
+  }
   return dbLogoUrl ?? `/logos/${storeId}.png`;
 }

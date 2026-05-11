@@ -132,6 +132,29 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
      it later. */
   "emi-snapmint":               { name: "Snapmint",       searchUrl: (q) => `https://snapmint.com/search?q=${encodeURIComponent(q)}`,                homepage: "https://snapmint.com" },
   "snapmint":                   { name: "Snapmint",       searchUrl: (q) => `https://snapmint.com/search?q=${encodeURIComponent(q)}`,                homepage: "https://snapmint.com" },
+  /* Long-tail audit (May 2026) — these all fell through to /compare
+     because smart-fallback couldn't reach a valid domain (4-char
+     names or special chars in storeId). Adding explicit entries
+     so the clickthrough lands on the merchant. */
+  /* (eBay already in the table above; user just wanted the LOGO sourced.) */
+  "poshmark":                   { name: "Poshmark",            searchUrl: (q) => `https://poshmark.com/search?query=${encodeURIComponent(q)}`,        homepage: "https://poshmark.com" },
+  "dell":                       { name: "Dell",                searchUrl: (q) => `https://www.dell.com/en-us/search/${encodeURIComponent(q)}`,        homepage: "https://www.dell.com" },
+  "qvc":                        { name: "QVC",                 searchUrl: (q) => `https://www.qvc.com/keywordsearch.html?keyword=${encodeURIComponent(q)}`, homepage: "https://www.qvc.com" },
+  "nfm":                        { name: "NFM",                 searchUrl: (q) => `https://www.nfm.com/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.nfm.com" },
+  "dick-s-sporting-goods":      { name: "DICK'S Sporting Goods", searchUrl: (q) => `https://www.dickssportinggoods.com/search/SearchDisplay?searchTerm=${encodeURIComponent(q)}`, homepage: "https://www.dickssportinggoods.com" },
+  "b-h-photo-video-audio":      { name: "B&H Photo",           searchUrl: (q) => `https://www.bhphotovideo.com/c/search?Ntt=${encodeURIComponent(q)}`, homepage: "https://www.bhphotovideo.com" },
+  "ubuy":                       { name: "Ubuy",                searchUrl: (q) => `https://www.ubuy.com/en/search/?ref=${encodeURIComponent(q)}`,     homepage: "https://www.ubuy.com" },
+  /* User-reported: storeName "Marks Electrical" was slugifying to
+     markselectrical.com (404). Correct brand domain is
+     markselectrical.co.uk. */
+  "marks-electrical":           { name: "Marks Electrical",    searchUrl: (q) => `https://www.markselectrical.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.markselectrical.co.uk" },
+  /* Currys business storefront — same brand, same search path as
+     consumer Currys. Curated alias so the search URL works
+     identically. */
+  "currys-business":            { name: "Currys for Business", searchUrl: (q) => `https://www.currys.co.uk/search?q=${encodeURIComponent(q)}`,        homepage: "https://www.currys.co.uk" },
+  /* 93mobiles — Indian electronics aggregator. Starts with a digit
+     so the smart-fallback's looksLikeSimpleBrand check rejects it. */
+  "93mobiles":                  { name: "93mobiles",           searchUrl: (q) => `https://www.93mobiles.com/search?q=${encodeURIComponent(q)}`,        homepage: "https://www.93mobiles.com" },
   "snapklik":                   { name: "Snapklik",       searchUrl: (q) => `https://uae.snapklik.com/en-AE/search?q=${encodeURIComponent(q)}`,     homepage: "https://uae.snapklik.com" },
   "wonderprice":                { name: "WonderPrice",    searchUrl: (q) => `https://wonderprice.co.uk/search?q=${encodeURIComponent(q)}`,          homepage: "https://wonderprice.co.uk" },
   "verizon":                    { name: "Verizon",        searchUrl: (q) => `https://www.verizon.com/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.verizon.com" },
