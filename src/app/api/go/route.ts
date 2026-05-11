@@ -86,36 +86,56 @@ async function resolveViaSerpApi(googleUrl: string): Promise<string | null> {
   if (!apiKey) return null;
 
   /* The relay URL contains a `prds=...productId...` segment we can
-     extract. Without product_id we can't resolve. */
-  let productId: string | null = null;
+     extract. Without product_id we can't resolve.
+
+     Round-4 QA caught a 400 from Google's consent gate when the
+     resolver fell through. The relay URL's `prds` carries multiple
+     IDs (catalogid, productid, headlineOfferDocid, gpcid, mid).
+     SerpAPI's google_product endpoint specifically wants the
+     PRODUCT_ID, not catalogid. The previous regex matched whichever
+     came first (usually catalogid) → SerpAPI returned no sellers
+     → resolver returned null → fallback redirected to the Google
+     relay → Google's consent gate broke. Now: try productid first
+     and fall back through the alternatives. */
+  const candidateIds: string[] = [];
   try {
     const u = new URL(googleUrl);
     const prds = u.searchParams.get("prds") ?? "";
-    const match = prds.match(/(?:catalogid|productid|gpcid):(\d+)/i);
-    if (match) productId = match[1];
-  } catch {/* fall through */}
-  if (!productId) return null;
-
-  const endpoint = new URL("https://serpapi.com/search.json");
-  endpoint.searchParams.set("engine",     "google_product");
-  endpoint.searchParams.set("product_id", productId);
-  endpoint.searchParams.set("api_key",    apiKey);
-
-  try {
-    const res = await fetch(endpoint.toString(), { next: { revalidate: 0 } });
-    if (!res.ok) return null;
-    const data = (await res.json()) as SerpProductResponse;
-    const sellers = data.sellers_results?.online_sellers
-      ?? data.product_results?.sellers
-      ?? [];
-    for (const s of sellers) {
-      const link = s.direct_link ?? s.link;
-      if (link && !isGoogleRelay(link)) return link;
+    /* Pull each id type in priority order. SerpAPI's google_product
+       most often accepts the `productid:` value. catalogid + gpcid
+       are SerpAPI-resolvable fallbacks. */
+    const priorityKeys = ["productid", "catalogid", "gpcid"] as const;
+    for (const key of priorityKeys) {
+      const re = new RegExp(`${key}:(\\d+)`, "i");
+      const m = prds.match(re);
+      if (m && !candidateIds.includes(m[1])) candidateIds.push(m[1]);
     }
-    return null;
-  } catch {
-    return null;
+  } catch {/* fall through */}
+  if (candidateIds.length === 0) return null;
+
+  /* Try each candidate ID until one returns a usable merchant URL.
+     Stops at the first hit so we burn at most one extra SerpAPI
+     credit per failed lookup. */
+  for (const productId of candidateIds) {
+    const endpoint = new URL("https://serpapi.com/search.json");
+    endpoint.searchParams.set("engine",     "google_product");
+    endpoint.searchParams.set("product_id", productId);
+    endpoint.searchParams.set("api_key",    apiKey);
+
+    try {
+      const res = await fetch(endpoint.toString(), { next: { revalidate: 0 } });
+      if (!res.ok) continue;
+      const data = (await res.json()) as SerpProductResponse;
+      const sellers = data.sellers_results?.online_sellers
+        ?? data.product_results?.sellers
+        ?? [];
+      for (const s of sellers) {
+        const link = s.direct_link ?? s.link;
+        if (link && !isGoogleRelay(link)) return link;
+      }
+    } catch {/* try next candidate */}
   }
+  return null;
 }
 
 export async function GET(req: NextRequest) {
@@ -183,38 +203,34 @@ export async function GET(req: NextRequest) {
   }
 
   /* Last resort — Google relay we couldn't resolve.
-     Round-4 QA caught: every UK retailer click was bouncing to
-     /uk?deal_unavailable=1 because the new SerpAPI Google Shopping
-     relay URLs use ?q=<category>+deals rather than the older
-     ?prds=catalogid:X format the resolver knows how to parse. The
-     resolver returns null → we used to redirect to a havlo error
-     page → user sees a bounce, not a merchant.
 
-     Better fallback: send the user to the Google Shopping URL
-     itself. It's literally a Google Shopping search-results page
-     for the product — not the direct merchant page we wanted, but
-     a useful destination with real product listings. Round 3
-     already did this implicitly (it didn't filter relay URLs at
-     all); round 4 over-corrected with the error bounce.
-
-     Trade-off: we lose affiliate attribution on this fallback (no
-     merchant tag wraps a Google search URL). Acceptable cost vs
-     the alternative of bouncing every UK click to an error page.
-
-     Title hint still wins when available — /compare?q=<title> is
-     better than Google Shopping for known products. Only the
-     no-title relay falls through to Google. */
+     Evolution of this fallback across QA rounds:
+       Round 3: redirected to /[country]?deal_unavailable=1 → bad
+         UX, user saw an apology banner with no next step.
+       Round 4 (first try): redirected to the Google relay URL
+         itself → Google's consent gate (consent.google.com)
+         double-encoded the continue URL and returned 400. The
+         user's report on this exact failure mode triggered the
+         current fix.
+       Round 4 (final): always redirect to a Havlo destination.
+         With a title hint, send to /compare?q=<title> (alternative
+         listings). Without a title hint, send to /[country]/deals
+         (browse fresh deals). Never redirect to a Google URL —
+         consent.google.com is unreliable across regions and
+         routinely 400s on encoded continue params. */
   if (titleHint) {
     const compareUrl = new URL(`${req.nextUrl.origin}/${country.code}/compare`);
     compareUrl.searchParams.set("q", titleHint);
-    /* Don't set deal_unavailable — this is a positive recovery
-       (showing alternative listings for the same product), not an
-       error state. The flag previously triggered an apology banner
-       on /compare that confused users. */
+    /* Positive recovery (show alternatives), not an error — no
+       deal_unavailable flag. */
     return NextResponse.redirect(compareUrl, 307);
   }
-  /* No title, can't resolve, can't compare. Send the user to the
-     Google relay URL directly so they at least see a Google Shopping
-     page for the product instead of a havlo error page. */
-  return NextResponse.redirect(target, 307);
+  /* No title, can't resolve. Send to the country /deals page so
+     the user lands on a real Havlo destination (browse fresh deals)
+     and can continue shopping. Strictly better than the Google
+     consent 400 the previous fallback caused. */
+  return NextResponse.redirect(
+    new URL(`/${country.code}/deals`, req.nextUrl.origin),
+    307,
+  );
 }
