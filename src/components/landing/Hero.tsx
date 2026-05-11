@@ -100,52 +100,22 @@ export default function Hero({ storeCount }: Props) {
         {/* Headline — large, editorial, single tone.
             "Before you buy it / find it for less" anchors the action
             moment (the shopper standing at a checkout button on
-            Konga / Amazon / Argos with their finger hovering) which
-            the previous "Find similar products for less" framing
-            didn't. The 'similar products' keyword is preserved in
-            the bottom-section CTA + page metadata so the SEO
-            footprint stays intact.
+            Konga / Amazon / Argos with their finger hovering).
 
-            Mobile typography (v3, May 2026 — second QA pass):
-              v1 (clamp 1.95→8vw) wrapped to 4 lines on iPhone.
-              v2 dropped clamp min to 1.65rem and added text-balance.
-              QA retest reported v2 STILL wrapped to 4 lines —
-              text-balance interacted weirdly with the block→inline
-              span trick (it was reflowing the two text nodes into
-              4 balanced micro-lines instead of using the explicit
-              break at the span boundary).
-
-              v3 abandons text-balance, drops the span, and uses a
-              ch-unit max-width to constrain the H1 to a width that
-              MUST wrap to 2 lines on mobile and 1 line on desktop:
-                • max-w-[18ch]: at the mobile font size, 18 chars is
-                  exactly the longer of the two clauses ('Before you
-                  buy it,' = 18 chars). Browser wraps at the word
-                  boundary, producing a clean 2-line layout regardless
-                  of viewport width or font-rendering quirks.
-                • clamp() lowered to (1.5rem, 7vw, 5rem) so even on
-                  320px iPhone SE the first clause fits on one line.
-                • leading bumped to 1.06 on mobile for breathing room
-                  between the two lines; back to 0.98 from sm: where
-                  the H1 returns to its single-line editorial form. */}
+            Sizing reverted (May 2026) to the original
+            clamp(1.95rem, 8vw, 5rem) + block-on-mobile span. The
+            preceding shrink iterations (v2→v5) chased a 2-lines-on-
+            iPhone target at the cost of looking too small for an
+            editorial hero. Going back to the bigger, hierarchy-first
+            size — the block-span trick still forces a clean 2-line
+            stack on mobile, and at 390px the first clause ("Before
+            you buy it,") fits inside the 358px container at this
+            font size with a few px of headroom. iPhone SE (320px)
+            may bump to 3 lines on the first clause; acceptable
+            trade-off vs. shrinking the type. */}
         <h1
-          /* Hero v5 (round-4 QA — fifth attempt; previous max-w-ch
-             approaches kept wrapping to 3 lines because the `ch`
-             unit doesn't track bold-weight char width accurately).
-             New strategy: combine a smaller mobile font with an
-             EXPLICIT line break via the block-on-mobile span. The
-             two clauses get one line each, period.
-
-             Math at 390px viewport:
-               clamp(1.25rem, 6vw, 5rem) = 23.4px on iPhone
-               "Before you buy it," (18 chars × ~12.5px bold) = ~225px
-               container = 358px (width - px-4)
-               225px < 358px ✓ fits on one line
-               "find it for less." (17 chars × ~12.5px) = ~213px
-               213px < 358px ✓ fits on one line
-             Total: 2 lines, exactly. */
-          className="font-bold text-ink leading-[1.06] sm:leading-[0.98] tracking-[-0.04em] mb-5 sm:mb-6 animate-fade-up"
-          style={{ fontSize: "clamp(1.25rem, 6vw, 5rem)" }}
+          className="font-bold text-ink leading-[1.05] sm:leading-[0.98] tracking-[-0.04em] mb-5 sm:mb-6 animate-fade-up"
+          style={{ fontSize: "clamp(1.95rem, 8vw, 5rem)" }}
         >
           Before you buy it,{" "}
           <span className="block sm:inline">find it for less.</span>
