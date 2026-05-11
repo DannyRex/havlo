@@ -72,6 +72,13 @@ export default function DealFeed() {
      (linked from homepage CategoryGrid tiles) lands on the correct
      filtered view instead of the default "all". */
   const searchParams = useSearchParams();
+
+  /* Country lifted to the top of the component because the initial
+     origin default is country-aware (see initialOrigin below). NG
+     visitors default to "all" because cross-border buying is a big
+     share of intent there; every other market defaults to "local"
+     so the first scroll surfaces retailers the user recognises. */
+  const { country } = useCountry();
   /* Validate category against the known list. An unknown slug
      (e.g. ?category=junkjunkjunk from a stale Slack/Twitter link)
      used to silently fall back to 'all' with no UI hint, leaving
@@ -97,10 +104,17 @@ export default function DealFeed() {
     ? (initialSortRaw as SortOption)
     : "relevance";
   const initialSearch = searchParams.get("search") ?? "";
-  const initialOriginRaw = searchParams.get("origin") ?? "all";
-  const initialOrigin = VALID_ORIGINS.has(initialOriginRaw as OriginFilter)
-    ? (initialOriginRaw as OriginFilter)
-    : "all";
+  /* Country-aware origin default. NG defaults to "all" (cross-border
+     shoppers want AliExpress/Amazon-INT visible); every other market
+     defaults to "local" so the UK/US/DE/AE/IN/ZA landing experience
+     leads with retailers the user recognises in-market. The explicit
+     ?origin= URL override always wins so deep-links from social or
+     newsletters still resolve exactly as authored. */
+  const initialOriginRaw = searchParams.get("origin");
+  const initialOrigin: OriginFilter =
+    initialOriginRaw && VALID_ORIGINS.has(initialOriginRaw as OriginFilter)
+      ? (initialOriginRaw as OriginFilter)
+      : country.code !== "ng" ? "local" : "all";
 
   const [items, setItems]       = useState<Deal[]>([]);
   const [total, setTotal]       = useState(0);
@@ -159,7 +173,8 @@ export default function DealFeed() {
      fetch and clobber the result. */
   const fetchSeqRef = useRef(0);
   const router = useRouter();
-  const { country } = useCountry();
+  /* `country` is lifted to the top of the component (above
+     initialOrigin) — see comment near the top of DealFeed. */
 
   /* Country goes into the URL so:
        1. The CDN cache key differs per country (s-maxage was caching
