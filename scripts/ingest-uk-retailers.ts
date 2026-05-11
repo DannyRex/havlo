@@ -20,9 +20,21 @@
    only rows whose source matches the target retailer (drops the
    inevitable Amazon spillover Google sneaks into every result set).
 
+   v2 (May 2026): expanded from 8 → 14 retailers to fill the gaps a
+   real UK shopper would expect. Each retailer now has its OWN SKU
+   list (B&Q doesn't sell iPhones; JD Sports doesn't sell drills),
+   so the call count is bounded by per-retailer category coverage,
+   not a flat "all retailers × all SKUs" matrix. Matchers became
+   a list (string[]) so retailers with brand-name ambiguity (B&Q,
+   Next) can match multiple variants of how SerpAPI returns their
+   source string.
+
    Cost:
-     8 retailers × ~6 SKUs = ~48 SerpAPI credits per run. Cheap.
-     Twice-weekly cron = ~96/month against a 1,000-credit Starter plan.
+     ~14 retailers, each with ~6-14 SKUs.
+     Total: ~120 SerpAPI calls per run.
+     Twice-weekly cron = ~960/month against a 1,000-credit Starter
+     plan — still within budget. Drop --retailers= to ingest a
+     subset if approaching cap.
 
    Usage:
      npm run ingest:uk-retailers
@@ -39,32 +51,15 @@ import { getActiveSearchProviders } from "../src/lib/providers";
 import { ingestDeals } from "../src/lib/providers/ingestion";
 import type { Deal } from "../src/types";
 
-/* UK retailers we want represented in the pool. Each entry is a
-   short matcher token used to filter SerpAPI source strings — keep
-   it lowercase and substring-friendly. The retailer is also passed
-   as a query prefix to bias Google Shopping toward this source.
+/* ── SKU groups ──────────────────────────────────────────────────────
+   Grouped by shopper intent, not by category, so the per-retailer
+   SKU lists compose cleanly. A retailer that carries both electronics
+   and home (John Lewis, Argos) lists multiple groups. A specialist
+   (B&Q, Smyths) lists only its native group. */
 
-   Picked for two criteria:
-     1. Real UK high-street presence (so users recognise the name)
-     2. Sells across electronics + general retail (broad SKU coverage)
-   Skipped Amazon UK (already in the curated catalog), Tesco/Sainsbury
-   (mostly groceries, low cross-shop overlap with our product types). */
-const UK_RETAILERS: Array<{ name: string; matcher: string }> = [
-  { name: "Argos",          matcher: "argos"        },
-  { name: "Currys",         matcher: "currys"       },
-  { name: "John Lewis",     matcher: "john lewis"   },
-  { name: "Boots",          matcher: "boots"        },
-  { name: "AO.com",         matcher: "ao.com"       },
-  { name: "Very",           matcher: "very"         },
-  { name: "Selfridges",     matcher: "selfridges"   },
-  { name: "Marks & Spencer", matcher: "marks"       },
-];
+type SkuQuery = { q: string; categorySlug: string };
 
-/* SKU queries that match the UK retail mix. Apple flagships +
-   Samsung flagships drive the most search volume; PS5 / Xbox /
-   Switch are cross-cutting; appliances + audio fill the long tail.
-   Each query becomes one SerpAPI call per retailer. */
-const TARGET_SKUS: Array<{ q: string; categorySlug: string }> = [
+const ELECTRONICS_SKUS: SkuQuery[] = [
   // Phones — Apple + Samsung flagships
   { q: "iPhone 17 Pro Max",        categorySlug: "phones" },
   { q: "iPhone 17",                categorySlug: "phones" },
@@ -86,16 +81,158 @@ const TARGET_SKUS: Array<{ q: string; categorySlug: string }> = [
   { q: "Samsung QLED TV 55 inch",  categorySlug: "televisions" },
 ];
 
+const HOME_SKUS: SkuQuery[] = [
+  { q: "Dyson V15 Detect",        categorySlug: "appliances" },
+  { q: "Ninja Air Fryer",         categorySlug: "appliances" },
+  { q: "Stanley Quencher tumbler", categorySlug: "home" },
+  { q: "duvet king size",         categorySlug: "home" },
+  { q: "memory foam mattress",    categorySlug: "home" },
+  { q: "lamp shade",              categorySlug: "home" },
+];
+
+const DIY_SKUS: SkuQuery[] = [
+  { q: "DeWalt cordless drill",   categorySlug: "home" },
+  { q: "lawn mower electric",     categorySlug: "home" },
+  { q: "step ladder",             categorySlug: "home" },
+  { q: "paint Dulux white",       categorySlug: "home" },
+  { q: "garden hose",             categorySlug: "home" },
+  { q: "Karcher pressure washer", categorySlug: "home" },
+];
+
+const FASHION_SPORTS_SKUS: SkuQuery[] = [
+  { q: "Nike Air Force 1",        categorySlug: "fashion" },
+  { q: "Adidas Samba",            categorySlug: "fashion" },
+  { q: "Nike Tech Fleece",        categorySlug: "fashion" },
+  { q: "running shoes mens",      categorySlug: "sports" },
+  { q: "yoga mat",                categorySlug: "sports" },
+  { q: "dumbbells set",           categorySlug: "sports" },
+];
+
+const AUTO_CYCLING_SKUS: SkuQuery[] = [
+  { q: "car battery",             categorySlug: "home" },
+  { q: "dash cam",                categorySlug: "electronics" },
+  { q: "bike helmet",             categorySlug: "sports" },
+  { q: "kids bike",               categorySlug: "sports" },
+  { q: "roof box",                categorySlug: "home" },
+  { q: "car phone holder",        categorySlug: "electronics" },
+];
+
+const TOY_SKUS: SkuQuery[] = [
+  { q: "Lego Technic",            categorySlug: "gaming" },
+  { q: "Lego Star Wars",          categorySlug: "gaming" },
+  { q: "Barbie Dreamhouse",       categorySlug: "gaming" },
+  { q: "Hot Wheels track",        categorySlug: "gaming" },
+  { q: "Nintendo Switch OLED",    categorySlug: "electronics" },
+];
+
+/* Kept exported as TARGET_SKUS for backward-compat with the
+   --skus= filter logic in parseArgs(). Equal to the union of all
+   groups — the filter then narrows it. */
+const TARGET_SKUS: SkuQuery[] = [
+  ...ELECTRONICS_SKUS,
+  ...HOME_SKUS,
+  ...DIY_SKUS,
+  ...FASHION_SPORTS_SKUS,
+  ...AUTO_CYCLING_SKUS,
+  ...TOY_SKUS,
+];
+
+/* ── Retailer registry ───────────────────────────────────────────────
+   Each retailer carries:
+     - name      : query prefix Google Shopping understands
+                   ("Currys iPhone 17 Pro Max")
+     - key       : short token for the --retailers= CLI filter
+     - matchers  : lowercase substrings used to filter raw SerpAPI
+                   results to ONLY this retailer. List so we can
+                   catch multiple variants (B&Q vs diy.com,
+                   Next plc vs next.co.uk).
+     - skus      : per-retailer SKU set so we don't waste credits
+                   asking B&Q for iPhones or JD Sports for drills.
+
+   Picked for two criteria:
+     1. Real UK high-street presence (so users recognise the name)
+     2. Sells across at least one Havlo category (broad SKU coverage)
+   Skipped Amazon UK (already in the curated catalog), Tesco /
+   Sainsbury (mostly groceries, low cross-shop overlap with our
+   product types). */
+
+type RetailerCfg = {
+  name:     string;
+  key:      string;
+  matchers: string[];
+  skus:     SkuQuery[];
+};
+
+const UK_RETAILERS: RetailerCfg[] = [
+  // ── Original 8 (electronics-heavy + department stores) ──
+  { name: "Argos",            key: "argos",       matchers: ["argos"],
+    skus: [...ELECTRONICS_SKUS, ...HOME_SKUS, ...TOY_SKUS] },
+
+  { name: "Currys",           key: "currys",      matchers: ["currys"],
+    skus: ELECTRONICS_SKUS },
+
+  { name: "John Lewis",       key: "john-lewis",  matchers: ["john lewis"],
+    skus: [...ELECTRONICS_SKUS, ...HOME_SKUS] },
+
+  { name: "Boots",            key: "boots",       matchers: ["boots"],
+    skus: [] /* beauty SKUs not yet defined; placeholder */ },
+
+  { name: "AO.com",           key: "ao",          matchers: ["ao.com", "ao uk"],
+    skus: ELECTRONICS_SKUS },
+
+  { name: "Very",             key: "very",        matchers: ["very.co.uk", "very uk", "very "],
+    skus: [...ELECTRONICS_SKUS.slice(0, 8), ...FASHION_SPORTS_SKUS] },
+
+  { name: "Selfridges",       key: "selfridges",  matchers: ["selfridges"],
+    skus: FASHION_SPORTS_SKUS },
+
+  { name: "Marks & Spencer",  key: "marks",       matchers: ["marks", "m&s "],
+    skus: [...FASHION_SPORTS_SKUS, ...HOME_SKUS] },
+
+  // ── v2 additions (gap-fillers for DIY / sports / auto / home / toys) ──
+  /* B&Q: DIY anchor, currently zero UK coverage in this category.
+     Matchers cover the ampersand variants SerpAPI returns and
+     diy.com which B&Q sometimes uses in source attribution. */
+  { name: "B&Q",              key: "bq",          matchers: ["b&q", "b & q", "diy.com"],
+    skus: DIY_SKUS },
+
+  /* JD Sports: the obvious peer to Sports Direct, much heavier on
+     athleisure / lifestyle. Matcher avoids the dangerous bare "jd"
+     which would false-match many other stores. */
+  { name: "JD Sports",        key: "jd",          matchers: ["jd sports", "jdsports"],
+    skus: FASHION_SPORTS_SKUS },
+
+  /* Halfords: auto + cycling, zero coverage today. */
+  { name: "Halfords",         key: "halfords",    matchers: ["halfords"],
+    skus: AUTO_CYCLING_SKUS },
+
+  /* Dunelm: home & kitchen depth. Current home pool is 17 deals —
+     adding Dunelm should roughly double it. */
+  { name: "Dunelm",           key: "dunelm",      matchers: ["dunelm"],
+    skus: HOME_SKUS },
+
+  /* Next: mainstream fashion + home. Already comes through organically
+     (~3 deals via category ingest) — explicit ingest formalises it.
+     Matcher avoids bare "next" which would match too many things. */
+  { name: "Next",             key: "next",        matchers: ["next.co.uk", "next plc", "next official", "next retail"],
+    skus: [...FASHION_SPORTS_SKUS, ...HOME_SKUS] },
+
+  /* Smyths Toys: dedicated toys retailer, complements Argos which
+     stocks toys but isn't a specialist. */
+  { name: "Smyths Toys",      key: "smyths",      matchers: ["smyths"],
+    skus: TOY_SKUS },
+];
+
 interface CliArgs {
-  retailerMatchers?: Set<string>;
-  skuTokens?:       string[];
+  retailerKeys?: Set<string>;
+  skuTokens?:   string[];
 }
 
 function parseArgs(): CliArgs {
   const args: CliArgs = {};
   for (const arg of process.argv.slice(2)) {
     if (arg.startsWith("--retailers=")) {
-      args.retailerMatchers = new Set(
+      args.retailerKeys = new Set(
         arg.slice("--retailers=".length).split(",").map((s) => s.trim().toLowerCase()),
       );
     } else if (arg.startsWith("--skus=")) {
@@ -120,18 +257,25 @@ async function main(): Promise<void> {
   const provider = providers[0];
 
   const retailers = UK_RETAILERS.filter(
-    (r) => !args.retailerMatchers || args.retailerMatchers.has(r.matcher),
-  );
-  const skus = TARGET_SKUS.filter(
-    (s) =>
-      !args.skuTokens ||
-      args.skuTokens.some((t) => s.q.toLowerCase().includes(t)),
+    (r) => !args.retailerKeys || args.retailerKeys.has(r.key),
   );
 
-  const totalCalls = retailers.length * skus.length;
-  console.log(`▶ UK retailer ingest — ${totalCalls} SerpAPI calls`);
-  console.log(`  Retailers: ${retailers.map((r) => r.name).join(", ")}`);
-  console.log(`  SKUs:      ${skus.length} queries × ${retailers.length} retailers`);
+  /* Apply --skus= filter to each retailer's SKU list independently.
+     If a retailer has no remaining SKUs after the filter (and the
+     filter was provided), skip that retailer rather than running
+     zero SerpAPI calls against it. */
+  const planned = retailers
+    .map((r) => ({
+      retailer: r,
+      skus: r.skus.filter((s) =>
+        !args.skuTokens || args.skuTokens.some((t) => s.q.toLowerCase().includes(t)),
+      ),
+    }))
+    .filter((p) => p.skus.length > 0);
+
+  const totalCalls = planned.reduce((n, p) => n + p.skus.length, 0);
+  console.log(`▶ UK retailer ingest — ${totalCalls} SerpAPI calls planned`);
+  console.log(`  Retailers: ${planned.map((p) => `${p.retailer.name} (${p.skus.length})`).join(", ")}`);
   console.log("");
 
   const startedAt = Date.now();
@@ -140,12 +284,12 @@ async function main(): Promise<void> {
   let totalUpserted = 0;
   let totalErrors   = 0;
 
-  for (const retailer of retailers) {
+  for (const { retailer, skus } of planned) {
     let retailerKept = 0;
 
     for (const sku of skus) {
       const q = `${retailer.name} ${sku.q}`;
-      const label = `[${retailer.name.padEnd(15)}] ${sku.q.padEnd(28)}`;
+      const label = `[${retailer.name.padEnd(16)}] ${sku.q.padEnd(28)}`;
       try {
         const raw = await provider.searchDeals({
           q,
@@ -155,12 +299,15 @@ async function main(): Promise<void> {
 
         /* Filter to ONLY this retailer. Google Shopping returns
            Amazon spillover even on retailer-prefixed queries; we
-           match on store substring (case-insensitive) to keep the
-           target retailer's rows and drop the rest. */
+           match on store substring (case-insensitive) across the
+           retailer's matchers[] list so brand-ambiguous names
+           (B&Q, Next, M&S) catch every variant SerpAPI returns. */
         const onTarget = raw.filter((d: Deal) => {
           const storeNameLc = d.storeName.toLowerCase();
           const storeIdLc   = d.storeId.toLowerCase();
-          return storeNameLc.includes(retailer.matcher) || storeIdLc.includes(retailer.matcher);
+          return retailer.matchers.some(
+            (m) => storeNameLc.includes(m) || storeIdLc.includes(m),
+          );
         });
 
         /* Tag with category so /api/deals?category=... groups
@@ -169,7 +316,7 @@ async function main(): Promise<void> {
           d.categorySlug = sku.categorySlug;
         });
 
-        const result = await ingestDeals(provider.id, `${retailer.matcher}:${sku.q}:uk`, onTarget);
+        const result = await ingestDeals(provider.id, `${retailer.key}:${sku.q}:uk`, onTarget);
         totalFetched  += raw.length;
         totalKept     += onTarget.length;
         totalUpserted += result.upserted;
@@ -200,3 +347,8 @@ main().catch((err) => {
   console.error("✗ Fatal:", err);
   process.exit(1);
 });
+
+/* Re-export so existing tooling that imports the union still works.
+   Keeping this at the bottom of the file so the dev path-of-eyes
+   lands on the retailer config first. */
+export { TARGET_SKUS };
