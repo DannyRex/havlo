@@ -108,6 +108,34 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "shein":          { name: "Shein",         searchUrl: (q) => `https://www.shein.com/pdsearch/${encodeURIComponent(q)}/`,                        homepage: "https://www.shein.com" },
   "temu":           { name: "Temu",          searchUrl: (q) => `https://www.temu.com/search_result.html?search_key=${encodeURIComponent(q)}`,     homepage: "https://www.temu.com" },
   "dhgate":         { name: "DHgate",        searchUrl: (q) => `https://www.dhgate.com/wholesale/search.do?searchkey=${encodeURIComponent(q)}`,   homepage: "https://www.dhgate.com" },
+
+  // ── Long-tail merchants the slug guess gets wrong ──────────────
+  // Each was caught by the live-curl audit. Pattern: storeName
+  // doesn't map cleanly to brand+.com — these need explicit entries.
+  "american-eagle-outfitters":  { name: "American Eagle", searchUrl: (q) => `https://www.ae.com/us/en/search/${encodeURIComponent(q)}`,             homepage: "https://www.ae.com" },
+  "ae":                         { name: "American Eagle", searchUrl: (q) => `https://www.ae.com/us/en/search/${encodeURIComponent(q)}`,             homepage: "https://www.ae.com" },
+  "oppo":                       { name: "OPPO",           searchUrl: (q) => `https://www.oppo.com/en/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.oppo.com" },
+  "ulefone":                    { name: "Ulefone",        searchUrl: (q) => `https://www.ulefone.com/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.ulefone.com" },
+  "mango":                      { name: "Mango",          searchUrl: (q) => `https://shop.mango.com/gb/search?kw=${encodeURIComponent(q)}`,         homepage: "https://shop.mango.com" },
+  "wallis":                     { name: "Wallis",         searchUrl: (q) => `https://www.wallis.co.uk/search?text=${encodeURIComponent(q)}`,        homepage: "https://www.wallis.co.uk" },
+  "simply-be":                  { name: "Simply Be",      searchUrl: (q) => `https://www.simplybe.co.uk/search?q=${encodeURIComponent(q)}`,         homepage: "https://www.simplybe.co.uk" },
+  "peacocks":                   { name: "Peacocks",       searchUrl: (q) => `https://www.peacocks.co.uk/search?q=${encodeURIComponent(q)}`,         homepage: "https://www.peacocks.co.uk" },
+  "torrid":                     { name: "Torrid",         searchUrl: (q) => `https://www.torrid.com/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.torrid.com" },
+  "mobile-phones-direct":       { name: "Mobile Phones Direct", searchUrl: (q) => `https://www.mobilephonesdirect.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.mobilephonesdirect.co.uk" },
+  "sony-store-online":          { name: "Sony Store",     searchUrl: (q) => `https://www.sony.co.uk/electronics/search?searchTerm=${encodeURIComponent(q)}`, homepage: "https://www.sony.co.uk" },
+  "sony-store":                 { name: "Sony Store",     searchUrl: (q) => `https://www.sony.co.uk/electronics/search?searchTerm=${encodeURIComponent(q)}`, homepage: "https://www.sony.co.uk" },
+  "cashify":                    { name: "Cashify",        searchUrl: (q) => `https://www.cashify.in/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.cashify.in" },
+  "snapklik":                   { name: "Snapklik",       searchUrl: (q) => `https://uae.snapklik.com/en-AE/search?q=${encodeURIComponent(q)}`,     homepage: "https://uae.snapklik.com" },
+  "wonderprice":                { name: "WonderPrice",    searchUrl: (q) => `https://wonderprice.co.uk/search?q=${encodeURIComponent(q)}`,          homepage: "https://wonderprice.co.uk" },
+  "verizon":                    { name: "Verizon",        searchUrl: (q) => `https://www.verizon.com/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.verizon.com" },
+  "at-t":                       { name: "AT&T",           searchUrl: (q) => `https://www.att.com/search/?q=${encodeURIComponent(q)}`,               homepage: "https://www.att.com" },
+  "t-mobile":                   { name: "T-Mobile",       searchUrl: (q) => `https://www.t-mobile.com/search?q=${encodeURIComponent(q)}`,           homepage: "https://www.t-mobile.com" },
+  "boost-mobile":               { name: "Boost Mobile",   searchUrl: (q) => `https://www.boostmobile.com/cell-phones.html?q=${encodeURIComponent(q)}`, homepage: "https://www.boostmobile.com" },
+  "cricket-wireless":           { name: "Cricket Wireless", searchUrl: (q) => `https://www.cricketwireless.com/shop/all-phones`,                    homepage: "https://www.cricketwireless.com" },
+  "kaufland":                   { name: "Kaufland",       searchUrl: (q) => `https://www.kaufland.de/s/?search_value=${encodeURIComponent(q)}`,    homepage: "https://www.kaufland.de" },
+  "mr-price":                   { name: "Mr Price",       searchUrl: (q) => `https://www.mrp.com/en_za/search/?q=${encodeURIComponent(q)}`,         homepage: "https://www.mrp.com" },
+  "cash-crusaders":             { name: "Cash Crusaders", searchUrl: (q) => `https://www.cashcrusaders.co.za/search?q=${encodeURIComponent(q)}`,    homepage: "https://www.cashcrusaders.co.za" },
+  "ikea":                       { name: "IKEA",           searchUrl: (q) => `https://www.ikea.com/gb/en/search/?q=${encodeURIComponent(q)}`,        homepage: "https://www.ikea.com" },
 };
 
 /** Resolve a search URL for a given store id / name + product title.
@@ -220,6 +248,64 @@ function brandSlug(s: string): string {
   return s.toLowerCase().replace(/\s+/g, "");
 }
 
+/* Country-suffix → TLD map. Lots of SerpAPI source names follow
+   the "<brand> <country>" pattern (e.g. "Sony Store Online UK",
+   "Mango UK", "Wallis UK", "Dell South Africa"). The brand
+   typically owns the country-specific TLD ("wonderprice.co.uk",
+   "wallis.co.uk", "mango.com/gb") rather than the "xuk.com"
+   slug my old code produced.
+
+   Rule: when the storeName ends with one of these markers, strip
+   the marker before slugifying and use the matched TLD instead
+   of ".com". Matches the user-reported failure case
+   (WonderPriceUK → wonderprice.co.uk). */
+const COUNTRY_SUFFIX_TLDS: Array<[RegExp, string]> = [
+  [/\s+(uk|united\s*kingdom)\s*$/i,         "co.uk"],
+  [/\s+(usa|us|united\s*states)\s*$/i,      "com"],
+  [/\s+(de|germany|deutschland)\s*$/i,      "de"],
+  [/\s+(ae|uae|emirates)\s*$/i,             "ae"],
+  [/\s+(in|india)\s*$/i,                    "in"],
+  [/\s+(sa|south\s*africa|za)\s*$/i,        "co.za"],
+  [/\s+(ng|nigeria)\s*$/i,                  "com.ng"],
+  [/\s+(au|australia)\s*$/i,                "com.au"],
+  [/\s+(ca|canada)\s*$/i,                   "ca"],
+  /* Also handle the no-space "WonderPriceUK" pattern — country
+     marker glued to the end of the brand. Same TLDs. */
+  [/(uk|gb)\s*$/i,                          "co.uk"],
+];
+
+/** Strip generic SerpAPI-source suffixes that aren't part of the
+    brand domain. "OPPO Official Store" → "OPPO" (oppo.com),
+    "Ulefone Global" → "Ulefone" (ulefone.com), "Microsoft Store
+    Online" → "Microsoft" (microsoft.com). Returns the cleaned
+    brand name, or the input unchanged when no suffix matches. */
+function stripGenericSuffix(s: string): string {
+  return s
+    .replace(/\s+(official\s+store|online\s+store|store\s+online|web\s+store|brand\s+store|outlet\s+store|flagship\s+store)\s*$/i, "")
+    .replace(/\s+(official|outlet|flagship|store|online|web|shop|direct|global|international|hq)\s*$/i, "")
+    .trim();
+}
+
+/** Given "Sony Store Online UK", return
+    { slug: "sonystoreonline", tld: "co.uk" }.
+    For names without a country marker, returns null so the
+    caller falls back to the generic .com guess. */
+function stripCountrySuffix(s: string): { slug: string; tld: string } | null {
+  const trimmed = s.trim();
+  for (const [re, tld] of COUNTRY_SUFFIX_TLDS) {
+    const m = trimmed.match(re);
+    if (!m) continue;
+    /* Cut at the COUNTRY suffix, then ALSO strip any generic
+       suffix from what remains. "Sony Store Online UK" → strip
+       country → "Sony Store Online" → strip generic → "Sony". */
+    const stripped = stripGenericSuffix(trimmed.slice(0, m.index).trim());
+    if (stripped.length < 4) continue;
+    if (!/^[a-z][a-z\s]+[a-z]$/i.test(stripped)) continue;
+    return { slug: brandSlug(stripped), tld };
+  }
+  return null;
+}
+
 export function smartFallbackUrl(
   storeId: string | null | undefined,
   storeName: string | null | undefined,
@@ -239,14 +325,29 @@ export function smartFallbackUrl(
     return { url, merchantName: sid };
   }
 
-  /* Strategy 2: storeName looks like a multi-word brand. Try
-     "<slug>.com" — most real retailers own their obvious brand
-     domain. If they don't, the user sees a clear 404 on a
-     recognisable URL rather than a search engine page that
-     defeats Havlo's purpose. */
-  if (sname && looksLikeSimpleBrand(sname)) {
-    const url = `https://${brandSlug(sname)}.com`;
-    return { url, merchantName: sname };
+  /* Strategy 2a: storeName ends with a country marker (UK / SA /
+     DE / etc.). Strip the marker and use the matching country
+     TLD. "Sony Store Online UK" → sonystoreonline.co.uk,
+     "Dell South Africa" → dell.co.za, "WonderPriceUK" →
+     wonderprice.co.uk. Catches the user-reported case where
+     "wonderpriceuk.com" was wrong. */
+  if (sname) {
+    const c = stripCountrySuffix(sname);
+    if (c) {
+      return { url: `https://${c.slug}.${c.tld}`, merchantName: sname };
+    }
+  }
+
+  /* Strategy 2b: storeName looks like a plain brand (no country
+     marker). Strip generic suffixes ("Official Store", "Global",
+     etc.) first so "OPPO Official Store" → oppo.com, "Ulefone
+     Global" → ulefone.com. Then try "<slug>.com". */
+  if (sname) {
+    const cleaned = stripGenericSuffix(sname);
+    if (looksLikeSimpleBrand(cleaned)) {
+      const url = `https://${brandSlug(cleaned)}.com`;
+      return { url, merchantName: sname };
+    }
   }
 
   return null;
