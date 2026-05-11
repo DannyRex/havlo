@@ -125,6 +125,13 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "sony-store-online":          { name: "Sony Store",     searchUrl: (q) => `https://www.sony.co.uk/electronics/search?searchTerm=${encodeURIComponent(q)}`, homepage: "https://www.sony.co.uk" },
   "sony-store":                 { name: "Sony Store",     searchUrl: (q) => `https://www.sony.co.uk/electronics/search?searchTerm=${encodeURIComponent(q)}`, homepage: "https://www.sony.co.uk" },
   "cashify":                    { name: "Cashify",        searchUrl: (q) => `https://www.cashify.in/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.cashify.in" },
+  /* SerpAPI lists this as "EMI Snapmint" (EMI = installment-payment
+     option). Slug → "emisnapmint.com" 404s; canonical brand domain
+     is snapmint.com. Both id forms keyed so the lookup works
+     whether ingest stored "emi-snapmint" (current) or normalised
+     it later. */
+  "emi-snapmint":               { name: "Snapmint",       searchUrl: (q) => `https://snapmint.com/search?q=${encodeURIComponent(q)}`,                homepage: "https://snapmint.com" },
+  "snapmint":                   { name: "Snapmint",       searchUrl: (q) => `https://snapmint.com/search?q=${encodeURIComponent(q)}`,                homepage: "https://snapmint.com" },
   "snapklik":                   { name: "Snapklik",       searchUrl: (q) => `https://uae.snapklik.com/en-AE/search?q=${encodeURIComponent(q)}`,     homepage: "https://uae.snapklik.com" },
   "wonderprice":                { name: "WonderPrice",    searchUrl: (q) => `https://wonderprice.co.uk/search?q=${encodeURIComponent(q)}`,          homepage: "https://wonderprice.co.uk" },
   "verizon":                    { name: "Verizon",        searchUrl: (q) => `https://www.verizon.com/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.verizon.com" },
@@ -286,6 +293,20 @@ function stripGenericSuffix(s: string): string {
     .trim();
 }
 
+/* Strip SerpAPI-style metadata PREFIXES that aren't part of the brand
+   domain. User-reported case (May 2026): "EMI Snapmint" was being
+   slugified to "emisnapmint" → emisnapmint.com (404). EMI is a
+   payment-option marker SerpAPI prepends to Indian-retail listings,
+   not a brand name. Same pattern for BNPL ("Buy Now Pay Later"),
+   "Pay Later", and the COD (cash-on-delivery) prefix that sometimes
+   leaks through. */
+function stripGenericPrefix(s: string): string {
+  return s
+    .replace(/^(emi|bnpl|cod|prime)\s+/i, "")
+    .replace(/^(pay\s+later|buy\s+now\s+pay\s+later)\s+/i, "")
+    .trim();
+}
+
 /** Given "Sony Store Online UK", return
     { slug: "sonystoreonline", tld: "co.uk" }.
     For names without a country marker, returns null so the
@@ -340,10 +361,11 @@ export function smartFallbackUrl(
 
   /* Strategy 2b: storeName looks like a plain brand (no country
      marker). Strip generic suffixes ("Official Store", "Global",
-     etc.) first so "OPPO Official Store" → oppo.com, "Ulefone
-     Global" → ulefone.com. Then try "<slug>.com". */
+     etc.) AND generic prefixes ("EMI", "BNPL", "Pay Later") so
+     "OPPO Official Store" → oppo.com, "EMI Snapmint" → snapmint.com,
+     "Ulefone Global" → ulefone.com. Then try "<slug>.com". */
   if (sname) {
-    const cleaned = stripGenericSuffix(sname);
+    const cleaned = stripGenericPrefix(stripGenericSuffix(sname));
     if (looksLikeSimpleBrand(cleaned)) {
       const url = `https://${brandSlug(cleaned)}.com`;
       return { url, merchantName: sname };
