@@ -90,6 +90,12 @@ export interface MultiStoreChip {
       clicked, since FTS hits all token forms. The friendlified
       label is for display, the raw is for the URL. */
   searchQuery:  string;
+  /** Product ID for direct DB lookup when FTS misses. Round-4 QA:
+      user clicked a chip and got "Nothing in our local index" —
+      root cause was stale chip data (FTS couldn't anchor after the
+      catalog shifted). Passing productId as a backstop lets the
+      compare API do a direct lookup when FTS returns empty. */
+  productId:    string;
   storeCount:   number;
 }
 
@@ -168,6 +174,7 @@ async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
     seenFriendly.set(friendly, {
       title:       friendly,
       searchQuery: raw,
+      productId:   id,
       storeCount:  set.size,
     });
   }

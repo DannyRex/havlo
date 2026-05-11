@@ -98,9 +98,15 @@ export default function TrendingChipRail({ countryCode, limit = 10 }: Props) {
         {visible.map((chip) => (
           <Link
             key={chip.title}
-            /* searchQuery is the RAW DB title (better FTS hit), but
-               the visible label uses the friendlified short form. */
-            href={`/${countryCode}/compare?q=${encodeURIComponent(chip.searchQuery)}&mode=similar`}
+            /* searchQuery is the RAW DB title (better FTS hit) used
+               for display + URL sharing. pid is the product_id
+               backstop — if the catalog shifts between chip-pool
+               generation and this click (orphan cleanup, signature
+               merge), /api/compare falls back to direct lookup so
+               the user ALWAYS sees the comparison the chip promised.
+               Round-4 QA: user clicked a chip and got "Nothing in
+               our local index" because of exactly that timing gap. */
+            href={`/${countryCode}/compare?q=${encodeURIComponent(chip.searchQuery)}&pid=${chip.productId}&mode=similar`}
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface border border-border hover:border-border-strong hover:shadow-card transition-all whitespace-nowrap active:scale-95"
             aria-label={`${chip.title}, available across ${chip.storeCount.toLocaleString()} stores`}
           >

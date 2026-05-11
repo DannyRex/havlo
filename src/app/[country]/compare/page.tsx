@@ -35,6 +35,11 @@ function CompareContent() {
   const { country } = useCountry();
   const initialQuery = searchParams.get("q") ?? "";
   const initialKey   = searchParams.get("key") ?? "";
+  /* Chip click backstop. When the user clicks a homepage / compare
+     chip, the URL carries both q= (for shareability + display) and
+     pid= (the product_id direct-lookup fallback). Forwarded to
+     /api/compare so the API can short-circuit empty FTS results. */
+  const initialPid   = searchParams.get("pid") ?? "";
 
   const [query, setQuery]             = useState(initialQuery);
   const [result, setResult]           = useState<SearchOutput | null>(null);
@@ -157,12 +162,13 @@ function CompareContent() {
   }, [router, fetchLive]);
 
   /* ── Text search ────────────────────────────────────────────────────── */
-  const handleSearch = useCallback(async (q: string) => {
+  const handleSearch = useCallback(async (q: string, pid?: string) => {
     if (looksLikeUrl(q)) { handleUrlSearch(q); return; }
 
     setQuery(q);
     setSniffResult(null);
     const params = new URLSearchParams({ q, mode: "similar" });
+    if (pid) params.set("pid", pid);
     router.replace(`/compare?${params.toString()}`, { scroll: false });
     setLoading(true);
     setResult(null);
@@ -171,7 +177,14 @@ function CompareContent() {
     fetchLive(q);
 
     try {
-      const res = await fetch(`/api/compare?q=${encodeURIComponent(q)}&mode=similar`);
+      /* Forward pid to the API so it can fall back to direct
+         product lookup when FTS misses. Round-4 QA: chip clicks
+         were getting "Nothing in our local index" because of
+         catalog timing — pid backstop fixes that. */
+      const apiUrl = pid
+        ? `/api/compare?q=${encodeURIComponent(q)}&pid=${encodeURIComponent(pid)}&mode=similar`
+        : `/api/compare?q=${encodeURIComponent(q)}&mode=similar`;
+      const res = await fetch(apiUrl);
       setResult(await res.json() as SearchOutput);
     } catch {
       setResult({ mode: "empty", query: q, suggestions: [] });
@@ -185,10 +198,10 @@ function CompareContent() {
     if (initialKey) fetchByKey(initialKey, initialQuery);
     else if (initialQuery) {
       if (looksLikeUrl(initialQuery)) handleUrlSearch(initialQuery);
-      else handleSearch(initialQuery);
+      else handleSearch(initialQuery, initialPid || undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialKey, initialQuery]);
+  }, [initialKey, initialQuery, initialPid]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">

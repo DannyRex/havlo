@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchByKey } from "@/lib/search";
-import { pgFtsFindSimilar } from "@/lib/search/pg-fts";
+import { pgFtsFindSimilar, pgFtsFindByProductId } from "@/lib/search/pg-fts";
 import { getServerCountry } from "@/lib/country-server";
 import { isOfferAllowedForCountry } from "@/lib/country";
 import type { SearchOutput, ProductGroup, DupeResult } from "@/lib/search";
@@ -52,19 +52,39 @@ function filterByCountry(
 export async function GET(req: NextRequest) {
   const q   = req.nextUrl.searchParams.get("q")   ?? "";
   const key = req.nextUrl.searchParams.get("key") ?? "";
+  /* Round-4 QA: chip clicks pass `?pid=<product_id>` as a backstop
+     so FTS-flakiness or catalog shift can't surface "Nothing in our
+     local index" for a product the chip pool just promised was
+     comparable across 2+ stores. If the FTS query path returns
+     empty AND we have a pid, fall through to direct DB lookup. */
+  const pid = req.nextUrl.searchParams.get("pid") ?? "";
 
   // Key-based direct lookup (legacy /compare?key= URLs)
   if (key) {
     return NextResponse.json(searchByKey(key), { headers });
   }
 
-  if (!q.trim()) {
+  if (!q.trim() && !pid) {
     return NextResponse.json({ error: "Query required" }, { status: 400 });
   }
 
   try {
-    const result = await pgFtsFindSimilar(q);
     const country = getServerCountry();
+    let result: SearchOutput;
+    /* Primary path: FTS over the user's query. */
+    if (q.trim()) {
+      result = await pgFtsFindSimilar(q);
+    } else {
+      result = { mode: "empty", query: "", suggestions: [] };
+    }
+    /* Backstop: if we have a pid AND the FTS path returned empty,
+       fetch the product directly. This catches chip clicks where
+       the catalog shifted between the chip-pool generation and the
+       click (orphan cleanup, signature merge, etc.) so users always
+       see the comparison the chip promised them. */
+    if (pid && result.mode === "empty") {
+      result = await pgFtsFindByProductId(pid);
+    }
     const filtered = country.code === "ng" ? result : filterByCountry(result, country);
     return NextResponse.json(filtered, { headers });
   } catch (err) {

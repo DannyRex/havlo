@@ -1053,3 +1053,105 @@ export async function pgFtsFindSimilar(
     dupes,
   };
 }
+
+/* Direct product lookup by id. Used as a backstop when a homepage /
+   compare chip click can't be anchored via FTS — typically because
+   the chip data was fresher than what FTS can find right now
+   (catalog shift, signature mismatch, etc.). Round-4 QA: user
+   clicked a chip and got "Nothing in our local index" even though
+   the chip was supposed to guarantee ≥2 stores.
+
+   Same shape as pgFtsFindSimilar — anchor + dupes — but skips the
+   FTS anchor selection entirely and uses the product_id directly.
+   Dupes are still found via FTS over the anchor's title.
+
+   Returns empty if the product_id doesn't exist or has no offers. */
+export async function pgFtsFindByProductId(
+  productId: string,
+  opts?: { limit?: number },
+): Promise<SearchOutput> {
+  const supa = getSupabaseAdmin();
+  if (!supa) return { mode: "empty", query: productId, suggestions: [] };
+  const limit = opts?.limit ?? 16;
+
+  /* Fetch the product + its offers + pool any siblings sharing the
+     same signature (same cross-store-pool behavior as the FTS path). */
+  const { data: product } = await supa
+    .from("products")
+    .select(`
+      id, title, category_slug, brand, image_url, signature,
+      offers (
+        id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
+        stores ( id, name, logo_url, is_international )
+      )
+    `)
+    .eq("id", productId)
+    .maybeSingle();
+
+  if (!product) {
+    return { mode: "empty", query: productId, suggestions: [] };
+  }
+
+  const base = product as unknown as AnchorProduct & { signature: string | null };
+  let anchorPayload: AnchorProduct = base;
+
+  /* Pool siblings by signature (best-effort — fall through silently
+     if the join fails). */
+  if (base.signature && base.signature !== "?|?") {
+    const { data: siblings } = await supa
+      .from("products")
+      .select(`
+        id, title, category_slug, brand, image_url,
+        offers (
+          id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
+          stores ( id, name, logo_url, is_international )
+        )
+      `)
+      .eq("signature", base.signature)
+      .neq("id", productId);
+    if (siblings && siblings.length > 0) {
+      const baseOffers = (base.offers ?? []) as NestedOffer[];
+      const siblingOffers = (siblings as unknown as Array<{ offers: NestedOffer[] }>)
+        .flatMap((s) => s.offers ?? []);
+      anchorPayload = { ...base, offers: [...baseOffers, ...siblingOffers] };
+    }
+  }
+
+  const anchor = buildAnchorGroup(anchorPayload);
+  if (anchor.offers.length === 0) {
+    return { mode: "empty", query: product.title, suggestions: [] };
+  }
+
+  /* Same dupes pipeline as pgFtsFindSimilar — FTS over the anchor's
+     title, then the standard family / variant / price filters. */
+  const { data: similarMatches } = await supa.rpc("search_products_fts", {
+    q: anchor.title,
+    max_results: 60,
+  });
+
+  const dupes: DupeResult[] = ((similarMatches as FtsRow[]) ?? [])
+    .filter((r) => r.product_id !== productId)
+    .filter((r) => !anchor.category || anchor.category === "general" || r.category_slug === anchor.category)
+    .filter((r) => priceInNgn(r.current_price, r.currency) < anchor.bestPrice * 0.99)
+    .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug, r.title))
+    .filter((r) => isUsableMerchantUrl(r.url))
+    .filter((r) => !looksLikeAccessory(r.title))
+    .filter((r) => !looksSuspicious(r.title))
+    .filter((r) => alternativeFamilyMatches(anchor.title, r.title))
+    .map((r) => ftsRowToDupe(r, anchor))
+    .filter((d) => d.savingsPercent > 0)
+    .slice(0, limit * 2)
+    .sort((a, b) => {
+      const aScore = a.similarityScore * 0.55 + Math.min(a.savingsPercent, 80) * 0.45;
+      const bScore = b.similarityScore * 0.55 + Math.min(b.savingsPercent, 80) * 0.45;
+      return bScore - aScore;
+    })
+    .slice(0, limit);
+
+  return {
+    mode: "similar",
+    query: product.title,
+    anchor,
+    dupes,
+  };
+}
