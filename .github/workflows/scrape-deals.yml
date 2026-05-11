@@ -265,3 +265,36 @@ jobs:
       - name: Dedup products
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
         run: npm run dedup
+
+  # ── Job 5: Send the twice-weekly newsletter digest. Runs after
+  #          everything else completes so the digest pulls the
+  #          freshly-deduped catalog, not a half-ingested snapshot.
+  #          Only fires when all upstream jobs succeeded — skipping
+  #          a digest is preferable to sending one built from
+  #          partial / failed data.
+  send-newsletter:
+    needs: [scrape, ingest-aliexpress, ingest-serpapi, ingest-uk-retailers, dedup]
+    if: success()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RESEND_API_KEY:            ${{ secrets.RESEND_API_KEY }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Send digest to active subscribers
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.RESEND_API_KEY != ''
+        run: npm run newsletter:send

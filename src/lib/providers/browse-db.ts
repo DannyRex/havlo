@@ -177,9 +177,15 @@ export const dbBrowseProvider: BrowseProvider = {
     const pageRequests = Array.from({ length: PAGES }, (_, i) =>
       buildQuery().range(i * PAGE, (i + 1) * PAGE - 1),
     );
+    /* getPopularityRecord is wrapped in unstable_cache which throws
+       "Invariant: incrementalCache missing" when called outside a
+       Next.js request context (e.g. from a tsx cron script). The
+       popularity Map is an optional ranking signal — fall back to
+       an empty record on any error so fetchDeals stays callable
+       from both Next routes AND scripts. */
     const [results, popularity] = await Promise.all([
       Promise.all(pageRequests),
-      getPopularityRecord(),
+      getPopularityRecord().catch(() => ({} as Record<string, number>)),
     ]);
 
     /* Stop on first error, surface curated as fallback so the page

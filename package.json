@@ -22,6 +22,8 @@
     "ingest:curated": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-curated-targets.ts",
     "ingest:uk-retailers": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-uk-retailers.ts",
     "dedup": "tsx --tsconfig tsconfig.scripts.json scripts/dedup-products.ts",
+    "newsletter:send": "tsx --tsconfig tsconfig.scripts.json scripts/cron/send-newsletter.ts",
+    "newsletter:dry-run": "tsx --tsconfig tsconfig.scripts.json scripts/cron/send-newsletter.ts --dry-run",
     "test:matcher": "tsx --tsconfig tsconfig.scripts.json scripts/test-matcher.ts",
     "retag": "tsx --tsconfig tsconfig.scripts.json scripts/retag-categories.ts"
   },

@@ -18,11 +18,11 @@ export default function NewsletterStrip() {
           Stay in the loop
         </p>
         <h2 className="text-[24px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight mb-3 sm:mb-4">
-          The best price drops, in your inbox daily.
+          The best price drops, in your inbox.
         </h2>
         <p className="text-sm sm:text-base text-ink-2 max-w-md mx-auto mb-7 sm:mb-8 leading-relaxed">
-          One short email a day. Just the price drops worth opening.
-          Unsubscribe in one click.
+          Two emails a week, Monday and Thursday morning. Just the price
+          drops worth opening. Unsubscribe in one click.
         </p>
         <div className="flex justify-center">
           <EmailCapture heading="" subheading="" source="homepage-strip" />
