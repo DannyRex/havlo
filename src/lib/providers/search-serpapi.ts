@@ -35,6 +35,52 @@ interface SerpResponse {
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
 
+/* Canonicalise the raw source string SerpAPI returns BEFORE it flows
+   into both storeId and storeName. Google Shopping returns the same
+   merchant under several spellings — e.g. "Amazon.co.uk", "Amazon UK",
+   "Amazon.co.uk - Amazon.co.uk-Seller" — each producing a different
+   storeId via inferStoreId() below, and therefore a separate row in
+   the stores table. The UK "local" pool ended up with 35% of its
+   deals split across three Amazon-UK variants (per the post-launch
+   inventory audit), inflating Amazon's apparent dominance and
+   thinning the perceived diversity of UK retailers.
+
+   This normaliser collapses Amazon's country variants to one
+   canonical name + ID per market. Other merchant collapses (e.g.
+   John Lewis & Partners → John Lewis) can be added here too —
+   keep the prefix tests case-insensitive and ordered most-specific
+   first. */
+function canonicaliseSource(raw: string): string {
+  const lc = raw.toLowerCase().trim();
+
+  /* Amazon — collapse all known variants per market.
+     Order matters: ".co.uk" is more specific than bare "amazon",
+     same for ".de" / ".ae" / ".in". The bare "amazon" / "amazon.com"
+     branches sit last so they don't swallow the others. */
+  if (lc.startsWith("amazon.co.uk") || lc.startsWith("amazon uk") ||
+      lc === "amazon.co.uk-seller" || lc.includes("amazon.co.uk-seller")) {
+    return "Amazon UK";
+  }
+  if (lc.startsWith("amazon.de") || lc.startsWith("amazon germany") || lc === "amazon de") {
+    return "Amazon Germany";
+  }
+  if (lc.startsWith("amazon.ae") || lc.startsWith("amazon uae") || lc === "amazon ae") {
+    return "Amazon UAE";
+  }
+  if (lc.startsWith("amazon.in") || lc.startsWith("amazon india") || lc === "amazon in") {
+    return "Amazon India";
+  }
+  if (lc.startsWith("amazon.ca") || lc.startsWith("amazon canada")) {
+    return "Amazon Canada";
+  }
+  if (lc === "amazon" || lc === "amazon.com" || lc.startsWith("amazon.com -") ||
+      lc.startsWith("amazon.com seller") || lc.startsWith("amazon - amazon")) {
+    return "Amazon";
+  }
+
+  return raw;
+}
+
 function inferStoreId(source: string): string {
   return source
     .toLowerCase()
@@ -187,7 +233,13 @@ function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | nu
   const floor: number = inferredCat ? (CATEGORY_USD_FLOOR[inferredCat] ?? 0.5) : 0.5;
   if (sale < floor) return null;
 
-  const storeId = inferStoreId(store);
+  /* Canonicalise the merchant string BEFORE deriving both ID and
+     display name. See canonicaliseSource() at the top of this file
+     for the why — without this, "Amazon UK" and "Amazon.co.uk -
+     Amazon.co.uk-Seller" produce two separate store rows and the
+     UK local pool double-counts Amazon. */
+  const canonicalStore = canonicaliseSource(store);
+  const storeId = inferStoreId(canonicalStore);
 
   return {
     id: `serp-${Date.now().toString(36)}-${i}`,
@@ -196,7 +248,7 @@ function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | nu
     category: "general",
     categorySlug: "all",
     storeId,
-    storeName: store,
+    storeName: canonicalStore,
     originalPrice: original,
     salePrice: sale,
     discountPercent,
