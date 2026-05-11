@@ -73,24 +73,32 @@ export default async function TrendingDeals() {
                     (Best Buy, Currys, ASOS, Macy's, …). NG shoppers
                     DO use these via freight forwarders, but they
                     shouldn't crowd same-day NG retailers out of the
-                    primary 'local' quota. Backfill-only.
+                    primary 'local' quota. Now has its own small
+                    primary quota so it surfaces every rotation.
 
-     Target mix: 50% local, ~37.5% Amazon, ~12.5% AliExpress (8 / 6 / 2
-     of 16). Reasoning:
-       • 50% local keeps the homepage feeling rooted in stores the
-         visitor already trusts and can buy from same-day.
-       • 50% combined Amazon + AliExpress maximises monetised clicks
-         since those are the affiliate networks Havlo actively earns
-         from. Amazon gets the larger slice (higher commission per
-         click + higher cart values + faster delivery via local FBA);
-         AliExpress gets the tail slot for cross-border discovery.
+     Target mix: 55% local, 30% Amazon + AliExpress, ~12.5% intl-other
+     (9 / 4 + 1 / 2 of 16). Reasoning:
+       • 55% local keeps the homepage anchored in stores the visitor
+         already trusts and can buy from same-day. Bumped from 50%
+         after the NG-local audit showed the bucket was being
+         crowded out by intl-other leak.
+       • Amazon + AliExpress combined at 30% keeps the monetised
+         affiliate streams visible without over-rotating to them.
+         Split 4:1 (Amazon:AliExpress) to preserve the prior weight
+         — Amazon has higher commission per click and stronger NG
+         delivery via marketplace sellers.
+       • intl-other gets a small dedicated 2-slot quota (was
+         backfill-only) so cross-border retailers like Currys / Best
+         Buy / John Lewis surface every rotation for shoppers who
+         use freight forwarders.
 
      If a bucket is thin at the current rotation window, the cascade
      backfills from the others — never showing fewer than 16 cards. */
   const TARGET_TOTAL = 16;
-  const Q_LOCAL      = 8;
-  const Q_AMAZON     = 6;
-  const Q_ALIEXPRESS = 2;
+  const Q_LOCAL      = 9;
+  const Q_AMAZON     = 4;
+  const Q_ALIEXPRESS = 1;
+  const Q_INTL_OTHER = 2;
 
   const rng = makeRng(freshnessSeed());
 
@@ -175,6 +183,7 @@ export default async function TrendingDeals() {
   const capLocal      = distinctStoreCap(bucketed.local,      Q_LOCAL);
   const capAmazon     = Math.max(3, distinctStoreCap(bucketed.amazon, Q_AMAZON, 3));
   const capAliExpress = Q_ALIEXPRESS;
+  const capIntlOther  = distinctStoreCap(bucketed["intl-other"], Q_INTL_OTHER, 1);
 
   function fill(bucket: Deal[], quota: number, cap: number): number {
     let added = 0;
@@ -185,9 +194,10 @@ export default async function TrendingDeals() {
     return added;
   }
 
-  fill(bucketed.local,      Q_LOCAL,      capLocal);
-  fill(bucketed.amazon,     Q_AMAZON,     capAmazon);
-  fill(bucketed.aliexpress, Q_ALIEXPRESS, capAliExpress);
+  fill(bucketed.local,         Q_LOCAL,       capLocal);
+  fill(bucketed.amazon,        Q_AMAZON,      capAmazon);
+  fill(bucketed.aliexpress,    Q_ALIEXPRESS,  capAliExpress);
+  fill(bucketed["intl-other"], Q_INTL_OTHER,  capIntlOther);
 
   /* Backfill cascade — ordered by what we'd rather show if a bucket
      under-filled. Local first (trust + same-day delivery), then Amazon
