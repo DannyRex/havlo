@@ -154,7 +154,12 @@ export default function CategorySubscribe({ categorySlug, categoryName, category
           disabled={status === "submitting"}
           aria-invalid={status === "error"}
           aria-describedby={status === "error" ? "category-subscribe-error" : undefined}
-          className="flex-1 sm:w-56 h-9 px-3 rounded-lg border border-border bg-bg text-[13px] text-ink placeholder:text-ink-3/70 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand disabled:opacity-60"
+          /* text-base on mobile (16px) prevents iOS Safari auto-zoom
+             on focus — anything smaller triggers the viewport zoom.
+             sm:text-[13px] restores the compact look on tablet+
+             where there's no zoom hazard. Same pattern the /deals
+             search input uses (DealFeed.tsx:271-272). */
+          className="flex-1 sm:w-56 h-9 px-3 rounded-lg border border-border bg-bg text-base sm:text-[13px] text-ink placeholder:text-ink-3/70 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand disabled:opacity-60"
         />
         <button
           type="submit"
