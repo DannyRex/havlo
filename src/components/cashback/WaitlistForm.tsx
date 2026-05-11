@@ -161,13 +161,20 @@ export default function WaitlistForm({ country, source = "cashback-page", compac
           <p className="text-ink font-semibold mb-1">You&apos;re on the list.</p>
           {compact ? (
             <p className="text-ink-2 text-sm leading-relaxed">
-              We&apos;ll email you when it goes live.
+              We&apos;ll email you when cashback opens.
             </p>
           ) : (
+            /* Replaces the QA-flagged preciousness pattern from the
+               retest report (the "instant-of-launch" phrasing the
+               brand voice rules call out as marketing fluff). The
+               new copy is concrete (launch email, retroactive
+               clicks) and reuses the trust frame ("before anyone
+               else") that runs through the FAQ. */
             <p className="text-ink-2 text-sm leading-relaxed">
-              We&apos;ll email you the moment cashback launches. Until then, keep
-              shopping through Havlo and the rates above will apply retroactively
-              to clicks made while you&apos;re signed up at launch.
+              You&apos;ll get the launch email before anyone else. Until then,
+              keep shopping through Havlo. Any qualifying clicks made between
+              signup and launch will apply retroactively to your balance once
+              we go live.
             </p>
           )}
         </div>

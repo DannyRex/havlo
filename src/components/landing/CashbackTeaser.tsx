@@ -49,32 +49,35 @@ export default function CashbackTeaser() {
             </span>
           </div>
 
-          {/* Headline — drops the "Get paid to shop" cashback-genre
-              cliché. Same observational beat, no trope. */}
+          {/* Headline — mirrors the /cashback hero so the language
+              carries across surfaces. Anyone who sees this teaser and
+              then clicks through reads the same promise reinforced,
+              not a slightly different second pitch. */}
           <h2
             id="cashback-teaser-heading"
             className="text-[24px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight mb-3 sm:mb-4"
           >
-            Money back on the deals you&apos;d buy anyway.
+            Cashback that lands in your bank account.
           </h2>
 
-          {/* Body — direct value prop in the genre convention, with
-              an honest "select stores" qualifier so the claim isn't
-              over-promising. Founder-voice differentiation lives on
-              /[country]/cashback + in the confirmation email; on a
-              teaser the genre wording reads faster.
+          {/* Body — concrete rate up front (teaser surface, the number
+              earns the click), then the founder-voice differentiation
+              ("Cash, not points.") compressed into the punchy two-word
+              coda the /cashback subhead uses. CTA "How it works →"
+              matches the destination page's first H2 so the link
+              promise lines up with what the user lands on.
 
               Hardcoded "5%" rather than {topRate} so a future rate
               shuffle can't accidentally mis-quote the headline number
               without a deliberate copy edit. */}
           <p className="text-sm sm:text-base text-ink-2 max-w-xl mx-auto mb-6 sm:mb-8 leading-relaxed">
-            Earn up to 5% cashback when you shop through select stores
-            on Havlo.{" "}
+            Up to 5% back on select stores when you shop through Havlo. Cash,
+            not points.{" "}
             <Link
               href={`/${country.code}/cashback`}
               className="text-ink font-medium underline underline-offset-2 hover:text-ink-2 transition-colors"
             >
-              Learn more →
+              How it works →
             </Link>
           </p>
 
