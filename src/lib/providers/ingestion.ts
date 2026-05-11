@@ -182,27 +182,49 @@ export async function ingestDeals(
          multi-store. */
       const sigStr = sig.key;
 
-      /* Skip signature-based dedup when brand or model couldn't be
-         parsed. The fallback key '?|?' would otherwise collapse
-         every unbranded product into a single row.
-
-         BUT — without ANY dedup, AliExpress affiliate ingest creates
-         a fresh product row every cron cycle for the same merchant
-         listing (the offer URL stays stable but the signature is
-         unparsable). QA round-3 caught this: a single AliExpress
-         handbag had 20+ duplicate product rows, all surfacing as
-         separate cards in /ng/deals?category=phones. Same listing,
-         same URL, same store, but 20 product_ids.
-
-         Fallback: when signature dedup is unavailable, look up
-         whether this offer's (store_id, url) already maps to a
-         product. If yes, reuse that product. If no, create new.
-         This catches the AliExpress repeat-same-URL case without
-         collapsing distinct products into the '?|?' bucket. */
       const tryDedup = sig.brand !== null && sig.model !== null;
 
+      /* Dedup lookup order (round-4 audit fix):
+           1. ALWAYS check (store_id, url) first. If this exact
+              merchant URL is already in the offers table, reuse
+              the product it points at — no matter what signature
+              dedup would say. This catches the catastrophic case
+              the audit surfaced: 26k products vs 11k offers,
+              4302 titles with 2+ product_ids, 15k orphan products.
+              Root cause was that signature-based dedup failed for
+              unbranded titles AND the fallback was an else-branch,
+              so when sig.brand/model parsed but signature didn't
+              match an existing product, we still inserted a fresh
+              product and re-pointed the offer. Result: the offer
+              upserted (single offer row, store_id+url unique key)
+              but the OLD product became an orphan.
+           2. If (store_id, url) didn't find an existing offer,
+              fall back to signature dedup when brand+model parsed.
+           3. If neither matches, create a new product. */
       let existing: { id: string; image_url: string | null } | null = null;
-      if (tryDedup) {
+
+      const offerUrl = (d.url ?? "").trim();
+      if (offerUrl && d.storeId) {
+        const { data: existingOffer } = await supa
+          .from("offers")
+          .select("product_id")
+          .eq("store_id", d.storeId)
+          .eq("url", offerUrl)
+          .limit(1)
+          .maybeSingle();
+        if (existingOffer?.product_id) {
+          const { data: existingProduct } = await supa
+            .from("products")
+            .select("id, image_url")
+            .eq("id", existingOffer.product_id)
+            .maybeSingle();
+          existing = existingProduct ?? null;
+        }
+      }
+
+      /* Step 2: signature-based dedup, only when (a) we didn't
+         find an existing offer above and (b) brand+model parsed. */
+      if (!existing && tryDedup) {
         const { data } = await supa
           .from("products")
           .select("id, image_url")
@@ -210,28 +232,6 @@ export async function ingestDeals(
           .limit(1)
           .maybeSingle();
         existing = data ?? null;
-      } else {
-        /* Fallback: same store + same URL = same listing. Look up
-           via the offers table since (store_id, url) is the offers
-           uniqueness key. */
-        const offerUrl = (d.url ?? "").trim();
-        if (offerUrl && d.storeId) {
-          const { data: existingOffer } = await supa
-            .from("offers")
-            .select("product_id")
-            .eq("store_id", d.storeId)
-            .eq("url", offerUrl)
-            .limit(1)
-            .maybeSingle();
-          if (existingOffer?.product_id) {
-            const { data: existingProduct } = await supa
-              .from("products")
-              .select("id, image_url")
-              .eq("id", existingOffer.product_id)
-              .maybeSingle();
-            existing = existingProduct ?? null;
-          }
-        }
       }
 
       let productId: string;
