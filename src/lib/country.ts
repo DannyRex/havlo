@@ -36,19 +36,25 @@ export interface Country {
 /* MVP roster — every country here either:
    1. Is where Nigerians actually shop (NG, US, UK, AE, DE, IN, ZA), OR
    2. Is on the SerpAPI ingest country list so live data flows for it.
-   Easy to extend — add a row here and the selector picks it up. */
+   Easy to extend — add a row here and the selector picks it up.
+
+   Ordered alphabetically by display name so the country switcher
+   reads top-to-bottom in the order shoppers would scan it. The
+   DEFAULT_COUNTRY ("ng") is still picked by code, not array
+   position, so reordering doesn't change which country a fresh
+   visitor lands on. */
 export const COUNTRIES: Country[] = [
+  { code: "de", name: "Germany",        flag: "🇩🇪", currency: "EUR", symbol: "€", serpGl: "de" },
+  { code: "in", name: "India",          flag: "🇮🇳", currency: "INR", symbol: "₹", serpGl: "in" },
   { code: "ng", name: "Nigeria",        flag: "🇳🇬", currency: "NGN", symbol: "₦", serpGl: "ng" },
-  { code: "us", name: "United States",  flag: "🇺🇸", currency: "USD", symbol: "$", serpGl: "us" },
+  { code: "za", name: "South Africa",   flag: "🇿🇦", currency: "ZAR", symbol: "R", serpGl: "za" },
+  { code: "ae", name: "UAE",            flag: "🇦🇪", currency: "AED", symbol: "د.إ", serpGl: "ae" },
   /* UK is supported in the UI + data filter, but doesn't monetize yet
      (no Amazon UK Associates, no Awin, no UK-specific affiliate keys
      wired). Outbound clicks to UK retailers fall through /api/go's
      wrapper unchanged → user reaches the merchant, no commission. */
   { code: "uk", name: "United Kingdom", flag: "🇬🇧", currency: "GBP", symbol: "£", serpGl: "uk" },
-  { code: "ae", name: "UAE",            flag: "🇦🇪", currency: "AED", symbol: "د.إ", serpGl: "ae" },
-  { code: "de", name: "Germany",        flag: "🇩🇪", currency: "EUR", symbol: "€", serpGl: "de" },
-  { code: "in", name: "India",          flag: "🇮🇳", currency: "INR", symbol: "₹", serpGl: "in" },
-  { code: "za", name: "South Africa",   flag: "🇿🇦", currency: "ZAR", symbol: "R", serpGl: "za" },
+  { code: "us", name: "United States",  flag: "🇺🇸", currency: "USD", symbol: "$", serpGl: "us" },
 ];
 
 const COUNTRY_BY_CODE = new Map(COUNTRIES.map((c) => [c.code, c]));
