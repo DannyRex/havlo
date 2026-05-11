@@ -30,10 +30,6 @@ import WaitlistForm from "@/components/cashback/WaitlistForm";
 export default function CashbackTeaser() {
   const country = getServerCountry();
   const rates   = getAllCashbackRates();
-  /* Headline rate = highest live percent. Currently 5% (AliExpress).
-     Pulled from the rate map so when a new partner with a higher
-     tier lights up, the headline updates without a copy change. */
-  const topRate = rates.reduce((max, r) => (r.percent > max ? r.percent : max), 0);
 
   return (
     <section
@@ -61,9 +57,18 @@ export default function CashbackTeaser() {
           </h2>
 
           <p className="text-sm sm:text-base text-ink-2 max-w-xl mx-auto mb-6 sm:mb-8 leading-relaxed">
-            Earn up to {topRate}% back when you check out through Havlo&apos;s
-            links. No new app, no points, no expiry. Plain cash, paid to
-            your bank or wallet once you hit the withdrawal minimum.
+            {/* Rates are hardcoded in the founder-voice claim rather
+                than interpolated from the rate map. The map could
+                shift order if a higher-paying partner lights up
+                (then AliExpress wouldn't be "top"). The pills below
+                stay dynamic and show the live truth; the body
+                copy is a hand-authored statement of today's two
+                anchor partners. Update both copy + RATES together
+                if the pairing changes. */}
+            Buy through our links and we share what the merchants pay us.
+            5% at AliExpress, 2% at Amazon today. More stores as we sign
+            them on. Paid in cash to your bank. Not points. Not store
+            credit.
           </p>
 
           {/* Active rates pills — concrete proof, not marketing copy.
@@ -83,7 +88,7 @@ export default function CashbackTeaser() {
                 </span>
               ))}
               <span className="text-[12px] text-ink-3">
-                +more partners as we light up affiliate tags
+                more soon
               </span>
             </div>
           )}
