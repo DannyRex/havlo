@@ -111,7 +111,17 @@ export default function DealFeed() {
   const [category, setCategory] = useState(initialCategory);
   const [tier, setTier]         = useState<DiscountTier>(initialTier);
   const [sort, setSort]         = useState<SortOption>(initialSort);
-  const [search, setSearch]     = useState(initialSearch);
+  /* searchInput is bound to the input box and updates synchronously
+     on every keystroke (so the user sees what they're typing).
+     searchDebounced is the value that actually drives the /api/deals
+     fetch and the URL sync — settles 300ms after typing stops, so
+     fast typing doesn't fire a fetch per keystroke. The previous
+     setup had no debounce; rapid typing produced N in-flight fetches
+     and out-of-order responses overwrote each other, producing the
+     "search/filter isn't working" symptom even though the server was
+     answering each request correctly. */
+  const [searchInput, setSearchInput]       = useState(initialSearch);
+  const [searchDebounced, setSearchDebounced] = useState(initialSearch);
   const [origin, setOrigin]     = useState<OriginFilter>(initialOrigin);
   const [originCounts, setOriginCounts] =
     useState<{ all: number; local: number; intl: number }>();
@@ -133,7 +143,21 @@ export default function DealFeed() {
     window.localStorage.setItem(VIEW_STORAGE_KEY, viewMode);
   }, [viewMode]);
 
+  /* 300ms debounce — settle the search value used for fetching after
+     the user stops typing. The input itself stays responsive because
+     searchInput updates synchronously on every keystroke. */
+  useEffect(() => {
+    const t = setTimeout(() => setSearchDebounced(searchInput), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
   const offsetRef = useRef(0);
+  /* Sequence counter for fetch-race defence. Every fetch effect run
+     increments this; the .then() handler bails out if the counter
+     has moved on. Belt-and-braces alongside the debounce: even with
+     debouncing, a slow first fetch could land after a faster second
+     fetch and clobber the result. */
+  const fetchSeqRef = useRef(0);
   const router = useRouter();
   const { country } = useCountry();
 
@@ -147,16 +171,19 @@ export default function DealFeed() {
     if (category !== "all") p.set("category", category);
     if (tier !== "all")     p.set("minDiscount", tier);
     if (sort)               p.set("sort", sort);
-    if (search)             p.set("search", search);
+    /* Use the debounced search so the fetch only fires after typing
+       settles — see the searchDebounced comment above. */
+    if (searchDebounced)    p.set("search", searchDebounced);
     if (origin !== "all")   p.set("origin", origin);
     p.set("country", country.code);
     p.set("limit",  String(PAGE_SIZE));
     p.set("offset", String(offset));
     return p.toString();
-  }, [category, tier, sort, search, origin, country.code]);
+  }, [category, tier, sort, searchDebounced, origin, country.code]);
 
   // Reset + first page on filter change
   useEffect(() => {
+    const mySeq = ++fetchSeqRef.current;
     setLoading(true);
     setItems([]);
     offsetRef.current = 0;
@@ -164,6 +191,9 @@ export default function DealFeed() {
     fetch(`/api/deals?${buildParams(0)}`)
       .then((r) => r.json())
       .then(({ items, total, hasMore, originCounts, error }) => {
+        /* Bail if a newer fetch has started since we kicked off —
+           prevents stale results from clobbering newer ones. */
+        if (mySeq !== fetchSeqRef.current) return;
         if (error) return;
         setItems(items);
         setTotal(total);
@@ -182,7 +212,12 @@ export default function DealFeed() {
         }
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => {
+        /* Only flip loading off if this is still the latest fetch.
+           Otherwise a stale-fetch finally could clear the loading
+           state mid-way through a newer one's render. */
+        if (mySeq === fetchSeqRef.current) setLoading(false);
+      });
   }, [buildParams]);
 
   /* Sync filter state back to URL so /deals?category=phones updates as
@@ -194,7 +229,10 @@ export default function DealFeed() {
     if (category !== "all") params.set("category", category);
     if (tier !== "all")     params.set("minDiscount", tier);
     if (sort !== "relevance") params.set("sort", sort);
-    if (search.trim())      params.set("search", search.trim());
+    /* URL syncs the DEBOUNCED search — keeping the URL in lockstep
+       with every keystroke would flood router history and update
+       the back-button stack per character. */
+    if (searchDebounced.trim()) params.set("search", searchDebounced.trim());
     if (origin !== "all")   params.set("origin", origin);
 
     const desired = params.toString();
@@ -202,7 +240,7 @@ export default function DealFeed() {
     if (desired === current) return;
 
     router.replace(desired ? `/deals?${desired}` : "/deals", { scroll: false });
-  }, [category, tier, sort, search, origin, router, searchParams]);
+  }, [category, tier, sort, searchDebounced, origin, router, searchParams]);
 
   const loadMore = useCallback(() => {
     if (loadingMore || !hasMore) return;
@@ -261,20 +299,23 @@ export default function DealFeed() {
           type="text"
           aria-label="Filter by product or store, or press Enter to compare across stores"
           placeholder="Filter by product or store…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && search.trim()) {
-              router.push(`/compare?q=${encodeURIComponent(search.trim())}&mode=similar`);
+            if (e.key === "Enter" && searchInput.trim()) {
+              router.push(`/compare?q=${encodeURIComponent(searchInput.trim())}&mode=similar`);
             }
           }}
           className="w-full pl-11 pr-10 py-3 rounded-full text-base text-ink placeholder:text-ink-3 bg-surface border border-border-strong focus:border-brand focus:shadow-input outline-none transition-all"
           style={{ fontSize: "16px" }}
         />
-        {search && (
+        {searchInput && (
           <button
             type="button"
-            onClick={() => setSearch("")}
+            /* Clear both the input AND the debounced filter state
+               so the list returns to "no filter" immediately rather
+               than waiting 300ms. */
+            onClick={() => { setSearchInput(""); setSearchDebounced(""); }}
             aria-label="Clear search"
             className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-ink-3 hover:text-ink transition-colors"
           >
@@ -486,8 +527,10 @@ export default function DealFeed() {
           combos (no search, just filters), keep the lighter "reset
           filters" affordance — the recovery flow doesn't fit there. */}
       {!loading && items.length === 0 && (
-        search.trim() ? (
-          <EmptySearchState query={search.trim()} source="deals" />
+        /* Use the debounced search for empty-state branching —
+           reflects what the server actually filtered against. */
+        searchDebounced.trim() ? (
+          <EmptySearchState query={searchDebounced.trim()} source="deals" />
         ) : (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <Search size={32} className="text-ink-3 mb-3" strokeWidth={1.5} />
@@ -498,7 +541,9 @@ export default function DealFeed() {
             <button
               type="button"
               onClick={() => {
-                setCategory("all"); setTier("all"); setSearch(""); setOrigin("all");
+                setCategory("all"); setTier("all");
+                setSearchInput(""); setSearchDebounced("");
+                setOrigin("all");
               }}
               className="btn-secondary"
             >
