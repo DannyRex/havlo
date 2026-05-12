@@ -189,27 +189,24 @@ export async function GET(req: NextRequest) {
 
   const itemsForResponse = priceFiltered.slice(0, limit);
 
-  /* Write-back to DB. SerpAPI calls cost money; each unique
-     successful response represents knowledge we should keep so the
-     next user searching the same product doesn't trigger another
-     paid call. The full filtered set (not just the sliced view)
-     gets persisted so even rows beyond the user's visible limit
-     contribute to the index.
+  /* Write-back to DB — PAUSED May 2026 to relieve Supabase egress
+     pressure (account hit 127% of 5GB free-tier quota the day this
+     code shipped; the per-day egress chart spiked exactly when this
+     write-back went live).
 
-     Fire-and-forget: the response returns immediately and the DB
-     write happens in the background. ingestDeals has its own error
-     handling + dedup (UNIQUE on store_id + url), so repeat writes
-     of the same offer just refresh `scraped_at`.
+     What it did when enabled: each unique successful SerpAPI response
+     got persisted to the offers table, so future searches for the
+     same product hit our DB index instead of triggering another paid
+     SerpAPI call. The intent was right (turn one paid call into a
+     forever-cached row) but the cost showed up on the wrong line of
+     the bill: SerpAPI savings, Supabase egress hit. Re-enable only
+     after the egress budget is comfortably under quota AND there's a
+     measurable SerpAPI spend justifying the trade.
 
-     Combined with the edge cache below, this is a two-layer cost
-     savings:
-
-       Layer 1 (edge cache):   repeat query within 1h → 0 SerpAPI cost
-       Layer 2 (write-back):   future query (anytime) → DB hit, 0 SerpAPI cost
-
-     Together: hot queries are nearly free (edge cache); cold queries
-     pay once + teach the index forever (write-back). */
-  if (priceFiltered.length > 0) {
+     The edge cache below still gives us the headline cost win for
+     hot queries — repeat searches inside a 1h window cost zero. */
+  void persistLiveResults; // referenced to keep import live; see comment above
+  if (false && priceFiltered.length > 0) {
     void persistLiveResults(q, countryCode, priceFiltered);
   }
 

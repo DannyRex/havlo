@@ -123,9 +123,23 @@ export const dbBrowseProvider: BrowseProvider = {
     const { col, asc } = sortToOrder(q.sort);
 
     /* Build a query factory so we can re-apply the same filters
-       across paginated requests without duplication. */
+       across paginated requests without duplication.
+
+       Column projection is explicit (not select('*')) to shrink the
+       per-row payload. The view exposes ~25 columns; we use 16. At
+       8000 rows per browse fetch that adds up — May 2026 audit traced
+       a chunk of Supabase egress to the .select('*') here. The list
+       below matches BestOfferRow's shape one-to-one. If you add a
+       field to BestOfferRow, add it here too or rowToDeal will
+       silently see undefined. */
+    const COLS = [
+      "product_id", "title", "category_slug", "brand", "image_url",
+      "offer_id", "store_id", "url", "current_price", "original_price",
+      "discount_percent", "currency", "scraped_at",
+      "store_name", "is_international", "store_logo_url",
+    ].join(",");
     const buildQuery = () => {
-      let query = supa.from("product_best_offers").select("*");
+      let query = supa.from("product_best_offers").select(COLS);
       if (q.categorySlug && q.categorySlug !== "all") {
         query = query.eq("category_slug", q.categorySlug);
       }
@@ -178,13 +192,22 @@ export const dbBrowseProvider: BrowseProvider = {
        row 1000 in the discount-DESC pre-sort and never made it
        into /api/deals.
 
-       Fix: fan out 8 parallel range() requests to pull up to 8000
-       rows in one round trip's wall time. The ~5MB total payload
-       is fine for serverless; the parallel requests amortize
-       latency. Revisit when total in-stock offers crosses 20000
-       and switch to cursor-based pagination. */
+       Fix: fan out N parallel range() requests to pull up to N×1000
+       rows in one round trip's wall time. PAGES is tuned below — see
+       its comment for current value + egress-cost reasoning. Revisit
+       when total in-stock offers crosses 20000 and switch to cursor-
+       based pagination. */
     const PAGE = 1000;
-    const PAGES = 8; // 8000-row ceiling
+    /* Halved from 8 → 4 May 2026 after Supabase egress hit 127% of
+       the 5GB free-tier quota. 4000-row ceiling still covers every
+       meaningful sort + filter combo in the current catalog (~7k
+       in-stock offers): discount-DESC pre-sort means the top 4000
+       are always the strongest deals, and origin/category filters
+       narrow the candidate pool further. Re-evaluate when total
+       in-stock offers crosses 15000 and pages start hitting the cap
+       (instrument with a head=true count probe if the list ever
+       feels truncated). */
+    const PAGES = 4; // 4000-row ceiling
     /* Fetch the popularity record (product_id → 30d click count) in
        parallel with the offers fan-out. Cached for 5 min on the JS
        side so this is a single DB call per cache window. Empty
@@ -218,7 +241,12 @@ export const dbBrowseProvider: BrowseProvider = {
     const seenOfferIds = new Set<string>();
     for (const r of results) {
       if (!r.data) continue;
-      for (const row of r.data as BestOfferRow[]) {
+      /* Double cast (via unknown) because the explicit column string
+         passed to .select() makes PostgREST's TS overload return a
+         GenericStringError[] union it can't reconcile to BestOfferRow.
+         The runtime shape is correct — the cast just bypasses the
+         compile-time inference that the explicit projection broke. */
+      for (const row of r.data as unknown as BestOfferRow[]) {
         /* Defensive dedup. The .order(col, asc).order(offer_id, true)
            tiebreaker above SHOULD make this unnecessary, but if the
            underlying view ever changes its identity column name, or

@@ -283,7 +283,13 @@ export default async function ProductPage({ params }: PageProps) {
      the same title (user report May 2026: "filter by iPhone 15 Pro
      shows multiple products on /deals but PDP shows no cheaper
      alternatives"). */
-  const dupes = await pgFtsFindDupes(offer.title, 0, { limit: 16 });
+  /* Limit halved from 16 → 8 May 2026 to relieve Supabase egress
+     (pgFtsFindDupes hydrates per-product offer rows, so doubling the
+     anchor count roughly doubled the egress per PDP view). The "You
+     may also like" rail renders ~6 cards by default with a "Show
+     more" toggle; 8 hydrated candidates is enough headroom for the
+     country filter below to drop a couple and still feel populated. */
+  const dupes = await pgFtsFindDupes(offer.title, 0, { limit: 8 });
 
   /* Drop dupe-offers from stores that aren't appropriate for the
      visitor's market (e.g. NG-anchored Konga rows on a UK PDP).

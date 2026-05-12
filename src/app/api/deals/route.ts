@@ -164,9 +164,20 @@ export async function GET(req: NextRequest) {
     const items = all.slice(offset, offset + limit);
     const hasMore = offset + limit < total;
 
+    /* Cache window bumped May 2026 from s-maxage=60/swr=300 to
+       s-maxage=600/swr=3600 — Supabase egress crossed the free-tier
+       cap (127% on 11 May, charts pinned the spike to fan-out reads
+       from this endpoint). 10 minutes of staleness is invisible to
+       browsers (prices on the deals feed move on hour-scale, not
+       minute-scale) and the SWR window means a stale page renders
+       instantly while a fresh one warms in the background.
+
+       Cache key still varies by full URL (every filter combo gets
+       its own slot), so this won't accidentally serve UK results to
+       NG users or vice versa. */
     return NextResponse.json(
       { items, total, hasMore, originCounts, stores: storesAggregate, provider: provider.id },
-      { headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate=300" } },
+      { headers: { "Cache-Control": "s-maxage=600, stale-while-revalidate=3600" } },
     );
   } catch (err) {
     console.error("[/api/deals]", err);
