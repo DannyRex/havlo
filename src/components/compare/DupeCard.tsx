@@ -5,8 +5,9 @@ import { TrendingDown, ExternalLink, Plane, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { formatPriceForUser, getClickThroughUrl } from "@/lib/utils";
 import { useCountry } from "@/components/providers/CountryProvider";
+import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { trackClick } from "@/lib/trackClick";
-import type { DupeResult } from "@/lib/search";
+import type { DupeResult, StoreOffer } from "@/lib/search";
 
 export default function DupeCard({
   dupe,
@@ -28,6 +29,23 @@ export default function DupeCard({
   const extraStores = dupe.offers.length - 1;
   const [showAll, setShowAll] = useState(false);
   const visibleOffers = showAll ? dupe.offers : dupe.offers.slice(0, 1);
+
+  /* Runtime "INTL for this visitor" check — same fix shape as
+     PriceResults and MasonryCard. The StoreOffer.isInternational
+     flag from pg-fts.ts is a GLOBAL store-currency property
+     (currency === "USD") not a per-visitor judgement, so it
+     misfires for every UK / US / DE retailer when the visitor IS
+     in that retailer's home market. */
+  const isIntlForUser = (offer: Pick<StoreOffer, "storeId" | "storeName" | "currency" | "isInternational">): boolean => {
+    const storeCountry = inferStoreCountry(offer.storeId, offer.storeName);
+    if (storeCountry !== null) {
+      return storeCountry.toLowerCase() !== country.code.toLowerCase();
+    }
+    /* Global cross-border short-circuit before the currency fallback —
+       same fix MasonryCard / PriceResults apply. */
+    if (isGlobalIntlStore(offer.storeId, offer.storeName)) return true;
+    return offer.currency !== country.currency && offer.isInternational;
+  };
 
   return (
     <div className="group relative flex flex-col rounded-2xl border border-border bg-surface overflow-hidden hover:border-border-strong hover:-translate-y-0.5 hover:shadow-card transition-all duration-200">
@@ -125,7 +143,7 @@ export default function DupeCard({
                 />
               </span>
               <span className="truncate">View on {bestOffer.storeName}</span>
-              {bestOffer.isInternational && bestOffer.landedCostExtra > 0 && (
+              {isIntlForUser(bestOffer) && bestOffer.landedCostExtra > 0 && (
                 <Plane size={11} className="text-amber-300 shrink-0" />
               )}
             </span>

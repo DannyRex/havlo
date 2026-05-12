@@ -28,6 +28,7 @@ import {
   USD_FX,
   formatLocal,
   inferStoreCountry,
+  isGlobalIntlStore,
   getCountry,
   type Country,
 } from "@/lib/country";
@@ -107,12 +108,14 @@ export default function ProductHero({ offer, countryCode }: Props) {
      guarantee for the specific item the user lands on. */
   const isPriceFromOnly = isStoreSearchUrl(offer.url);
 
-  /* Cross-border signal — same logic as MasonryCard.isCrossBorderForUser.
-     Uses the store-country roster as the source of truth, falls back
-     to currency mismatch when the store can't be inferred. */
+  /* Cross-border signal — same three-step logic as MasonryCard:
+     store-country roster first, then global-intl short-circuit
+     (catches AliExpress/Shein/Temu/etc.), then currency-mismatch
+     fallback. */
   const dealStoreCountry = inferStoreCountry(offer.storeId, offer.storeName);
   const storeIsLocalToUser = dealStoreCountry !== null && dealStoreCountry.toLowerCase() === country.code.toLowerCase();
-  const isCrossBorder      = !storeIsLocalToUser && !sameCcy;
+  const storeIsGlobalIntl  = dealStoreCountry === null && isGlobalIntlStore(offer.storeId, offer.storeName);
+  const isCrossBorder      = !storeIsLocalToUser && (storeIsGlobalIntl || !sameCcy);
 
   /* Resolved /api/go URL for the View-at-merchant CTA. The wrapper
      attaches the title + storeId + storeName fallback hints so

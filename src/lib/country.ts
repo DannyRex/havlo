@@ -216,6 +216,38 @@ const NG_STORES = [
   "okadabooks",
 ];
 
+/* Stores that are NEVER local to any country — universal cross-border
+   shippers. AliExpress, Shein, Temu, etc. ship globally and serve
+   no single market as "local". The bucketing logic uses this list
+   to short-circuit the currency-match fallback, which otherwise
+   misclassifies AliExpress (USD-priced) as US-local for US shoppers,
+   DHgate (USD-priced) as US-local, etc.
+
+   Substring match on storeId/storeName. Each entry MUST be specific
+   enough that it can't false-match a regional retailer (e.g.
+   "aliexpress" rather than "express" which would catch American
+   Eagle's "Express" brand). */
+export const GLOBAL_INTL_STORES = [
+  "aliexpress",
+  "shein",
+  "temu",
+  "dhgate",
+  "banggood",
+  "wish.com",
+  "alibaba",
+  "lightinthebox",
+  "geekbuying",
+  "trendyol", // Turkish marketplace, ships globally
+];
+
+/** True if the store is a universal cross-border / global shipper
+    that should NEVER be flagged as local to any specific country. */
+export function isGlobalIntlStore(storeId: string, storeName: string): boolean {
+  const id = lc(storeId);
+  const name = lc(storeName);
+  return matchesAny(id, GLOBAL_INTL_STORES) || matchesAny(name, GLOBAL_INTL_STORES);
+}
+
 /* Per-country anchored stores. The filter doesn't strictly require
    these (untagged intl rows pass through too) but having them mapped
    lets future code prioritize "real" country stores in ranking +
@@ -238,12 +270,25 @@ export const COUNTRY_STORES: Record<string, string[]> = {
     "jd sports", "jd-sports", "jdsports",
     "dunelm",
     "smyths", "smyths toys",
+    /* v3 additions: QVC UK leaks into US pool without an explicit
+       UK entry (US bucketing was matching it via currency fallback).
+       qvc-uk / qvc.co.uk are specific enough to avoid catching the
+       US QVC parent. */
+    "qvc-uk", "qvc.co.uk", "qvc uk",
   ],
   us: [
     "amazon.com", "walmart", "best buy", "bestbuy", "target", "newegg",
     "ebay", "home depot", "homedepot", "macy", "kohl", "costco", "bjs",
     "nordstrom", "sephora", "ulta", "wayfair", "etsy", "lowes", "lowe's",
     "staples", "gap", "old navy", "oldnavy", "nike", "adidas",
+    /* v3 additions: GameStop primarily ships US (occasionally
+       cross-border but anchored in the US market). QVC parent is
+       US-anchored — QVC UK has its own UK roster entry which
+       takes precedence in inferStoreCountry's first-match-wins
+       iteration. */
+    "gamestop", "qvc.com", "qvc-com",
+    "fashion nova", "fashion-nova",
+    "dick's sporting", "dick-s-sporting", "dicks sporting",
   ],
   de: [
     "amazon.de", "mediamarkt", "media-markt", "saturn", "otto", "zalando",
@@ -261,7 +306,12 @@ export const COUNTRY_STORES: Record<string, string[]> = {
     "reliancedigital", "vijay sales", "vijaysales", "shopclues",
   ],
   za: [
-    "takealot", "makro", "game", "loot.co.za", "loot", "wantitall",
+    /* v3: tightened "game" → "game.co.za" / "game stores" because the
+       bare "game" substring matched "GameStop" (US), "Game Loot"
+       (cross-border indie), "Games" generic — leaking those into the
+       ZA local pool. The SA "Game" chain consistently appears as
+       its domain or with " Stores" suffix in SerpAPI source strings. */
+    "takealot", "makro", "game.co.za", "game stores", "loot.co.za", "loot", "wantitall",
     "yuppiechef", "superbalist", "zando", "everyshop", "incredible connection",
     "incredibleconnection", "checkers", "pick n pay", "picknpay",
   ],

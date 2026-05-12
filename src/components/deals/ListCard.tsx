@@ -15,7 +15,7 @@ import {
 } from "@/lib/utils";
 import InfoTip from "@/components/ui/InfoTip";
 import { useCountry } from "@/components/providers/CountryProvider";
-import { USD_FX, formatLocal, inferStoreCountry, type Country } from "@/lib/country";
+import { USD_FX, formatLocal, inferStoreCountry, isGlobalIntlStore, type Country } from "@/lib/country";
 import type { Deal } from "@/types";
 
 /* Convert any Deal price (NGN or USD) into the user's preferred
@@ -120,9 +120,14 @@ export default function ListCard({ deal }: Props) {
      applied in MasonryCard. SerpAPI normalises all UK retailer
      prices to USD, so a currency-only check would mark every Argos
      row as cross-border for UK users. */
+  /* Three-step cross-border check (matches MasonryCard exactly).
+     Step 2 — the global-intl short-circuit — fixes AliExpress /
+     Shein / Temu being flagged as local for US users by the bare
+     currency-match fallback. */
   const dealStoreCountry = inferStoreCountry(deal.storeId, deal.storeName);
   const storeIsLocalToUser = dealStoreCountry !== null && dealStoreCountry.toLowerCase() === country.code.toLowerCase();
-  const isCrossBorder = !storeIsLocalToUser && !sameCcy;
+  const storeIsGlobalIntl  = dealStoreCountry === null && isGlobalIntlStore(deal.storeId, deal.storeName);
+  const isCrossBorder = !storeIsLocalToUser && (storeIsGlobalIntl || !sameCcy);
   const landedNgnStr = isCrossBorder ? `≈ ${formatLocal(Math.round(primarySale * 1.30), country)}` : null;
 
   return (

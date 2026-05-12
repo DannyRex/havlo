@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
-import { filterDealsForCountry, getCountry, inferStoreCountry } from "@/lib/country";
+import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import type { OriginFilter, SortOption } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -112,6 +112,13 @@ export async function GET(req: NextRequest) {
       if (storeCountry !== null) {
         return storeCountry.toLowerCase() === country.code.toLowerCase();
       }
+      /* Explicit global cross-border stores (AliExpress, Shein, Temu,
+         DHgate, …) are NEVER local. Without this short-circuit the
+         currency fallback below misclassifies USD-priced AliExpress
+         rows as "local" for US visitors (US currency = USD) — exactly
+         the bug the May 2026 cross-country audit caught (AliExpress
+         was the top store in the US "local" pool at 63 deals). */
+      if (isGlobalIntlStore(d.storeId, d.storeName)) return false;
       // Fallback to currency match when store country can't be inferred
       return d.currency === country.currency;
     };

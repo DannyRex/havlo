@@ -23,7 +23,7 @@ import {
 } from "@/lib/utils";
 import { useCountry } from "@/components/providers/CountryProvider";
 import {
-  USD_FX, formatLocal, inferStoreCountry, type Country,
+  USD_FX, formatLocal, inferStoreCountry, isGlobalIntlStore, type Country,
 } from "@/lib/country";
 import { getCashbackForStore } from "@/lib/cashback";
 import InfoTip from "@/components/ui/InfoTip";
@@ -204,9 +204,19 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
      → no INTL badge. AliExpress / Shein → null → cross-border →
      INTL badge stays. The currency-mismatch is now a fall-back
      signal only when store country is unknown. */
+  /* Cross-border classification — three-step decision:
+       1. If inferStoreCountry returns a country, store is local
+          IFF it matches the user's country.
+       2. If store has no country anchor BUT is in GLOBAL_INTL_STORES
+          (AliExpress, Shein, Temu, DHgate…), it's ALWAYS cross-
+          border, regardless of currency match. This fixes the
+          previous bug where AliExpress (USD-priced) flagged as
+          "local" for US users via the currency fallback.
+       3. Otherwise fall back to currency-mismatch. */
   const dealStoreCountry = inferStoreCountry(deal.storeId, deal.storeName);
   const storeIsLocalToUser = dealStoreCountry !== null && dealStoreCountry.toLowerCase() === country.code.toLowerCase();
-  const isCrossBorderForUser = !storeIsLocalToUser && !sameCcy;
+  const storeIsGlobalIntl  = dealStoreCountry === null && isGlobalIntlStore(deal.storeId, deal.storeName);
+  const isCrossBorderForUser = !storeIsLocalToUser && (storeIsGlobalIntl || !sameCcy);
   const showIntl = showOriginBadge && isCrossBorderForUser;
 
   return (

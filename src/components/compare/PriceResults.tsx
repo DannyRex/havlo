@@ -4,8 +4,9 @@ import Image from "next/image";
 import { ExternalLink, Trophy, Truck, Globe, Star } from "lucide-react";
 import { formatPriceForUser, proxiedImageUrl, cleanTitle } from "@/lib/utils";
 import { useCountry } from "@/components/providers/CountryProvider";
+import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { trackClick } from "@/lib/trackClick";
-import type { ProductGroup } from "@/lib/search";
+import type { ProductGroup, StoreOffer } from "@/lib/search";
 
 export default function PriceResults({
   group,
@@ -18,6 +19,36 @@ export default function PriceResults({
 }) {
   const { country } = useCountry();
   const { offers, bestPrice, maxSavings, title, imageUrl, imageEmoji, imageGradient, category, storeCount } = group;
+
+  /* Compute "INTL for this visitor" at the UI layer rather than
+     trusting the StoreOffer.isInternational flag from pg-fts.ts.
+
+     The flag comes from stores.is_international in the DB, which
+     was set at ingest time to `currency === "USD"`. Since SerpAPI
+     normalises every UK / US / DE / AE / IN / ZA retailer's price
+     to USD, the flag fires `true` for the WHOLE non-NG roster,
+     making every Argos / Currys / Walmart / MediaMarkt /  card
+     in compare results render an INTL badge regardless of the
+     visitor's actual country.
+
+     Same fix MasonryCard applies on /deals: a deal is "INTL for
+     me" if the store's anchored country (via inferStoreCountry's
+     COUNTRY_STORES roster lookup) is NOT my country. Falls back to
+     the currency check when the store can't be inferred (rare,
+     niche scrapers). */
+  const isIntlForUser = (offer: Pick<StoreOffer, "storeId" | "storeName" | "currency" | "isInternational">): boolean => {
+    const storeCountry = inferStoreCountry(offer.storeId, offer.storeName);
+    if (storeCountry !== null) {
+      return storeCountry.toLowerCase() !== country.code.toLowerCase();
+    }
+    /* Explicit global cross-border stores (AliExpress, Shein, Temu,
+       DHgate, …) are ALWAYS intl regardless of currency. Without
+       this short-circuit AliExpress USD-priced rows flagged as local
+       for US visitors (US currency = USD). */
+    if (isGlobalIntlStore(offer.storeId, offer.storeName)) return true;
+    /* Unknown store → fall back to currency mismatch. */
+    return offer.currency !== country.currency && offer.isInternational;
+  };
 
   return (
     <div>
@@ -117,7 +148,7 @@ export default function PriceResults({
                   {isBest && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/20 text-success font-semibold uppercase tracking-wide">Best</span>
                   )}
-                  {p.isInternational && (
+                  {isIntlForUser(p) && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-medium flex items-center gap-1">
                       <Globe size={9} /> INTL
                     </span>

@@ -9,7 +9,7 @@ import {
 } from "@/lib/utils";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import { useCountry } from "@/components/providers/CountryProvider";
-import { USD_FX, formatLocal } from "@/lib/country";
+import { USD_FX, formatLocal, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import type { Deal } from "@/types";
 
 interface Props {
@@ -36,19 +36,40 @@ function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
     : null;
   const hasDiscount = deal.originalPrice > deal.salePrice && deal.discountPercent > 0;
 
-  /* Country chip — show the specific code when SerpAPI tagged it
-     ("country:us" → "US"); fall back to "INTL" for items that came
-     from pg-fts (DB) and have an "intl" tag but no country code; hide
-     entirely for known-local items. Keeps the chip visually consistent
-     across all live cards instead of appearing/disappearing. */
+  /* Country chip — three sources, in order:
+       1. SerpAPI's specific country tag (`country:us` → `US`)
+       2. Tagged "intl" / "live" → fall back to `INTL`
+       3. Nothing.
+
+     Then suppress the chip entirely when the store's anchored
+     country matches the visitor's country (using inferStoreCountry,
+     same roster as MasonryCard / PriceResults). Without this
+     suppression, a UK user looking at Argos would see "UK" or
+     "INTL" on every card — visually noisy and incorrectly
+     classifying a local retailer as cross-border. */
   const countryTag = deal.tags.find((t) => t.startsWith("country:"))?.split(":")[1];
   const isIntl = deal.tags.includes("intl") || deal.tags.includes("live");
+  const storeCountry = inferStoreCountry(deal.storeId, deal.storeName);
+  const storeIsLocalToUser =
+    storeCountry !== null && storeCountry.toLowerCase() === country.code.toLowerCase();
+  /* Global cross-border stores (AliExpress, Shein, Temu, …) always
+     show the INTL chip regardless of the user's currency match —
+     mirroring the same short-circuit MasonryCard / PriceResults
+     / DupeCard apply. Without this, AliExpress USD-priced live
+     results suppressed the chip for US users. */
+  const storeIsGlobalIntl = storeCountry === null && isGlobalIntlStore(deal.storeId, deal.storeName);
   /* Renamed from `country` (collided with the user-country from
      useCountry above, added during the round-4 currency-display
      fix). */
-  const dealCountryChip = countryTag
-    ? countryTag.toUpperCase()
-    : (isIntl ? "INTL" : null);
+  const dealCountryChip = storeIsLocalToUser
+    ? null
+    : storeIsGlobalIntl
+      ? "INTL"
+      : countryTag
+        ? countryTag.toUpperCase()
+        : isIntl
+          ? "INTL"
+          : null;
 
   return (
     <a

@@ -3,7 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 import { categories } from "@/lib/data/categories";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
-import { filterDealsForCountry, inferStoreCountry } from "@/lib/country";
+import { filterDealsForCountry, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import type { Deal } from "@/types";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
@@ -79,6 +79,12 @@ export default async function CategoryGrid() {
   const isLocalToUser = (d: Deal): boolean => {
     const sc = inferStoreCountry(d.storeId, d.storeName);
     if (sc !== null) return sc.toLowerCase() === country.code.toLowerCase();
+    /* Global cross-border stores (AliExpress, Shein, Temu, …) are
+       NEVER local. Without this short-circuit AliExpress USD-priced
+       rows misclassified as local for US visitors via the bare
+       currency-match fallback below — same fix shape applied across
+       /api/deals + all card components. */
+    if (isGlobalIntlStore(d.storeId, d.storeName)) return false;
     return d.currency === country.currency;
   };
 
