@@ -40,27 +40,59 @@ interface Props {
 export default function StoreFilter({ stores, selected, onChange }: Props) {
   const [open, setOpen]     = useState(false);
   const [search, setSearch] = useState("");
-  /* Two refs because the panel renders in two different DOM
-     positions:
-       - Desktop popover: child of `rootRef` (the trigger's wrapper),
-         so `rootRef.contains()` detects clicks inside it.
-       - Mobile sheet:    portalled to document.body, OUTSIDE
-         `rootRef`. Without `sheetPanelRef`, the outside-click
-         handler fired setOpen(false) the moment a user tapped any
-         store button inside the sheet — exactly the bug reported
-         May 2026 ("selecting a store from the popup, no filter
-         applied, popup just closes"). */
-  const rootRef       = useRef<HTMLDivElement | null>(null);
-  const sheetPanelRef = useRef<HTMLDivElement | null>(null);
+  /* Both panel surfaces are portalled to document.body so they
+     escape the parent filter bar's overflow-x-auto clipping
+     context (which would otherwise crop the popover's lower half
+     on desktop AND the entire sheet on mobile).
 
-  /* Close on outside click — popover pattern. Now treats BOTH the
-     trigger's wrapper AND the portalled mobile sheet's panel as
-     "inside", so multi-store selection works on every viewport. */
+     Three refs:
+       - rootRef:        wraps the trigger button. Outside-click
+                         treats clicks inside as "inside" so tapping
+                         the trigger again toggles closed normally.
+       - desktopPanelRef on the desktop popover.
+       - sheetPanelRef   on the mobile bottom-sheet panel.
+     The mousedown listener treats all three as "inside" so taps
+     on store rows inside either panel never bubble out and
+     close the surface prematurely. */
+  const rootRef          = useRef<HTMLDivElement | null>(null);
+  const triggerRef       = useRef<HTMLButtonElement | null>(null);
+  const desktopPanelRef  = useRef<HTMLDivElement | null>(null);
+  const sheetPanelRef    = useRef<HTMLDivElement | null>(null);
+
+  /* Trigger's viewport rect. Computed when the popover opens so the
+     portalled desktop panel can position itself directly under the
+     trigger button. Recomputed on scroll/resize so the panel tracks
+     the button if either moves. */
+  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const updateRect = () => {
+      const r = triggerRef.current?.getBoundingClientRect();
+      if (r) setTriggerRect(r);
+    };
+    updateRect();
+    /* Track scroll + resize so the popover doesn't drift away from
+       the trigger if the user scrolls the page (rare but possible
+       since the filter bar is sticky). */
+    window.addEventListener("scroll", updateRect, true);
+    window.addEventListener("resize", updateRect);
+    return () => {
+      window.removeEventListener("scroll", updateRect, true);
+      window.removeEventListener("resize", updateRect);
+    };
+  }, [open]);
+
+  /* Close on outside click. Treats the trigger wrapper, the
+     desktop popover panel, and the mobile sheet panel as "inside"
+     so taps inside any of them don't bubble out and close the
+     surface before the inner onClick handlers fire. */
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
       const t = e.target as Node;
       if (rootRef.current?.contains(t)) return;
+      if (desktopPanelRef.current?.contains(t)) return;
       if (sheetPanelRef.current?.contains(t)) return;
       setOpen(false);
     };
@@ -186,9 +218,34 @@ export default function StoreFilter({ stores, selected, onChange }: Props) {
     </>
   );
 
+  /* Desktop popover position — anchored to the trigger's right edge,
+     drops below the trigger by 6px. Falls back to (0,0) until the
+     first measurement lands; CSS visibility-hidden could replace
+     the brief mispositioned flash but the simpler approach is to
+     skip render until rect exists. */
+  const PANEL_W = 288; // matches w-72
+  const desktopStyle: React.CSSProperties | undefined = triggerRect
+    ? {
+        position: "fixed",
+        top:  triggerRect.bottom + 6,
+        /* Keep the panel inside the viewport when the trigger sits
+           near the right edge. Clamp the left coord between 8 (safe
+           margin) and (viewportWidth - PANEL_W - 8). */
+        left: Math.max(
+          8,
+          Math.min(
+            (typeof window !== "undefined" ? window.innerWidth : PANEL_W + 32) - PANEL_W - 8,
+            triggerRect.right - PANEL_W,
+          ),
+        ),
+        width: PANEL_W,
+      }
+    : undefined;
+
   return (
     <div ref={rootRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
@@ -207,17 +264,27 @@ export default function StoreFilter({ stores, selected, onChange }: Props) {
         )}
       </button>
 
-      {/* Desktop popover — anchored absolutely beneath the trigger.
-          Renders only at md+ so mobile gets the sheet instead. */}
-      {open && (
-        <div
-          role="listbox"
-          aria-label="Filter by store"
-          className="hidden md:block absolute z-40 mt-1.5 right-0 w-72 rounded-2xl border border-border bg-bg shadow-2xl"
-        >
-          {panelBody}
-        </div>
-      )}
+      {/* Desktop popover — portalled to document.body with fixed
+          positioning so the parent filter bar's overflow-x-auto
+          doesn't clip the lower half of the panel. The previous
+          inline absolute-positioned version rendered correctly but
+          the clipped portion made the store list visually present
+          yet non-interactive (user report: "stores not clickable
+          on desktop"). md:block keeps it hidden below the md
+          breakpoint where the mobile sheet handles things. */}
+      {open && desktopStyle && typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={desktopPanelRef}
+            role="listbox"
+            aria-label="Filter by store"
+            style={desktopStyle}
+            className="hidden md:block z-50 rounded-2xl border border-border bg-bg shadow-2xl"
+          >
+            {panelBody}
+          </div>,
+          document.body,
+        )}
 
       {/* Mobile bottom sheet — portalled to document.body so it
           escapes the parent's overflow-x-auto clipping context.
