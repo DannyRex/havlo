@@ -33,6 +33,7 @@ import { scrapeHealthPlus } from "./scrapers/healthplus.js";
 import { scrapeSupermart }  from "./scrapers/supermart.js";
 import { scrapeMedPlus }    from "./scrapers/medplus.js";
 import { scrapeEssenza }    from "./scrapers/essenza.js";
+import { scrapeAjebomarket } from "./scrapers/ajebomarket.js";
 /* Disabled NG scrapers — files retained, imports commented. To
    revive one: verify selectors against live HTML, uncomment the
    import + matching entry in the orchestrator below. */
@@ -239,6 +240,10 @@ async function main() {
     { name: "Supermart",  probe: "https://www.supermart.ng/",                     fn: () => scrapeSupermart(page) },
     { name: "MedPlus",    probe: "https://medplusnig.com/",                       fn: () => scrapeMedPlus(page) },
     { name: "Essenza",    probe: "https://www.essenza.ng/",                       fn: () => scrapeEssenza(page) },
+    /* Ajebomarket — Shopify-hosted NG marketplace. robots.txt
+       confirms Shopify; /products.json responds 200. No browser
+       needed, fetch-only path through _shopify-json.ts. */
+    { name: "Ajebomarket", probe: "https://ajebomarket.com/",                     fn: () => scrapeAjebomarket(page) },
     /* ── Still disabled — need per-site verification ──
        These were stamped from one template that didn't fit. Each
        needs the same kind of investigation HealthPlus / Supermart /

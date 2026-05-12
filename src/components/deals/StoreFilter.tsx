@@ -35,9 +35,15 @@ interface Props {
   stores:   StoreOption[];
   selected: Set<string>;
   onChange: (next: Set<string>) => void;
+  /** When true, the trigger button stretches to fill its parent's
+      width and aligns its content with `justify-between` (label
+      left, optional count right). Used on mobile /deals where the
+      button gets `flex-1` from its parent to fill the empty space
+      that was sitting to the right of the tier pills. */
+  fillRow?: boolean;
 }
 
-export default function StoreFilter({ stores, selected, onChange }: Props) {
+export default function StoreFilter({ stores, selected, onChange, fillRow = false }: Props) {
   const [open, setOpen]     = useState(false);
   const [search, setSearch] = useState("");
   /* Both panel surfaces are portalled to document.body so they
@@ -261,7 +267,7 @@ export default function StoreFilter({ stores, selected, onChange }: Props) {
     : undefined;
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className={fillRow ? "relative w-full" : "relative"}>
       <button
         ref={triggerRef}
         type="button"
@@ -269,16 +275,29 @@ export default function StoreFilter({ stores, selected, onChange }: Props) {
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] sm:text-xs whitespace-nowrap transition-colors border",
+          "items-center gap-1.5 px-3 py-1 rounded-full text-[12px] sm:text-xs whitespace-nowrap transition-colors border",
+          fillRow
+            /* `w-full justify-between` makes the pill stretch to the
+                parent's width with label hugging the left and the
+                count badge (when present) on the right. ChevronDown
+                cap on the right edge signals it's a dropdown control,
+                not just a static label. */
+            ? "flex w-full justify-between"
+            : "inline-flex",
           selectedCount > 0
             ? "bg-ink text-bg border-ink font-semibold"
             : "bg-surface-2 text-ink-2 border-border hover:text-ink",
         )}
       >
-        <StoreIcon size={12} strokeWidth={2.25} aria-hidden="true" />
-        <span>Stores</span>
-        {selectedCount > 0 && (
-          <span className="tabular-nums">({selectedCount})</span>
+        <span className="inline-flex items-center gap-1.5">
+          <StoreIcon size={12} strokeWidth={2.25} aria-hidden="true" />
+          <span>Stores</span>
+          {selectedCount > 0 && (
+            <span className="tabular-nums">({selectedCount})</span>
+          )}
+        </span>
+        {fillRow && (
+          <span aria-hidden="true" className="text-[10px] opacity-70">▾</span>
         )}
       </button>
 

@@ -457,34 +457,14 @@ export default function DealFeed() {
             dropdown on its own line in mobile"). */}
         <CategoryNav active={category} onChange={setCategory} />
 
-        {/* Row 2 (mobile-only) — dedicated sort row.
-            Deal count on the left, sort pill on the right. Sits
-            between CategoryNav and the tier-pills row so the
-            primary sort control is visible without horizontal-
-            scrolling the tier row. */}
-        <div className="sm:hidden mt-3 flex items-center justify-between gap-2">
-          {!loading && (
-            <span className="text-xs text-ink-3 tabular-nums">
-              {total.toLocaleString()} deals
-            </span>
-          )}
-          <div className="relative ml-auto">
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortOption)}
-              aria-label="Sort deals"
-              className="appearance-none bg-surface-2 border border-border rounded-full pl-3.5 pr-8 py-1.5 text-xs text-ink hover:border-border-strong outline-none cursor-pointer transition-colors"
-            >
-              {SORTS.map(({ value, label }) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-3 text-[10px]">▾</span>
-          </div>
-        </div>
-
-        <div className="mt-3 flex items-center justify-between gap-3 overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-1 flex-shrink-0">
+        {/* Mobile filter row — tier pills cluster shrink-0 on the
+            left, Stores filter button expands to fill remaining
+            width (was a tight chip with awkward empty space to its
+            right). The cluster as a whole has overflow-x-auto so
+            many tier pills can still scroll horizontally if needed,
+            but in practice 4 tier buttons + sliders icon fit. */}
+        <div className="mt-3 flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1 flex-shrink-0 overflow-x-auto no-scrollbar">
             <SlidersHorizontal size={13} className="text-ink-3 mr-1.5" />
             {TIERS.map(({ value, label }) => (
               <button
@@ -500,28 +480,27 @@ export default function DealFeed() {
                 {label}
               </button>
             ))}
-            {/* Stores filter — sits inline with discount tiers in the
-                left cluster of the filter bar. Only renders once the
-                first /api/deals response has populated storeOptions so
-                we don't show an empty popover during initial load.
-                Hidden behind a length check rather than always-on so
-                empty-state queries (zero results) don't show a useless
-                "Stores" button next to "0 deals". */}
-            {storeOptions.length > 0 && (
-              <div className="ml-1.5">
-                <StoreFilter
-                  stores={storeOptions}
-                  selected={selectedStores}
-                  onChange={setSelectedStores}
-                />
-              </div>
-            )}
           </div>
+          {/* Stores filter takes the remaining width on mobile so
+              the button reads as a full action surface (was a
+              tight pill with empty space to the right). On desktop
+              it stays inline-flex / intrinsic width since the
+              right cluster (deal count + sort) sits beside it. */}
+          {storeOptions.length > 0 && (
+            <div className="flex-1 sm:flex-none ml-1.5">
+              <StoreFilter
+                stores={storeOptions}
+                selected={selectedStores}
+                onChange={setSelectedStores}
+                fillRow
+              />
+            </div>
+          )}
 
-          {/* Right cluster — desktop only. Mobile sort lives in Row 1
-              above; the deal count chip below the filter bar covers
-              the mobile count surface. */}
-          <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
+          {/* Right cluster — desktop only. Mobile sort lives in the
+              view-mode toggle row right above the grid (grid/list
+              left, sort right). */}
+          <div className="hidden sm:flex items-center gap-3 flex-shrink-0 ml-auto">
             {!loading && (
               <span className="text-xs text-ink-3 tabular-nums">
                 {total.toLocaleString()} deals
@@ -562,14 +541,15 @@ export default function DealFeed() {
         );
       })()}
 
-      {/* Mobile-only view-mode toggle. Deal count moved out of this
-          row (lives in the sticky sort row now) so this strip is
-          just the grid/list switcher, right-aligned. */}
-      <div className="flex items-center justify-end mb-3 sm:hidden">
+      {/* Mobile-only row above the grid: view-mode toggle on the
+          LEFT, Sort dropdown on the RIGHT. Grouped together because
+          both control how the grid below looks — feels like one
+          "shape this view" line. */}
+      <div className="flex items-center justify-between gap-3 mb-3 sm:hidden">
         <div
           role="group"
           aria-label="View mode"
-          className="flex items-center gap-0.5 rounded-full bg-surface-2 border border-border p-0.5 ml-auto"
+          className="flex items-center gap-0.5 rounded-full bg-surface-2 border border-border p-0.5"
         >
           <button
             type="button"
@@ -597,6 +577,20 @@ export default function DealFeed() {
           >
             <List size={14} strokeWidth={viewMode === "list" ? 2.5 : 2} />
           </button>
+        </div>
+
+        <div className="relative">
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortOption)}
+            aria-label="Sort deals"
+            className="appearance-none bg-surface-2 border border-border rounded-full pl-3.5 pr-8 py-1.5 text-xs text-ink hover:border-border-strong outline-none cursor-pointer transition-colors"
+          >
+            {SORTS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+          <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-3 text-[10px]">▾</span>
         </div>
       </div>
 

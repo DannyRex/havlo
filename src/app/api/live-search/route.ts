@@ -19,6 +19,7 @@ import { filterDealsForCountry } from "@/lib/country";
 import { detectFamily, alternativeFamilyMatches } from "@/lib/search/families";
 import { priceLooksPlausibleForLiveDeal } from "@/lib/search/price-floor";
 import { ingestDeals } from "@/lib/providers/ingestion";
+import { withinBudget, recordSerpApiCall } from "@/lib/serpapi-budget";
 import type { Deal } from "@/types";
 
 export async function GET(req: NextRequest) {
@@ -48,10 +49,46 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  /* Monthly budget gate. When SerpAPI usage crosses 80% of the
+     monthly cap, this route stops making paid calls for the rest of
+     the month and returns an empty live-results set with a note.
+     The UI's existing fall-through (DB matches from /api/compare)
+     keeps the search surface functional. Background ingest jobs
+     consume the remaining 20% headroom for scheduled scrapes.
+
+     Failsafe: withinBudget returns `allowed: true` on Supabase
+     unreachability — never silently kill live search because of a
+     DB outage. */
+  const budget = await withinBudget();
+  if (!budget.allowed) {
+    console.warn(
+      `[live-search] monthly budget threshold hit: ${budget.calls}/${budget.cap} for ${budget.monthKey}`,
+    );
+    return NextResponse.json(
+      {
+        items: [],
+        providers: [],
+        note: "Live search paused for the rest of this month — monthly budget reached. Returning catalog-only results via /api/compare and /api/deals.",
+        budget: { calls: budget.calls, cap: budget.cap, monthKey: budget.monthKey },
+      },
+      /* Short cache so we re-check budget within minutes if a
+         human edits the cap row in Supabase to raise the limit. */
+      { headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate=600" } },
+    );
+  }
+
   // Run all providers in parallel; per-provider failures don't break the request
   const results = await Promise.allSettled(
     providers.map((p) => p.searchDeals({ q, countryCode, limit })),
   );
+
+  /* Record one credit per provider that succeeded (each provider
+     call hits its own upstream API). Fire-and-forget — the counter
+     is a soft cap; missing a write isn't a correctness issue. */
+  const successfulProviderCount = results.filter((r) => r.status === "fulfilled").length;
+  if (successfulProviderCount > 0) {
+    void recordSerpApiCall(successfulProviderCount);
+  }
 
   const items = results.flatMap((r, i) => {
     if (r.status === "fulfilled") return r.value;
