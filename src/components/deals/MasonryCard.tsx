@@ -38,6 +38,13 @@ interface Props {
   /** Above-the-fold cards opt in to eager + high-priority image loading
       so the LCP pixel arrives without waiting for the lazy heuristic. */
   priority?: boolean;
+  /** Override the default `/[country]/p/[deal.id]` PDP link.
+      Used by SimilarProducts + LiveAlternatives where the deal IDs are
+      synthetic (e.g. `argos:product_key` or `serp-xxxx`) and don't
+      resolve in the PDP route. Those surfaces pass a /compare-style
+      URL instead so the user lands on a meaningful page rather than
+      a 404. */
+  linkHref?: string;
 }
 
 /* Convert a Deal's native price into the user's preferred currency.
@@ -125,7 +132,7 @@ function ResilientImage({ deal, priority }: { deal: Deal; priority: boolean }) {
   );
 }
 
-export default function MasonryCard({ deal, aspect, showOriginBadge = true, priority = false }: Props) {
+export default function MasonryCard({ deal, aspect, showOriginBadge = true, priority = false, linkHref }: Props) {
   const { country } = useCountry();
   const router      = useRouter();
   const dealCcy = deal.currency as Country["currency"];
@@ -232,7 +239,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
          Net effect: one extra hop for the user, more page views per
          session, and the affiliate chokepoint still fires on every
          actual purchase-intent click. */
-      href={`/${country.code}/p/${deal.id}`}
+      href={linkHref ?? `/${country.code}/p/${deal.id}`}
       aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${deal.storeName}. Open details.`}
       className="group block"
     >

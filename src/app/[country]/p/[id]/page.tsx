@@ -304,20 +304,32 @@ export default async function ProductPage({ params }: PageProps) {
      each maps to a Schema.org Product field. */
   const heroData = offerRowToHero(offer);
 
-  /* Count of unique stores that carry this product across the
-     anchor + cheaper-alternatives set. Drives the "Compare prices
-     across N stores" CTA label so the user knows how broad the
-     compare view will be relative to this single-store PDP. The
-     anchor store always counts; each dupe contributes the unique
-     store_ids in its offers list. */
-  const storesAcrossAlternatives = new Set<string>();
-  storesAcrossAlternatives.add(offer.store_id);
-  for (const d of filteredDupes) {
-    for (const o of d.offers) {
-      if (o.storeId) storesAcrossAlternatives.add(o.storeId);
+  /* Count of unique in-stock stores that carry THIS exact product.
+     Drives the "Compare prices across N stores" CTA so the number
+     matches what the user lands on after clicking — /compare's
+     anchor-card header reads "Across N stores" where N is the
+     anchor product's offer count. Same product_id → same count.
+
+     Previous version counted anchor + similar-products' stores,
+     which double-counted retailers and didn't match /compare's
+     display. User report May 2026: "compare price across x stores
+     doesn't align with the number of stores on the compare page."
+
+     Curated Amazon PDPs (product_id is the synthetic slug, not a
+     real DB row) have a single anchor store — Amazon — so the
+     fallback to 1 is correct for that path. */
+  let totalStores = 1;
+  const supaForCount = getSupabaseAdmin();
+  if (supaForCount && offer.product_id && !offer.offer_id.startsWith("amazon-")) {
+    const { data: siblingOffers } = await supaForCount
+      .from("offers")
+      .select("store_id")
+      .eq("product_id", offer.product_id)
+      .eq("in_stock", true);
+    if (siblingOffers && siblingOffers.length > 0) {
+      totalStores = new Set(siblingOffers.map((o) => o.store_id)).size;
     }
   }
-  const totalStores = storesAcrossAlternatives.size;
   const breadcrumb = buildBreadcrumbList([
     { name: "Havlo",          url: `${SITE_URL}/${country.code}` },
     { name: country.name,     url: `${SITE_URL}/${country.code}` },
@@ -379,7 +391,7 @@ export default async function ProductPage({ params }: PageProps) {
                 {filteredDupes.length} similar {filteredDupes.length === 1 ? "product" : "products"} from other stores. Sorted cheapest first.
               </p>
             </header>
-            <SimilarProducts dupes={filteredDupes} />
+            <SimilarProducts dupes={filteredDupes} countryCode={country.code} />
           </section>
         )}
 

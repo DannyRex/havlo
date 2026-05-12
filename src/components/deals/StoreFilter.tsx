@@ -109,12 +109,20 @@ export default function StoreFilter({ stores, selected, onChange }: Props) {
 
   /* Filter the visible list by the search input. Case-insensitive,
      matches store name OR store id (so a user can type "amazon" and
-     hit "Amazon UK" + "amazon-co-uk" alike). */
+     hit "Amazon UK" + "amazon-co-uk" alike). The result is sorted
+     alphabetically by display name — was sorted by deal count in
+     the API response, but visitors expect alphabetical when
+     scanning a checklist (user feedback May 2026). localeCompare
+     handles diacritics correctly for non-Latin display names. */
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return stores;
-    return stores.filter(
-      (s) => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q),
+    const filtered = q
+      ? stores.filter(
+          (s) => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q),
+        )
+      : stores;
+    return [...filtered].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
     );
   }, [stores, search]);
 

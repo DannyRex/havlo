@@ -66,9 +66,14 @@ function ResilientThumb({ deal }: { deal: Deal }) {
 
 interface Props {
   deal: Deal;
+  /** Override the default `/[country]/p/[deal.id]` PDP link.
+      Same purpose as MasonryCard.linkHref — used by surfaces with
+      synthetic Deal IDs (SimilarProducts / LiveAlternatives) so
+      cards route somewhere meaningful instead of 404ing the PDP. */
+  linkHref?: string;
 }
 
-export default function ListCard({ deal }: Props) {
+export default function ListCard({ deal, linkHref }: Props) {
   const { country } = useCountry();
   const dealCcy = deal.currency as Country["currency"];
   const sameCcy = dealCcy === country.currency;
@@ -137,7 +142,7 @@ export default function ListCard({ deal }: Props) {
          merchant info and a "View at {Merchant}" CTA — the actual
          /api/go affiliate-wrapped outbound now fires at that CTA
          click instead of this card click. Matches MasonryCard. */
-      href={`/${country.code}/p/${deal.id}`}
+      href={linkHref ?? `/${country.code}/p/${deal.id}`}
       aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${deal.storeName}. Open details.`}
       className="group flex gap-3 items-start p-2.5 rounded-2xl border border-border bg-surface hover:border-border-strong hover:shadow-card transition-all"
     >

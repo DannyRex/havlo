@@ -16,7 +16,10 @@ import type { DupeResult } from "@/lib/search";
 import type { Deal } from "@/types";
 
 interface Props {
-  dupes: DupeResult[];
+  dupes:       DupeResult[];
+  /** Country code threaded through so the per-card link target is
+      country-aware (`/uk/compare?q=…` not `/compare?q=…`). */
+  countryCode: string;
 }
 
 /* Convert a DupeResult (pooled product across stores) into a Deal
@@ -62,17 +65,27 @@ function dupeToDeal(d: DupeResult): Deal {
   };
 }
 
-export default function SimilarProducts({ dupes }: Props) {
+export default function SimilarProducts({ dupes, countryCode }: Props) {
   const deals = dupes.map(dupeToDeal);
 
   return (
     <div className="columns-2 sm:columns-3 lg:columns-4 gap-2 sm:gap-3 lg:gap-4 [column-fill:_balance]">
       {deals.map((deal, i) => (
         <div key={deal.id + ":" + i} className="break-inside-avoid mb-2 sm:mb-3 lg:mb-4">
+          {/* Route similar-product cards to the COMPARE page for that
+              product's title, not the PDP. The synthetic `storeId:key`
+              deal IDs these cards carry don't resolve in the PDP
+              route (they're not real offer UUIDs), so a default
+              /p/[id] link 404s — user-reported May 2026 with
+              "/uk/p/argos:ded62f28-…". The compare page accepts any
+              query string and renders a useful similar-products
+              view, which matches user intent for "tell me more
+              about this alternative." */}
           <MasonryCard
             deal={deal}
             aspect={MASONRY_ASPECTS[i % MASONRY_ASPECTS.length]}
             priority={i < 2}
+            linkHref={`/${countryCode}/compare?q=${encodeURIComponent(deal.title)}&mode=similar`}
           />
         </div>
       ))}

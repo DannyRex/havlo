@@ -36,6 +36,30 @@ interface Props {
   pad?: number;
 }
 
+/* Stores whose /logos/<id>.png is a white-on-transparent wordmark
+   designed for dark navbars. On a light-mode bg-bg background
+   (white-ish), they're invisible without an invert. Same approach
+   the homepage marquee uses via StoreLogoChip's `whiteLogo` prop —
+   except here the cell doesn't get a per-store prop from the call
+   site (compare results render generic offer rows), so we look up
+   storeId against a small known-bad registry instead.
+
+   Add entries here when a new store ships a white-on-transparent
+   logo file. Keep the list lowercased to match storeId convention. */
+const WHITE_ON_TRANSPARENT_LOGOS = new Set<string>([
+  "3chub",
+  "threechub",
+]);
+
+/* Stores with dark-on-transparent wordmarks that vanish in dark
+   mode (mirror of the above for the opposite theme). John Lewis
+   is the canonical example. */
+const DARK_ON_TRANSPARENT_LOGOS = new Set<string>([
+  "john-lewis-partners",
+  "john-lewis",
+  "johnlewis",
+]);
+
 export default function StoreLogo({
   storeId,
   storeName,
@@ -61,6 +85,18 @@ export default function StoreLogo({
      further plumbing. */
   const initial = storeName.trim().charAt(0).toUpperCase() || "•";
 
+  /* Theme-aware inversion: stores with white-on-transparent
+     wordmarks get inverted in light mode (so the mark renders
+     dark) and stay un-inverted in dark mode. Mirror for dark-
+     on-transparent stores. Both keep the original at the
+     non-conflicting theme so logo colour matches the brand
+     anywhere it's visible. */
+  const sidLc = storeId.toLowerCase();
+  const invertClass =
+    WHITE_ON_TRANSPARENT_LOGOS.has(sidLc) ? "invert dark:invert-0"
+    : DARK_ON_TRANSPARENT_LOGOS.has(sidLc) ? "dark:invert"
+    : "";
+
   return (
     <div className={cellClass} style={{ width: size, height: size }}>
       {!failed && storeLogoUrl ? (
@@ -69,7 +105,7 @@ export default function StoreLogo({
           alt={storeName}
           width={inner}
           height={inner}
-          className="object-contain"
+          className={`object-contain ${invertClass}`}
           onError={() => setFailed(true)}
         />
       ) : (

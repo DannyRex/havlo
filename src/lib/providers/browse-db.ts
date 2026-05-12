@@ -133,13 +133,19 @@ export const dbBrowseProvider: BrowseProvider = {
         query = query.gte("discount_percent", q.minDiscount);
       }
       if (q.search?.trim()) {
-        /* Dual-purpose filter: matches product title OR store name
-           so a user can type "iPhone" to filter to iPhone listings
-           OR type "Konga" to filter to all Konga deals. PostgREST
-           .or() takes a comma-separated list of column filters and
-           returns rows where ANY clause matches. */
+        /* Title-only filter. Earlier this also matched store_name via
+           an .or() clause so users could type "Konga" or "Currys" to
+           filter by retailer — but with the dedicated Store filter
+           popup live (May 2026), the two intents started competing
+           in one input. Typing "Argos" returned Argos's entire stock
+           ignoring the category the user had also picked, which felt
+           broken (user report May 2026: "store search in deals
+           search bar is not functional"). The Store filter button
+           now handles "filter by store"; the text input handles
+           "filter by product title." Clearer mental model, fewer
+           false-positives. */
         const escaped = q.search.trim().replace(/[(),]/g, " ");
-        query = query.or(`title.ilike.%${escaped}%,store_name.ilike.%${escaped}%`);
+        query = query.ilike("title", `%${escaped}%`);
       }
       if (q.origin && q.origin !== "all") {
         query = applyOriginFilter(query, q.origin);

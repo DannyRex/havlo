@@ -68,19 +68,14 @@ const VALID_TIERS = new Set<DiscountTier>(["all", "10", "20", "30", "50"]);
 const VALID_SORTS = new Set<SortOption>(["relevance", "newest", "discount", "popular", "price_asc", "price_desc"]);
 const VALID_ORIGINS = new Set<OriginFilter>(["all", "local", "intl"]);
 
-/* One short, recognisable local retailer per market — used in the
-   search input placeholder so the example primes the user with a
-   store they actually shop at. Kept to ≤8 chars where possible so
-   the placeholder doesn't get clipped on small viewports. */
-const LOCAL_STORE_EXAMPLE: Record<string, string> = {
-  ng: "Konga",
-  uk: "Currys",
-  us: "Walmart",
-  de: "MediaMarkt",
-  ae: "Noon",
-  in: "Flipkart",
-  za: "Takealot",
-};
+/* "iPhone" as the product-name example in the search-input
+   placeholder. The placeholder used to suggest a country-local
+   store name (Konga / Currys / MediaMarkt) but the search field is
+   title-only now that the dedicated Store filter popup handles
+   store-by-store selection — keeping a store example would
+   mislead users into typing one and getting confusing partial
+   matches. iPhone is universally recognised across all seven
+   markets and reliably has stock to surface. */
 
 export default function DealFeed() {
   /* Read initial filter state from URL params so /deals?category=phones
@@ -365,8 +360,8 @@ export default function DealFeed() {
         <input
           id="deals-search"
           type="text"
-          aria-label="Filter these deals by name or store, or press Enter to search across all stores"
-          placeholder={`Search these deals or try '${LOCAL_STORE_EXAMPLE[country.code] ?? "Amazon"}'…`}
+          aria-label="Filter these deals by product name. Use the Stores button above to filter by store. Press Enter to search across all stores."
+          placeholder="Search these deals — try 'iPhone'…"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={(e) => {
