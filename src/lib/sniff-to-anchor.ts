@@ -89,6 +89,11 @@ export function sniffToAnchor(sniff: SniffResult): ProductGroup | null {
   const storeId = inferStoreId(sniff.store ?? "external");
 
   const offer: StoreOffer = {
+    /* Sniffed anchors (paste-a-link flow) have no DB offer ID —
+        they're constructed from page-scrape data. Empty string
+        signals "synthetic" to downstream code that needs to route
+        to /p/live instead of /p/[id]. */
+    offerId:        "",
     storeId,
     storeName:      sniff.store ?? "External",
     storeLogoUrl:   getStoreLogoUrl(sniff.store ?? "External", sniff.url),

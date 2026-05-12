@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { TrendingDown, ExternalLink, Plane, ChevronDown } from "lucide-react";
+import { TrendingDown, ArrowRight, Plane, ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { formatPriceForUser, getClickThroughUrl } from "@/lib/utils";
+import { formatPriceForUser } from "@/lib/utils";
+import { pdpUrlForOffer } from "@/lib/pdp-url";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { trackClick } from "@/lib/trackClick";
@@ -108,22 +109,18 @@ export default function DupeCard({
           )}
         </div>
 
-        {/* Primary store CTA — best (cheapest) offer prominent */}
+        {/* Primary store CTA — best (cheapest) offer prominent.
+
+            Click model (May 2026): routes to the PDP for this
+            specific offer (or /p/live for offers without a real
+            DB id), not outbound to the merchant. /api/go's
+            affiliate wrap still fires when the user clicks the
+            "View at {merchant}" CTA on that PDP — keeping the
+            chokepoint intact while ensuring "no product across the
+            site goes directly to merchant" (user rule). */}
         {bestOffer && (
           <a
-            href={getClickThroughUrl({
-              url: bestOffer.url,
-              id: `${dupe.key}-${bestOffer.storeId}`,
-              /* Title + store hints for /api/go fallback. When the
-                 Google-relay resolver fails, /api/go uses these to
-                 send the user to the merchant's search page (round-4
-                 fix). */
-              title:     dupe.title,
-              storeId:   bestOffer.storeId,
-              storeName: bestOffer.storeName,
-            })}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
+            href={pdpUrlForOffer(country.code, { ...bestOffer, title: dupe.title })}
             onClick={() => trackClick(dupe.key, query, rank, mode)}
             className="mt-3 inline-flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-ink text-bg text-xs font-semibold hover:opacity-90 transition-opacity"
           >
@@ -147,7 +144,10 @@ export default function DupeCard({
                 <Plane size={11} className="text-amber-300 shrink-0" />
               )}
             </span>
-            <ExternalLink size={12} className="shrink-0 opacity-80" />
+            {/* Internal navigation to the PDP for this offer —
+                visual cue is an arrow rather than ExternalLink so
+                the user knows the click stays on Havlo first. */}
+            <ArrowRight size={12} className="shrink-0 opacity-80" />
           </a>
         )}
 
@@ -168,18 +168,10 @@ export default function DupeCard({
                 {visibleOffers.slice(1).map((offer) => (
                   <a
                     key={`${offer.storeId}-${offer.price}`}
-                    href={getClickThroughUrl({
-                      url: offer.url,
-                      id: `${dupe.key}-${offer.storeId}`,
-                      /* Pass storeId/Name so /api/go can fall back
-                         to a merchant search URL when relay
-                         resolution fails (round-4 fix). */
-                      title:     dupe.title,
-                      storeId:   offer.storeId,
-                      storeName: offer.storeName,
-                    })}
-                    target="_blank"
-                    rel="noopener noreferrer sponsored"
+                    /* Same PDP-first click model as the primary CTA
+                       above. Routes to /p/[id] for DB-backed offers
+                       or /p/live for synthetic ones. */
+                    href={pdpUrlForOffer(country.code, { ...offer, title: dupe.title })}
                     onClick={() => trackClick(dupe.key, query, rank, mode)}
                     className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border hover:border-border-strong hover:bg-surface-2 transition-colors text-[11px]"
                   >

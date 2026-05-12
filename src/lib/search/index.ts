@@ -25,6 +25,10 @@ import { resolveStoreLogoUrl } from "@/lib/store-logo";
 /* ── Public types ─────────────────────────────────────────────────── */
 
 export interface StoreOffer {
+  /** Offer UUID from the offers table. Empty string for live SerpAPI
+      rows that don't exist in the DB yet — those need the
+      query-param synthetic PDP at /[country]/p/live. */
+  offerId: string;
   storeId: string;
   storeName: string;
   storeLogoUrl: string;
@@ -143,6 +147,11 @@ function dealToOffer(d: Deal): StoreOffer {
   const isIntl = meta.intl;
   const landedCostExtra = isIntl ? estimateLandedCostExtra(price, d.category, d.storeId) : 0;
   return {
+    /* Deal.id is the offer_id when sourced from the DB (browse-db.ts
+       sets `id: r.offer_id`). For synthetic curated rows the id is
+       the curated slug — still acceptable for routing to /p/[id]
+       which handles both formats. */
+    offerId: d.id,
     storeId: d.storeId,
     storeName: meta.name,
     storeLogoUrl: resolveStoreLogoUrl(d.storeId),

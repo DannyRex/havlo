@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 import MasonryCard from "@/components/deals/MasonryCard";
 import { MASONRY_ASPECTS } from "@/components/deals/masonry-layout";
+import { pdpUrlForDeal } from "@/lib/pdp-url";
 import type { Deal } from "@/types";
 
 interface Props {
@@ -83,15 +84,18 @@ export default function LiveAlternatives({ query, countryCode, excludeStoreId }:
       <div className="columns-2 sm:columns-3 lg:columns-4 gap-2 sm:gap-3 lg:gap-4 [column-fill:_balance]">
         {items.map((deal, i) => (
           <div key={deal.id + ":live:" + i} className="break-inside-avoid mb-2 sm:mb-3 lg:mb-4">
-            {/* Live results carry synthetic `serp-{ts}-{i}` IDs that
-                don't resolve in the PDP route. Route to /compare for
-                that product's title instead — same fix shape as
-                SimilarProducts. */}
+            {/* Live results carry synthetic `serp-{ts}-{i}` IDs.
+                pdpUrlForDeal routes them through /p/live (query-param
+                synthetic PDP) so visitors get the same PDP experience
+                as DB-backed offers — never jumping straight to the
+                merchant. The synthetic PDP renders the offer hero +
+                similar products from the DB, then a single "View at
+                {merchant}" CTA does the outbound. */}
             <MasonryCard
               deal={deal}
               aspect={MASONRY_ASPECTS[i % MASONRY_ASPECTS.length]}
               priority={false}
-              linkHref={`/${countryCode}/compare?q=${encodeURIComponent(deal.title)}&mode=similar`}
+              linkHref={pdpUrlForDeal(countryCode, deal)}
             />
           </div>
         ))}

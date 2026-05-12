@@ -493,6 +493,10 @@ function offerToStoreOffer(o: NestedOffer, productTitle?: string): StoreOffer {
   const isIntl = store?.is_international ?? false;
   const landedExtra = isIntl ? Math.round(priceN * 0.30) : 0;
   return {
+    /* Threaded through so cards rendered from StoreOffer (compare
+       dupes, PDP similar-products) can route to the real /p/[offer_id]
+       PDP instead of synthetic links. */
+    offerId:        o.id,
     storeId:        o.store_id,
     storeName:      store?.name ?? o.store_id,
     storeLogoUrl:   resolveStoreLogoUrl(o.store_id, store?.logo_url),
@@ -517,6 +521,7 @@ function ftsRowToSingleOffer(r: FtsRow): StoreOffer {
   const origN = r.original_price ? priceInNgn(r.original_price, r.currency) : priceN;
   const landedExtra = r.is_international ? Math.round(priceN * 0.30) : 0;
   return {
+    offerId:        r.offer_id,
     storeId:        r.store_id,
     storeName:      r.store_name,
     storeLogoUrl:   resolveStoreLogoUrl(r.store_id, r.store_logo_url),

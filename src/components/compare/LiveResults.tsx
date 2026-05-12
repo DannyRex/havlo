@@ -1,11 +1,11 @@
 "use client";
 
 import { Globe } from "lucide-react";
+import { pdpUrlForDeal } from "@/lib/pdp-url";
 import {
   formatUSDPrice,
   savings,
   formatCompact,
-  getClickThroughUrl,
 } from "@/lib/utils";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import { useCountry } from "@/components/providers/CountryProvider";
@@ -73,14 +73,15 @@ function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
 
   return (
     <a
-      /* /api/go applies wrapWithAffiliate so the right ?tag= /
-         ?subId= / ?aff_short_key= gets appended for the matching
-         retailer. Without this wrap, none of our wired affiliate
-         programs ever earn commission. */
-      href={getClickThroughUrl(deal)}
-      target="_blank"
-      rel="noopener noreferrer sponsored"
-      aria-label={`${deal.title}, ${priceFmt} at ${deal.storeName}`}
+      /* Click model (May 2026): live results route to a PDP first
+         (real /p/[offer_id] for DB-backed rows, synthetic /p/live?…
+         for SerpAPI rows that aren't in the DB), not outbound to
+         the merchant. The actual /api/go affiliate wrap fires at
+         the PDP's "View at {merchant}" CTA — matches the site-wide
+         "no product across the site should go directly to merchant"
+         rule. */
+      href={pdpUrlForDeal(country.code, deal)}
+      aria-label={`${deal.title}, ${priceFmt} at ${deal.storeName}. Open details.`}
       className="group card card-hover overflow-hidden flex flex-col"
     >
       {/* Image — varied aspect for masonry feel */}

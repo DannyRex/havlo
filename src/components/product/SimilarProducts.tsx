@@ -40,7 +40,13 @@ function dupeToDeal(d: DupeResult): Deal {
   const best = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
 
   return {
-    id:              best.storeId + ":" + d.key, // synthetic; cards don't use it for routing in this path
+    /* Use the BEST offer's real offer_id so the card's link target
+       resolves to a real PDP. Falls back to the synthetic
+       storeId:productKey form (which routes to /compare via the
+       linkHref override below) only when the dupes engine couldn't
+       attach an offer_id — e.g. live-search results that aren't in
+       the DB. */
+    id:              best.offerId || (best.storeId + ":" + d.key),
     title:           d.title,
     description:     d.title,
     category:        d.category ?? "general",
@@ -72,20 +78,16 @@ export default function SimilarProducts({ dupes, countryCode }: Props) {
     <div className="columns-2 sm:columns-3 lg:columns-4 gap-2 sm:gap-3 lg:gap-4 [column-fill:_balance]">
       {deals.map((deal, i) => (
         <div key={deal.id + ":" + i} className="break-inside-avoid mb-2 sm:mb-3 lg:mb-4">
-          {/* Route similar-product cards to the COMPARE page for that
-              product's title, not the PDP. The synthetic `storeId:key`
-              deal IDs these cards carry don't resolve in the PDP
-              route (they're not real offer UUIDs), so a default
-              /p/[id] link 404s — user-reported May 2026 with
-              "/uk/p/argos:ded62f28-…". The compare page accepts any
-              query string and renders a useful similar-products
-              view, which matches user intent for "tell me more
-              about this alternative." */}
+          {/* Card links to the real PDP for the cheapest offer of
+              this dupe (deal.id is now the offer_id thanks to the
+              offerId propagation through StoreOffer). Falls back to
+              /compare?q={title} when the offer_id couldn't be
+              attached — rare edge case for live results that aren't
+              in the DB. */}
           <MasonryCard
             deal={deal}
             aspect={MASONRY_ASPECTS[i % MASONRY_ASPECTS.length]}
             priority={i < 2}
-            linkHref={`/${countryCode}/compare?q=${encodeURIComponent(deal.title)}&mode=similar`}
           />
         </div>
       ))}
