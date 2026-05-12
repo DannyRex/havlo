@@ -178,10 +178,9 @@ export default function StoreFilter({ stores, selected, onChange }: Props) {
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-ink text-bg text-[12px] font-semibold hover:opacity-90 transition-opacity"
+          className="px-4 py-1 rounded-full bg-ink text-bg text-[12px] font-semibold hover:opacity-90 transition-opacity"
         >
           Done
-          <X size={11} strokeWidth={2.5} aria-hidden="true" />
         </button>
       </div>
     </>
