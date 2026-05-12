@@ -142,8 +142,10 @@ export default function StoreFilter({ stores, selected, onChange }: Props) {
      and bug fixes in one apply to both. */
   const panelBody = (
     <>
-      {/* Search */}
-      <div className="p-3 border-b border-border">
+      {/* Search + count indicator. The count makes it explicit how
+          many stores are available so users understand the list
+          scrolls when the visible portion doesn't show all of them. */}
+      <div className="p-3 border-b border-border space-y-2">
         <input
           type="text"
           value={search}
@@ -153,13 +155,21 @@ export default function StoreFilter({ stores, selected, onChange }: Props) {
           className="w-full px-3 py-1.5 rounded-full text-[13px] bg-surface border border-border focus:border-brand focus:shadow-input outline-none transition-all"
           style={{ fontSize: "16px" }}
         />
+        <p className="text-[11px] text-ink-3 px-1 tabular-nums">
+          {search.trim()
+            ? `${visible.length} of ${stores.length} stores`
+            : `${stores.length} stores · scroll for more`}
+        </p>
       </div>
 
-      {/* List — taller cap on mobile sheet (more vertical real estate
-          available since we're filling the bottom of the viewport).
-          Capped at max-h-72 on desktop popover to keep the popover
-          fitting beneath the trigger. */}
-      <ul className="max-h-[60vh] md:max-h-72 overflow-y-auto py-1.5">
+      {/* List height. The previous max-h-72 (288px ≈ 8 rows) was too
+          short on desktop — UK has ~27 stores in the pool and only
+          the first 8 fit, with no obvious scroll affordance, so users
+          reported "not displaying all stores" even though the
+          scroll technically worked. max-h-96 (384px ≈ 10-11 rows)
+          balances "see more at a glance" against "don't overflow
+          the viewport on shorter screens." */}
+      <ul className="max-h-[60vh] md:max-h-96 overflow-y-auto py-1.5">
         {visible.length === 0 ? (
           <li className="px-4 py-3 text-[13px] text-ink-3 text-center">
             No stores match &ldquo;{search}&rdquo;
