@@ -199,35 +199,83 @@ export const dbBrowseProvider: BrowseProvider = {
        based pagination. */
     const PAGE = 1000;
     /* Halved from 8 → 4 May 2026 after Supabase egress hit 127% of
-       the 5GB free-tier quota. 4000-row ceiling still covers every
-       meaningful sort + filter combo in the current catalog (~7k
-       in-stock offers): discount-DESC pre-sort means the top 4000
-       are always the strongest deals, and origin/category filters
-       narrow the candidate pool further. Re-evaluate when total
-       in-stock offers crosses 15000 and pages start hitting the cap
-       (instrument with a head=true count probe if the list ever
-       feels truncated). */
-    const PAGES = 4; // 4000-row ceiling
-    /* Fetch the popularity record (product_id → 30d click count) in
-       parallel with the offers fan-out. Cached for 5 min on the JS
-       side so this is a single DB call per cache window. Empty
-       record returned on RPC errors so "Most popular" gracefully
-       falls back to discount-desc ordering when migration 0015
-       isn't applied. Record (not Map) because unstable_cache
-       serialises via JSON — a Map round-trips to {}. */
-    const pageRequests = Array.from({ length: PAGES }, (_, i) =>
+       the 5GB free-tier quota. 4000-row ceiling covers every
+       discounted offer in the current ~11k catalog comfortably
+       (6.5k discounted rows fit inside 4 pages). The follow-up
+       fix below (Pass B) handles the 0%-discount tail separately
+       so HealthPlus / MedPlus / Bitmarte / Essenza / Supermart /
+       Ajebomarket don't get pushed below the cap. Re-evaluate
+       when discounted-offer count crosses 6000 (instrument with
+       a head=true count probe if the list ever feels truncated). */
+    const PAGES = 4; // 4000-row ceiling on the discount-DESC pass
+    /* Pass B: zero-discount inventory pass.
+
+       Why this exists: /deals defaults to discount-DESC sort under
+       the hood (sortToOrder() biases relevance / popular / discount
+       toward discount_percent DESC). With 4.8k zero-discount rows
+       in the catalog — pharmacies / grocers / Shopify stores whose
+       feed doesn't publish a `compare_at_price`, so every row
+       ingests at 0% — those rows sit at the BOTTOM of the
+       discount-DESC sort and get cut off by the PAGES=4 ceiling.
+
+       User report May 2026: "I don't see products from stores
+       without deals, they're just sitting in the db." Probe
+       confirmed: 11,274 total view rows, 7,274 truncated by the
+       cap, virtually all of them 0%-discount inventory.
+
+       Fix: an additional 2-page fetch where discount_percent = 0,
+       ordered by scraped_at DESC, merged into the same allRows
+       array. The dedup-by-offer_id Set below catches any overlap
+       (none expected — Pass A returns discount > 0, Pass B
+       returns discount = 0, so the two sets are disjoint by
+       construction).
+
+       Only fires for the discount-biased sort paths. `newest` and
+       `price_*` sorts already surface 0%-only inventory naturally
+       via their own pre-sort, so no Pass B needed there. */
+    const sortIsDiscountBiased =
+      !q.sort || q.sort === "relevance" || q.sort === "popular" || q.sort === "discount";
+    /* Also skip Pass B when the user has asked for discount >= 1%
+       (or higher) — by definition Pass B's 0%-discount rows can't
+       satisfy that filter, so the extra fetch would burn egress
+       for nothing. */
+    const userFloorAllowsZero = !q.minDiscount || q.minDiscount === 0;
+    const runPassB = sortIsDiscountBiased && userFloorAllowsZero;
+    /* Pass A — discount-DESC fan-out, unchanged. */
+    const passARequests = Array.from({ length: PAGES }, (_, i) =>
       buildQuery().range(i * PAGE, (i + 1) * PAGE - 1),
     );
+    /* Pass B — 0%-discount inventory, freshest first.
+
+       Reuses buildQuery() so the user's category + search + origin
+       + stores filters all still apply, then layers on the
+       discount-zero predicate and overrides the order. Note: the
+       previous .order(col, asc).order(offer_id) chain inside
+       buildQuery() still runs — PostgREST applies orders in the
+       order they're chained, but our new .order(scraped_at) lands
+       first because it's chained AFTER buildQuery() returns. */
+    const PASS_B_PAGES = 2;
+    const passBRequests = runPassB
+      ? Array.from({ length: PASS_B_PAGES }, (_, i) =>
+          buildQuery()
+            .eq("discount_percent", 0)
+            .order("scraped_at", { ascending: false })
+            .order("offer_id", { ascending: true })
+            .range(i * PAGE, (i + 1) * PAGE - 1),
+        )
+      : [];
     /* getPopularityRecord is wrapped in unstable_cache which throws
        "Invariant: incrementalCache missing" when called outside a
        Next.js request context (e.g. from a tsx cron script). The
        popularity Map is an optional ranking signal — fall back to
        an empty record on any error so fetchDeals stays callable
        from both Next routes AND scripts. */
-    const [results, popularity] = await Promise.all([
-      Promise.all(pageRequests),
+    const [passAResults, passBResults, popularity] = await Promise.all([
+      Promise.all(passARequests),
+      Promise.all(passBRequests),
       getPopularityRecord().catch(() => ({} as Record<string, number>)),
     ]);
+    const results = [...passAResults, ...passBResults];
 
     /* Stop on first error, surface curated as fallback so the page
        isn't blank if Supabase had a transient hiccup mid-fan-out. */
