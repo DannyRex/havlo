@@ -40,13 +40,29 @@ interface Props {
 export default function StoreFilter({ stores, selected, onChange }: Props) {
   const [open, setOpen]     = useState(false);
   const [search, setSearch] = useState("");
-  const rootRef = useRef<HTMLDivElement | null>(null);
+  /* Two refs because the panel renders in two different DOM
+     positions:
+       - Desktop popover: child of `rootRef` (the trigger's wrapper),
+         so `rootRef.contains()` detects clicks inside it.
+       - Mobile sheet:    portalled to document.body, OUTSIDE
+         `rootRef`. Without `sheetPanelRef`, the outside-click
+         handler fired setOpen(false) the moment a user tapped any
+         store button inside the sheet — exactly the bug reported
+         May 2026 ("selecting a store from the popup, no filter
+         applied, popup just closes"). */
+  const rootRef       = useRef<HTMLDivElement | null>(null);
+  const sheetPanelRef = useRef<HTMLDivElement | null>(null);
 
-  /* Close on outside click — popover pattern. */
+  /* Close on outside click — popover pattern. Now treats BOTH the
+     trigger's wrapper AND the portalled mobile sheet's panel as
+     "inside", so multi-store selection works on every viewport. */
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t)) return;
+      if (sheetPanelRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -218,8 +234,13 @@ export default function StoreFilter({ stores, selected, onChange }: Props) {
               aria-hidden="true"
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             />
-            {/* Sheet */}
+            {/* Sheet — sheetPanelRef anchors the outside-click
+                check so taps inside this panel don't bubble out and
+                close the sheet via the document-level listener. The
+                backdrop above has its own onClick={close} so tapping
+                outside the panel still dismisses correctly. */}
             <div
+              ref={sheetPanelRef}
               role="listbox"
               aria-label="Filter by store"
               className="absolute left-0 right-0 bottom-0 rounded-t-2xl border-t border-border bg-bg shadow-2xl max-h-[85vh] flex flex-col"
