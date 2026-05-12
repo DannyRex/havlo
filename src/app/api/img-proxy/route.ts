@@ -72,6 +72,13 @@ const HOST_REFERER: Record<string, string> = {
      — shows up when SerpAPI returns Google's own search-result
      image as the product photo. */
   "gstatic.com":                      "",
+  /* AWS S3 — Bitmarte hosts product images at
+     bitmarte-bucket.s3.eu-north-1.amazonaws.com. The proxy is the
+     belt-and-braces backstop in case any code path bypasses the
+     direct-load whitelist in lib/utils.ts. Open S3 buckets don't
+     enforce Referer; sending the original would also be fine but
+     omitting it avoids leaking the user's browsing context. */
+  "amazonaws.com":                    "",
 };
 
 /* Reasonable upper bound for cache lifetime. Product images don't

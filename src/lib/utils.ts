@@ -225,6 +225,15 @@ const DIRECT_LOAD_IMAGE_HOSTS = new Set([
      where Google's own search-results thumbnails come back as the
      product image. Open CDN, served fast from Google's edge. */
   "gstatic.com",
+  /* AWS S3 — Bitmarte hosts product images at
+     bitmarte-bucket.s3.eu-north-1.amazonaws.com. Open S3 bucket, no
+     Referer enforcement. The subdomain-suffix matcher catches every
+     regional + bucket variant (eu-north-1, us-east-1, etc.) via the
+     bare entry, the same shape as the digitaloceanspaces / dhresource
+     entries above. NOTE this does NOT match `*.amazon.com` hosts —
+     those are different TLDs and remain in the proxy allowlist with
+     their proper Referer rewrites. */
+  "amazonaws.com",
 ]);
 
 /* Wrap an external image URL through /api/img-proxy unless its host

@@ -182,23 +182,49 @@ export async function GET(req: NextRequest) {
       effectiveOrigin === "intl"  ? qualifyingIntl  :
       qualifyingCountryFiltered;
 
-    /* Build the stores aggregate from the BROAD pool (un-discount-
-       filtered) so 0%-only stores stay in the dropdown regardless of
-       tier. Count reflects the broad pool — i.e. "how many offers
-       does this store have in your country / category / origin",
-       not "...at your current tier". If a user ticks a 0%-only store
-       while on tier=20%+, the items list will be empty — that's the
-       deliberate UX trade-off ("user can see the store exists but
-       has to drop the tier to see its inventory"). */
+    /* Build the stores aggregate as a HYBRID:
+
+       • Store LIST comes from the broad pool — every store in the
+         country/category/origin context appears, including 0%-only
+         pharmacies / grocers that have no qualifying inventory at
+         the current tier. So users at tier=20%+ still see HealthPlus
+         in the dropdown.
+
+       • Store COUNT comes from the qualifying pool — the number next
+         to each store matches the items that will appear in the feed
+         after that store is ticked. So if a user reads "HealthPlus
+         (12)" and clicks, they see 12 items — not 554.
+
+       Before this hybrid, the count was sourced from the broad pool
+       and didn't match post-click reality. User report May 2026:
+       "some stores show a wrong number in the dropdown and it
+       changes when the store is selected." The number actually
+       changed because tier-filtered items came back with a smaller
+       total — fixed by reconciling the two upfront. */
     const storesAggregate = (() => {
+      /* First pass: build the qualifying-pool counts so we have a
+         per-store-id → count map matching what the user will see. */
+      const qualifyingCounts = new Map<string, number>();
+      for (const d of qualifyingByOrigin) {
+        if (!d.storeId) continue;
+        qualifyingCounts.set(d.storeId, (qualifyingCounts.get(d.storeId) ?? 0) + 1);
+      }
+      /* Second pass: walk the broad pool to collect the store list
+         (so 0%-only stores still appear) and stamp each with its
+         qualifying count (0 when the store has no items at the
+         user's current tier). */
       const map = new Map<string, { id: string; name: string; count: number }>();
       for (const d of broadByOrigin) {
         const id = d.storeId;
         if (!id) continue;
-        const existing = map.get(id);
-        if (existing) existing.count += 1;
-        else map.set(id, { id, name: d.storeName, count: 1 });
+        if (map.has(id)) continue;
+        map.set(id, { id, name: d.storeName, count: qualifyingCounts.get(id) ?? 0 });
       }
+      /* Sort by qualifying count DESC so the stores with the most
+         actionable inventory at the current tier float to the top
+         of the dropdown. Stores with count=0 (visible but empty)
+         settle at the bottom — still clickable, still alphabetised
+         within the count=0 group via the client-side sort. */
       return Array.from(map.values()).sort((a, b) => b.count - a.count);
     })();
 
