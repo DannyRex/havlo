@@ -311,7 +311,7 @@ export const COUNTRY_STORES: Record<string, string[]> = {
        (cross-border indie), "Games" generic — leaking those into the
        ZA local pool. The SA "Game" chain consistently appears as
        its domain or with " Stores" suffix in SerpAPI source strings. */
-    "takealot", "makro", "game.co.za", "game stores", "loot.co.za", "loot", "wantitall",
+    "takealot", "makro", "game.co.za", "game stores", "loot.co.za", "wantitall",
     "yuppiechef", "superbalist", "zando", "everyshop", "incredible connection",
     "incredibleconnection", "checkers", "pick n pay", "picknpay",
   ],
