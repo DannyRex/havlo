@@ -10,12 +10,12 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   cleanTitle,
   formatCompact,
   formatUSDPrice,
-  getClickThroughUrl,
   isStoreSearchUrl,
   proxiedImageUrl,
   savings,
@@ -210,15 +210,20 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
   const showIntl = showOriginBadge && isCrossBorderForUser;
 
   return (
-    <a
-      /* Routes through /api/go so wrapWithAffiliate appends the right
-         ?tag= for Amazon, ?subId= for Konga, etc. before sending the
-         user to the merchant. Without this wrap, the affiliate tags
-         the project has wired up never actually fire. */
-      href={getClickThroughUrl(deal)}
-      target="_blank"
-      rel="noopener noreferrer sponsored"
-      aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${deal.storeName}`}
+    <Link
+      /* Click model change (May 2026): cards now route to the
+         product detail page first instead of jumping straight
+         outbound. The PDP carries the merchant info, an explicit
+         "View at {Merchant}" CTA, and a cheaper-alternatives rail
+         so the user sees full context before leaving the site.
+
+         The outbound /api/go affiliate wrap still happens — just at
+         the PDP's primary CTA click instead of at this card click.
+         Net effect: one extra hop for the user, more page views per
+         session, and the affiliate chokepoint still fires on every
+         actual purchase-intent click. */
+      href={`/${country.code}/p/${deal.id}`}
+      aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${deal.storeName}. Open details.`}
       className="group block"
     >
       <div className={`relative overflow-hidden rounded-xl sm:rounded-2xl bg-surface-2 border border-border ${aspect}`}>
@@ -362,6 +367,6 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
           </p>
         )}
       </div>
-    </a>
+    </Link>
   );
 }

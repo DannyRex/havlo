@@ -57,7 +57,7 @@ export default function AboutPage() {
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-lg leading-relaxed">
             Havlo is an independent price comparison platform for emerging
-            markets. We started in Nigeria. Today we&apos;re live in seven
+            markets. Today we&apos;re live in seven
             countries across Africa, Europe, the Middle East, North America,
             and Asia. Paste a link or search anything. We find cheaper
             alternatives across the stores you already know.

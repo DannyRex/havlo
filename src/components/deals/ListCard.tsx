@@ -6,9 +6,9 @@
    for casual visual browsing — that's why it's a user choice. */
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   cleanTitle,
-  getClickThroughUrl,
   isStoreSearchUrl,
   proxiedImageUrl,
   timeAgo,
@@ -126,13 +126,14 @@ export default function ListCard({ deal }: Props) {
   const landedNgnStr = isCrossBorder ? `≈ ${formatLocal(Math.round(primarySale * 1.30), country)}` : null;
 
   return (
-    <a
-      /* Routes through /api/go for affiliate tag wrapping — same
-         reason as MasonryCard. */
-      href={getClickThroughUrl(deal)}
-      target="_blank"
-      rel="noopener noreferrer sponsored"
-      aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${deal.storeName}`}
+    <Link
+      /* Click model change (May 2026): routes to the product detail
+         page rather than jumping outbound. The PDP carries the
+         merchant info and a "View at {Merchant}" CTA — the actual
+         /api/go affiliate-wrapped outbound now fires at that CTA
+         click instead of this card click. Matches MasonryCard. */
+      href={`/${country.code}/p/${deal.id}`}
+      aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${deal.storeName}. Open details.`}
       className="group flex gap-3 items-start p-2.5 rounded-2xl border border-border bg-surface hover:border-border-strong hover:shadow-card transition-all"
     >
       {/* Image — square thumbnail on the left */}
@@ -211,6 +212,6 @@ export default function ListCard({ deal }: Props) {
           </p>
         )}
       </div>
-    </a>
+    </Link>
   );
 }
