@@ -47,6 +47,11 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "MedPlus",    domain: "medplusnig.com" },
     { name: "Supermart",  domain: "supermart.ng" },
     { name: "Essenza",    domain: "essenza.ng" },
+    /* v3 NG additions (May 2026): Ajebomarket (WooCommerce
+       marketplace) + Bitmarte (SaaS storefront). Logos resolve via
+       Google s2 favicon — both have indexed domains. */
+    { name: "Ajebomarket",domain: "ajebomarket.com" },
+    { name: "Bitmarte",   domain: "bitmarte.com" },
     // Cross-border, in NG-shopper preference order
     { name: "Temu",       domain: "temu.com" },
     { name: "AliExpress", domain: "aliexpress.com" },

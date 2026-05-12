@@ -183,6 +183,8 @@ const NG_STORES = [
   "konga", "jumia", "3c-hub", "3chub", "3c hub",
   "slot", "pointek", "fouani", "zit-trading", "hayathub",
   "ajebomarket", "kara", "obiwezy", "pricepally", "payporte",
+  /* v3 NG addition: Bitmarte. */
+  "bitmarte",
 
   /* Additions — well-known NG-anchored retailers across pharmacies,
      groceries, classifieds, and second-tier electronics. Each is

@@ -46,6 +46,15 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "medplus":        { name: "MedPlus",      searchUrl: (q) => `https://medplusnig.com/products?q=${encodeURIComponent(q)}`,        homepage: "https://medplusnig.com" },
   "essenza":        { name: "Essenza",      searchUrl: (q) => `https://www.essenza.ng/search?q=${encodeURIComponent(q)}`,          homepage: "https://www.essenza.ng" },
   "kara":           { name: "Kara",         searchUrl: (q) => `https://kara.com.ng/?s=${encodeURIComponent(q)}&post_type=product`, homepage: "https://kara.com.ng" },
+  /* Ajebomarket — Nigerian marketplace on standard WP + WooCommerce
+     (?s=X&post_type=product). Verified live May 2026. */
+  "ajebomarket":    { name: "Ajebomarket",  searchUrl: (q) => `https://ajebomarket.com/?s=${encodeURIComponent(q)}&post_type=product`, homepage: "https://ajebomarket.com" },
+  /* Bitmarte — Nigerian SaaS storefront. Homepage redirects to
+     `/customer`; product search endpoint observed at
+     `/customer/products?q=X`. If this changes, refresh the
+     pattern; merchantSearchUrl just fires the URL and lets the
+     merchant handle the rest. */
+  "bitmarte":       { name: "Bitmarte",     searchUrl: (q) => `https://bitmarte.com/customer/products?q=${encodeURIComponent(q)}`, homepage: "https://bitmarte.com" },
   "obiwezy":        { name: "Obiwezy",      searchUrl: (q) => `https://obiwezy.com/?s=${encodeURIComponent(q)}`,                   homepage: "https://obiwezy.com" },
   "spar":           { name: "Spar Nigeria", searchUrl: (q) => `https://www.sparng.com/search?q=${encodeURIComponent(q)}`,          homepage: "https://www.sparng.com" },
 
