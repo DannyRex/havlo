@@ -34,6 +34,7 @@ import { scrapeSupermart }  from "./scrapers/supermart.js";
 import { scrapeMedPlus }    from "./scrapers/medplus.js";
 import { scrapeEssenza }    from "./scrapers/essenza.js";
 import { scrapeAjebomarket } from "./scrapers/ajebomarket.js";
+import { scrapeBitmarte }   from "./scrapers/bitmarte.js";
 /* Disabled NG scrapers — files retained, imports commented. To
    revive one: verify selectors against live HTML, uncomment the
    import + matching entry in the orchestrator below. */
@@ -244,6 +245,11 @@ async function main() {
        confirms Shopify; /products.json responds 200. No browser
        needed, fetch-only path through _shopify-json.ts. */
     { name: "Ajebomarket", probe: "https://ajebomarket.com/",                     fn: () => scrapeAjebomarket(page) },
+    /* Bitmarte — JS-rendered SaaS storefront. Apex 308s to
+       /customer; React shell with hashed class names so the
+       scraper walks /customer/product/* link anchors up the DOM
+       to find ₦ — same trick kara.ts uses. */
+    { name: "Bitmarte",    probe: "https://bitmarte.com/customer",                fn: () => scrapeBitmarte(page) },
     /* ── Still disabled — need per-site verification ──
        These were stamped from one template that didn't fit. Each
        needs the same kind of investigation HealthPlus / Supermart /
