@@ -37,10 +37,12 @@ import { COUNTRIES } from "@/lib/country";
 import { SITE_URL, buildBreadcrumbList, buildHreflangAlternates } from "@/lib/seo";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { pgFtsFindDupes } from "@/lib/search/pg-fts";
-import { isOfferAllowedForCountry, USD_FX } from "@/lib/country";
+import { isOfferAllowedForCountry } from "@/lib/country";
+import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 import JsonLd from "@/components/seo/JsonLd";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import SimilarProducts from "@/components/product/SimilarProducts";
+import LiveAlternatives from "@/components/product/LiveAlternatives";
 
 /* Offers churn frequently (every ingest cycle adds + retires rows).
    ISR revalidate keeps the cached HTML fresh without re-rendering
@@ -65,7 +67,10 @@ interface OfferRow {
   discount_percent: number | null;
   currency: "NGN" | "USD";
   scraped_at: string;
-  in_stock: boolean;
+  /** Undefined when sourced from product_best_offers (the view
+      filters for in_stock=true by construction and the column
+      doesn't propagate). Treated as "in stock" downstream. */
+  in_stock: boolean | undefined;
   title: string;
   category_slug: string | null;
   brand: string | null;
@@ -74,59 +79,106 @@ interface OfferRow {
   store_logo_url: string | null;
 }
 
-/* Fetch a single offer by its ID, joined with its product + store.
-   Returns null on miss → page falls through to notFound().
-   Uses product_best_offers when possible (already joined view) but
-   falls back to a manual join when the offer isn't the "best" for
-   its product (e.g. user landed on a non-cheapest offer via deep
-   link). The manual fallback covers every offer regardless of rank. */
+/* Fetch a single offer by its ID. Three sources, tried in order:
+     1. product_best_offers view (fast, ~50% of /deals clicks).
+     2. offers + products + stores manual join (every DB-backed offer).
+     3. curated-amazon static catalogue (the in-memory baseline for
+        Amazon's 5 marketplaces, IDs like `amazon-us-iphone-15-pro-max`
+        that aren't in the DB at all).
+   Returns null on miss → page falls through to notFound(). */
 async function fetchOffer(offerId: string): Promise<OfferRow | null> {
   const supa = getSupabaseAdmin();
-  if (!supa) return null;
 
-  /* Try the joined view first — fast path for offers that ARE the
-     best for their product (~50% of /deals clicks). */
-  const { data: viewRow } = await supa
-    .from("product_best_offers")
-    .select("*")
-    .eq("offer_id", offerId)
-    .maybeSingle();
+  /* Try the joined view first. */
+  if (supa) {
+    const { data: viewRow } = await supa
+      .from("product_best_offers")
+      .select("*")
+      .eq("offer_id", offerId)
+      .maybeSingle();
 
-  if (viewRow) return viewRow as OfferRow;
+    if (viewRow) {
+      /* The product_best_offers view filters for in_stock=true via a
+         lateral join and drops the column from its projection. Default
+         to true so the out-of-stock badge doesn't misfire across every
+         PDP (the bug user reported May 2026: "all products say Last
+         seen unavailable"). */
+      return {
+        ...(viewRow as Omit<OfferRow, "in_stock">),
+        in_stock: true,
+      };
+    }
 
-  /* Fall back to the offers + products + stores join. Slower (two
-     more network hops) but covers every offer in the catalog. */
-  const { data: offer } = await supa
-    .from("offers")
-    .select("id, product_id, store_id, url, current_price, original_price, discount_percent, currency, in_stock, scraped_at")
-    .eq("id", offerId)
-    .maybeSingle();
-  if (!offer) return null;
+    /* Fall back to the offers + products + stores join. Slower (two
+       more network hops) but covers every offer in the catalog. */
+    const { data: offer } = await supa
+      .from("offers")
+      .select("id, product_id, store_id, url, current_price, original_price, discount_percent, currency, in_stock, scraped_at")
+      .eq("id", offerId)
+      .maybeSingle();
 
-  const [{ data: product }, { data: store }] = await Promise.all([
-    supa.from("products").select("title, category_slug, brand, image_url").eq("id", offer.product_id).maybeSingle(),
-    supa.from("stores").select("name, logo_url").eq("id", offer.store_id).maybeSingle(),
-  ]);
-  if (!product || !store) return null;
+    if (offer) {
+      const [{ data: product }, { data: store }] = await Promise.all([
+        supa.from("products").select("title, category_slug, brand, image_url").eq("id", offer.product_id).maybeSingle(),
+        supa.from("stores").select("name, logo_url").eq("id", offer.store_id).maybeSingle(),
+      ]);
+      if (product && store) {
+        return {
+          offer_id: offer.id,
+          product_id: offer.product_id,
+          store_id: offer.store_id,
+          url: offer.url,
+          current_price: offer.current_price,
+          original_price: offer.original_price,
+          discount_percent: offer.discount_percent,
+          currency: offer.currency as "NGN" | "USD",
+          scraped_at: offer.scraped_at,
+          /* offers.in_stock has a `default true` in the schema so a
+             missing/null value is treated as in-stock. Only explicit
+             false renders the out-of-stock tile in ProductHero. */
+          in_stock: offer.in_stock ?? true,
+          title: product.title,
+          category_slug: product.category_slug,
+          brand: product.brand,
+          image_url: product.image_url,
+          store_name: store.name,
+          store_logo_url: store.logo_url,
+        };
+      }
+    }
+  }
 
-  return {
-    offer_id: offer.id,
-    product_id: offer.product_id,
-    store_id: offer.store_id,
-    url: offer.url,
-    current_price: offer.current_price,
-    original_price: offer.original_price,
-    discount_percent: offer.discount_percent,
-    currency: offer.currency as "NGN" | "USD",
-    scraped_at: offer.scraped_at,
-    in_stock: offer.in_stock,
-    title: product.title,
-    category_slug: product.category_slug,
-    brand: product.brand,
-    image_url: product.image_url,
-    store_name: store.name,
-    store_logo_url: store.logo_url,
-  };
+  /* Curated Amazon fallback — handles IDs like
+     `amazon-us-iphone-15-pro-max` (5 marketplaces x ~15 products =
+     ~75 stable URLs that aren't in the offers table). Without this,
+     clicking a curated card on /deals 404s the PDP. */
+  const curated = curatedAmazonDeals.find((d) => d.id === offerId);
+  if (curated) {
+    return {
+      offer_id: curated.id,
+      /* Curated rows have no product_id (they're not in the products
+         table). Use the id as a synthetic key — the PDP only reads
+         this for the dupes anchor, and pgFtsFindDupes ranks by title
+         similarity regardless of key value. */
+      product_id: curated.id,
+      store_id: curated.storeId,
+      url: curated.url,
+      current_price: curated.salePrice,
+      original_price: curated.originalPrice ?? curated.salePrice,
+      discount_percent: curated.discountPercent ?? 0,
+      currency: curated.currency,
+      scraped_at: curated.postedAt + "T00:00:00Z",
+      in_stock: true,
+      title: curated.title,
+      category_slug: curated.categorySlug,
+      brand: null,
+      image_url: curated.imageUrl ?? null,
+      store_name: curated.storeName,
+      store_logo_url: `/logos/${curated.storeId}.png`,
+    };
+  }
+
+  return null;
 }
 
 function offerRowToHero(row: OfferRow): OfferData {
@@ -150,17 +202,13 @@ function offerRowToHero(row: OfferRow): OfferData {
   };
 }
 
-/* Convert the offer's native-currency price into NGN for the
-   anchor-price arg pgFtsFindDupes expects. Falls back to 0
-   ("no price ceiling") when the conversion can't be derived,
-   matching the existing /compare/dupes contract. */
-function offerToNgnAnchor(row: OfferRow): number {
-  if (row.currency === "NGN") return row.current_price;
-  if (row.currency === "USD") {
-    return Math.round(row.current_price * USD_FX.NGN);
-  }
-  return 0;
-}
+/* No anchor-price ceiling is passed to pgFtsFindDupes anymore.
+   The previous behaviour (cap candidates at the anchor's NGN price)
+   hid every alternative listed at or above the anchor's price,
+   which made many PDPs show "0 alternatives" even when /deals
+   had multiple matches for the same title.
+   pgFtsFindDupes treats anchorPriceNgn === 0 as "no ceiling, rank
+   by FTS similarity alone" — exactly what we want here. */
 
 /* ── Static params ───────────────────────────────────────────────── */
 
@@ -228,12 +276,15 @@ export default async function ProductPage({ params }: PageProps) {
   const offer = await fetchOffer(params.id);
   if (!offer) notFound();
 
-  /* Cheaper alternatives via the existing dupes pipeline. Pass the
-     offer's price as the anchor so the dupes engine ranks rows
-     cheaper-than-this-offer first; falls back to "no ceiling" for
-     USD-priced rows that don't translate cleanly to NGN. */
-  const anchorNgn = offerToNgnAnchor(offer);
-  const dupes = await pgFtsFindDupes(offer.title, anchorNgn, { limit: 12 });
+  /* Similar products via the dupes engine. anchorPriceNgn=0 means
+     "no price ceiling" — rank by FTS similarity alone. Previously
+     we passed the anchor's NGN price which silently hid every
+     candidate priced at or above the anchor, producing empty
+     alternative rails even when /deals showed multiple matches for
+     the same title (user report May 2026: "filter by iPhone 15 Pro
+     shows multiple products on /deals but PDP shows no cheaper
+     alternatives"). */
+  const dupes = await pgFtsFindDupes(offer.title, 0, { limit: 16 });
 
   /* Drop dupe-offers from stores that aren't appropriate for the
      visitor's market (e.g. NG-anchored Konga rows on a UK PDP).
@@ -252,6 +303,21 @@ export default async function ProductPage({ params }: PageProps) {
      SERPs. Image, brand, category, price, currency, availability —
      each maps to a Schema.org Product field. */
   const heroData = offerRowToHero(offer);
+
+  /* Count of unique stores that carry this product across the
+     anchor + cheaper-alternatives set. Drives the "Compare prices
+     across N stores" CTA label so the user knows how broad the
+     compare view will be relative to this single-store PDP. The
+     anchor store always counts; each dupe contributes the unique
+     store_ids in its offers list. */
+  const storesAcrossAlternatives = new Set<string>();
+  storesAcrossAlternatives.add(offer.store_id);
+  for (const d of filteredDupes) {
+    for (const o of d.offers) {
+      if (o.storeId) storesAcrossAlternatives.add(o.storeId);
+    }
+  }
+  const totalStores = storesAcrossAlternatives.size;
   const breadcrumb = buildBreadcrumbList([
     { name: "Havlo",          url: `${SITE_URL}/${country.code}` },
     { name: country.name,     url: `${SITE_URL}/${country.code}` },
@@ -301,20 +367,37 @@ export default async function ProductPage({ params }: PageProps) {
           Back to deals
         </Link>
 
-        <ProductHero offer={heroData} countryCode={country.code} />
+        <ProductHero offer={heroData} countryCode={country.code} totalStores={totalStores} />
 
         {filteredDupes.length > 0 && (
           <section className="mt-12 sm:mt-16">
             <header className="mb-6 sm:mb-8">
               <h2 className="text-[22px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
-                Cheaper alternatives
+                Similar products
               </h2>
               <p className="text-sm sm:text-base text-ink-2 mt-1.5">
-                {filteredDupes.length} similar {filteredDupes.length === 1 ? "product" : "products"} we found across other stores. Sorted cheapest first.
+                {filteredDupes.length} similar {filteredDupes.length === 1 ? "product" : "products"} from other stores. Sorted cheapest first.
               </p>
             </header>
             <SimilarProducts dupes={filteredDupes} />
           </section>
+        )}
+
+        {/* Live results — fetches /api/live-search on mount and renders
+            real-time alternatives the DB index doesn't have yet (long-
+            tail items, freshly-promoted bargains, cross-border options).
+            Same pattern /compare uses; client component so the static
+            PDP shell still SSRs fast.
+
+            Excluded entirely on the curated Amazon fallback path since
+            those PDPs already represent search-page anchors; calling
+            live-search again returns duplicate results. */}
+        {!offer.offer_id.startsWith("amazon-") && (
+          <LiveAlternatives
+            query={offer.title}
+            countryCode={country.code}
+            excludeStoreId={offer.store_id}
+          />
         )}
       </div>
     </main>

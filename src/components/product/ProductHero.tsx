@@ -14,7 +14,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { ExternalLink, Tag, Clock, Store as StoreIcon, ShieldCheck, Globe } from "lucide-react";
+import { ExternalLink, Tag, Clock, Store as StoreIcon, Globe } from "lucide-react";
 import {
   cleanTitle,
   proxiedImageUrl,
@@ -50,13 +50,22 @@ export interface OfferData {
   originalPrice:   number;
   discountPercent: number;
   currency:        "NGN" | "USD";
-  inStock:         boolean;
+  /** `false` only when explicitly out of stock. `undefined` /
+      missing values are treated as in-stock — the product_best_offers
+      view filters for in_stock=true by construction and drops the
+      column from the projection, so casting raw view rows blind
+      would otherwise misfire the out-of-stock badge on every PDP. */
+  inStock:         boolean | undefined;
   scrapedAt:       string;
 }
 
 interface Props {
-  offer:       OfferData;
-  countryCode: string;
+  offer:        OfferData;
+  countryCode:  string;
+  /** Total count of stores carrying this product (anchor + dupes).
+      Drives the "Compare prices across N stores" CTA label so the
+      user knows how much broader the compare view is than the PDP. */
+  totalStores?: number;
 }
 
 /* Convert any price (NGN or USD) to the user's preferred currency.
@@ -76,7 +85,7 @@ function convertToUserCurrency(
   return country.currency === "USD" ? Math.round(out * 100) / 100 : Math.round(out);
 }
 
-export default function ProductHero({ offer, countryCode }: Props) {
+export default function ProductHero({ offer, countryCode, totalStores }: Props) {
   const country = getCountry(countryCode);
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -256,24 +265,30 @@ export default function ProductHero({ offer, countryCode }: Props) {
 
         {/* Secondary action — compare across stores. Routes to /compare
             with the product title as the query, surfacing the broader
-            search-results view including more dupes than the focused
-            "Cheaper alternatives" rail below. */}
+            search-results view including dupes + live results.
+
+            Label is dynamic: "Compare prices across N stores" when
+            totalStores is known and > 1, so the user can see at a
+            glance how broad the compare view will be. Falls back to
+            generic copy when the count isn't computable (e.g. a curated
+            row without a dupes pre-fetch). */}
         <Link
           href={`/${countryCode}/compare?q=${encodeURIComponent(offer.title)}&mode=similar`}
           className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-border-strong text-ink font-medium text-[14px] hover:bg-surface-2 transition-colors mb-7"
         >
-          Compare prices across stores
+          {typeof totalStores === "number" && totalStores > 1
+            ? <>Compare prices across {totalStores} stores</>
+            : <>Compare prices across stores</>}
         </Link>
 
-        {/* Useful info row — paste of small facts users want before
-            clicking through. Modelled on spoken.io's product detail
-            page which surfaces designer / category / materials / etc.
-            We don't have spec-level metadata, but the four below give
-            useful trust signal:
-              • Last seen — when our scraper last checked this offer
-              • Store country — where the retailer is anchored
-              • Affiliate disclosure — quiet but legally required
-              • In-stock note — explicit when out of stock */}
+        {/* Useful info row — small facts shoppers want before clicking
+            through. Affiliate disclosure removed (May 2026) — it lives
+            on /how-we-make-money for users who want the detail, and
+            peer comparison sites (Dupe, etc.) don't surface it inline
+            on each PDP. The remaining tiles are direct trust signals:
+              • Last seen — when our scraper last checked
+              • Store country — retailer anchor (or 'International')
+              • Out of stock notice — only when in_stock = false */}
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[13px]">
           <div className="flex items-start gap-2.5 p-3 rounded-xl bg-surface border border-border">
             <Clock size={14} className="text-ink-3 mt-0.5 shrink-0" aria-hidden="true" />
@@ -297,7 +312,12 @@ export default function ProductHero({ offer, countryCode }: Props) {
             </div>
           </div>
 
-          {!offer.inStock && (
+          {/* Out-of-stock tile — only when in_stock is explicitly false.
+              Defaults to in-stock when the field is missing (the
+              product_best_offers view filters for in_stock=true by
+              construction, so the column drops out of the projection
+              and would otherwise show the badge for every row). */}
+          {offer.inStock === false && (
             <div className="flex items-start gap-2.5 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-300/40 sm:col-span-2">
               <Clock size={14} className="text-red-500 mt-0.5 shrink-0" aria-hidden="true" />
               <div>
@@ -310,18 +330,6 @@ export default function ProductHero({ offer, countryCode }: Props) {
               </div>
             </div>
           )}
-
-          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-surface border border-border sm:col-span-2">
-            <ShieldCheck size={14} className="text-ink-3 mt-0.5 shrink-0" aria-hidden="true" />
-            <div>
-              <dt className="text-ink-3 text-[11px] uppercase tracking-[0.08em] font-semibold mb-0.5">
-                Affiliate disclosure
-              </dt>
-              <dd className="text-ink-2 leading-relaxed">
-                Some outbound links may earn us a small commission at no extra cost to you. The cheapest verified option always ranks first.
-              </dd>
-            </div>
-          </div>
         </dl>
       </div>
     </section>
