@@ -98,6 +98,66 @@ export function isAmazonSearchUrl(url: string | undefined | null): boolean {
   }
 }
 
+/* Generalised search-URL detector across ALL retailers, not just
+   Amazon. When a deal's outbound link routes to a store's search
+   results page rather than a specific product page, we can't
+   guarantee the displayed price is what the user will see at
+   checkout — the search page may surface a sponsored listing,
+   a different variant, or a different seller at a higher price.
+
+   Card components prefix the price with "from " when this returns
+   true (same UX pattern isAmazonSearchUrl already used for Amazon)
+   so the displayed number reads as a reference, not a guarantee.
+
+   Detects:
+     - /search, /search/...      (Currys, Argos, John Lewis, Konga, ...)
+     - /sitesearch               (Boots)
+     - /s, /s/...                (Amazon)
+     - /gp/search                (Amazon legacy)
+     - /searchresults.html       (Sports Direct)
+     - /searchpage.jsp           (Best Buy)
+     - /catalog/                 (Jumia)
+     - root path "/" + ?q=/?s=/?search=  (homepage search redirects)
+
+   Does NOT match obvious product pages:
+     - /dp/{ASIN}, /gp/product/  (Amazon products)
+     - /p/, /product/, /products/, /pd/  (most retailers)
+     - /item/                     (eBay, AliExpress)
+     - any path containing a slash-separated SKU or slug */
+export function isStoreSearchUrl(url: string | undefined | null): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    const path = u.pathname.toLowerCase();
+    const qs   = u.search.toLowerCase();
+
+    /* Explicit search path patterns covering the merchants we ship.
+       Ordered cheapest-to-most-specific so the common case bails
+       fast. */
+    if (/^\/search(\/|\?|$)/.test(path)) return true;       // /search?q= or /search/foo
+    if (/^\/sitesearch(\/|\?|$)/.test(path)) return true;   // Boots
+    if (/^\/s(\/|\?|$)/.test(path)) return true;            // Amazon
+    if (path.startsWith("/gp/search")) return true;         // Amazon legacy
+    if (path.includes("/searchresults")) return true;       // Sports Direct + variants
+    if (path.includes("/searchpage.jsp")) return true;      // Best Buy
+    if (path.startsWith("/catalog")) return true;           // Jumia
+    if (path.startsWith("/sr")) return true;                // Nordstrom /sr?keyword=
+    if (path.includes("/keyword")) return true;             // Wayfair /keyword.php
+
+    /* Root path with a search query string — common pattern for
+       single-page Shopify storefronts (Kara, HealthPlus, Supermart,
+       Slot use this). */
+    if ((path === "/" || path === "") &&
+        /[?&](q|s|search|keyword|searchterm|qz|ntt|descriptionfilter)=/i.test(qs)) {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 /* Hosts whose images load fine when hotlinked direct from havlo.io.
    Anything NOT in this set is wrapped through /api/img-proxy which
    rewrites the Referer to the merchant's own domain so Amazon /

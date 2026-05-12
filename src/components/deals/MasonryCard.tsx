@@ -16,7 +16,7 @@ import {
   formatCompact,
   formatUSDPrice,
   getClickThroughUrl,
-  isAmazonSearchUrl,
+  isStoreSearchUrl,
   proxiedImageUrl,
   savings,
   timeAgo,
@@ -156,7 +156,16 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
      not a guarantee for the specific item the user lands on. The
      "from " prefix tells the user that explicitly, which is the
      truthful framing the QA agent asked for. */
-  const isPriceFromOnly = isAmazonSearchUrl(deal.url);
+  /* "from $X" prefix when the outbound link is a store search page
+     rather than a specific product page. Generalised from Amazon-
+     only (the previous isAmazonSearchUrl check) to all retailers
+     because Currys, Argos, John Lewis, Walmart and others have the
+     same shape — when we don't have a direct product URL we route
+     to the merchant's search results, and the displayed price is
+     the cheapest reference we have for the product family, not a
+     guarantee for the specific item the user lands on. The "from "
+     prefix tells the user that explicitly. */
+  const isPriceFromOnly = isStoreSearchUrl(deal.url);
 
   /* Landed-cost estimate for cross-border purchases. Uses the same
      30% markup as the /compare anchor row (offerToStoreOffer in

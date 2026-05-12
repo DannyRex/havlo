@@ -9,7 +9,7 @@ import { useState } from "react";
 import {
   cleanTitle,
   getClickThroughUrl,
-  isAmazonSearchUrl,
+  isStoreSearchUrl,
   proxiedImageUrl,
   timeAgo,
 } from "@/lib/utils";
@@ -93,7 +93,12 @@ export default function ListCard({ deal }: Props) {
      search results page, not a specific item. "from " makes that
      honest. Same flag must apply on both card layouts so the framing
      stays consistent across grid + list views. */
-  const isPriceFromOnly = isAmazonSearchUrl(deal.url);
+  /* "from $X" prefix when the outbound link is a store search page
+     rather than a specific product page. Generalised across all
+     retailers so Currys / Argos / Walmart / etc. search-fallback
+     URLs surface as "from" prices, matching the existing Amazon
+     treatment. See isStoreSearchUrl() for the detection rules. */
+  const isPriceFromOnly = isStoreSearchUrl(deal.url);
 
   /* Secondary price hint — shows the deal's NATIVE currency (what
      the merchant actually charges) when the user's display currency
