@@ -88,7 +88,19 @@ async function main() {
   for (const [storeId, batch] of byStore) {
     const label = `[${storeId.padEnd(12)}]`;
     try {
-      const result = await ingestDeals("playwright-scraper", storeId, batch);
+      /* Pass `sweepScope: { store: storeId }` — these scrapers walk
+         each store's full public catalog, so any offer in the DB
+         that wasn't re-seen this run is stale and should be marked
+         out-of-stock. ingestDeals has its own safety guards (skips
+         sweep if batch is suspiciously small or shrinks too much
+         vs the existing in-stock count) so partial scrape failures
+         won't accidentally zero out a healthy catalog. */
+      const result = await ingestDeals(
+        "playwright-scraper",
+        storeId,
+        batch,
+        { sweepScope: { store: storeId } },
+      );
       totalFetched += result.fetched;
       totalUpserted += result.upserted;
       totalErrors += result.errors.length;

@@ -104,7 +104,13 @@ function inferSourceCountry(d: Deal, sourceQuery: string): string | null {
   return null;
 }
 
-function dealToOfferRow(d: Deal, productId: string, sourceProvider: string, sourceQuery: string) {
+function dealToOfferRow(
+  d: Deal,
+  productId: string,
+  sourceProvider: string,
+  sourceQuery: string,
+  runStartedAt: string,
+) {
   return {
     product_id: productId,
     store_id: d.storeId,
@@ -113,13 +119,49 @@ function dealToOfferRow(d: Deal, productId: string, sourceProvider: string, sour
     original_price: d.originalPrice ?? null,
     discount_percent: d.discountPercent ?? null,
     currency: d.currency,
+    /* Always (re)mark as in_stock on a successful upsert. The
+       staleness sweep below flips offers that DIDN'T get touched
+       this run, so re-stamping here is the "I saw this URL this
+       run" half of the contract. */
     in_stock: true,
     source_provider: sourceProvider,
     source_query: sourceQuery,
     source_country: inferSourceCountry(d, sourceQuery),
     scraped_at: new Date().toISOString(),
+    /* last_seen_at uses the RUN-START timestamp, not now(), so every
+       offer touched in the same run shares a single stamp. The sweep
+       below selects `last_seen_at < runStartedAt`, so using `now()`
+       per-row would make that boundary fuzzy (an offer upserted at
+       run+30s would be 30s newer than the run start and could leak
+       into a future run's sweep window). Migration 0018 adds the
+       column with default now() for safety; we override here. */
+    last_seen_at: runStartedAt,
   };
 }
+
+/* Options bag for ingestDeals. Most callers don't need this — the
+   defaults are conservative (no staleness sweep, no destructive
+   side-effects). */
+export interface IngestOptions {
+  /** When the caller has just walked a store's FULL public catalog,
+      pass `{ store: storeId }` so ingestDeals can soft-delete offers
+      that weren't seen this run (mark them in_stock=false). The
+      sweep is only safe for full-catalog scrapers — per-category /
+      per-SKU ingest must leave this undefined. */
+  sweepScope?: { store: string };
+}
+
+/** Minimum deal count BEFORE the sweep is allowed to run. Catches
+    the catastrophic case where a Playwright run breaks partway and
+    only returns a handful of items — without this threshold we'd
+    mark the rest of the catalog as out of stock. */
+const MIN_DEALS_FOR_SWEEP = 10;
+
+/** Sweep is skipped when the new batch is smaller than this
+    fraction of the existing in-stock count for the store. A 60%
+    drop in catalog size between runs is almost always a scraper
+    regression, not a genuine delisting wave. */
+const MIN_BATCH_FRACTION_OF_EXISTING = 0.4;
 
 /* ── Main ingestion function ──────────────────────────────────────── */
 
@@ -138,6 +180,7 @@ export async function ingestDeals(
   sourceProvider: string,
   sourceQuery: string,
   deals: Deal[],
+  options: IngestOptions = {},
 ): Promise<IngestResult> {
   const result: IngestResult = { fetched: deals.length, upserted: 0, errors: [] };
   const supa = getSupabaseAdmin();
@@ -147,6 +190,12 @@ export async function ingestDeals(
     return result;
   }
   if (deals.length === 0) return result;
+
+  /* Pinned at the start of the run. Every offer upserted below
+     gets this exact stamp as `last_seen_at`, so the post-loop
+     sweep can cleanly select `last_seen_at < runStartedAt` without
+     race conditions between upserts and the sweep. */
+  const runStartedAt = new Date().toISOString();
 
   // Open a run record
   const { data: run, error: runErr } = await supa
@@ -256,7 +305,7 @@ export async function ingestDeals(
 
       const { error: offerErr } = await supa
         .from("offers")
-        .upsert(dealToOfferRow(d, productId, sourceProvider, sourceQuery), {
+        .upsert(dealToOfferRow(d, productId, sourceProvider, sourceQuery, runStartedAt), {
           onConflict: "store_id,url",
         });
 
@@ -270,7 +319,17 @@ export async function ingestDeals(
     }
   }
 
-  // 3. Close the run record
+  // 3. Staleness sweep — only when the caller asserts full-catalog scope.
+  if (options.sweepScope?.store) {
+    await sweepStaleOffers(supa, {
+      storeId: options.sweepScope.store,
+      runStartedAt,
+      batchSize: result.upserted,
+      result,
+    });
+  }
+
+  // 4. Close the run record
   await supa
     .from("ingestion_runs")
     .update({
@@ -283,4 +342,95 @@ export async function ingestDeals(
     .eq("id", run.id);
 
   return result;
+}
+
+/* ── Staleness sweep ──────────────────────────────────────────────── */
+
+interface SweepParams {
+  storeId:       string;
+  runStartedAt:  string;
+  /** How many offers the run successfully upserted. Used as a sanity
+      guard against partially-broken scrapes. */
+  batchSize:     number;
+  /** Mutated to record the outcome of the sweep (count flipped,
+      reasons skipped, etc.) on result.errors when relevant. */
+  result:        IngestResult;
+}
+
+/**
+ * Mark offers belonging to `storeId` that were NOT touched in this
+ * run as in_stock=false. The product_best_offers view filters
+ * in_stock=true, so flipped offers immediately drop out of /deals
+ * and the per-product price comparisons without us deleting any
+ * rows (historical data preserved for audit).
+ *
+ * Guards (skips sweep + logs a warning, no errors raised):
+ *   1. batchSize < MIN_DEALS_FOR_SWEEP — almost certainly a broken
+ *      scrape, not a real "merchant has 9 products" catalog.
+ *   2. batchSize < MIN_BATCH_FRACTION_OF_EXISTING × current in-stock
+ *      count — a >60% drop in catalog size is much more likely a
+ *      scraper regression than mass delisting.
+ */
+async function sweepStaleOffers(
+  supa:   NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  params: SweepParams,
+): Promise<void> {
+  const { storeId, runStartedAt, batchSize, result } = params;
+
+  if (batchSize < MIN_DEALS_FOR_SWEEP) {
+    console.warn(
+      `[ingest] sweep skipped for ${storeId}: only ${batchSize} deals upserted (< ${MIN_DEALS_FOR_SWEEP}). Looks like a broken scrape — leaving existing offers untouched.`,
+    );
+    return;
+  }
+
+  /* Compare the new batch size to the store's CURRENT in-stock
+     offer count. If we're seeing a giant drop, abort the sweep —
+     way more likely the scraper broke than the merchant lost 80%
+     of their catalog overnight. */
+  const { count: existingCount, error: countErr } = await supa
+    .from("offers")
+    .select("*", { count: "exact", head: true })
+    .eq("store_id", storeId)
+    .eq("in_stock", true);
+
+  if (countErr) {
+    /* If we can't read the count, fail open — don't sweep, log it.
+       Better to leave a stale row in for one cycle than risk nuking
+       a healthy catalog on a transient PostgREST hiccup. */
+    console.warn(
+      `[ingest] sweep skipped for ${storeId}: count probe failed (${countErr.message}). Will retry next run.`,
+    );
+    return;
+  }
+
+  if (existingCount && batchSize < existingCount * MIN_BATCH_FRACTION_OF_EXISTING) {
+    console.warn(
+      `[ingest] sweep skipped for ${storeId}: batch (${batchSize}) is < ${Math.round(MIN_BATCH_FRACTION_OF_EXISTING * 100)}% of existing in-stock (${existingCount}). Looks like a partial scrape — leaving existing offers untouched.`,
+    );
+    return;
+  }
+
+  /* All checks passed — run the sweep. Single statement, indexed by
+     (store_id, last_seen_at). Returns the affected rows via a
+     count=exact hint so we can log how many vanished. */
+  const { data: flipped, error: sweepErr } = await supa
+    .from("offers")
+    .update({ in_stock: false })
+    .eq("store_id", storeId)
+    .eq("in_stock", true)
+    .lt("last_seen_at", runStartedAt)
+    .select("id");
+
+  if (sweepErr) {
+    result.errors.push(`Staleness sweep for ${storeId}: ${sweepErr.message}`);
+    return;
+  }
+
+  const flippedCount = flipped?.length ?? 0;
+  if (flippedCount > 0) {
+    console.log(
+      `[ingest] sweep ${storeId}: ${flippedCount} offer(s) marked out-of-stock (not seen in run starting ${runStartedAt}).`,
+    );
+  }
 }
