@@ -165,10 +165,10 @@ export default async function LivePdpPage({ params, searchParams }: PageProps) {
           <section className="mt-12 sm:mt-16">
             <header className="mb-6 sm:mb-8">
               <h2 className="text-[22px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
-                Similar products
+                You may also like
               </h2>
               <p className="text-sm sm:text-base text-ink-2 mt-1.5">
-                {filteredDupes.length} similar {filteredDupes.length === 1 ? "product" : "products"} from other stores. Sorted cheapest first.
+                {filteredDupes.length} {filteredDupes.length === 1 ? "pick" : "picks"} from other stores. Sorted cheapest first.
               </p>
             </header>
             <SimilarProducts dupes={filteredDupes} countryCode={country.code} />

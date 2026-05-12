@@ -448,26 +448,27 @@ export default function DealFeed() {
           to a helper — duplication is small (~10 lines), avoids the
           render overhead of a tiny client subcomponent. */}
       <div className="sticky top-16 z-30 -mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg/85 backdrop-blur-xl border-b border-border">
-        {/* Row 1 — CategoryNav grows; mobile-only Sort sits at the
-            right.
+        {/* Row 1 — CategoryNav (always full-width). The previous
+            attempt to inline the mobile sort here overlapped the
+            rightmost chip even with `overflow-hidden` because
+            CategoryNav has internal `-mx-1` for its scroll
+            affordance. Moving sort to its own row (below) is the
+            cleaner fix (user report May 2026: "put the sort
+            dropdown on its own line in mobile"). */}
+        <CategoryNav active={category} onChange={setCategory} />
 
-            Three things conspire to make this not overlap:
-              1. `gap-3` on the parent gives breathing room.
-              2. `flex-1 min-w-0 overflow-hidden` on the CategoryNav
-                 wrapper strictly clips its content. CategoryNav has
-                 a negative margin (-mx-1) internally for its scroll
-                 affordance — without explicit `overflow-hidden` on
-                 the wrapper, that bleed could visually push the
-                 rightmost pill under the sort dropdown (user report
-                 May 2026: "sort is overlaying the chips on mobile").
-              3. The sort pill has a solid `bg-surface-2`, so even
-                 if a pill DID leak under it, the user only sees the
-                 sort. */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 min-w-0 overflow-hidden">
-            <CategoryNav active={category} onChange={setCategory} />
-          </div>
-          <div className="sm:hidden shrink-0 relative">
+        {/* Row 2 (mobile-only) — dedicated sort row.
+            Deal count on the left, sort pill on the right. Sits
+            between CategoryNav and the tier-pills row so the
+            primary sort control is visible without horizontal-
+            scrolling the tier row. */}
+        <div className="sm:hidden mt-3 flex items-center justify-between gap-2">
+          {!loading && (
+            <span className="text-xs text-ink-3 tabular-nums">
+              {total.toLocaleString()} deals
+            </span>
+          )}
+          <div className="relative ml-auto">
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortOption)}
@@ -561,16 +562,10 @@ export default function DealFeed() {
         );
       })()}
 
-      {/* Mobile-only view-mode toggle — its own row, right-aligned, just
-          above the items grid. Keeps the sticky filter bar uncluttered
-          (sort dropdown was getting pushed off-screen on narrow mobile
-          when the toggle lived inside the filter row). */}
-      <div className="flex items-center justify-between mb-3 sm:hidden">
-        {!loading && (
-          <span className="text-xs text-ink-3 tabular-nums">
-            {total.toLocaleString()} deals
-          </span>
-        )}
+      {/* Mobile-only view-mode toggle. Deal count moved out of this
+          row (lives in the sticky sort row now) so this strip is
+          just the grid/list switcher, right-aligned. */}
+      <div className="flex items-center justify-end mb-3 sm:hidden">
         <div
           role="group"
           aria-label="View mode"
