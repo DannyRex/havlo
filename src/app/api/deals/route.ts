@@ -83,16 +83,45 @@ export async function GET(req: NextRequest) {
        pull origin='all', country-filter, bucket by currency in-
        memory, then apply the user's chosen origin to the items
        returned. Counts and items are now guaranteed consistent. */
+    /* Fetch the BROAD pool — no minDiscount filter passed to the
+       provider. The user's tier choice (20%+, 50%+) is applied
+       below in JS so we can keep TWO pools:
+
+         broadPool      — un-discount-filtered. Powers the Stores
+                          dropdown so 0%-only stores (pharmacies,
+                          grocers, Shopify-no-compare-at-price feeds)
+                          still appear when the user picks a stricter
+                          tier. User report May 2026: "stores without
+                          deals should be included as well" — without
+                          this split, HealthPlus / MedPlus / Bitmarte /
+                          Essenza / Supermart / Ajebomarket vanish
+                          from the dropdown whenever tier > 0.
+
+         qualifying     — broadPool ∩ discount tier. Powers the
+                          items list + originCounts. These need to
+                          match what the user clicks: "Local 50"
+                          better mean clicking "Local stores" shows
+                          50 items, not 200.
+
+       Egress unchanged: PAGES caps fan-out at 4000 rows regardless
+       of whether minDiscount is SQL-filtered or JS-filtered. The
+       dual-pass Pass B already pulled 2000 zero-discount rows for
+       the default tier; this change just makes that data visible
+       in the dropdown for higher tiers too. */
+    const userMinDiscount = minDiscount ? parseInt(minDiscount, 10) : 0;
     const allRawAcrossOrigins = await provider.fetchDeals({
       categorySlug: category,
-      minDiscount: minDiscount ? parseInt(minDiscount, 10) : undefined,
+      /* Intentionally NOT passing the user's minDiscount — see
+         comment above. Pass 0 to force browse-db's Pass B to fire
+         even when the user has a stricter tier picked. */
+      minDiscount: 0,
       sort,
       search,
       origin: "all",
     });
 
     /* Country store filter — pure-function, runs over Deal[] */
-    const allFiltered = filterDealsForCountry(allRawAcrossOrigins, country);
+    const broadCountryFiltered = filterDealsForCountry(allRawAcrossOrigins, country);
 
     /* Bucket by store COUNTRY (not currency). Round-4 QA caught
        /uk/deals showing "Local stores: 0" even though John Lewis,
@@ -107,7 +136,7 @@ export async function GET(req: NextRequest) {
        shoppers. AliExpress / Shein / Temu / DHgate → no anchor
        → INTL for everyone. Falls back to the currency check when
        the store can't be inferred (rare, niche scrapers). */
-    const isLocalToUser = (d: typeof allFiltered[0]): boolean => {
+    const isLocalToUser = (d: typeof broadCountryFiltered[0]): boolean => {
       const storeCountry = inferStoreCountry(d.storeId, d.storeName);
       if (storeCountry !== null) {
         return storeCountry.toLowerCase() === country.code.toLowerCase();
@@ -122,28 +151,48 @@ export async function GET(req: NextRequest) {
       // Fallback to currency match when store country can't be inferred
       return d.currency === country.currency;
     };
-    const localFiltered = allFiltered.filter(isLocalToUser);
-    const intlFiltered  = allFiltered.filter((d) => !isLocalToUser(d));
+
+    /* Apply user's origin choice to the BROAD pool — this is the
+       pool that drives the Stores dropdown. Country + origin are
+       hard intent signals (a UK user on "Local stores" should never
+       see Konga in the dropdown); discount tier is a soft preference
+       that shouldn't shrink the dropdown. */
+    const broadByOrigin =
+      effectiveOrigin === "local" ? broadCountryFiltered.filter(isLocalToUser) :
+      effectiveOrigin === "intl"  ? broadCountryFiltered.filter((d) => !isLocalToUser(d)) :
+      broadCountryFiltered;
+
+    /* Apply the user's discount tier to derive the qualifying pool
+       (items + originCounts). When tier=0 this is identical to
+       broadCountryFiltered, so no extra work for default views. */
+    const qualifyingCountryFiltered = userMinDiscount > 0
+      ? broadCountryFiltered.filter((d) => d.discountPercent >= userMinDiscount)
+      : broadCountryFiltered;
+    const qualifyingLocal = qualifyingCountryFiltered.filter(isLocalToUser);
+    const qualifyingIntl  = qualifyingCountryFiltered.filter((d) => !isLocalToUser(d));
     const originCounts = {
-      all:   allFiltered.length,
-      local: localFiltered.length,
-      intl:  intlFiltered.length,
+      all:   qualifyingCountryFiltered.length,
+      local: qualifyingLocal.length,
+      intl:  qualifyingIntl.length,
     };
 
-    /* Apply the user's origin filter for the items in the response. */
-    const allByOrigin =
-      effectiveOrigin === "local" ? localFiltered :
-      effectiveOrigin === "intl"  ? intlFiltered  :
-      allFiltered;
+    /* Items pool: qualifying pool, narrowed to the user's origin choice. */
+    const qualifyingByOrigin =
+      effectiveOrigin === "local" ? qualifyingLocal :
+      effectiveOrigin === "intl"  ? qualifyingIntl  :
+      qualifyingCountryFiltered;
 
-    /* Build the stores aggregate BEFORE applying the user's store-
-       filter selection — so the filter panel can show every store
-       still available within the current category/discount/search/
-       origin context, even ones the user hasn't ticked yet. Counts
-       reflect what they'd see if they ticked that single store. */
+    /* Build the stores aggregate from the BROAD pool (un-discount-
+       filtered) so 0%-only stores stay in the dropdown regardless of
+       tier. Count reflects the broad pool — i.e. "how many offers
+       does this store have in your country / category / origin",
+       not "...at your current tier". If a user ticks a 0%-only store
+       while on tier=20%+, the items list will be empty — that's the
+       deliberate UX trade-off ("user can see the store exists but
+       has to drop the tier to see its inventory"). */
     const storesAggregate = (() => {
       const map = new Map<string, { id: string; name: string; count: number }>();
-      for (const d of allByOrigin) {
+      for (const d of broadByOrigin) {
         const id = d.storeId;
         if (!id) continue;
         const existing = map.get(id);
@@ -157,8 +206,8 @@ export async function GET(req: NextRequest) {
        but the storesAggregate above still surfaces all available
        options to the filter UI. */
     const all = stores && stores.length > 0
-      ? allByOrigin.filter((d) => stores.includes(d.storeId.toLowerCase()))
-      : allByOrigin;
+      ? qualifyingByOrigin.filter((d) => stores.includes(d.storeId.toLowerCase()))
+      : qualifyingByOrigin;
 
     const total = all.length;
     const items = all.slice(offset, offset + limit);
