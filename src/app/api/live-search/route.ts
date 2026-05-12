@@ -18,6 +18,8 @@ import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry } from "@/lib/country";
 import { detectFamily, alternativeFamilyMatches } from "@/lib/search/families";
 import { priceLooksPlausibleForLiveDeal } from "@/lib/search/price-floor";
+import { ingestDeals } from "@/lib/providers/ingestion";
+import type { Deal } from "@/types";
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
@@ -148,11 +150,69 @@ export async function GET(req: NextRequest) {
     (it) => priceLooksPlausibleForLiveDeal(it.salePrice, it.title),
   );
 
+  const itemsForResponse = priceFiltered.slice(0, limit);
+
+  /* Write-back to DB. SerpAPI calls cost money; each unique
+     successful response represents knowledge we should keep so the
+     next user searching the same product doesn't trigger another
+     paid call. The full filtered set (not just the sliced view)
+     gets persisted so even rows beyond the user's visible limit
+     contribute to the index.
+
+     Fire-and-forget: the response returns immediately and the DB
+     write happens in the background. ingestDeals has its own error
+     handling + dedup (UNIQUE on store_id + url), so repeat writes
+     of the same offer just refresh `scraped_at`.
+
+     Combined with the edge cache below, this is a two-layer cost
+     savings:
+
+       Layer 1 (edge cache):   repeat query within 1h → 0 SerpAPI cost
+       Layer 2 (write-back):   future query (anytime) → DB hit, 0 SerpAPI cost
+
+     Together: hot queries are nearly free (edge cache); cold queries
+     pay once + teach the index forever (write-back). */
+  if (priceFiltered.length > 0) {
+    void persistLiveResults(q, countryCode, priceFiltered);
+  }
+
+  /* Edge-cache aggressively. Was s-maxage=300 / swr=900 (5min / 15min).
+     Bumped to 1h / 1d because:
+       - SerpAPI calls cost real $$ per request
+       - Most product prices don't move enough in 1h to matter
+       - stale-while-revalidate keeps responses instant; the
+         background revalidation runs at most once per hour per
+         unique query per region
+     User-visible UX is faster (warm cache); revenue-side $$ drops. */
   return NextResponse.json(
     {
-      items: priceFiltered.slice(0, limit),
+      items: itemsForResponse,
       providers: providers.map((p) => p.id),
     },
-    { headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=900" } },
+    { headers: { "Cache-Control": "s-maxage=3600, stale-while-revalidate=86400" } },
   );
+}
+
+/* Persist live-search results to the offers table so future
+   searches for the same product hit our DB index instead of
+   triggering another paid SerpAPI call.
+
+   Source-tagged "live-search" + the user's "{country}:{query}" so
+   we can distinguish demand-ingested rows from scheduled-scrape
+   rows when auditing the catalog. ingestDeals handles the rest:
+   upsert stores, find-or-create products by signature, upsert
+   offers by (store_id, url). */
+async function persistLiveResults(
+  query: string,
+  countryCode: string,
+  items: Deal[],
+): Promise<void> {
+  try {
+    await ingestDeals("live-search", `${countryCode}:${query}`, items);
+  } catch (err) {
+    /* Persist failure shouldn't block the user's response or surface
+       as an error. Log + continue — the cache layer still helps
+       for the immediate-repeat case. */
+    console.warn("[live-search] persist failed:", (err as Error).message);
+  }
 }
