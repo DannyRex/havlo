@@ -724,10 +724,25 @@ function CompareContent() {
           <div className="mt-12">
             {liveAvailable ? (
               <>
-                <div className="max-w-3xl mx-auto mb-5 px-1 text-center sm:text-left">
-                  <p className="text-[13px] text-ink-2">
-                    Nothing in our local index for &ldquo;{displayQuery}&rdquo; yet.
-                    Here&apos;s what&apos;s live online:
+                {/* Compact 3-option recovery panel above the live
+                    results. Re-uses the same EmptySearchState the
+                    "true empty" branch shows, so the user always
+                    gets the same three forward-options regardless
+                    of whether anything live came back. Did-you-mean
+                    pills (trigram-similarity matches) render inside
+                    EmptySearchState when present. */}
+                <EmptySearchState
+                  query={displayQuery}
+                  source="compare"
+                  suggestions={
+                    result?.mode === "empty"
+                      ? result.suggestions.map((s) => ({ title: s.title, key: s.key }))
+                      : []
+                  }
+                />
+                <div className="max-w-3xl mx-auto mb-5 px-1 mt-8 text-center sm:text-left">
+                  <p className="text-[13px] text-ink-3 uppercase tracking-[0.08em] font-semibold">
+                    Or browse what&apos;s live online for &ldquo;{displayQuery}&rdquo;
                   </p>
                 </div>
                 <LiveResults
