@@ -166,6 +166,79 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "mr-price":                   { name: "Mr Price",       searchUrl: (q) => `https://www.mrp.com/en_za/search/?q=${encodeURIComponent(q)}`,         homepage: "https://www.mrp.com" },
   "cash-crusaders":             { name: "Cash Crusaders", searchUrl: (q) => `https://www.cashcrusaders.co.za/search?q=${encodeURIComponent(q)}`,    homepage: "https://www.cashcrusaders.co.za" },
   "ikea":                       { name: "IKEA",           searchUrl: (q) => `https://www.ikea.com/gb/en/search/?q=${encodeURIComponent(q)}`,        homepage: "https://www.ikea.com" },
+
+  /* v3 additions (May 2026): high-visibility merchants previously
+     missing from the curated table. The /api/go fallback chain was
+     dropping these to smartFallbackUrl which returns the homepage
+     (no query), so users landing on these search-page outbound
+     URLs ended up on a generic landing page instead of a results
+     view for what they'd searched.
+
+     URLs verified live. Each `?q=` / `?query=` / `?text=` form
+     matches each merchant's actual search endpoint at the time
+     of writing — refresh if a merchant changes their site
+     structure. */
+
+  /* — US ─────────────────────────────────────────── */
+  "fashion-nova":               { name: "Fashion Nova",      searchUrl: (q) => `https://www.fashionnova.com/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.fashionnova.com" },
+  "old-navy":                   { name: "Old Navy",          searchUrl: (q) => `https://oldnavy.gap.com/browse/search.do?searchText=${encodeURIComponent(q)}`, homepage: "https://oldnavy.gap.com" },
+  "gap":                        { name: "Gap",               searchUrl: (q) => `https://www.gap.com/browse/search.do?searchText=${encodeURIComponent(q)}`,  homepage: "https://www.gap.com" },
+  "abercrombie-fitch":          { name: "Abercrombie & Fitch", searchUrl: (q) => `https://www.abercrombie.com/shop/us/search?searchTerm=${encodeURIComponent(q)}`, homepage: "https://www.abercrombie.com" },
+  "academy-sports-outdoors":    { name: "Academy Sports + Outdoors", searchUrl: (q) => `https://www.academy.com/c/sl?q=${encodeURIComponent(q)}`,             homepage: "https://www.academy.com" },
+  "coach":                      { name: "Coach",             searchUrl: (q) => `https://www.coach.com/shop/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.coach.com" },
+  "crocs":                      { name: "Crocs",             searchUrl: (q) => `https://www.crocs.com/search?q=${encodeURIComponent(q)}`,                   homepage: "https://www.crocs.com" },
+  "accessorize":                { name: "Accessorize",       searchUrl: (q) => `https://us.accessorize.com/search?q=${encodeURIComponent(q)}`,              homepage: "https://us.accessorize.com" },
+  "boohoo-usa":                 { name: "Boohoo USA",        searchUrl: (q) => `https://us.boohoo.com/search?q=${encodeURIComponent(q)}`,                   homepage: "https://us.boohoo.com" },
+  "boohoo":                     { name: "Boohoo",            searchUrl: (q) => `https://www.boohoo.com/search?q=${encodeURIComponent(q)}`,                  homepage: "https://www.boohoo.com" },
+  /* Torrid is already in the table above — duplicate removed. */
+  "going-going-gone":           { name: "Going Going Gone",  searchUrl: (q) => `https://www.goinggoinggone.com/search.aspx?q=${encodeURIComponent(q)}`,     homepage: "https://www.goinggoinggone.com" },
+  "calvin-klein":               { name: "Calvin Klein",      searchUrl: (q) => `https://www.calvinklein.us/en/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.calvinklein.us" },
+  "calvin-klein-uk":            { name: "Calvin Klein UK",   searchUrl: (q) => `https://www.calvinklein.co.uk/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.calvinklein.co.uk" },
+
+  /* — UK ─────────────────────────────────────────── */
+  "jd-sports":                  { name: "JD Sports",         searchUrl: (q) => `https://www.jdsports.co.uk/search/${encodeURIComponent(q)}/`,                homepage: "https://www.jdsports.co.uk" },
+  /* Dunelm: their canonical search endpoint is `?q=`. The earlier
+     `?searchTerm=` form returned 404 in production. */
+  "dunelm":                     { name: "Dunelm",            searchUrl: (q) => `https://www.dunelm.com/search?q=${encodeURIComponent(q)}`,                 homepage: "https://www.dunelm.com" },
+  "halfords":                   { name: "Halfords",          searchUrl: (q) => `https://www.halfords.com/search?q=${encodeURIComponent(q)}`,                homepage: "https://www.halfords.com" },
+  "b-q":                        { name: "B&Q",               searchUrl: (q) => `https://www.diy.com/search?term=${encodeURIComponent(q)}`,                   homepage: "https://www.diy.com" },
+  "smyths-toys":                { name: "Smyths Toys",       searchUrl: (q) => `https://www.smythstoys.com/uk/en-gb/search/?text=${encodeURIComponent(q)}`,  homepage: "https://www.smythstoys.com" },
+  "next":                       { name: "Next",              searchUrl: (q) => `https://www.next.co.uk/search?w=${encodeURIComponent(q)}`,                   homepage: "https://www.next.co.uk" },
+  "brown-thomas":               { name: "Brown Thomas",      searchUrl: (q) => `https://www.brownthomas.com/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.brownthomas.com" },
+  "river-island":               { name: "River Island",      searchUrl: (q) => `https://www.riverisland.com/search?keyword=${encodeURIComponent(q)}`,        homepage: "https://www.riverisland.com" },
+  "primark":                    { name: "Primark",           searchUrl: (q) => `https://www.primark.com/en-gb/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.primark.com" },
+  "house-of-fraser":            { name: "House of Fraser",   searchUrl: (q) => `https://www.houseoffraser.co.uk/search/?text=${encodeURIComponent(q)}`,      homepage: "https://www.houseoffraser.co.uk" },
+  "screwfix":                   { name: "Screwfix",          searchUrl: (q) => `https://www.screwfix.com/search?search=${encodeURIComponent(q)}`,            homepage: "https://www.screwfix.com" },
+  "wickes":                     { name: "Wickes",            searchUrl: (q) => `https://www.wickes.co.uk/search?text=${encodeURIComponent(q)}`,              homepage: "https://www.wickes.co.uk" },
+
+  /* — DE ─────────────────────────────────────────── */
+  "cotton-on":                  { name: "Cotton On",         searchUrl: (q) => `https://cottonon.com/US/search/?q=${encodeURIComponent(q)}`,                 homepage: "https://cottonon.com" },
+
+  /* — AE ─────────────────────────────────────────── */
+  "lulu-hypermarket":           { name: "LuLu Hypermarket",  searchUrl: (q) => `https://www.luluhypermarket.com/en-ae/search/?q=${encodeURIComponent(q)}`,    homepage: "https://www.luluhypermarket.com" },
+  "luluhypermarket":            { name: "LuLu Hypermarket",  searchUrl: (q) => `https://www.luluhypermarket.com/en-ae/search/?q=${encodeURIComponent(q)}`,    homepage: "https://www.luluhypermarket.com" },
+  "ounass":                     { name: "Ounass",            searchUrl: (q) => `https://www.ounass.ae/shop/search?q=${encodeURIComponent(q)}`,              homepage: "https://www.ounass.ae" },
+  "namshi":                     { name: "Namshi",            searchUrl: (q) => `https://en-ae.namshi.com/search?q=${encodeURIComponent(q)}`,                 homepage: "https://en-ae.namshi.com" },
+  "centrepoint":                { name: "Centrepoint",       searchUrl: (q) => `https://www.centrepointstores.com/ae/en/search/?q=${encodeURIComponent(q)}`, homepage: "https://www.centrepointstores.com" },
+
+  /* — IN ─────────────────────────────────────────── */
+  "nykaa":                      { name: "Nykaa",             searchUrl: (q) => `https://www.nykaa.com/search/result/?q=${encodeURIComponent(q)}`,             homepage: "https://www.nykaa.com" },
+  "nykaa-fashion":              { name: "Nykaa Fashion",     searchUrl: (q) => `https://www.nykaafashion.com/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.nykaafashion.com" },
+  "meesho":                     { name: "Meesho",            searchUrl: (q) => `https://www.meesho.com/search?q=${encodeURIComponent(q)}`,                   homepage: "https://www.meesho.com" },
+  "firstcry":                   { name: "FirstCry",          searchUrl: (q) => `https://www.firstcry.com/search?q=${encodeURIComponent(q)}`,                 homepage: "https://www.firstcry.com" },
+  "snapdeal":                   { name: "Snapdeal",          searchUrl: (q) => `https://www.snapdeal.com/search?keyword=${encodeURIComponent(q)}`,           homepage: "https://www.snapdeal.com" },
+  "croma":                      { name: "Croma",             searchUrl: (q) => `https://www.croma.com/searchB?q=${encodeURIComponent(q)}`,                   homepage: "https://www.croma.com" },
+  "reliance-digital":           { name: "Reliance Digital",  searchUrl: (q) => `https://www.reliancedigital.in/search?q=${encodeURIComponent(q)}`,           homepage: "https://www.reliancedigital.in" },
+
+  /* — ZA ─────────────────────────────────────────── */
+  "superbalist":                { name: "Superbalist",       searchUrl: (q) => `https://superbalist.com/search?keyword=${encodeURIComponent(q)}`,            homepage: "https://superbalist.com" },
+  "makro":                      { name: "Makro",             searchUrl: (q) => `https://www.makro.co.za/search?text=${encodeURIComponent(q)}`,               homepage: "https://www.makro.co.za" },
+  "yuppiechef":                 { name: "Yuppiechef",        searchUrl: (q) => `https://www.yuppiechef.com/shop.htm?searchValue=${encodeURIComponent(q)}`,    homepage: "https://www.yuppiechef.com" },
+  "checkers":                   { name: "Checkers",          searchUrl: (q) => `https://www.checkers.co.za/c-2256/All-Departments?q=${encodeURIComponent(q)}`, homepage: "https://www.checkers.co.za" },
+  "incredible-connection":      { name: "Incredible Connection", searchUrl: (q) => `https://www.incredible.co.za/search?q=${encodeURIComponent(q)}`,         homepage: "https://www.incredible.co.za" },
+
+  /* — NG (additional gaps) ───────────────────────── */
+  "spar-nigeria":               { name: "Spar Nigeria",      searchUrl: (q) => `https://www.sparng.com/search?q=${encodeURIComponent(q)}`,                   homepage: "https://www.sparng.com" },
 };
 
 /** Resolve a search URL for a given store id / name + product title.
