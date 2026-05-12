@@ -42,7 +42,6 @@ import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 import JsonLd from "@/components/seo/JsonLd";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import SimilarProducts from "@/components/product/SimilarProducts";
-import LiveAlternatives from "@/components/product/LiveAlternatives";
 
 /* Offers churn frequently (every ingest cycle adds + retires rows).
    ISR revalidate keeps the cached HTML fresh without re-rendering
@@ -395,22 +394,20 @@ export default async function ProductPage({ params }: PageProps) {
           </section>
         )}
 
-        {/* Live results — fetches /api/live-search on mount and renders
-            real-time alternatives the DB index doesn't have yet (long-
-            tail items, freshly-promoted bargains, cross-border options).
-            Same pattern /compare uses; client component so the static
-            PDP shell still SSRs fast.
+        {/* Live deals rail removed (May 2026).
+            Earlier this surface fetched /api/live-search on mount,
+            burning a SerpAPI credit per PDP visit regardless of
+            whether the user actually looked at the rail. The DB-
+            backed SimilarProducts rail above already covers the
+            "show me alternatives" intent for ~95% of products, and
+            the "Compare prices across N stores" CTA on the hero
+            already routes to /compare for users who want the
+            broader live-search view. Net: cleaner page + no per-
+            visit SerpAPI cost.
 
-            Excluded entirely on the curated Amazon fallback path since
-            those PDPs already represent search-page anchors; calling
-            live-search again returns duplicate results. */}
-        {!offer.offer_id.startsWith("amazon-") && (
-          <LiveAlternatives
-            query={offer.title}
-            countryCode={country.code}
-            excludeStoreId={offer.store_id}
-          />
-        )}
+            The LiveAlternatives component file stays in the
+            codebase — keep it around in case we want to revive the
+            pattern as an opt-in toggle later. */}
       </div>
     </main>
   );

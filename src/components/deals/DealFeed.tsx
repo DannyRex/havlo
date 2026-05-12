@@ -127,17 +127,24 @@ export default function DealFeed() {
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean),
   );
-  /* Country-aware origin default. NG defaults to "all" (cross-border
-     shoppers want AliExpress/Amazon-INT visible); every other market
-     defaults to "local" so the UK/US/DE/AE/IN/ZA landing experience
-     leads with retailers the user recognises in-market. The explicit
-     ?origin= URL override always wins so deep-links from social or
-     newsletters still resolve exactly as authored. */
+  /* Default origin is "local" for every market (May 2026). Was
+     country-aware: NG → "all", others → "local". Switched to one
+     consistent default because:
+       1. Most shoppers in any market start with stores they
+          recognise — lowest-friction landing.
+       2. The "All" mix tends to be AliExpress-heavy and reads as
+          overwhelming on first scroll.
+       3. The Intl tab is one tap away for users who want
+          cross-border options; the URL state persists once
+          chosen, so the user only switches once.
+
+     The explicit ?origin= URL override always wins so deep-links
+     from social / newsletters still resolve as authored. */
   const initialOriginRaw = searchParams.get("origin");
   const initialOrigin: OriginFilter =
     initialOriginRaw && VALID_ORIGINS.has(initialOriginRaw as OriginFilter)
       ? (initialOriginRaw as OriginFilter)
-      : country.code !== "ng" ? "local" : "all";
+      : "local";
 
   const [items, setItems]       = useState<Deal[]>([]);
   const [total, setTotal]       = useState(0);
@@ -442,10 +449,22 @@ export default function DealFeed() {
           render overhead of a tiny client subcomponent. */}
       <div className="sticky top-16 z-30 -mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg/85 backdrop-blur-xl border-b border-border">
         {/* Row 1 — CategoryNav grows; mobile-only Sort sits at the
-            right. flex-1 + min-w-0 lets CategoryNav's horizontal
-            scroll keep working regardless of how many categories ship. */}
-        <div className="flex items-center gap-2">
-          <div className="flex-1 min-w-0">
+            right.
+
+            Three things conspire to make this not overlap:
+              1. `gap-3` on the parent gives breathing room.
+              2. `flex-1 min-w-0 overflow-hidden` on the CategoryNav
+                 wrapper strictly clips its content. CategoryNav has
+                 a negative margin (-mx-1) internally for its scroll
+                 affordance — without explicit `overflow-hidden` on
+                 the wrapper, that bleed could visually push the
+                 rightmost pill under the sort dropdown (user report
+                 May 2026: "sort is overlaying the chips on mobile").
+              3. The sort pill has a solid `bg-surface-2`, so even
+                 if a pill DID leak under it, the user only sees the
+                 sort. */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <CategoryNav active={category} onChange={setCategory} />
           </div>
           <div className="sm:hidden shrink-0 relative">
