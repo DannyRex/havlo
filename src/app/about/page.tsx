@@ -21,12 +21,12 @@ const SITE_URL = "https://havlo.io";
 export const metadata: Metadata = {
   title: "About",
   description:
-    "Havlo is an independent price comparison platform helping shoppers in seven countries find similar products for less. Founded in 2026 by Daniel Ekum.",
+    "Havlo is an independent price comparison platform helping shoppers in seven countries find similar products for less. Local stores plus the cross-border options that ship to you.",
   alternates: { canonical: "/about" },
   openGraph: {
     title: "About · Havlo",
     description:
-      "Independent price comparison for emerging markets. The story behind Havlo.",
+      "Independent price comparison across seven markets. The story behind Havlo.",
     url: `${SITE_URL}/about`,
     type: "website",
   },
@@ -71,10 +71,9 @@ export default function AboutPage() {
           </h2>
           <div className="space-y-3.5 text-ink-2 text-[15px] leading-relaxed">
             <p>
-              Online shopping in Nigeria is messy. The same product on Jumia,
-              Konga, Slot, and AliExpress can vary by 30 to 50%, and the only
-              way to find that out is opening five tabs and pricing it
-              yourself.
+              Online shopping is messy in every market we cover. The same
+              product can vary by 30 to 50% between stores, and the only way
+              to find that out is opening five tabs and pricing it yourself.
             </p>
             <p>
               Havlo replaces those five tabs with one search box. Type a
@@ -119,35 +118,22 @@ export default function AboutPage() {
           </ul>
         </section>
 
-        {/* Independence + monetization — the section partnership prospects
-            and skeptical users will look for. Be transparent, plain.
-            Detailed breakdown lives on /how-we-make-money; this is the
-            one-paragraph summary with a link to dig deeper. Matches the
-            Wirecutter pattern (short summary on About, longer page
-            elsewhere). */}
+        {/* Independence — single paragraph, no monetisation breakdown.
+            Peer comparison sites (Dupe, etc.) don't disclose specific
+            commission mechanics either; the affiliate disclosure on
+            /how-we-make-money is enough for legal compliance. Vague
+            principle here, full disclosure on the dedicated page for
+            users who want to read more. */}
         <section className="mb-12">
           <h2 className="text-xl sm:text-2xl font-bold text-ink tracking-[-0.02em] mb-3">
-            How we make money, without bias
+            Independent by design
           </h2>
           <div className="space-y-3.5 text-ink-2 text-[15px] leading-relaxed">
             <p>
-              Havlo is free, and stays free. The retailer pays us a small
-              commission when you click through and buy, at no extra cost to
-              you. Same model as Skyscanner, Wirecutter, NerdWallet.
-            </p>
-            <p>
-              Retailers can&apos;t pay to rank higher. The cheapest option
-              always shows first. We earn more when we save you more, because
-              that&apos;s what gets clicked.
-            </p>
-            <p className="pt-1">
-              <Link
-                href="/how-we-make-money"
-                className="inline-flex items-center gap-1 text-brand font-medium hover:underline underline-offset-4"
-              >
-                Read the full breakdown{" "}
-                <span aria-hidden="true">→</span>
-              </Link>
+              Havlo is free for shoppers. Retailers can&apos;t pay to rank
+              higher. The cheapest verified option always shows first, no
+              matter who pays us or doesn&apos;t. We&apos;re an independent
+              business and that&apos;s the rule we built on day one.
             </p>
           </div>
         </section>

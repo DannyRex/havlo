@@ -3,20 +3,19 @@ import LegalPage from "@/components/legal/LegalPage";
 
 const sections = [
   {
-    /* Lead with the affiliate disclosure — it's the centerpiece of
-       this whole page, and the FTC clear-and-conspicuous standard
-       wants the disclosure obvious to anyone who lands here.
-       Renamed from "Affiliate disclosure" to "How we earn money"
-       so the section heading aligns with the page H1 ("How Havlo
-       makes money") and reads as editorial transparency rather
-       than legalese. Section content also satisfies the Amazon
-       Associates Operating Agreement requirement to include the
-       'qualifying purchases' phrase verbatim. */
+    /* Affiliate disclosure — kept lean. FTC clear-and-conspicuous
+       standard is satisfied by the first paragraph; Amazon Associates
+       Operating Agreement is satisfied by the verbatim "earns from
+       qualifying purchases" sentence. Removed the network-by-network
+       breakdown (May 2026) — competitors (Dupe et al.) don't enumerate
+       partners and the detail wasn't earning trust, just inviting
+       follow-up questions. Higher-paying retailers do not rank higher;
+       that principle stays explicit. */
     title: "How we earn money",
     paragraphs: [
-      "Havlo earns small commissions on qualifying purchases through some of our outbound links. This never changes the price you pay. It's the same model used by NerdWallet, Wirecutter, Skyscanner, and most other comparison platforms.",
-      "As an Amazon Associate, Havlo earns from qualifying purchases. This applies to clicks that lead to amazon.com, amazon.co.uk, amazon.de, amazon.ae, amazon.in, and other Amazon marketplaces.",
-      "Active affiliate relationships: Amazon Associates, AliExpress (Advanced API, full attribution), Konga, and Skimlinks (a network covering around 48,000 retailers). Pending approvals: Awin. New partners get added as their approvals come through. Higher-paying retailers do not rank higher in search; the cheapest option always shows first.",
+      "Some of the outbound links on Havlo are affiliate links. If you click through and buy, we may earn a small commission, at no extra cost to you. This never changes the price you pay.",
+      "As an Amazon Associate, Havlo earns from qualifying purchases.",
+      "Higher-paying retailers do not rank higher in search results. The cheapest verified option always shows first.",
     ],
   },
   {
@@ -28,8 +27,8 @@ const sections = [
   {
     title: "How we source listings",
     paragraphs: [
-      "Havlo combines public catalog data from multiple sources: official retailer affiliate feeds where available, third-party search APIs (Google Shopping via SerpAPI), and lightweight scrapers for retailers that don't expose a feed. We collect only the structured data needed for price comparison: titles, prices, discount percentages, store name, and product image URLs we link to (we do not host product photos).",
-      "We respect retailer robots.txt directives and reasonable rate limits. We honor takedown and exclusion requests within 5 business days. Retailers can email hello@havlo.io to remove or update their listings.",
+      "Havlo combines public catalog data from a mix of sources to surface comparable prices across the stores you already shop. We collect only the structured information needed to power the comparison: titles, prices, discount percentages, store name, and product image URLs we link to.",
+      "We respect retailer robots.txt directives and reasonable rate limits. We honour takedown and exclusion requests within 5 business days. Retailers can email hello@havlo.io to remove or update their listings.",
     ],
   },
   {
@@ -61,12 +60,12 @@ const sections = [
 export const metadata: Metadata = {
   title: "How Havlo makes money",
   description:
-    "How Havlo earns commissions, why our rankings stay independent of who pays us, where our listings come from, and the limits of the information shown on the site.",
+    "How Havlo stays independent and free for shoppers, where our listings come from, and the limits of the information shown on the site.",
   alternates: { canonical: "/how-we-make-money" },
   openGraph: {
     title: "How Havlo makes money",
     description:
-      "Affiliate links, no inflated prices, no bias on results — the cheapest store still ranks first.",
+      "Independent by design. Free for shoppers. The cheapest verified option always ranks first.",
     url: "/how-we-make-money",
     type: "website",
   },
@@ -76,12 +75,11 @@ export default function HowWeMakeMoneyPage() {
   return (
     <LegalPage
       /* Eyebrow is "About Havlo" — frames the page as editorial
-         transparency, not legal disclosure. Matches Wirecutter /
-         Kayak / Skyscanner branding for the same surface. */
+         transparency, not legal disclosure. */
       eyebrow="About Havlo"
       title="How Havlo makes money"
-      description="Havlo runs on affiliate commissions and is free for shoppers. This page covers exactly how we earn, why our rankings stay independent of who pays us, where our listings come from, and the limits of what we can guarantee."
-      lastUpdated="9 May 2026"
+      description="Havlo is free for shoppers and independent by design. This page covers how that works, where our listings come from, and the limits of what we can guarantee."
+      lastUpdated="12 May 2026"
       sections={sections}
     />
   );
