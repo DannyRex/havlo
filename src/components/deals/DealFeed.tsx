@@ -67,6 +67,20 @@ const VALID_TIERS = new Set<DiscountTier>(["all", "10", "20", "30", "50"]);
 const VALID_SORTS = new Set<SortOption>(["relevance", "newest", "discount", "popular", "price_asc", "price_desc"]);
 const VALID_ORIGINS = new Set<OriginFilter>(["all", "local", "intl"]);
 
+/* One short, recognisable local retailer per market — used in the
+   search input placeholder so the example primes the user with a
+   store they actually shop at. Kept to ≤8 chars where possible so
+   the placeholder doesn't get clipped on small viewports. */
+const LOCAL_STORE_EXAMPLE: Record<string, string> = {
+  ng: "Konga",
+  uk: "Currys",
+  us: "Walmart",
+  de: "MediaMarkt",
+  ae: "Noon",
+  in: "Flipkart",
+  za: "Takealot",
+};
+
 export default function DealFeed() {
   /* Read initial filter state from URL params so /deals?category=phones
      (linked from homepage CategoryGrid tiles) lands on the correct
@@ -303,7 +317,12 @@ export default function DealFeed() {
           QA audit: placeholder text disappears on focus, leaving the
           user without context for what Enter does (filter vs compare).
           Persistent micro-copy below the input keeps the rule visible
-          while the user is typing. */}
+          while the user is typing.
+
+          Placeholder is country-local: example store name picks from
+          the visitor's market roster, not the launch-market Currys
+          that didn't exist in NG/US/DE. Kept short (under ~30 chars)
+          so it doesn't get clipped on iPhone-mini-class viewports. */}
       <div className="relative mb-1.5">
         <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-3 pointer-events-none" aria-hidden="true" />
         <label htmlFor="deals-search" className="sr-only">
@@ -313,7 +332,7 @@ export default function DealFeed() {
           id="deals-search"
           type="text"
           aria-label="Filter these deals by name or store, or press Enter to search across all stores"
-          placeholder="Filter these deals — try 'iPhone' or 'Currys'…"
+          placeholder={`Filter deals — try '${LOCAL_STORE_EXAMPLE[country.code] ?? "Amazon"}'…`}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={(e) => {
