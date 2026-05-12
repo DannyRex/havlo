@@ -277,9 +277,46 @@ export const COUNTRY_STORES: Record<string, string[]> = {
        qvc-uk / qvc.co.uk are specific enough to avoid catching the
        US QVC parent. */
     "qvc-uk", "qvc.co.uk", "qvc uk",
+    /* v4 additions (May 2026): user-reported INTL badge firing on
+       every UK store on /compare. Root cause: substring-match
+       roster missed the actual storeId/storeName SerpAPI + the UK
+       retailer ingest write into Supabase. Two classes of fix:
+
+       1. Ampersand-in-name retailers. The roster had "marks and
+          spencer" but the actual storeName is "Marks & Spencer"
+          (literal &), so neither id ("marks") nor name matched.
+          Adding the & form catches the literal name; the bare
+          "marks" catches the storeId from ingest-uk-retailers.ts
+          (key: "marks"). Same shape for any future & retailer. */
+    "marks & spencer", "marks ",
+    /* 2. Common UK retailers that the SerpAPI pool surfaces in
+          compare results but weren't in the v1-v3 roster. Each is
+          UK-anchored enough that the cross-roster ambiguity is
+          minimal — Waitrose / Ocado / Morrisons / Iceland / Aldi-
+          UK / TK Maxx are unambiguous in the UK retail landscape;
+          IKEA is multi-market but most SerpAPI UK results land
+          here (acceptable trade-off — a DE user looking at an
+          IKEA listing arguably IS cross-border to them anyway). */
+    "ikea", "waitrose", "ocado", "morrisons", "iceland", "aldi",
+    "wilko", "lakeland", "tk maxx", "tkmaxx", "tk-maxx",
+    "hotel chocolat", "hotel-chocolat", "robert dyas", "robert-dyas",
+    "the range", "the-range", "toolstation",
+    /* eBay UK: the bare "ebay" entry in the US roster matches
+       first under first-match-wins iteration (US iterates after
+       UK, so UK gets first crack — but UK roster only had
+       "ebay.co.uk", which fails to substring-match the storeName
+       "eBay" SerpAPI returns for UK listings). Adding "ebay uk" /
+       "ebay-uk" so UK-specific variants match before falling
+       through to the bare US "ebay". */
+    "ebay uk", "ebay-uk",
   ],
   us: [
     "amazon.com", "walmart", "best buy", "bestbuy", "target", "newegg",
+    /* Bare "ebay" is intentionally ambiguous — eBay is a global
+       marketplace. The UK roster has explicit "ebay.co.uk" /
+       "ebay uk" / "ebay-uk" variants that match BEFORE this
+       fallback under first-match-wins iteration. So a UK listing
+       still resolves to UK; everything else lands here. */
     "ebay", "home depot", "homedepot", "macy", "kohl", "costco", "bjs",
     "nordstrom", "sephora", "ulta", "wayfair", "etsy", "lowes", "lowe's",
     "staples", "gap", "old navy", "oldnavy", "nike", "adidas",
