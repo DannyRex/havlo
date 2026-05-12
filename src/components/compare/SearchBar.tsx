@@ -97,6 +97,15 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
+  /* Track whether the user has actively interacted with the input
+     since mount. When the user lands on /compare?q=foo with a query
+     already in the URL, the input gets autoFocus + onFocus → the
+     suggestions panel was popping open unprompted on every page
+     load, even though the user clearly already has a query.
+     Now: suggestions only auto-open AFTER an onChange OR when the
+     input is empty (the trending-chips case still wants to surface
+     ideas). */
+  const [hasInteracted, setHasInteracted] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -271,8 +280,21 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
           <input
             type="text"
             value={value}
-            onChange={(e) => { setValue(e.target.value); setOpen(true); setHighlighted(-1); }}
-            onFocus={() => setOpen(true)}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setHasInteracted(true);
+              setOpen(true);
+              setHighlighted(-1);
+            }}
+            onFocus={() => {
+              /* Don't pop the suggestions on the initial autoFocus
+                 when the URL already carried a query (e.g.
+                 /compare?q=iPhone+15). User reported this surfaced
+                 the dropdown on every navigation. Once they've
+                 typed OR the input is empty (trending-chips intent),
+                 the normal open-on-focus behaviour resumes. */
+              if (hasInteracted || !value.trim()) setOpen(true);
+            }}
             onKeyDown={onKey}
             placeholder="Search or paste a link…"
             className="flex-1 min-w-0 pl-11 pr-2 py-3.5 bg-transparent text-ink placeholder:text-ink-3 text-base outline-none"
