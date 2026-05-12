@@ -19,6 +19,11 @@ export interface BrowseQuery {
   origin?: OriginFilter;
   limit?: number;
   offset?: number;
+  /** Restrict the result set to offers from these store IDs.
+      Multi-select; ANY match qualifies. Undefined / empty = no
+      store filter applied. Drives the "Stores" filter UI on
+      /deals (multi-store checkbox panel). */
+  stores?: string[];
 }
 
 export interface SearchQuery {

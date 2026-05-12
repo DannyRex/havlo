@@ -144,6 +144,12 @@ export const dbBrowseProvider: BrowseProvider = {
       if (q.origin && q.origin !== "all") {
         query = applyOriginFilter(query, q.origin);
       }
+      /* Multi-store filter: include only offers whose store_id is in
+         the selected set. Drives the "Stores" filter on /deals.
+         Empty array OR undefined = no filter applied (show all). */
+      if (q.stores && q.stores.length > 0) {
+        query = query.in("store_id", q.stores);
+      }
       /* Tiebreaker on offer_id is non-negotiable for the paginated
          fan-out below to be safe. Without it, PostgreSQL may return
          tied rows (same price / discount / scraped_at) in different

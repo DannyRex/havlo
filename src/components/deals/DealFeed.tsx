@@ -7,6 +7,7 @@ import CategoryNav from "./CategoryNav";
 import OriginToggle from "./OriginToggle";
 import ListCard from "./ListCard";
 import MasonryCard from "./MasonryCard";
+import StoreFilter, { type StoreOption } from "./StoreFilter";
 import { MASONRY_ASPECTS } from "./masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
 import EmptySearchState from "@/components/empty/EmptySearchState";
@@ -118,6 +119,19 @@ export default function DealFeed() {
     ? (initialSortRaw as SortOption)
     : "relevance";
   const initialSearch = searchParams.get("search") ?? "";
+
+  /* Multi-store filter state. URL param ?stores=argos,currys is the
+     source of truth so the filter survives reload + share. Parsed
+     into a Set for O(1) toggle / has-check operations in the popover.
+     Trimmed + lower-cased to match storeId conventions across the
+     codebase. */
+  const initialStoresRaw = searchParams.get("stores") ?? "";
+  const initialStores = new Set(
+    initialStoresRaw
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
   /* Country-aware origin default. NG defaults to "all" (cross-border
      shoppers want AliExpress/Amazon-INT visible); every other market
      defaults to "local" so the UK/US/DE/AE/IN/ZA landing experience
@@ -153,6 +167,13 @@ export default function DealFeed() {
   const [origin, setOrigin]     = useState<OriginFilter>(initialOrigin);
   const [originCounts, setOriginCounts] =
     useState<{ all: number; local: number; intl: number }>();
+  /* Selected store IDs from the StoreFilter popover. Persists to URL
+     via buildParams (?stores=argos,currys). */
+  const [selectedStores, setSelectedStores] = useState<Set<string>>(initialStores);
+  /* All stores currently available in the filtered pool. Comes back
+     in the /api/deals response alongside items + counts. Empty until
+     the first fetch lands. */
+  const [storeOptions, setStoreOptions] = useState<StoreOption[]>([]);
 
   /* Mobile-only view-mode toggle (grid masonry vs list rows). Tablet +
      desktop always show masonry — toggle UI is hidden via sm:hidden.
@@ -204,11 +225,17 @@ export default function DealFeed() {
        settles — see the searchDebounced comment above. */
     if (searchDebounced)    p.set("search", searchDebounced);
     if (origin !== "all")   p.set("origin", origin);
+    /* Stores filter: comma-separated, sorted alphabetically so the
+       URL is stable regardless of click order (better for browser
+       cache + clean share-links). */
+    if (selectedStores.size > 0) {
+      p.set("stores", Array.from(selectedStores).sort().join(","));
+    }
     p.set("country", country.code);
     p.set("limit",  String(PAGE_SIZE));
     p.set("offset", String(offset));
     return p.toString();
-  }, [category, tier, sort, searchDebounced, origin, country.code]);
+  }, [category, tier, sort, searchDebounced, origin, selectedStores, country.code]);
 
   // Reset + first page on filter change
   useEffect(() => {
@@ -219,7 +246,7 @@ export default function DealFeed() {
 
     fetch(`/api/deals?${buildParams(0)}`)
       .then((r) => r.json())
-      .then(({ items, total, hasMore, originCounts, error }) => {
+      .then(({ items, total, hasMore, originCounts, stores, error }) => {
         /* Bail if a newer fetch has started since we kicked off —
            prevents stale results from clobbering newer ones. */
         if (mySeq !== fetchSeqRef.current) return;
@@ -228,6 +255,7 @@ export default function DealFeed() {
         setTotal(total);
         setHasMore(hasMore);
         if (originCounts) setOriginCounts(originCounts);
+        if (Array.isArray(stores)) setStoreOptions(stores);
         offsetRef.current = PAGE_SIZE;
         /* Scroll AFTER items have rendered. Doing it synchronously in the
            effect lands the user mid-page if the previous (longer) list
@@ -263,13 +291,19 @@ export default function DealFeed() {
        the back-button stack per character. */
     if (searchDebounced.trim()) params.set("search", searchDebounced.trim());
     if (origin !== "all")   params.set("origin", origin);
+    /* Mirror buildParams' alphabetical sort so the URL is stable
+       regardless of selection order — keeps history clean and
+       share-links predictable. */
+    if (selectedStores.size > 0) {
+      params.set("stores", Array.from(selectedStores).sort().join(","));
+    }
 
     const desired = params.toString();
     const current = searchParams.toString();
     if (desired === current) return;
 
     router.replace(desired ? `/deals?${desired}` : "/deals", { scroll: false });
-  }, [category, tier, sort, searchDebounced, origin, router, searchParams]);
+  }, [category, tier, sort, searchDebounced, origin, selectedStores, router, searchParams]);
 
   const loadMore = useCallback(() => {
     if (loadingMore || !hasMore) return;
@@ -415,6 +449,22 @@ export default function DealFeed() {
                 {label}
               </button>
             ))}
+            {/* Stores filter — sits inline with discount tiers in the
+                left cluster of the filter bar. Only renders once the
+                first /api/deals response has populated storeOptions so
+                we don't show an empty popover during initial load.
+                Hidden behind a length check rather than always-on so
+                empty-state queries (zero results) don't show a useless
+                "Stores" button next to "0 deals". */}
+            {storeOptions.length > 0 && (
+              <div className="ml-1.5">
+                <StoreFilter
+                  stores={storeOptions}
+                  selected={selectedStores}
+                  onChange={setSelectedStores}
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">

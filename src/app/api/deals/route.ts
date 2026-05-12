@@ -25,6 +25,23 @@ export async function GET(req: NextRequest) {
     const limit       = searchParams.get("limit")  ? parseInt(searchParams.get("limit")!,  10) : 24;
     const offset      = searchParams.get("offset") ? parseInt(searchParams.get("offset")!, 10) : 0;
 
+    /* Multi-store filter: comma-separated list of store IDs the user
+       has ticked in the Stores filter panel (e.g. ?stores=argos,currys).
+       Empty / absent = no filter applied. Trimmed + de-duped + cap at
+       50 entries to prevent abusive queries from blowing up the SQL
+       IN clause. */
+    const storesParam = searchParams.get("stores")?.trim();
+    const stores: string[] | undefined = storesParam
+      ? Array.from(
+          new Set(
+            storesParam
+              .split(",")
+              .map((s) => s.trim().toLowerCase())
+              .filter(Boolean),
+          ),
+        ).slice(0, 50)
+      : undefined;
+
     /* Country priority: URL param (when set) > cookie. The URL form
        is what the client sends so the CDN cache key varies per country;
        cookie fallback covers direct API consumers / curl. */
@@ -107,17 +124,41 @@ export async function GET(req: NextRequest) {
     };
 
     /* Apply the user's origin filter for the items in the response. */
-    const all =
+    const allByOrigin =
       effectiveOrigin === "local" ? localFiltered :
       effectiveOrigin === "intl"  ? intlFiltered  :
       allFiltered;
+
+    /* Build the stores aggregate BEFORE applying the user's store-
+       filter selection — so the filter panel can show every store
+       still available within the current category/discount/search/
+       origin context, even ones the user hasn't ticked yet. Counts
+       reflect what they'd see if they ticked that single store. */
+    const storesAggregate = (() => {
+      const map = new Map<string, { id: string; name: string; count: number }>();
+      for (const d of allByOrigin) {
+        const id = d.storeId;
+        if (!id) continue;
+        const existing = map.get(id);
+        if (existing) existing.count += 1;
+        else map.set(id, { id, name: d.storeName, count: 1 });
+      }
+      return Array.from(map.values()).sort((a, b) => b.count - a.count);
+    })();
+
+    /* Apply the multi-store filter LAST so the items list narrows
+       but the storesAggregate above still surfaces all available
+       options to the filter UI. */
+    const all = stores && stores.length > 0
+      ? allByOrigin.filter((d) => stores.includes(d.storeId.toLowerCase()))
+      : allByOrigin;
 
     const total = all.length;
     const items = all.slice(offset, offset + limit);
     const hasMore = offset + limit < total;
 
     return NextResponse.json(
-      { items, total, hasMore, originCounts, provider: provider.id },
+      { items, total, hasMore, originCounts, stores: storesAggregate, provider: provider.id },
       { headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate=300" } },
     );
   } catch (err) {
