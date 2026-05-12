@@ -366,7 +366,7 @@ export default function DealFeed() {
           id="deals-search"
           type="text"
           aria-label="Filter these deals by name or store, or press Enter to search across all stores"
-          placeholder={`Filter deals — try '${LOCAL_STORE_EXAMPLE[country.code] ?? "Amazon"}'…`}
+          placeholder={`Search these deals or try '${LOCAL_STORE_EXAMPLE[country.code] ?? "Amazon"}'…`}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={(e) => {
