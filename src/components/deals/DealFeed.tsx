@@ -361,7 +361,7 @@ export default function DealFeed() {
           id="deals-search"
           type="text"
           aria-label="Filter these deals by product name. Use the Stores button above to filter by store. Press Enter to search across all stores."
-          placeholder="Search these deals — try 'iPhone'…"
+          placeholder="Search these deals, try 'iPhone'…"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={(e) => {
@@ -423,9 +423,45 @@ export default function DealFeed() {
         )}
       </div>
 
-      {/* Sticky filter bar — categories + discount tiers + sort */}
+      {/* Sticky filter bar — categories + discount tiers + sort.
+
+          Mobile layout (Option A, May 2026):
+            Row 1: CategoryNav (horizontal scroll)  · Sort dropdown
+            Row 2: tier pills · Stores filter
+
+          Sort moves to Row 1 on mobile so it stays visible without
+          scrolling the secondary row — previously on phones with
+          many tier pills the sort dropdown ended up off-screen at
+          the right edge of the overflow container, easy to miss.
+
+          Desktop layout unchanged: Sort + deal count stay on the
+          right of Row 2 where there's plenty of horizontal space.
+
+          The sort dropdown JSX is inlined twice rather than extracted
+          to a helper — duplication is small (~10 lines), avoids the
+          render overhead of a tiny client subcomponent. */}
       <div className="sticky top-16 z-30 -mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg/85 backdrop-blur-xl border-b border-border">
-        <CategoryNav active={category} onChange={setCategory} />
+        {/* Row 1 — CategoryNav grows; mobile-only Sort sits at the
+            right. flex-1 + min-w-0 lets CategoryNav's horizontal
+            scroll keep working regardless of how many categories ship. */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <CategoryNav active={category} onChange={setCategory} />
+          </div>
+          <div className="sm:hidden shrink-0 relative">
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortOption)}
+              aria-label="Sort deals"
+              className="appearance-none bg-surface-2 border border-border rounded-full pl-3.5 pr-8 py-1.5 text-xs text-ink hover:border-border-strong outline-none cursor-pointer transition-colors"
+            >
+              {SORTS.map(({ value, label }) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-3 text-[10px]">▾</span>
+          </div>
+        </div>
 
         <div className="mt-3 flex items-center justify-between gap-3 overflow-x-auto no-scrollbar">
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -462,9 +498,12 @@ export default function DealFeed() {
             )}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+          {/* Right cluster — desktop only. Mobile sort lives in Row 1
+              above; the deal count chip below the filter bar covers
+              the mobile count surface. */}
+          <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
             {!loading && (
-              <span className="hidden sm:inline text-xs text-ink-3 tabular-nums">
+              <span className="text-xs text-ink-3 tabular-nums">
                 {total.toLocaleString()} deals
               </span>
             )}
@@ -474,7 +513,7 @@ export default function DealFeed() {
                 value={sort}
                 onChange={(e) => setSort(e.target.value as SortOption)}
                 aria-label="Sort deals"
-                className="appearance-none bg-surface-2 border border-border rounded-full pl-3.5 pr-8 py-1.5 text-xs sm:text-[13px] text-ink hover:border-border-strong outline-none cursor-pointer transition-colors"
+                className="appearance-none bg-surface-2 border border-border rounded-full pl-3.5 pr-8 py-1.5 text-[13px] text-ink hover:border-border-strong outline-none cursor-pointer transition-colors"
               >
                 {SORTS.map(({ value, label }) => (
                   <option key={value} value={value}>{label}</option>
