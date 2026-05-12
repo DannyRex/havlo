@@ -2,19 +2,26 @@
 
 /* Multi-select store filter for /deals.
    Inspired by spoken.io's store sidebar — checkbox list, search-
-   within-list, count badge per store. Compact for the deals page
-   filter bar: opens as a popover on click, closes on outside-click
-   or Escape.
+   within-list, count badge per store.
 
-   State model:
-     - selected: Set<string> of store IDs the user has ticked
-     - search:   string for filtering the visible list
-     - open:     boolean for popover visibility
+   Adaptive shell:
+     - Desktop (md+): right-anchored absolute popover beneath the
+       trigger button.
+     - Mobile (<md):  full-width sheet that slides up from the bottom
+       of the viewport.
 
-   Selection persists in URL via the parent's ?stores= param so deep-
-   links work (e.g. /uk/deals?stores=argos,currys). */
+   Why the split: on mobile the parent filter bar uses overflow-x-
+   auto (for the horizontal scroll of tier pills), which CLIPS any
+   absolute-positioned children. A fixed-position bottom sheet
+   escapes the clipping context AND is a more native mobile pattern
+   (matches the Radix Drawer / iOS action sheet shape users expect).
+
+   Both shells share the same body — search input, checkbox list,
+   footer with Clear / Done — so the desktop popover and mobile
+   sheet stay visually consistent. */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Store as StoreIcon, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -74,6 +81,96 @@ export default function StoreFilter({ stores, selected, onChange }: Props) {
 
   const selectedCount = selected.size;
 
+  /* Body of the panel — shared between desktop popover and mobile
+     sheet. Pulled out so the two shells stay visually identical
+     and bug fixes in one apply to both. */
+  const panelBody = (
+    <>
+      {/* Search */}
+      <div className="p-3 border-b border-border">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search stores…"
+          aria-label="Search stores"
+          className="w-full px-3 py-1.5 rounded-full text-[13px] bg-surface border border-border focus:border-brand focus:shadow-input outline-none transition-all"
+          style={{ fontSize: "16px" }}
+        />
+      </div>
+
+      {/* List — taller cap on mobile sheet (more vertical real estate
+          available since we're filling the bottom of the viewport).
+          Capped at max-h-72 on desktop popover to keep the popover
+          fitting beneath the trigger. */}
+      <ul className="max-h-[60vh] md:max-h-72 overflow-y-auto py-1.5">
+        {visible.length === 0 ? (
+          <li className="px-4 py-3 text-[13px] text-ink-3 text-center">
+            No stores match &ldquo;{search}&rdquo;
+          </li>
+        ) : (
+          visible.map((s) => {
+            const isSelected = selected.has(s.id);
+            return (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  onClick={() => toggle(s.id)}
+                  className={cn(
+                    "w-full flex items-center justify-between gap-3 px-3 py-2 text-left text-[13px] transition-colors",
+                    isSelected
+                      ? "bg-ink/5 text-ink"
+                      : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+                  )}
+                >
+                  <span className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className={cn(
+                        "shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors",
+                        isSelected
+                          ? "bg-ink border-ink text-bg"
+                          : "border-border-strong",
+                      )}
+                      aria-hidden="true"
+                    >
+                      {isSelected && <Check size={12} strokeWidth={3} />}
+                    </span>
+                    <span className="truncate">{s.name}</span>
+                  </span>
+                  <span className="shrink-0 text-[11px] text-ink-3 tabular-nums">
+                    {s.count}
+                  </span>
+                </button>
+              </li>
+            );
+          })
+        )}
+      </ul>
+
+      {/* Footer */}
+      <div className="px-3 py-2 border-t border-border flex items-center justify-between">
+        <button
+          type="button"
+          onClick={clearAll}
+          disabled={selectedCount === 0}
+          className="text-[12px] text-ink-3 hover:text-ink disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Clear all
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-ink text-bg text-[12px] font-semibold hover:opacity-90 transition-opacity"
+        >
+          Done
+          <X size={11} strokeWidth={2.5} aria-hidden="true" />
+        </button>
+      </div>
+    </>
+  );
+
   return (
     <div ref={rootRef} className="relative">
       <button
@@ -95,99 +192,61 @@ export default function StoreFilter({ stores, selected, onChange }: Props) {
         )}
       </button>
 
+      {/* Desktop popover — anchored absolutely beneath the trigger.
+          Renders only at md+ so mobile gets the sheet instead. */}
       {open && (
-        /* Popover panel — anchored to the button, drops down on
-           larger viewports, slides up from below on small ones via
-           bottom-positioning fallback when there isn't enough room
-           below. Kept lightweight; no portal because the parent's
-           sticky filter bar is z-30 and the panel needs to render
-           in-context. */
         <div
           role="listbox"
           aria-label="Filter by store"
-          className="absolute z-40 mt-1.5 right-0 w-72 rounded-2xl border border-border bg-bg shadow-2xl"
+          className="hidden md:block absolute z-40 mt-1.5 right-0 w-72 rounded-2xl border border-border bg-bg shadow-2xl"
         >
-          {/* Search */}
-          <div className="p-3 border-b border-border">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search stores…"
-              aria-label="Search stores"
-              className="w-full px-3 py-1.5 rounded-full text-[13px] bg-surface border border-border focus:border-brand focus:shadow-input outline-none transition-all"
-              style={{ fontSize: "16px" }}
-            />
-          </div>
-
-          {/* List */}
-          <ul className="max-h-72 overflow-y-auto py-1.5">
-            {visible.length === 0 ? (
-              <li className="px-4 py-3 text-[13px] text-ink-3 text-center">
-                No stores match &ldquo;{search}&rdquo;
-              </li>
-            ) : (
-              visible.map((s) => {
-                const isSelected = selected.has(s.id);
-                return (
-                  <li key={s.id}>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={isSelected}
-                      onClick={() => toggle(s.id)}
-                      className={cn(
-                        "w-full flex items-center justify-between gap-3 px-3 py-2 text-left text-[13px] transition-colors",
-                        isSelected
-                          ? "bg-ink/5 text-ink"
-                          : "text-ink-2 hover:bg-surface-2 hover:text-ink",
-                      )}
-                    >
-                      <span className="flex items-center gap-2.5 min-w-0">
-                        <span
-                          className={cn(
-                            "shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors",
-                            isSelected
-                              ? "bg-ink border-ink text-bg"
-                              : "border-border-strong",
-                          )}
-                          aria-hidden="true"
-                        >
-                          {isSelected && <Check size={12} strokeWidth={3} />}
-                        </span>
-                        <span className="truncate">{s.name}</span>
-                      </span>
-                      <span className="shrink-0 text-[11px] text-ink-3 tabular-nums">
-                        {s.count}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })
-            )}
-          </ul>
-
-          {/* Footer */}
-          <div className="px-3 py-2 border-t border-border flex items-center justify-between">
-            <button
-              type="button"
-              onClick={clearAll}
-              disabled={selectedCount === 0}
-              className="text-[12px] text-ink-3 hover:text-ink disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Clear all
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-ink text-bg text-[12px] font-semibold hover:opacity-90 transition-opacity"
-            >
-              Done
-              <X size={11} strokeWidth={2.5} aria-hidden="true" />
-            </button>
-          </div>
+          {panelBody}
         </div>
       )}
+
+      {/* Mobile bottom sheet — portalled to document.body so it
+          escapes the parent's overflow-x-auto clipping context.
+          Backdrop + slide-from-bottom panel matches the iOS / Radix
+          action-sheet pattern users expect. typeof document guard
+          keeps SSR safe. */}
+      {open && typeof document !== "undefined" &&
+        createPortal(
+          <div className="md:hidden fixed inset-0 z-50">
+            {/* Backdrop — closes on click */}
+            <div
+              onClick={() => setOpen(false)}
+              aria-hidden="true"
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            {/* Sheet */}
+            <div
+              role="listbox"
+              aria-label="Filter by store"
+              className="absolute left-0 right-0 bottom-0 rounded-t-2xl border-t border-border bg-bg shadow-2xl max-h-[85vh] flex flex-col"
+            >
+              {/* Drag-handle visual cue at the top of the sheet —
+                  signals 'this is a dismissable sheet, swipe down'
+                  even though we don't wire actual swipe gestures (a
+                  tap on the backdrop is the documented close). */}
+              <div className="flex justify-center pt-2 pb-1">
+                <div className="w-10 h-1 rounded-full bg-ink-3/40" aria-hidden="true" />
+              </div>
+              <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                <p className="text-sm font-semibold text-ink">Filter by store</p>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close"
+                  className="-mr-1 p-1 text-ink-3 hover:text-ink transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              {panelBody}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
