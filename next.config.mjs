@@ -9,6 +9,21 @@ const nextConfig = {
     removeConsole: { exclude: ["error", "warn"] },
   },
 
+  /* Aggressive tree-shake for libraries whose ESM index file re-exports
+     everything from one barrel. Without this hint, the bundler can't
+     statically prove which named exports are dead and ends up shipping
+     the whole package per route that imports any subset of it.
+
+     Note: Next 14.2 already auto-applies this transform to a fixed list
+     of popular packages, lucide-react included — measured delta from
+     adding it explicitly was 0 kB. Kept here as forward-compatible
+     documentation: if a future Next minor changes the auto-list, our
+     bundle stays optimised because we've stated intent here. Cheap
+     insurance, no harm. */
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
+
   images: {
     /* Modern formats — Next negotiates the best one per browser.
        AVIF first (smaller), WebP fallback. Saves ~25–50% over JPEG. */
