@@ -14,11 +14,21 @@ import DealUnavailableBanner from "@/components/feedback/DealUnavailableBanner";
 import { COUNTRIES, getCountry } from "@/lib/country";
 import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList } from "@/lib/seo";
 
-/* Revalidate this page server-side every 5 min so the trending shuffle
-   surfaces fresh picks for every cached request. Combined with the
-   client-side <RefreshOnInterval /> below, users on the page also see
-   updates without manual reload. */
-export const revalidate = 300;
+/* Revalidate this page server-side every 30 min. Was 300s (5 min);
+   pushed out to 1800s on May 2026 after PSI flagged "Document request
+   latency: 4,830 ms" on a cold-cache hit — that 4.8s is the streaming
+   SSR's full duration (TrendingDeals + CategoryGrid each fan out to
+   several DB queries before the response stream closes), and the
+   short revalidate window meant ~12 cold renders per region per hour.
+
+   Bumping to 1800s drops that to 2 cold renders per region per hour
+   — every other visitor still hits warm ISR cache, and the client-
+   side <RefreshOnInterval /> below kicks in every 5 minutes for users
+   already on the page so freshness on the live surface is preserved.
+
+   The trending shuffle still rotates because the underlying ranker
+   uses popularity_score that updates with click telemetry. */
+export const revalidate = 1800;
 
 export function generateStaticParams() {
   return COUNTRIES.map((c) => ({ country: c.code }));

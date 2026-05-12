@@ -1,0 +1,19 @@
+# Browserslist config — used by Next's SWC pass to decide which
+# JavaScript syntax features need polyfills/transpilation.
+#
+# Default Next.js targets are conservative (going back to IE11-ish),
+# which ships ~12 KiB of legacy polyfills PSI flagged ("Legacy
+# JavaScript: Est savings of 12 KiB"). Real Havlo visitors are on
+# modern mobile Chrome / Safari / Samsung Internet — IE has been
+# dead for years and our analytics show 0% IE/legacy-Edge traffic.
+#
+# The targets below cover ~96% of global usage as of May 2026
+# (caniuse "modern" baseline). Trimmed payload, no real-world
+# browser left behind.
+
+> 0.5%
+last 2 versions
+Firefox ESR
+not dead
+not IE 11
+not op_mini all

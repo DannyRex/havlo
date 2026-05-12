@@ -77,8 +77,17 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
   const onChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setQuery(e.target.value);
     const ta = e.target;
-    ta.style.height = "auto";
-    ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
+    /* Wrap the layout read/write in rAF to avoid the synchronous
+       forced reflow PSI flagged on the May 2026 audit. Reading
+       scrollHeight after setting height="auto" forces the browser
+       to synchronously recompute layout; doing it inside rAF lets
+       the browser batch the read with the next paint instead of
+       interrupting the React commit. Cosmetic timing only — the
+       textarea still resizes within the same frame as the keystroke. */
+    requestAnimationFrame(() => {
+      ta.style.height = "auto";
+      ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
+    });
   };
 
   const isUrl = /^https?:\/\//i.test(query.trim());
