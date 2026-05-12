@@ -226,7 +226,13 @@ export default function DealFeed() {
     /* Use the debounced search so the fetch only fires after typing
        settles — see the searchDebounced comment above. */
     if (searchDebounced)    p.set("search", searchDebounced);
-    if (origin !== "all")   p.set("origin", origin);
+    /* Always set the origin param (even when "all") so the API
+       request URL is unambiguous and the response cache keys cleanly.
+       Was: only set when origin !== "all" — created an asymmetry
+       where flipping back to "all" didn't change the API URL
+       and could mask the toggle's effect (user report May 2026:
+       "all deals isn't clickable for ng"). */
+    p.set("origin", origin);
     /* Stores filter: comma-separated, sorted alphabetically so the
        URL is stable regardless of click order (better for browser
        cache + clean share-links). */
@@ -292,7 +298,11 @@ export default function DealFeed() {
        with every keystroke would flood router history and update
        the back-button stack per character. */
     if (searchDebounced.trim()) params.set("search", searchDebounced.trim());
-    if (origin !== "all")   params.set("origin", origin);
+    /* Always set origin in the URL too — same reasoning as
+       buildParams. The visible URL stays in lockstep with the
+       toggle state, which avoids the visual "did anything
+       happen?" ambiguity when flipping back to "all". */
+    params.set("origin", origin);
     /* Mirror buildParams' alphabetical sort so the URL is stable
        regardless of selection order — keeps history clean and
        share-links predictable. */
