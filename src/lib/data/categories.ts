@@ -13,6 +13,15 @@ export const categories: Category[] = [
   { id: "computing",   name: "Computing",        slug: "computing",   icon: "Laptop",       color: "#06B6D4", dealCount: 20  },
   { id: "audio",       name: "Audio",            slug: "audio",       icon: "Headphones",   color: "#F97316", dealCount: 14  },
   { id: "appliances",  name: "Appliances",       slug: "appliances",  icon: "Refrigerator", color: "#6366F1", dealCount: 11  },
+  /* Health & Wellness — added May 2026. Hidden from the homepage
+     CategoryGrid because the grid is currently `grid-cols-2 sm:grid-cols-3
+     lg:grid-cols-5` and 10 browsable tiles fit cleanly on 2 and 5 cols;
+     adding an 11th would orphan a tile on every breakpoint. Still
+     surfaces in /deals CategoryNav chips (no grid constraint) and
+     accepts deep-link traffic via /deals?category=health. Promote
+     out of `hidden` once the homepage grid earns a row swap. */
+  { id: "health",      name: "Health & Wellness", slug: "health",     icon: "HeartPulse",  color: "#0EA5E9", dealCount: 0,
+    hidden: true },
 ];
 
 export const getCategory = (slug: string) =>

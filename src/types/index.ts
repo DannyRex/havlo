@@ -17,6 +17,12 @@ export interface Category {
   icon: string;
   color: string;
   dealCount: number;
+  /** When true, the category exists for ingest classification + the
+      /deals CategoryNav chips, but is HIDDEN from the homepage
+      CategoryGrid. Used for taxonomies that don't yet earn a homepage
+      tile because adding a 9th/11th tile would leave the grid
+      unbalanced on at least one breakpoint. */
+  hidden?: boolean;
 }
 
 export interface Deal {

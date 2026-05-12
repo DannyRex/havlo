@@ -26,7 +26,13 @@ const ICON_FOR: Record<string, IconComp> = {
   appliances:  AppliancesIcon,
 };
 
-const browsable = categories.filter((c) => c.slug !== "all");
+/* Browsable on the homepage = everything except "all" AND anything
+   marked `hidden: true`. The hidden flag lets us add taxonomies to
+   the data layer + /deals CategoryNav chips without disturbing the
+   homepage grid's count/layout. Add a `health` category at the
+   data layer, but skip its homepage tile until the grid earns a row
+   swap and can absorb an extra column. */
+const browsable = categories.filter((c) => c.slug !== "all" && !c.hidden);
 
 export default async function CategoryGrid() {
   /* Counts MUST match what /deals?category=X actually shows.

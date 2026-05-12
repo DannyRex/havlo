@@ -38,7 +38,24 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   // ── Computing (laptops + tablets, NOT phones) ──
   { pattern: /\b(macbook|thinkpad|chromebook|ideapad|zenbook|pavilion|inspiron|latitude|elitebook|surface\s*(pro|laptop|book))\b/i, slug: "computing", reason: "laptop model" },
   { pattern: /\b(laptop|notebook)\b/i, slug: "computing", reason: "generic laptop" },
-  { pattern: /\b(ipad|tablet|tab\s*(s|a)\b|matepad|mediapad)\b/i, slug: "computing", reason: "tablet" },
+  /* Tablet COMPUTERS only — disambiguated from pharmaceutical
+     "tablet" / "Tabs" notation. The original rule used bare `tablet`
+     and `tab\s*(s|a)`, both of which matched thousands of pharmacy
+     SKUs ("Amitriptyline 25mg Tablet x28", "ZENTEL * 2 TABS",
+     "LONART * 6 TABS"). Two-part split:
+
+       1. Brand-specific computing identifiers — iPad, Samsung Galaxy
+          Tab S/A, Huawei MatePad, Mediapad. `tab\s+(s|a)` requires
+          whitespace so "Tabs" doesn't match. */
+  { pattern: /\b(ipad|tab\s+(s|a)\b|matepad|mediapad)\b/i, slug: "computing", reason: "tablet brand" },
+  /* 2. Bare "tablet" ONLY when paired with a computing qualifier —
+        form factor, OS, screen size, or "computer/pc/device".
+        Without this gate, every Panadol / Glucophage / Centrum
+        pharmaceutical "Tablet" routes to Computing. The qualifier
+        set below covers every realistic phrasing for tablet-form-
+        factor consumer electronics. */
+  { pattern: /\b(android|ios|windows|wifi|cellular|\d{1,2}-?inch|\d{1,2}\.\d-?inch|gaming|kids?|kid'?s|drawing|graphic|art|writing)\s*tablet\b/i, slug: "computing", reason: "tablet form factor" },
+  { pattern: /\btablet\s*(computer|pc|device|laptop)\b/i, slug: "computing", reason: "tablet device" },
   { pattern: /\bdesktop\s*(pc|computer)?\b|\bimac\b|\bmac\s*mini\b|\bmac\s*pro\b|\ball-in-one\s*pc\b/i, slug: "computing", reason: "desktop" },
   { pattern: /\b(monitor|display)\b.*\b(\d{2}["”'']|inch)\b/i, slug: "computing", reason: "monitor" },
 
@@ -169,13 +186,84 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   { pattern: /\b(lipstick|mascara|gloss\s*bomb|concealer|foundation|lash\s*sensational|fenty\s*beauty|charlotte\s*tilbury|eye\s*shadow|eyeliner|blush|bronzer|highlighter|primer|setting\s*spray|brush\s*set)\b/i, slug: "beauty", reason: "makeup" },
   { pattern: /\b(niacinamide|moisturizer|moisturiser|moisturizing\s*cream|cleanser|toner|serum|cerave|the\s*ordinary|exfoliator|face\s*mask|sunscreen|spf\s*\d+|retinol|hyaluronic|salicylic|glycolic|vitamin\s*c\s*serum)\b/i, slug: "beauty", reason: "skincare" },
   { pattern: /\b(perfume|cologne|fragrance|eau\s*de\s*parfum|eau\s*de\s*toilette|edp|edt|afnan|montale|kayali|maison\s*margiela|ariana|tom\s*ford|jo\s*malone|creed|dior|chanel|gucci|versace)\s*(?:\d+ml|\d+\.\d+\s*oz|spray)?\b/i, slug: "beauty", reason: "fragrance" },
-  /* Pharmacy + wellness — vitamins, supplements, OTC drugs, baby
-     health. These were the bulk of HealthPlus / MedPlus product
-     types and were defaulting to "electronics" via the resolver
-     fallback. Bucket as beauty for now (the closest existing slug);
-     a dedicated "wellness" / "pharmacy" category is a separate
-     decision the user is weighing. */
-  { pattern: /\b(vitamin\s*[a-e]\d?|multivitamin|supplement|paracetamol|ibuprofen|aspirin|antacid|antihistamine|cough\s*syrup|throat\s*lozenge|pain\s*relief|first\s*aid|antiseptic|hand\s*sanitizer|antibacterial|sanitary\s*pad|baby\s*lotion|baby\s*oil|baby\s*wipes|diaper|nappy|formula\s*milk)\b/i, slug: "beauty", reason: "wellness / pharmacy" },
+  /* ── Health & Wellness ──────────────────────────────────────────
+     Promoted from a beauty sub-rule to its own category May 2026.
+     Pharmacies, supplements, OTC drugs, baby health, first aid.
+     Order: keep the OTC-drug-form rule FIRST so titles like
+     "Augmentin 1g Tabs x14" hit here before any other beauty/home
+     keyword could re-route them. */
+
+  /* OTC drug form markers — "Tabs", "Capsules", "Syrup", "Suspension",
+     "Sachet", dosage strings like "500mg", "5mg/5ml". These cover the
+     long tail of HealthPlus / MedPlus / pharmacy SKUs whose specific
+     drug names aren't in the brand list below. Any one of these
+     forms in a title is a strong signal it's a med, not a beauty
+     or computing product. The `Tabs?` pattern catches both "Tabs"
+     and "Tab" when paired with a dosage marker. */
+  { pattern: /\b(\d+\s*mg|\d+\s*mcg|\d+\s*iu)\b.*\b(tabs?|tablets?|capsules?|caps?|syrup|suspension|sachets?|drops?|injection|vial|ampoule|effervescent|lozenges?|blister)\b|\b(tabs?|tablets?|capsules?|caps?|syrup|suspension|sachets?|drops?|injection|vial|ampoule|effervescent|lozenges?|blister)\b.*\b(\d+\s*mg|\d+\s*mcg|\d+\s*iu)\b/i, slug: "health", reason: "OTC drug form + dosage" },
+  { pattern: /\b\d+\s*ml\b.*\b(syrup|suspension|drops?|injection|elixir)\b|\b(syrup|suspension|drops?|injection|elixir)\s+\d+\s*ml\b/i, slug: "health", reason: "liquid drug form" },
+  /* MedPlus / Nigerian pharmacy quantity notation: "ZENTEL * 2 TABS",
+     "HYDREX TABS *10 STRIPS", "DANACID TABLET * 12 STR". No dosage
+     marker, just a quantity multiplier (*, x, ×) before/after the
+     drug form. Real consumer electronics never use this notation
+     (you don't see "Samsung Galaxy * 6 TABS"). */
+  { pattern: /\b(?:\*|x|×)\s*\d+\s*(tabs?|tablets?|capsules?|caps?|sachets?|strips?|blisters?)\b/i, slug: "health", reason: "drug form + quantity" },
+  { pattern: /\b(tabs?|tablets?|capsules?|caps?|sachets?|strips?|blisters?)\b.*\b(?:\*|x|×)\s*\d+/i, slug: "health", reason: "drug form + quantity (trailing)" },
+
+  /* Specific pharma brand / generic-name keywords. List trimmed to
+     drugs with high prevalence in NG/UK pharmacy SerpAPI pools —
+     antimalarials (Coartem, Lonart, P-Alaxin, Artequick, Amalar),
+     antibiotics (Augmentin, Amoxicillin, Ciprofloxacin, Clavulist),
+     statins (Lipitor, Atorvastatin, Rosuvastatin, Crestor),
+     antihypertensives (Atacand, Aprovel, Amlodipine, Co-Diovan),
+     ED meds (Viagra, Cialis, Tadalis), erectile / fertility
+     (Clomid, Postinor, Proviron), GI (Danacid, Hydrex), and the
+     ubiquitous OTC names. */
+  { pattern: /\b(paracetamol|acetaminophen|ibuprofen|aspirin|naproxen|diclofenac|tramadol|panadol|tylenol|advil|nurofen|calpol)\b/i, slug: "health", reason: "OTC analgesic" },
+  { pattern: /\b(augmentin|amoxicillin|amoxil|ciprofloxacin|ciprotab|clavulist|azithromycin|erythromycin|metronidazole|flagyl|doxycycline|tetracycline|cefuroxime|zinnat|cipro)\b/i, slug: "health", reason: "antibiotic" },
+  { pattern: /\b(coartem|lonart|p-?alaxin|artequick|amalar|fansidar|artemether|lumefantrine|dihydroartemisinin|piperaquine|chloroquine)\b/i, slug: "health", reason: "antimalarial" },
+  { pattern: /\b(lipitor|atorvastatin|rosuvastatin|crestor|simvastatin|astin)\b/i, slug: "health", reason: "statin" },
+  { pattern: /\b(atacand|aprovel|amlodipine|valsartan|losartan|candesartan|co-?diovan|aprovasc|olmesartan)\b/i, slug: "health", reason: "antihypertensive" },
+  { pattern: /\b(viagra|cialis|tadalis|sildenafil|tadalafil|levitra|vardenafil)\b/i, slug: "health", reason: "ED medication" },
+  { pattern: /\b(clomid|clomiphene|postinor|levonorgestrel|proviron|mesterolone|metformin|glucophage|insulin)\b/i, slug: "health", reason: "hormone / fertility / endocrine" },
+  { pattern: /\b(antacid|antihistamine|loratadine|cetirizine|clarityn|benadryl|chlorpheniramine|prednisone|prednisolone|salbutamol|asthalin|ventolin|amitriptyline)\b/i, slug: "health", reason: "common Rx" },
+
+  /* Vitamins, multivitamins, supplements — high-confidence health
+     signals across every store. Includes specific brand names that
+     surface frequently (Centrum, Berocca, Calgovit, Astymin,
+     Astyfer, Osteocare, Puritan's Pride, Floradix). */
+  { pattern: /\b(vitamin\s*[a-e]\d?|multivitamin|supplement|probiotic|prebiotic|omega-?3|fish\s*oil|cod\s*liver\s*oil|folic\s*acid|iron\s*supplement|calcium\s*supplement|zinc\s*supplement)\b/i, slug: "health", reason: "vitamin / supplement" },
+  { pattern: /\b(centrum|berocca|calgovit|astymin|astyfer|osteocare|puritan'?s\s*pride|holland\s*&\s*barrett|floradix|seven\s*seas)\b/i, slug: "health", reason: "supplement brand" },
+
+  /* Herbal bitters as Nigerian wellness category — the existing
+     alcohol rule (line ~222 of the original) catches "bitters" but
+     in NG most bitters are herbal flusher / detox products sold in
+     pharmacies, not alcoholic. Disambiguate: bitters + capsule /
+     sachet / powder / herb / flush / detox / aloe → health.
+     Pure alcoholic bitters (Angostura, Campari) still hit the home
+     rule below. */
+  { pattern: /\b(bitters?)\b.*\b(capsules?|caps?|tablets?|tabs?|sachets?|powder|herbs?|herbal|flush|flusher|detox|aloe|liver|colon|kidney)\b|\b(capsules?|caps?|tablets?|tabs?|sachets?|powder|herbs?|herbal|flush|flusher|detox|aloe|liver|colon|kidney)\b.*\b(bitters?)\b/i, slug: "health", reason: "herbal bitters" },
+  { pattern: /\b(herbout|legend\s*immune|swedish\s*bitters|woodfix|alomo|orijin)\b/i, slug: "health", reason: "NG herbal/wellness brand" },
+
+  /* OTC + first aid + sanitary categories. Baby health stays in
+     this bucket too — diapers, baby formula, infant medication. */
+  /* "Bandage" is intentionally NOT in the bare keyword list — the
+     dry-run on the live catalog caught "Fashion Nova Bandage Midi
+     Dress" and "Emerald Green Bandage Dress" matching `\bbandage\b`
+     and getting routed to health. Bandage-style is a real fashion
+     term (figure-hugging bodycon construction). Match medical
+     contexts only: "adhesive bandage", "bandage roll", "bandage
+     gauze", "wound bandage". Same shape for "tape" → "medical tape"
+     / "surgical tape" only. */
+  { pattern: /\b(pain\s*relief|first\s*aid|antiseptic|hand\s*sanitizer|hand\s*sanitiser|antibacterial\s*gel|sanitary\s*pad|sanitary\s*towel|tampon|adhesive\s*bandage|bandage\s*(roll|gauze|tape)|wound\s*(care|bandage|dressing)|gauze\s*pad|surgical\s*tape|medical\s*tape|elastic\s*compression\s*bandage|plaster\s*(strip|cast)|crepe\s*bandage|surgical\s*mask|face\s*mask\s*medical|disposable\s*mask)\b/i, slug: "health", reason: "first aid / OTC" },
+  { pattern: /\b(baby\s*lotion|baby\s*oil|baby\s*wipes?|baby\s*shampoo|baby\s*powder|baby\s*formula|infant\s*formula|formula\s*milk|diapers?|nappy|nappies)\b/i, slug: "health", reason: "baby health" },
+  { pattern: /\b(cough\s*syrup|cough\s*drops?|throat\s*lozenge|nasal\s*spray|inhaler|chest\s*rub|vapor\s*rub|menthol\s*rub|mentholatum)\b/i, slug: "health", reason: "cold & flu OTC" },
+
+  /* ── Beauty (cont'd): hair + personal care ────────────────────
+     Split visually from the makeup/skincare/fragrance block above
+     by the Health insertion. Originally a single contiguous block;
+     kept here so pharma keywords inserted between the two halves
+     of beauty don't accidentally re-route a wellness product. */
   { pattern: /\b(shampoo|conditioner|hair\s*oil|hair\s*spray|leave-?in|deep\s*conditioner|edge\s*control|relaxer|texturizer|hair\s*serum|hair\s*mask|scalp\s*treatment)\b/i, slug: "beauty", reason: "hair care" },
   { pattern: /\b(deodorant|antiperspirant|body\s*spray|body\s*wash|shower\s*gel|bar\s*soap|body\s*butter|body\s*lotion|hand\s*cream|foot\s*cream|exfoliating\s*scrub)\b/i, slug: "beauty", reason: "personal care" },
 
