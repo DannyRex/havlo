@@ -108,7 +108,7 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
             the search box below the fold. Short form on mobile keeps
             the credibility signal but doesn't eat vertical space. */}
         <div
-          className="inline-flex items-center gap-2 mb-5 sm:mb-8 px-3 py-1.5 rounded-full bg-surface-2 border border-border text-xs sm:text-sm text-ink-2 animate-fade-in"
+          className="inline-flex items-center gap-2 mb-5 sm:mb-8 px-3 py-1.5 rounded-full bg-surface-2 border border-border text-xs sm:text-sm text-ink-2"
         >
           <span className="relative flex h-2 w-2" aria-hidden="true">
             <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 animate-ping" />
@@ -140,8 +140,15 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
                 SE (320px) may bump the first clause to 2 lines for
                 a 3-line total; accepted trade-off vs. shrinking the
                 hero type. */}
+        {/* No animate-fade-up here — the H1 is the LCP candidate on
+            this page (PSI May 2026 audit). Fade animations push LCP
+            registration to the end of the animation (browsers wait
+            for opacity to settle before marking LCP complete),
+            adding ~200-400ms to LCP for no visible benefit. Subhead
+            below + search input keep their animations because they
+            don't compete for LCP. */}
         <h1
-          className="font-bold text-ink leading-[1.05] sm:leading-[0.98] tracking-[-0.04em] mb-5 sm:mb-6 animate-fade-up"
+          className="font-bold text-ink leading-[1.05] sm:leading-[0.98] tracking-[-0.04em] mb-5 sm:mb-6"
           style={{ fontSize: "clamp(1.95rem, 8vw, 5rem)" }}
         >
           Before you buy it,{" "}

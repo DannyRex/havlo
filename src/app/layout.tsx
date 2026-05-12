@@ -20,10 +20,19 @@ const inter = Inter({
 
 /* Header / display font — Bricolage Grotesque has sharp letterforms,
    tight spacing, and a magazine-cover feel that pairs cleanly with
-   Inter's neutral body text. */
+   Inter's neutral body text.
+
+   Weight set trimmed (May 2026): was 500/600/700/800. PSI flagged
+   font payload as part of the LCP drag at 3.7s. Heading usage
+   audit:
+     - weight 700 = default heading weight (globals.css h1-h6)
+     - weight 600 = font-semibold h2/h3 (used heavily)
+     - weight 500 = font-medium, used on 2 h3s — falls back to Inter
+     - weight 800 = font-extrabold, UNUSED on any heading
+   Dropping 500 + 800 saves ~60-100 kB of font data per page load. */
 const displayFont = Bricolage_Grotesque({
   subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
+  weight: ["600", "700"],
   variable: "--font-display",
   display: "swap",
 });

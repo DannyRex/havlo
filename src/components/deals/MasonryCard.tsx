@@ -9,6 +9,7 @@
    masonry-layout.ts so server components can still import them. */
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   cleanTitle,
@@ -94,16 +95,32 @@ function ResilientImage({ deal, priority }: { deal: Deal; priority: boolean }) {
      skips the proxy. */
   const imgSrc = proxiedImageUrl(deal.imageUrl);
 
+  /* next/image instead of raw <img> — PSI flagged "Improve image
+     delivery — Est savings of 157 KiB" on May 2026 perf audit.
+     Wrapping with next/image gets:
+       - Automatic AVIF / WebP conversion (~50% smaller than the JPEG
+         upstream CDNs serve)
+       - Responsive srcset so mobile gets a 320px-wide variant
+         instead of the 1500px CDN original
+       - Edge cache via Vercel's image optimizer so the second visitor
+         skips the upstream waterfall entirely
+     Composes with /api/img-proxy: next/image fetches the proxy URL,
+     the proxy fetches with the right Referer, next/image transforms
+     and caches. First hit slightly slower, every subsequent hit fast. */
   return (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
+    <Image
       src={imgSrc}
       alt={altText}
-      loading={priority ? "eager" : "lazy"}
-      fetchPriority={priority ? "high" : "auto"}
-      decoding={priority ? "sync" : "async"}
+      fill
+      /* sizes: tell the optimizer what render size to expect at each
+         breakpoint so it picks the right srcset entry. Matches the
+         columns-2/3/4 layout in TrendingDeals: 50vw mobile (2-col),
+         33vw tablet (3-col), 25vw desktop (4-col), then capped by
+         the max-w-7xl container width on very wide viewports. */
+      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+      priority={priority}
       onError={() => setFailed(true)}
-      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05] motion-reduce:group-hover:scale-100"
+      className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05] motion-reduce:group-hover:scale-100"
     />
   );
 }
