@@ -126,6 +126,35 @@ export function isAmazonSearchUrl(url: string | undefined | null): boolean {
      - any path containing a slash-separated SKU or slug */
 export function isStoreSearchUrl(url: string | undefined | null): boolean {
   if (!url) return false;
+
+  /* Unwrap /api/go redirects first.
+
+     SerpAPI / curated Amazon / AliExpress-converter rows often
+     persist their outbound URL as `/api/go?url=...&...` (the
+     affiliate chokepoint). new URL() can't parse a relative URL
+     without a base, so the previous implementation silently
+     returned false for every wrapped row — i.e. the Amazon
+     "from" prefix was only firing for raw amazon.com URLs and
+     never for the wrapped ones the user was actually seeing on
+     /deals.
+
+     Strategy: detect the /api/go prefix, pull the `url` query
+     param, recurse on the inner URL. The decoded URL is the
+     real merchant URL we want to test against the search-page
+     patterns below. */
+  if (url.startsWith("/api/go") || url.startsWith("/api/go?")) {
+    const qIndex = url.indexOf("?");
+    if (qIndex < 0) return false;
+    try {
+      const params = new URLSearchParams(url.slice(qIndex + 1));
+      const inner = params.get("url");
+      if (!inner) return false;
+      return isStoreSearchUrl(inner);
+    } catch {
+      return false;
+    }
+  }
+
   try {
     const u = new URL(url);
     const path = u.pathname.toLowerCase();
