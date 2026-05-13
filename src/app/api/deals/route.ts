@@ -4,7 +4,22 @@ import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import type { OriginFilter, SortOption } from "@/types";
 
-export const dynamic = "force-dynamic";
+/* No `export const dynamic = "force-dynamic"` here.
+
+   The route's use of `req.nextUrl.searchParams` automatically marks
+   it dynamic in Next 14, so `force-dynamic` was redundant — but it
+   ALSO caused Next.js to set
+   `Cache-Control: public, max-age=0, must-revalidate` on the response,
+   which silently overrode the explicit
+   `Cache-Control: s-maxage=600, stale-while-revalidate=3600`
+   set in the NextResponse below. QA caught this May 2026: Vercel
+   edge was still HITting on warm cache somehow, but the shipped
+   header didn't match spec and downstream CDN / browser caching was
+   far weaker than intended. Removing the directive lets the
+   explicit header flow through to clients.
+
+   Route still behaves dynamically because of the searchParams read
+   — no caching regression, just a header reconciliation. */
 
 export async function GET(req: NextRequest) {
   try {

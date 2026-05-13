@@ -206,9 +206,25 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
      "HYDREX TABS *10 STRIPS", "DANACID TABLET * 12 STR". No dosage
      marker, just a quantity multiplier (*, x, ×) before/after the
      drug form. Real consumer electronics never use this notation
-     (you don't see "Samsung Galaxy * 6 TABS"). */
-  { pattern: /\b(?:\*|x|×)\s*\d+\s*(tabs?|tablets?|capsules?|caps?|sachets?|strips?|blisters?)\b/i, slug: "health", reason: "drug form + quantity" },
-  { pattern: /\b(tabs?|tablets?|capsules?|caps?|sachets?|strips?|blisters?)\b.*\b(?:\*|x|×)\s*\d+/i, slug: "health", reason: "drug form + quantity (trailing)" },
+     (you don't see "Samsung Galaxy * 6 TABS").
+
+     Boundary note: `\b\*` does NOT match in titles where a space
+     precedes the `*` ("TABS *10" — both space and `*` are non-word
+     characters so `\b` can't fire between them). Fix: use a
+     (?:^|\s) alternation instead of `\b` so the multiplier can sit
+     after a space, at the start of the title, or against a word
+     boundary. QA report May 2026 caught this:
+     "HYDREX TABS *10 STRIPS" was returning null from inference.
+
+     Truncated-form note: MedPlus stores some titles truncated
+     ("NEUROVIT FORTE * 10 STR..."). The drug-form alternation
+     accepts both full words (`tablets?`, `strips?`, `capsules?`)
+     and 3-letter abbreviated stems (`tab`, `str`, `cap`, `sach`,
+     `bli`) followed by an optional `\.\.\.` ellipsis or end-of-line.
+     A bare `tab` mid-title (e.g. fashion "table runner") still
+     fails because the previous step requires a leading multiplier. */
+  { pattern: /(?:^|\s|\b)(?:\*|x|×)\s*\d+\s*(tabs?|tablets?|capsules?|caps?|sachets?|strips?|blisters?|str|tab|cap|sach|bli)(s|let|sule|in)?(?:\.\.\.|\b|$)/i, slug: "health", reason: "drug form + quantity" },
+  { pattern: /\b(tabs?|tablets?|capsules?|caps?|sachets?|strips?|blisters?)\b.*(?:^|\s|\b)(?:\*|x|×)\s*\d+/i, slug: "health", reason: "drug form + quantity (trailing)" },
 
   /* Specific pharma brand / generic-name keywords. List trimmed to
      drugs with high prevalence in NG/UK pharmacy SerpAPI pools —
@@ -278,8 +294,10 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   { pattern: /\b(winter\s*coat|trench\s*coat|raincoat|peacoat)\b/i, slug: "fashion", reason: "outerwear" },
   /* 'dress' alone is greedy ('dress shoes', 'dressing' table, 'dressing
      gown' is fine but 'salad dressing' isn't). Constrain to garment
-     contexts. */
-  { pattern: /\b(maxi\s*dress|midi\s*dress|sundress|cocktail\s*dress|wedding\s*dress|gown)\b/i, slug: "fashion", reason: "dress" },
+     contexts. Bandage / bodycon / mini / evening / skater dress added
+     May 2026 after QA caught "Emerald Green Bandage Dress" sitting in
+     electronics with no fashion rule matching it. */
+  { pattern: /\b(maxi\s*dress|midi\s*dress|sundress|cocktail\s*dress|wedding\s*dress|bandage\s*dress|bodycon\s*dress|mini\s*dress|evening\s*dress|skater\s*dress|gown)\b/i, slug: "fashion", reason: "dress" },
   /* Bags + small leather goods. 'wallet' alone matched 'Galaxy S24
      Wallet Case' in retag dry-run. Disambiguate by excluding case /
      phone contexts: when title contains 'case' or 'cover', skip.
