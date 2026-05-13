@@ -225,18 +225,34 @@ async function main() {
        proxies or Jiji exposes an affiliate / partner API, the
        scraper code in scrapers/jiji.ts stays parked. */
     // { name: "Jiji",    probe: "https://jiji.ng/",                              fn: () => scrapeJiji(page) },
-    /* ── Verified-and-revived NG retailers ─────────────────────────
-       These three were failing in the first cron run. Diagnosis +
-       fixes (May 2026):
-         • HealthPlus is on Shopify at healthplusnigeria.com — uses
-           the public products.json endpoint (no Playwright needed).
-         • Supermart is also Shopify at supermart.ng — same path.
-         • MedPlus is custom-themed WordPress at medplusnig.com,
-           rewrote using the verified .inline_product card selectors
-           and the /products?data_from=discounted&page=N URL.
-       _shopify-json.ts gives us a generic, stable approach for
-       Shopify stores going forward — every Shopify store exposes
-       the same endpoint. */
+
+    /* ── International stores ──────────────────────────────────────
+       Moved UP the queue from after the pharmacy block (May 2026).
+
+       Why: /api/deals?sort=newest pulls top-N by scraped_at DESC
+       and the last-scraped store dominates the top. Before this
+       reorder DHgate ran last → it dominated the newest sort on
+       /ng/deals. QA report: "?sort=newest is dominated by DHgate
+       listings; pharmacy/grocer cards do not float to the top."
+
+       After: DHgate + ASOS run BEFORE NG pharmacies, so the
+       pharmacy/grocer block becomes the last write per run. NG-
+       local fresh inventory now leads the newest view. */
+    /* AliExpress scraper disabled — anti-bot wall (Cloudflare). Real
+       AliExpress catalog comes from the Open Platform API ingest, run
+       in a separate workflow step (npm run ingest:aliexpress) once
+       ALIEXPRESS_APP_KEY/SECRET are set. */
+    // { name: "AliExpress", probe: "https://www.aliexpress.com/",                   fn: () => scrapeAliExpress(intlPage) },
+    { name: "DHgate",     probe: "https://www.dhgate.com/",                       fn: () => scrapeDHgate(intlPage) },
+    { name: "ASOS",       probe: "https://www.asos.com/",                         fn: () => scrapeAsos(intlPage) },
+
+    /* ── Verified-and-revived NG retailers — pharmacy / grocer block.
+       Runs LAST so these stores own the top of sort=newest.
+         • HealthPlus on Shopify (healthplusnigeria.com)
+         • Supermart on Shopify (supermart.ng)
+         • MedPlus custom WordPress (medplusnig.com)
+         • Essenza on Shopify (essenza.ng)
+       _shopify-json.ts gives us a generic Shopify approach. */
     { name: "HealthPlus", probe: "https://healthplusnigeria.com/",                fn: () => scrapeHealthPlus(page) },
     { name: "Supermart",  probe: "https://www.supermart.ng/",                     fn: () => scrapeSupermart(page) },
     { name: "MedPlus",    probe: "https://medplusnig.com/",                       fn: () => scrapeMedPlus(page) },
@@ -264,14 +280,9 @@ async function main() {
     // { name: "Switz",      probe: "https://www.switzelectronics.com/",             fn: () => scrapeSwitz(page) },
     // { name: "AddideMart", probe: "https://www.addidemart.com/",                   fn: () => scrapeAddideMart(page) },
     { name: "Popular SKUs", probe: "https://www.konga.com/",                      fn: () => scrapePopularSkus(page) },
-    // International stores (en-US stealth context)
-    /* AliExpress scraper disabled — anti-bot wall (Cloudflare). Real
-       AliExpress catalog comes from the Open Platform API ingest, run
-       in a separate workflow step (npm run ingest:aliexpress) once
-       ALIEXPRESS_APP_KEY/SECRET are set. */
-    // { name: "AliExpress", probe: "https://www.aliexpress.com/",                   fn: () => scrapeAliExpress(intlPage) },
-    { name: "DHgate",     probe: "https://www.dhgate.com/",                       fn: () => scrapeDHgate(intlPage) },
-    { name: "ASOS",       probe: "https://www.asos.com/",                         fn: () => scrapeAsos(intlPage) },
+    /* DHgate + ASOS moved UP — see the "International stores" block
+       earlier in this list. The reorder lets the NG pharmacy block
+       lead sort=newest on /ng/deals. */
     /* Amazon scraper — opt-in via AMAZON_SCRAPER_ENABLED=true.
        Default off: Amazon's bot defenses block ~50%+ of runs and
        polluted the logs / produced 0-deal cron runs. With the env

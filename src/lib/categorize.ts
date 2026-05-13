@@ -56,7 +56,16 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
         factor consumer electronics. */
   { pattern: /\b(android|ios|windows|wifi|cellular|\d{1,2}-?inch|\d{1,2}\.\d-?inch|gaming|kids?|kid'?s|drawing|graphic|art|writing)\s*tablet\b/i, slug: "computing", reason: "tablet form factor" },
   { pattern: /\btablet\s*(computer|pc|device|laptop)\b/i, slug: "computing", reason: "tablet device" },
-  { pattern: /\bdesktop\s*(pc|computer)?\b|\bimac\b|\bmac\s*mini\b|\bmac\s*pro\b|\ball-in-one\s*pc\b/i, slug: "computing", reason: "desktop" },
+  /* Desktop computers — qualifier is REQUIRED, not optional. The old
+     rule `\bdesktop\s*(pc|computer)?\b` matched bare "Desktop" because
+     of the `?` making the qualifier optional. That swept up audio
+     products like "Kanto ORA Powered Reference Desktop Speakers",
+     "Edifier D12 Desktop Stereo Speaker", "Audioengine A2 Wireless
+     Bluetooth Desktop Speakers" — all routed to Computing before the
+     audio rule could fire. QA report May 2026: "Side observation:
+     many Bluetooth speakers also classified as Computing". Tightened
+     to require a real computing-context word after "desktop". */
+  { pattern: /\bdesktop\s+(pc|computer|tower|workstation|monitor|setup)\b|\bimac\b|\bmac\s*mini\b|\bmac\s*pro\b|\ball-in-one\s*pc\b/i, slug: "computing", reason: "desktop" },
   { pattern: /\b(monitor|display)\b.*\b(\d{2}["”'']|inch)\b/i, slug: "computing", reason: "monitor" },
 
   // ── Audio (headphones, earbuds, speakers) ──
@@ -66,7 +75,15 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
      screwdriver sets, mystery boxes, tool kits. Pure spam — no real
      phone catalog uses these phrases. */
   { pattern: /\b(screwdriver\s*set|precision\s*screwdriver|tool\s*kit|mystery\s*box|lucky\s*box|blind\s*box|surprise\s*pack|tool\s*case)\b/i, slug: "electronics", reason: "tool/mystery accessory junk" },
-  { pattern: /\b(soundbar|home\s*theatre|home\s*theater|boombox|bluetooth\s*speaker|wireless\s*speaker|portable\s*speaker|party\s*speaker|party\s*box)\b/i, slug: "audio", reason: "speaker form factor" },
+  /* Speaker form factor — broadened May 2026 after QA caught "Kanto
+     ORA Desktop Speakers", "Edifier D12 Stereo Speaker", "Audioengine
+     A2 Bluetooth Desktop Speakers" all sitting in Computing because
+     the audio rule didn't match "Desktop Speaker" / "Stereo Speaker"
+     and the (now-tightened) desktop computing rule no longer caught
+     them either. Every entry below is a speaker-class qualifier
+     paired with the noun "speaker(s)" — no false-positive risk
+     since these phrasings don't appear in non-audio titles. */
+  { pattern: /\b(soundbar|home\s*theatre|home\s*theater|boombox|bluetooth\s*speakers?|wireless\s*speakers?|portable\s*speakers?|party\s*speakers?|party\s*box|desktop\s*speakers?|stereo\s*speakers?|bookshelf\s*speakers?|computer\s*speakers?|studio\s*speakers?|reference\s*speakers?|powered\s*speakers?|tower\s*speakers?|floor\s*speakers?|outdoor\s*speakers?|smart\s*speakers?)\b/i, slug: "audio", reason: "speaker form factor" },
   { pattern: /\b(jbl|bose|sonos|harman\s*kardon|marshall|wh-1000|qc(35|45|ultra)|quietcomfort)\b/i, slug: "audio", reason: "audio brand+model" },
 
   // ── Phone accessories (route to electronics so the Phones filter

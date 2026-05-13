@@ -128,21 +128,44 @@ export default function EmptySearchState({ query, source, browseHref, suggestion
   return (
     <div className="max-w-xl mx-auto py-10 sm:py-14 px-4">
 
-      {/* Heading */}
+      {/* Heading — adaptive based on whether we have suggestions.
+
+          When `suggestions.length > 0`, lead with "Did you mean…"
+          as the primary heading and demote the "Nothing found for X"
+          to subhead size. QA report May 2026: users were reading the
+          "Nothing found" h3 and bouncing without noticing the
+          smaller did-you-mean pills below. Promoting the suggestions
+          to the headline keeps the recovery path one click away
+          (suggestions.title → fresh /compare query).
+
+          When `suggestions.length === 0`, keep the original
+          "Nothing found" heading — there's no better hook to lead
+          with, and the three-options panel below carries the load. */}
       <div className="text-center mb-6">
         <Search size={28} className="text-ink-3 mx-auto mb-3" strokeWidth={1.5} />
-        <h3 className="text-base sm:text-lg font-semibold text-ink mb-1.5 leading-snug">
-          {query
-            ? <>Nothing found for &ldquo;{query}&rdquo;</>
-            : <>Nothing matches those filters</>
-          }
-        </h3>
-        {suggestions.length === 0 && (
-          <p className="text-sm text-ink-3 leading-relaxed">
-            {isUrlQuery
-              ? "We couldn't find this in the catalog yet. Pick a way forward."
-              : "Three ways forward. Pick whichever fits."}
-          </p>
+        {suggestions.length > 0 ? (
+          <>
+            <h3 className="text-base sm:text-lg font-semibold text-ink mb-1.5 leading-snug">
+              Did you mean one of these?
+            </h3>
+            <p className="text-sm text-ink-3 leading-relaxed">
+              We didn&apos;t find an exact match for &ldquo;{query}&rdquo; — these are the closest.
+            </p>
+          </>
+        ) : (
+          <>
+            <h3 className="text-base sm:text-lg font-semibold text-ink mb-1.5 leading-snug">
+              {query
+                ? <>Nothing found for &ldquo;{query}&rdquo;</>
+                : <>Nothing matches those filters</>
+              }
+            </h3>
+            <p className="text-sm text-ink-3 leading-relaxed">
+              {isUrlQuery
+                ? "We couldn't find this in the catalog yet. Pick a way forward."
+                : "Three ways forward. Pick whichever fits."}
+            </p>
+          </>
         )}
       </div>
 
@@ -150,12 +173,11 @@ export default function EmptySearchState({ query, source, browseHref, suggestion
           similarity. Rendered before the recovery options because a
           one-click correction is the lowest-friction path back. Routes
           to /[country]/compare?q=<title> so the user sees a fresh
-          search-results view instead of jumping to a single product. */}
+          search-results view instead of jumping to a single product.
+          Now the visual hierarchy hero on the empty state when
+          present — heading above already advertises them. */}
       {suggestions.length > 0 && (
         <div className="text-center mb-7">
-          <p className="text-xs text-ink-3 uppercase tracking-[0.08em] mb-2.5 font-semibold">
-            Did you mean
-          </p>
           <div className="flex flex-wrap justify-center gap-1.5">
             {suggestions.map((s) => (
               <Link
@@ -167,8 +189,8 @@ export default function EmptySearchState({ query, source, browseHref, suggestion
               </Link>
             ))}
           </div>
-          <p className="text-sm text-ink-3 leading-relaxed mt-5">
-            Or pick a different way forward.
+          <p className="text-xs text-ink-3 uppercase tracking-[0.08em] mt-5 font-semibold">
+            Or pick a different way forward
           </p>
         </div>
       )}
