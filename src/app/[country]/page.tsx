@@ -5,7 +5,7 @@ import Hero from "@/components/landing/Hero";
 import TrendingDeals from "@/components/landing/TrendingDeals";
 import CashbackTeaser from "@/components/landing/CashbackTeaser";
 import CategoryGrid from "@/components/landing/CategoryGrid";
-import StoreLogos, { getStoreCountForCountry } from "@/components/landing/StoreLogos";
+import StoreLogos, { getTotalStoreCount } from "@/components/landing/StoreLogos";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import CTA from "@/components/landing/CTA";
 import RefreshOnInterval from "@/components/ui/RefreshOnInterval";
@@ -137,10 +137,13 @@ export default function HomePage({ params }: { params: { country: string } }) {
     { name: country.name, url: `${SITE_URL}/${country.code}` },
   ]);
 
-  /* Pass the user's country store count to the Hero so the trust
-     pill ("scanning prices across N stores") matches the marquee
-     rendered below. Same source of truth, no drift. */
-  const storeCount = getStoreCountForCountry(country.code);
+  /* Hero trust pill ("Live · scanning prices across N stores")
+     uses the TOTAL store count across every market — the user's
+     home roster under-represents Havlo's actual coverage and the
+     pill is meant to signal app-wide scope, not the local marquee
+     length. The per-country marquee below still uses
+     getStoreCountForCountry. */
+  const storeCount = getTotalStoreCount();
 
   return (
     <>

@@ -242,6 +242,22 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
       href={linkHref ?? `/${country.code}/p/${deal.id}`}
       aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${deal.storeName}. Open details.`}
       className="group block"
+      onClick={() => {
+        /* GA4 product_click event — fires before navigation so the
+           click context (store, category, surface) is captured even
+           if the user closes the resulting tab quickly. No-ops when
+           consent isn't granted (handled inside track()). */
+        track({
+          name: "product_click",
+          props: {
+            store_id:   deal.storeId,
+            product_id: deal.id,
+            category:   deal.categorySlug,
+            surface:    "deals",
+            country:    country.code,
+          },
+        });
+      }}
     >
       <div className={`relative overflow-hidden rounded-xl sm:rounded-2xl bg-surface-2 border border-border ${aspect}`}>
         <ResilientImage deal={deal} priority={priority} />

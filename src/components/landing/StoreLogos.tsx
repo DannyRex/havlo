@@ -170,12 +170,31 @@ const ROSTERS: Record<string, StoreEntry[]> = {
 };
 
 /* Public helper: how many stores does Havlo cover for the given
-   country? Used by the Hero trust pill to show an accurate, honest
-   "scanning prices across N stores" count that matches the marquee
-   the user actually sees below. Defaults to NG roster when the
-   country code is unknown. */
+   country? Used by the per-country marquee below. Defaults to NG
+   roster when the country code is unknown. */
 export function getStoreCountForCountry(countryCode: string): number {
   return (ROSTERS[countryCode] ?? ROSTERS.ng).length;
+}
+
+/* Public helper: TOTAL distinct stores Havlo covers across every
+   market. Used by the homepage hero trust pill so the headline
+   credibility signal reflects the full scope of the app, not the
+   visitor's local roster (which under-represents the platform —
+   e.g. a UK visitor would see "22 stores" but the app actually
+   indexes 100+). User feedback May 2026: "store count in hero
+   should be the total we have, not per country."
+
+   Deduped by store name (case-insensitive) so multi-market stores
+   that appear in several rosters (Amazon, AliExpress, SHEIN, Temu,
+   DHgate) don't get counted multiple times. */
+export function getTotalStoreCount(): number {
+  const seen = new Set<string>();
+  for (const roster of Object.values(ROSTERS)) {
+    for (const store of roster) {
+      seen.add(store.name.toLowerCase());
+    }
+  }
+  return seen.size;
 }
 
 function Track({ stores, ariaHidden = false }: { stores: StoreEntry[]; ariaHidden?: boolean }) {

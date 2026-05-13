@@ -34,6 +34,8 @@ export type EventName =
   | "search_submit"           // user submits a search from /compare or homepage
   | "paste_link"              // pasted URL detected in compare input
   | "click_out_merchant"      // outbound to merchant (DB-backed via /api/click + GA4 mirror)
+  | "product_click"           // user clicked a product card (lands on PDP, not merchant)
+  | "category_click"          // user clicked a category tile / chip
   | "cashback_badge_click"    // tap on the green "Earn 5%" badge
   | "country_switch"          // user changes country picker
   | "compare_view"            // /compare page rendered with an anchor
@@ -68,6 +70,29 @@ interface CashbackProps extends BaseProps {
   percent: number;
 }
 
+/* Product card click — fired BEFORE navigation to the PDP (or
+   /compare for synthetic IDs that don't have a PDP yet). Drives the
+   GA4 funnel between "card view" and "outbound click" so we can
+   measure intent at the per-card level vs only the final merchant
+   click. Distinct from click_out_merchant which fires at /api/go. */
+interface ProductClickProps extends BaseProps {
+  store_id: string;
+  product_id?: string;        // omitted for synthetic offers
+  category?: string;
+  surface: "deals" | "trending" | "compare" | "pdp_similar" | "homepage";
+  position?: number;          // 0-indexed rank within its surface
+}
+
+/* Category tile / chip click. Fired from CategoryGrid (homepage
+   tiles) and CategoryNav (/deals chip strip). Lets us see which
+   categories actually attract entry traffic vs only being browsed
+   internally. */
+interface CategoryClickProps extends BaseProps {
+  category: string;            // slug — 'phones', 'electronics', etc.
+  surface: "homepage" | "deals_chip";
+  position?: number;
+}
+
 interface CountrySwitchProps extends BaseProps {
   from: string;
   to: string;
@@ -98,6 +123,8 @@ type EventProps =
   | { name: "search_submit"; props: SearchSubmitProps }
   | { name: "paste_link"; props: PasteLinkProps }
   | { name: "click_out_merchant"; props: ClickOutProps }
+  | { name: "product_click"; props: ProductClickProps }
+  | { name: "category_click"; props: CategoryClickProps }
   | { name: "cashback_badge_click"; props: CashbackProps }
   | { name: "country_switch"; props: CountrySwitchProps }
   | { name: "compare_view"; props: CompareViewProps }

@@ -64,14 +64,24 @@ export function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const seg = path.split("/")[1]?.toLowerCase() ?? "";
 
-  /* Case 1: URL has a valid country prefix → sync cookie if it
-     differs. Special-case for accidental /ng/about, /uk/contact
-     etc. — those global pages don't have a /[country]/ variant
-     and Next would 404 them. Strip the country prefix and redirect
-     to the canonical /global-page so the cookie still gets set
-     (via the redirect target's own pass through middleware) and
-     the user lands on a working page. The QA agent flagged
-     /ng/about returning a raw Next.js 404. */
+  /* Case 1: URL has a valid country prefix.
+
+     Middleware does NOT touch the country cookie here. The cookie is
+     the user's EXPLICIT preferred country, set only by the country
+     picker (CountryProvider.setCountry). Letting middleware mirror
+     the URL to the cookie meant a UK user who followed a shared
+     /ng/deals link got their cookie pinned to NG forever — every
+     subsequent visit to havlo.io/ then redirected them to /ng even
+     though geo says UK. User report May 2026: "a UK user sees ng by
+     default."
+
+     Now: clicking /ng/deals just renders that page. Cookie is
+     unchanged. Bare havlo.io/ then re-uses cookie → geo → ng default.
+
+     Special-case for accidental /ng/about, /uk/contact etc. — those
+     global pages don't have a /[country]/ variant. Strip the country
+     prefix and redirect to the canonical /global-page so the user
+     lands on a working page. */
   if (SUPPORTED.has(seg)) {
     const secondSeg = path.split("/")[2]?.toLowerCase() ?? "";
     if (secondSeg && GLOBAL_PAGES.has(secondSeg)) {
@@ -79,19 +89,7 @@ export function middleware(req: NextRequest) {
       target.pathname = `/${path.split("/").slice(2).join("/")}`;
       return NextResponse.redirect(target, 307);
     }
-    const cookieVal = req.cookies.get(COUNTRY_COOKIE)?.value;
-    if (cookieVal === seg) return NextResponse.next();
-
-    req.cookies.set(COUNTRY_COOKIE, seg);
-    const res = NextResponse.next({ request: { headers: req.headers } });
-    res.cookies.set({
-      name:     COUNTRY_COOKIE,
-      value:    seg,
-      maxAge:   60 * 60 * 24 * 365,
-      sameSite: "lax",
-      path:     "/",
-    });
-    return res;
+    return NextResponse.next();
   }
 
   /* Case 2: bare country-scoped path (/, /deals, /compare) → redirect

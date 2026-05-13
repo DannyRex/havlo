@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { categories } from "@/lib/data/categories";
+import CategoryTileLink from "./CategoryTileLink";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
@@ -130,11 +131,25 @@ export default async function CategoryGrid() {
         {/* Editorial monochrome tiles — type-led, no color tints.
             On hover: border tightens, icon lifts, arrow reveals.
             No two-zone split — single unified card surface. */}
+        {/* Sort tiles by deal count DESC so the highest-inventory
+            categories (most opportunity for the visitor) sit at the
+            top-left. Categories with zero deals fall to the bottom
+            of the grid but stay visible — the user can still click
+            through and see the empty-state guidance.
+
+            User feedback May 2026: "category chips on the homepage
+            should be sorted based on popularity from left to right."
+            Deal count is the best proxy we have for popularity until
+            we wire actual click data through. The numbers already
+            drive the count badge each tile displays, so this just
+            promotes the same signal to the layout order. */}
         <nav
           aria-label="Browse by category"
           className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4"
         >
-          {browsable.map((cat) => {
+          {[...browsable]
+            .sort((a, b) => (counts[b.slug] ?? 0) - (counts[a.slug] ?? 0))
+            .map((cat, idx) => {
             const Icon = ICON_FOR[cat.slug];
             /* Real count from country-filtered fetch above. No fallback
                to the hardcoded categories.ts value — that value was
@@ -144,9 +159,11 @@ export default async function CategoryGrid() {
                clickable and the deals page handles empty state. */
             const count = counts[cat.slug] ?? 0;
             return (
-              <Link
+              <CategoryTileLink
                 key={cat.id}
                 href={`/deals?category=${cat.slug}`}
+                category={cat.slug}
+                position={idx}
                 className="group relative block aspect-[4/5] sm:aspect-[5/6] overflow-hidden rounded-2xl border border-border bg-surface hover:border-ink/40 hover:bg-surface-2 transition-all duration-300"
               >
                 {/* Subtle hover-revealed corner arrow */}
@@ -176,7 +193,7 @@ export default async function CategoryGrid() {
                     </p>
                   </div>
                 </div>
-              </Link>
+              </CategoryTileLink>
             );
           })}
         </nav>

@@ -248,6 +248,52 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
 
   /* — NG (additional gaps) ───────────────────────── */
   "spar-nigeria":               { name: "Spar Nigeria",      searchUrl: (q) => `https://www.sparng.com/search?q=${encodeURIComponent(q)}`,                   homepage: "https://www.sparng.com" },
+
+  /* ── v5 additions (May 2026) — gap fillers caught by user QA ─────
+       User reported: "Valentino Jolly RE Handbag" outbound from a
+       Debenhams card landed on a broken Google relay because no
+       MERCHANTS entry existed for Debenhams. Added explicit search
+       URLs for the most common merchants we don't yet cover. Pattern
+       per merchant verified by visiting their search page directly.
+       Add new merchants here as live-curl audits catch them. */
+  /* Debenhams was the explicit user-reported gap (Valentino handbag
+     outbound landed on a broken Google relay). The rest are common
+     UK + US merchants Havlo's SerpAPI feed surfaces but our v1-v4
+     batches missed. Verified search URL pattern per merchant. */
+  "debenhams":                  { name: "Debenhams",         searchUrl: (q) => `https://www.debenhams.com/search?q=${encodeURIComponent(q)}`,                homepage: "https://www.debenhams.com" },
+  "prettylittlething":          { name: "PrettyLittleThing", searchUrl: (q) => `https://www.prettylittlething.com/catalogsearch/result/?q=${encodeURIComponent(q)}`, homepage: "https://www.prettylittlething.com" },
+  "pretty-little-thing":        { name: "PrettyLittleThing", searchUrl: (q) => `https://www.prettylittlething.com/catalogsearch/result/?q=${encodeURIComponent(q)}`, homepage: "https://www.prettylittlething.com" },
+  "new-look":                   { name: "New Look",          searchUrl: (q) => `https://www.newlook.com/uk/search?q=${encodeURIComponent(q)}`,                homepage: "https://www.newlook.com" },
+  "newlook":                    { name: "New Look",          searchUrl: (q) => `https://www.newlook.com/uk/search?q=${encodeURIComponent(q)}`,                homepage: "https://www.newlook.com" },
+  "schuh":                      { name: "Schuh",             searchUrl: (q) => `https://www.schuh.co.uk/search/?q=${encodeURIComponent(q)}`,                  homepage: "https://www.schuh.co.uk" },
+  "office":                     { name: "Office",            searchUrl: (q) => `https://www.office.co.uk/search?q=${encodeURIComponent(q)}`,                  homepage: "https://www.office.co.uk" },
+  "office-shoes":               { name: "Office",            searchUrl: (q) => `https://www.office.co.uk/search?q=${encodeURIComponent(q)}`,                  homepage: "https://www.office.co.uk" },
+  "dr-martens":                 { name: "Dr. Martens",       searchUrl: (q) => `https://www.drmartens.com/uk/en/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.drmartens.com" },
+  "drmartens":                  { name: "Dr. Martens",       searchUrl: (q) => `https://www.drmartens.com/uk/en/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.drmartens.com" },
+  "h-m":                        { name: "H&M",               searchUrl: (q) => `https://www2.hm.com/en_gb/search-results.html?q=${encodeURIComponent(q)}`,    homepage: "https://www2.hm.com" },
+  "hm":                         { name: "H&M",               searchUrl: (q) => `https://www2.hm.com/en_gb/search-results.html?q=${encodeURIComponent(q)}`,    homepage: "https://www2.hm.com" },
+  "zara":                       { name: "Zara",              searchUrl: (q) => `https://www.zara.com/uk/en/search?searchTerm=${encodeURIComponent(q)}`,        homepage: "https://www.zara.com" },
+  "uniqlo":                     { name: "Uniqlo",            searchUrl: (q) => `https://www.uniqlo.com/uk/en/search?q=${encodeURIComponent(q)}`,               homepage: "https://www.uniqlo.com" },
+  "holland-barrett":            { name: "Holland & Barrett", searchUrl: (q) => `https://www.hollandandbarrett.com/shop/search?q=${encodeURIComponent(q)}`,    homepage: "https://www.hollandandbarrett.com" },
+  "boots-com":                  { name: "Boots",             searchUrl: (q) => `https://www.boots.com/sitesearch?searchTerm=${encodeURIComponent(q)}`,        homepage: "https://www.boots.com" },
+  "superdrug":                  { name: "Superdrug",         searchUrl: (q) => `https://www.superdrug.com/search?text=${encodeURIComponent(q)}`,              homepage: "https://www.superdrug.com" },
+  "feelunique":                 { name: "feelunique",        searchUrl: (q) => `https://www.feelunique.com/search?q=${encodeURIComponent(q)}`,                homepage: "https://www.feelunique.com" },
+  "lookfantastic":              { name: "Lookfantastic",     searchUrl: (q) => `https://www.lookfantastic.com/elysium.search?search=${encodeURIComponent(q)}`, homepage: "https://www.lookfantastic.com" },
+  "cult-beauty":                { name: "Cult Beauty",       searchUrl: (q) => `https://www.cultbeauty.com/elysium.search?search=${encodeURIComponent(q)}`,    homepage: "https://www.cultbeauty.com" },
+  "the-perfume-shop":           { name: "The Perfume Shop",  searchUrl: (q) => `https://www.theperfumeshop.com/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.theperfumeshop.com" },
+  "fragrancenet":               { name: "FragranceNet",      searchUrl: (q) => `https://www.fragrancenet.com/search?q=${encodeURIComponent(q)}`,               homepage: "https://www.fragrancenet.com" },
+  "tesco":                      { name: "Tesco",             searchUrl: (q) => `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(q)}`,  homepage: "https://www.tesco.com" },
+  "sainsburys":                 { name: "Sainsbury's",       searchUrl: (q) => `https://www.sainsburys.co.uk/gol-ui/SearchResults/${encodeURIComponent(q)}`,   homepage: "https://www.sainsburys.co.uk" },
+  /* US fashion gap fillers */
+  "abercrombie":                { name: "Abercrombie",       searchUrl: (q) => `https://www.abercrombie.com/shop/us/search?searchTerm=${encodeURIComponent(q)}`, homepage: "https://www.abercrombie.com" },
+  "hollister":                  { name: "Hollister",         searchUrl: (q) => `https://www.hollisterco.com/shop/us/search?searchTerm=${encodeURIComponent(q)}`, homepage: "https://www.hollisterco.com" },
+  "urban-outfitters":           { name: "Urban Outfitters",  searchUrl: (q) => `https://www.urbanoutfitters.com/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.urbanoutfitters.com" },
+  "free-people":                { name: "Free People",       searchUrl: (q) => `https://www.freepeople.com/search?q=${encodeURIComponent(q)}`,                  homepage: "https://www.freepeople.com" },
+  "freepeople":                 { name: "Free People",       searchUrl: (q) => `https://www.freepeople.com/search?q=${encodeURIComponent(q)}`,                  homepage: "https://www.freepeople.com" },
+  "anthropologie":              { name: "Anthropologie",     searchUrl: (q) => `https://www.anthropologie.com/search?q=${encodeURIComponent(q)}`,               homepage: "https://www.anthropologie.com" },
+  "kohl":                       { name: "Kohl's",            searchUrl: (q) => `https://www.kohls.com/search.jsp?search=${encodeURIComponent(q)}`,              homepage: "https://www.kohls.com" },
+  "kohl-s":                     { name: "Kohl's",            searchUrl: (q) => `https://www.kohls.com/search.jsp?search=${encodeURIComponent(q)}`,              homepage: "https://www.kohls.com" },
+  "jcpenney":                   { name: "JCPenney",          searchUrl: (q) => `https://www.jcpenney.com/s?Ntt=${encodeURIComponent(q)}`,                       homepage: "https://www.jcpenney.com" },
 };
 
 /** Resolve a search URL for a given store id / name + product title.

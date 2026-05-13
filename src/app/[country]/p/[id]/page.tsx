@@ -294,7 +294,7 @@ export default async function ProductPage({ params }: PageProps) {
   /* Drop dupe-offers from stores that aren't appropriate for the
      visitor's market (e.g. NG-anchored Konga rows on a UK PDP).
      Same shape /api/compare/dupes already applies. */
-  const filteredDupes = country.code === "ng"
+  const countryFilteredDupes = country.code === "ng"
     ? dupes
     : dupes
         .map((d) => ({
@@ -302,6 +302,36 @@ export default async function ProductPage({ params }: PageProps) {
           offers: d.offers.filter((o) => isOfferAllowedForCountry(o, country)),
         }))
         .filter((d) => d.offers.length > 0);
+
+  /* Drop the anchor product itself from the "You may also like" rail.
+     pgFtsFindDupes returns every product matching the title — including
+     the anchor (same title, by definition, scores high). User report
+     May 2026: "remove the current product in view if it's in YML."
+     Three signals identify the anchor:
+       1. d.key === anchor product_id (DupeResult.key IS product_id —
+          see pgFtsFindDupes return shape).
+       2. d.offers contains the anchor offer_id (covers curated Amazon
+          rows whose product_id is a synthetic slug, not the same UUID
+          shape — the offer-id check catches them).
+       3. d.title exactly matches the anchor title (last-resort
+          defensive — should only fire for products that have
+          incomparable IDs across surfaces).
+
+     Also dedupe by best-offer id so the rail can't surface two groups
+     that resolve to the same /p/[id] link (defensive — dupes engine
+     already groups by signature, but FTS scoring can occasionally
+     split near-identical titles into separate groups). */
+  const seenIds = new Set<string>();
+  const filteredDupes = countryFilteredDupes.filter((d) => {
+    if (offer.product_id && d.key === offer.product_id) return false;
+    if (offer.offer_id && d.offers.some((o) => o.offerId === offer.offer_id)) return false;
+    if (offer.title && d.title === offer.title) return false;
+    const best = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
+    const id = best?.offerId || (best?.storeId + ":" + d.key);
+    if (seenIds.has(id)) return false;
+    seenIds.add(id);
+    return true;
+  });
 
   /* JSON-LD: Product schema (with offers) + BreadcrumbList. Google
      Rich Results use these for the price + availability badge in

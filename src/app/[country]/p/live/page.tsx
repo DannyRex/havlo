@@ -134,7 +134,7 @@ export default async function LivePdpPage({ params, searchParams }: PageProps) {
 
   /* Country-filter the dupes' offers so a UK PDP doesn't surface
      Konga rows. Same shape as the regular PDP. */
-  const filteredDupes = country.code === "ng"
+  const countryFilteredDupes = country.code === "ng"
     ? dupes
     : dupes
         .map((d) => ({
@@ -142,6 +142,20 @@ export default async function LivePdpPage({ params, searchParams }: PageProps) {
           offers: d.offers.filter((o) => isOfferAllowedForCountry(o, country)),
         }))
         .filter((d) => d.offers.length > 0);
+
+  /* Dedupe + drop the synthetic anchor itself from the YML rail.
+     Same shape as /p/[id]. Synthetic anchors don't have a product_id,
+     so the anchor filter relies on title-exact match + the dedupe
+     pass behind it. */
+  const seenIds = new Set<string>();
+  const filteredDupes = countryFilteredDupes.filter((d) => {
+    if (offer.title && d.title === offer.title) return false;
+    const best = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
+    const id = best?.offerId || (best?.storeId + ":" + d.key);
+    if (seenIds.has(id)) return false;
+    seenIds.add(id);
+    return true;
+  });
 
   /* Synthetic anchors don't have a DB product to count stores
      against. Fall back to 1 (just the anchor's own store). Future:

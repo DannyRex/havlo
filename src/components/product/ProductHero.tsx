@@ -274,12 +274,24 @@ export default function ProductHero({ offer, countryCode, totalStores }: Props) 
             row without a dupes pre-fetch). */}
         <Link
           href={`/${countryCode}/compare?q=${encodeURIComponent(offer.title)}&mode=similar`}
-          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-border-strong text-ink font-medium text-[14px] hover:bg-surface-2 transition-colors mb-7"
+          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-border-strong text-ink font-medium text-[14px] hover:bg-surface-2 transition-colors mb-4"
         >
           {typeof totalStores === "number" && totalStores > 1
             ? <>Compare prices across {totalStores} stores</>
             : <>Compare prices across stores</>}
         </Link>
+
+        {/* Price-staleness disclosure. We refresh the catalog on a
+            scrape cadence (every few hours for most stores), so the
+            price/availability shown here is a snapshot — not live. The
+            merchant CAN change either between our last scrape and the
+            user's click-through. Better to set the expectation upfront
+            than have users feel misled when they hit a 4xx on the
+            merchant page. Short, honest, no scary language. */}
+        <p className="text-[12px] text-ink-3 leading-relaxed mb-7 -mt-1">
+          Price and availability shown reflect our last check
+          {offer.scrapedAt ? <> {timeAgo(offer.scrapedAt)}</> : null}. The merchant may have updated either since — we&apos;ll send you to their page so you can verify before you buy.
+        </p>
 
         {/* Useful info row — small facts shoppers want before clicking
             through. Affiliate disclosure removed (May 2026) — it lives
