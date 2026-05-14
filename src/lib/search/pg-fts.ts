@@ -540,6 +540,46 @@ function ftsRowToSingleOffer(r: FtsRow): StoreOffer {
   };
 }
 
+/* A "tight" signature has BOTH brand AND model parsed. Anything
+   with a "?" component is too loose to use for sibling pooling.
+
+   Background: the dedup pass stores signatures as "brand|model"
+   (or "brand|model|inches" for screens), with "?" filling in when
+   buildSignature couldn't resolve a part from the title. Sibling
+   pooling at query time fetches every product sharing this
+   signature and merges their offers into one anchor — useful for
+   the legit case ("iPhone 15 128GB Black" on Konga + "iPhone 15 -
+   128GB - Midnight Black" on Amazon both parse to "apple|iphone15
+   |128" and merge into one comparison view).
+
+   But the guard `signature !== "?|?"` is too narrow. Signatures
+   like "nike|?" (brand known, model unknown) also catch fire —
+   "Nike Authentic Dunk Low Unisex Classic Lightweight Casual
+   Sneakers IB2051-400" normalises to "nike|?", and so do 251
+   OTHER Nike products in the catalogue ("Nike Air Force 1",
+   "Nike Air Max 95", "Nike Phoenix Fleece Hoodie", etc.). User
+   report May 2026: clicking Compare on this Dunk anchor showed
+   116 "offers" — actually offers from 251 unrelated Nike
+   products (socks, boxer briefs, tank tops, joggers, hoodies,
+   different sneaker silhouettes).
+
+   New rule: skip sibling pooling unless BOTH brand AND model are
+   resolved (no "?" in either slot). The "iPhone 15 128GB" /
+   "iPhone 15 - 128GB" case still merges because both sides parse
+   to "apple|iphone15|128". The "Nike Dunk Low" case stops merging
+   because its signature is "nike|?" and the helper returns false. */
+function isSignatureTightEnoughForPooling(sig: string | null | undefined): boolean {
+  if (!sig) return false;
+  const parts = sig.split("|");
+  if (parts.length < 2) return false;
+  /* Brand AND model must both be present and not the "?"
+     fallback. Optional third part (inches) can stay loose since
+     it's a refinement, not a primary identifier. */
+  const [brand, model] = parts;
+  if (!brand || brand === "?" || !model || model === "?") return false;
+  return true;
+}
+
 function buildAnchorGroup(p: AnchorProduct): ProductGroup {
   /* Two filters:
      1. in_stock — drop offers the merchant has sold out of
@@ -853,22 +893,29 @@ export async function pgFtsFindSimilar(
     /* Default: anchor uses just the chosen product's offers. */
     let anchorPayload = productData as unknown as AnchorProduct;
 
-    /* Cross-product pool: only when the chosen product has a usable
-       compact signature (brand+model parsed). The signature column
-       was rewritten from JSON.stringify(sig) to sig.key by the dedup
-       backfill — it's now either 'brand|model' or '?|?' (fallback
-       when brand or model couldn't be parsed).
+    /* Cross-product pool: only when the chosen product has a TIGHT
+       compact signature (brand AND model both parsed). The signature
+       column was rewritten from JSON.stringify(sig) to sig.key by
+       the dedup backfill — it's now either 'brand|model' or '?|?'
+       or 'brand|?' / '?|model' (fallback when one side couldn't
+       be parsed).
 
-       Round-4 user-reported bug: searching "10 Pcs Stainless Steel
-       Colored Handi Set" returned an anchor with 804 offers. Root
-       cause: this check used to be just `if (signature)` which was
-       truthy for "?|?". That made EVERY brand-less product pool
-       with every OTHER brand-less product. The single 1-offer
-       Handi Set anchor was pooling with ~800 unrelated generic-
-       title products' offers. Skip the pool when signature is
-       null OR "?|?". */
+       Pool guard history:
+         Round-1: `if (signature)` — too permissive, every "?|?"
+           product pooled with every other "?|?" product. The
+           "Handi Set" anchor pooled with ~800 unrelated generic
+           titles.
+         Round-2 (prior): `signature !== "?|?"` — fixed the both-
+           unknown case but not the half-unknown cases. "nike|?"
+           anchors STILL pooled with every other "nike|?" product
+           (Nike socks, hoodies, joggers, etc.). User report May
+           2026: clicking Compare on a Nike Dunk Low anchor pulled
+           in 251 sibling Nike products' offers.
+         Round-3 (now): isSignatureTightEnoughForPooling requires
+           BOTH brand AND model resolved. Half-unknown signatures
+           skip pooling and the anchor stays clean. */
     const signature = (productData as { signature: string | null }).signature;
-    if (signature && signature !== "?|?") {
+    if (isSignatureTightEnoughForPooling(signature)) {
       const { data: siblings } = await supa!
         .from("products")
         .select(`
@@ -1139,8 +1186,10 @@ export async function pgFtsFindByProductId(
   let anchorPayload: AnchorProduct = base;
 
   /* Pool siblings by signature (best-effort — fall through silently
-     if the join fails). */
-  if (base.signature && base.signature !== "?|?") {
+     if the join fails). Uses the SAME tightness guard as
+     resolveAnchorFromRow above so the FTS path and the pid-backstop
+     path agree on which signatures are safe to pool by. */
+  if (isSignatureTightEnoughForPooling(base.signature)) {
     const { data: siblings } = await supa
       .from("products")
       .select(`
