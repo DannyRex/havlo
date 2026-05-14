@@ -318,6 +318,15 @@ export default async function ProductPage({ params }: PageProps) {
         }))
         .filter((d) => d.offers.length > 0);
 
+  /* Anchor price normalised to NGN — needed UP HERE so the dupe
+     price-band gate (filteredDupes below) can reference it. Moved
+     from its prior location below filteredDupes when the band gate
+     was added May 2026. Same conversion as before:
+     USD anchors via usdToNgn, NGN anchors passthrough. */
+  const anchorPriceNgn = offer.currency === "USD"
+    ? usdToNgn(offer.current_price)
+    : offer.current_price;
+
   /* Drop the anchor product itself from the "You may also like" rail.
      pgFtsFindDupes returns every product matching the title — including
      the anchor (same title, by definition, scores high). User report
@@ -342,29 +351,53 @@ export default async function ProductPage({ params }: PageProps) {
      lowercase. Catches invisible Unicode, smart-quotes, en-dash vs
      hyphen, trailing punctuation. */
   const normaliseTitle = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const filteredDupes = countryFilteredDupes.filter((d) => {
-    /* Drop the ANCHOR product itself from the YML rail. Three signals:
-         1. d.key === anchor product_id (DupeResult.key IS product_id).
-         2. d.offers contains the anchor offer_id.
-         3. NORMALISED title matches AND a dupe-offer's storeId
-            matches the anchor's storeId. (Same product at the SAME
-            store IS the anchor; same title at a DIFFERENT store is
-            a legit cheaper alternative — keep those.)
+  /* Price-band guardrails for alternatives. Without these, an
+     anchor at £60 could surface a £5 alternative ("AirPods Max
+     silicone cover" matching "AirPods Max") or a £300 alternative
+     ("Pro Max bundle with accessories"). Both erode user trust:
+     they imply the alternative is the same product when it's
+     clearly not. User report May 2026: "when the comparison
+     difference is really large, like 5GBP and 100GBP for example,
+     it could mean they're not the same product and may affect
+     user's trust."
 
-       Fix May 2026: previous title-only check (line 348 below
-       removed) was too aggressive and dropped legit alternatives.
-       User report: "Compare across 3 stores" but compare page only
-       showed 1, with "Only seen at this store" wrongly rendered
-       even though /compare found alternatives. Root cause: a
-       Google Pixel 9a 128GB at Currys was filtered out because its
-       title matched the Very anchor's title — but Currys is a
-       different store offering the same product, exactly what the
-       PDP "Compare prices across N stores" CTA promises. */
+     Bounds chosen so legitimate deep discounts (up to 75% off) and
+     legitimate premium configurations (256GB → 512GB phone variants,
+     ~+50%) survive, but the obvious mismatches get filtered. The
+     band shrinks naturally for cheap anchors (£5 anchor → £1.25–£15
+     band, which is fine since most products in our catalogue are
+     above £10 anyway). */
+  const FLOOR_RATIO   = 0.25;  // alt ≥ 25% of anchor (drops "£5 vs £100" cases)
+  const CEILING_RATIO = 3.00;  // alt ≤ 3x anchor   (drops "£100 vs £300+ bundle" cases)
+  const filteredDupes = countryFilteredDupes.filter((d) => {
+    /* Drop the ANCHOR product itself. Two signals:
+         1. d.key === anchor.product_id — exact same product row.
+         2. d.offers contains the anchor's own offer_id.
+
+       NOTE: removed the prior "same-store + same-title = drop"
+       hard filter (May 2026). That filter wiped out legitimate
+       different listings of the same product at marketplaces like
+       AliExpress, where multiple sellers (or even the same seller
+       at different price points) list the same item. User report:
+       a £60 umbrella PDP couldn't see the £54 alternative
+       listing — both AliExpress, identical title, different
+       offer_ids. The seenStoreTitle dedupe below already collapses
+       same-store same-title to the CHEAPEST representative, so
+       relaxing the hard drop here doesn't introduce spam. */
     if (offer.product_id && d.key === offer.product_id) return false;
     if (offer.offer_id && d.offers.some((o) => o.offerId === offer.offer_id)) return false;
-    if (offer.title && offer.store_id && normaliseTitle(d.title) === normaliseTitle(offer.title)) {
-      if (d.offers.some((o) => o.storeId === offer.store_id)) return false;
+
+    /* Price-band gate. The dupe's CHEAPEST offer must sit within
+       [anchor * FLOOR_RATIO, anchor * CEILING_RATIO]. Only applies
+       when we have an anchor price to compare against. */
+    if (anchorPriceNgn > 0) {
+      const best = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
+      if (best) {
+        if (best.landedPrice < anchorPriceNgn * FLOOR_RATIO)   return false;
+        if (best.landedPrice > anchorPriceNgn * CEILING_RATIO) return false;
+      }
     }
+
     /* Dedupe by best-offer id (defensive — dupes engine already
        groups by signature, but FTS scoring sometimes splits near-
        identical titles into separate groups). */
@@ -372,11 +405,12 @@ export default async function ProductPage({ params }: PageProps) {
     const id = best?.offerId || (best?.storeId + ":" + d.key);
     if (seenIds.has(id)) return false;
     seenIds.add(id);
-    /* Same-store + same-title dedupe — catches the SKU-variant case
-       (Fashion Nova "Alena Pleated Crepe Mini Dress" at $13 and $16
-       are different sizes / colours, same merchant + same display
-       title; treat as one). Per-store; legit alternatives at OTHER
-       stores survive. */
+    /* Same-store + same-title dedupe — keeps the cheapest
+       representative when a merchant has multiple listings of the
+       same product (Fashion Nova SKU variants, AliExpress
+       multi-seller listings). Different store + same title is a
+       legit cross-store alternative and falls through this check
+       because storeTitleKey differs. */
     const titleKey = normaliseTitle(d.title);
     const storeTitleKey = `${best?.storeId ?? ""}|${titleKey}`;
     if (seenStoreTitle.has(storeTitleKey)) return false;
@@ -523,10 +557,10 @@ export default async function ProductPage({ params }: PageProps) {
      User report May 2026: PDP shows "Great price across 4 stores"
      with £0 cheapest / £0 highest because the USD anchor leaked
      into an NGN aggregate then got divided by 1600 again at the
-     formatter. */
-  const anchorPriceNgn = offer.currency === "USD"
-    ? usdToNgn(offer.current_price)
-    : offer.current_price;
+     formatter.
+
+     anchorPriceNgn is now defined above (near countryFilteredDupes)
+     so the dupe price-band gate can reference it during filtering. */
   const dupePricesNgn: number[] = filteredDupes.flatMap((d) => {
     const cheapestOffer = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
     return cheapestOffer ? [cheapestOffer.landedPrice] : [];
