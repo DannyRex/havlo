@@ -251,16 +251,17 @@ h1, h2, h3, h4, h5, h6 {
     color: rgb(var(--ink-2-rgb));
   }
 
-  /* Skeleton shimmer */
+  /* Skeleton — flat surface, no shimmer.
+     Per founder direction May 2026: "make the skeleton flat and
+     not with gradient." The shimmer animation drew attention to
+     the loading state instead of just placeholding the space,
+     and reads as visual noise on routes that render multiple
+     skeletons in parallel (deals grid, masonry, dupes rail).
+     Flat surface-2 still communicates "something will appear
+     here" via its shape, without competing with adjacent
+     real content for attention. */
   .skeleton {
-    background: linear-gradient(
-      90deg,
-      rgb(var(--surface-2-rgb)) 25%,
-      rgb(var(--border-rgb)) 50%,
-      rgb(var(--surface-2-rgb)) 75%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 2s infinite;
+    background: rgb(var(--surface-2-rgb));
   }
 }
 
