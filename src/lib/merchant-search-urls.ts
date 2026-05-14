@@ -83,12 +83,41 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
      ingest + affiliate.ts; amazon-co-uk preserved for legacy
      callers (cashback.ts, older ingest rows). Both route to the
      same UK marketplace + UK affiliate tag. */
+  /* Country-code slugs (match the affiliate.ts host regexes one-to-one). */
   "amazon-uk":      { name: "Amazon UK",  searchUrl: (q) => `https://www.amazon.co.uk/s?k=${encodeURIComponent(q)}`, homepage: "https://www.amazon.co.uk" },
   "amazon-co-uk":   { name: "Amazon UK",  searchUrl: (q) => `https://www.amazon.co.uk/s?k=${encodeURIComponent(q)}`, homepage: "https://www.amazon.co.uk" },
   "amazon-de":      { name: "Amazon DE",  searchUrl: (q) => `https://www.amazon.de/s?k=${encodeURIComponent(q)}`,    homepage: "https://www.amazon.de" },
   "amazon-ae":      { name: "Amazon AE",  searchUrl: (q) => `https://www.amazon.ae/s?k=${encodeURIComponent(q)}`,    homepage: "https://www.amazon.ae" },
   "amazon-in":      { name: "Amazon IN",  searchUrl: (q) => `https://www.amazon.in/s?k=${encodeURIComponent(q)}`,    homepage: "https://www.amazon.in" },
   "amazon":         { name: "Amazon",     searchUrl: (q) => `https://www.amazon.com/s?k=${encodeURIComponent(q)}`,   homepage: "https://www.amazon.com" },
+  /* Country-name aliases — SerpAPI Google Shopping ingest
+     sometimes tags storeIds with country names instead of TLD
+     codes ("amazon-germany", "amazon-uae", "amazon-india").
+     Without explicit aliases, pass-2 substring matching falls
+     through to MERCHANTS["amazon"] (amazon.com + havlo-20 US
+     tag), so a German Amazon listing earns US affiliate
+     attribution and the visitor lands on the wrong marketplace.
+
+     P0a audit May 2026 caught amazon-germany + amazon-uae
+     routing to amazon.com. Same shape was the amazon-uk bug
+     fixed earlier in fbc2c0c.
+
+     Keep this list in lockstep with affiliate.ts's
+     AMAZON_HOST_TO_ENV so every alias resolves to a TLD with
+     a configured tag env var. */
+  "amazon-germany":   { name: "Amazon DE",  searchUrl: (q) => `https://www.amazon.de/s?k=${encodeURIComponent(q)}`,    homepage: "https://www.amazon.de" },
+  "amazon-uae":       { name: "Amazon AE",  searchUrl: (q) => `https://www.amazon.ae/s?k=${encodeURIComponent(q)}`,    homepage: "https://www.amazon.ae" },
+  "amazon-india":     { name: "Amazon IN",  searchUrl: (q) => `https://www.amazon.in/s?k=${encodeURIComponent(q)}`,    homepage: "https://www.amazon.in" },
+  "amazon-france":    { name: "Amazon FR",  searchUrl: (q) => `https://www.amazon.fr/s?k=${encodeURIComponent(q)}`,    homepage: "https://www.amazon.fr" },
+  "amazon-italy":     { name: "Amazon IT",  searchUrl: (q) => `https://www.amazon.it/s?k=${encodeURIComponent(q)}`,    homepage: "https://www.amazon.it" },
+  "amazon-spain":     { name: "Amazon ES",  searchUrl: (q) => `https://www.amazon.es/s?k=${encodeURIComponent(q)}`,    homepage: "https://www.amazon.es" },
+  "amazon-canada":    { name: "Amazon CA",  searchUrl: (q) => `https://www.amazon.ca/s?k=${encodeURIComponent(q)}`,    homepage: "https://www.amazon.ca" },
+  "amazon-australia": { name: "Amazon AU",  searchUrl: (q) => `https://www.amazon.com.au/s?k=${encodeURIComponent(q)}`, homepage: "https://www.amazon.com.au" },
+  "amazon-japan":     { name: "Amazon JP",  searchUrl: (q) => `https://www.amazon.co.jp/s?k=${encodeURIComponent(q)}`, homepage: "https://www.amazon.co.jp" },
+  "amazon-mexico":    { name: "Amazon MX",  searchUrl: (q) => `https://www.amazon.com.mx/s?k=${encodeURIComponent(q)}`, homepage: "https://www.amazon.com.mx" },
+  "amazon-brazil":    { name: "Amazon BR",  searchUrl: (q) => `https://www.amazon.com.br/s?k=${encodeURIComponent(q)}`, homepage: "https://www.amazon.com.br" },
+  "amazon-saudi":     { name: "Amazon SA",  searchUrl: (q) => `https://www.amazon.sa/s?k=${encodeURIComponent(q)}`,    homepage: "https://www.amazon.sa" },
+  "amazon-singapore": { name: "Amazon SG",  searchUrl: (q) => `https://www.amazon.sg/s?k=${encodeURIComponent(q)}`,    homepage: "https://www.amazon.sg" },
 
   // ── Other US retailers (commonly seen via SerpAPI) ─────────────
   "walmart":        { name: "Walmart",       searchUrl: (q) => `https://www.walmart.com/search?q=${encodeURIComponent(q)}`,                       homepage: "https://www.walmart.com" },
