@@ -20,9 +20,30 @@ try {
   process.loadEnvFile?.(".env.local");
 } catch {/* fine */}
 
-import { deals } from "../src/lib/data/deals";
+import { existsSync, readFileSync } from "fs";
+import { resolve } from "path";
+import { deals as seedDeals } from "../src/lib/data/deals";
 import { ingestDeals } from "../src/lib/providers/ingestion";
 import type { Deal } from "../src/types";
+
+/* Read scrape output from scripts/data-cache/latest.json (May 2026
+   refactor — used to be src/lib/data/deals.ts but that file was
+   3.3MB and bloated the server bundle by ~2.5MB).
+
+   Falls back to the in-source seed when the runtime cache hasn't
+   been generated yet (e.g. a clean clone running ingest:scraped
+   without a prior `npm run scrape`). The seed only has ~15 entries
+   so this fallback ingests almost nothing — log a warning so the
+   operator notices. */
+function loadScrapedDeals(): Deal[] {
+  const cachePath = resolve(__dirname, "data-cache", "latest.json");
+  if (existsSync(cachePath)) {
+    return JSON.parse(readFileSync(cachePath, "utf-8")) as Deal[];
+  }
+  console.warn(`⚠ scripts/data-cache/latest.json not found — ingesting from the in-source seed (${seedDeals.length} entries). Run \`npm run scrape\` first to populate the runtime cache.`);
+  return seedDeals;
+}
+const deals = loadScrapedDeals();
 
 interface CliArgs {
   storeIds?: string[];

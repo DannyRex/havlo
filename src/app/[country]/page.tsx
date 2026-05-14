@@ -162,9 +162,17 @@ export default function HomePage({ params }: { params: { country: string } }) {
           each). Wrapping them in Suspense lets the page shell +
           Hero stream to the browser immediately — the visitor sees
           the search input and the trust pill within ~200ms instead
-          of waiting 1-3s for every section to resolve. */}
+          of waiting 1-3s for every section to resolve.
+
+          Country is passed as a PROP (not read via cookies()) so the
+          page stays statically renderable per /[country]/ segment.
+          See the "ISR-not-actually-ISR" investigation May 2026:
+          every cookies() read in the render tree forced dynamic
+          SSR + ~70 Supabase queries per visit. URL-as-source-of-
+          truth eliminates the cookie read and unlocks the
+          revalidate=1800 ISR caching that was already declared. */}
       <Suspense fallback={<TrendingDealsSkeleton />}>
-        <TrendingDeals />
+        <TrendingDeals country={country} />
       </Suspense>
       {/* Cashback teaser — restores the pre-launch signup hook that
           was previously a hero strip (removed in c9954c9 because it
@@ -172,18 +180,18 @@ export default function HomePage({ params }: { params: { country: string } }) {
           Sits below the fold so visitors who scroll see it; carries
           its own inline email capture so signup is one step, not
           "click → land on /cashback → submit". */}
-      <CashbackTeaser />
+      <CashbackTeaser country={country} />
       {/* TrendingSearches moved to /compare in round-4 QA. The
           chips work better as a "try a comparison" rail next to the
           search input than as a standalone homepage section that
           competed with TrendingDeals + CategoryGrid for the same
           attention. */}
       <Suspense fallback={<CategoryGridSkeleton />}>
-        <CategoryGrid />
+        <CategoryGrid country={country} />
       </Suspense>
-      <StoreLogos />
+      <StoreLogos country={country} />
       <NewsletterStrip />
-      <CTA />
+      <CTA country={country} />
       <RefreshOnInterval ms={300_000} />
     </>
   );

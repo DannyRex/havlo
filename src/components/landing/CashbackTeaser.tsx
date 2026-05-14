@@ -24,12 +24,16 @@
 
 import Link from "next/link";
 import { Coins } from "lucide-react";
-import { getServerCountry } from "@/lib/country-server";
+import type { Country } from "@/lib/country";
 import { getAllCashbackRates } from "@/lib/cashback";
 import WaitlistForm from "@/components/cashback/WaitlistForm";
 
-export default function CashbackTeaser() {
-  const country = getServerCountry();
+/* `country` arrives as a prop from the page (which reads it from
+   params.country, NOT cookies()) so this component stays statically
+   renderable per /[country]/. Removing the cookies() read here was
+   one of the six fixes that unlocked ISR caching of the homepage —
+   see the May 2026 perf investigation for context. */
+export default function CashbackTeaser({ country }: { country: Country }) {
   const rates   = getAllCashbackRates();
 
   return (

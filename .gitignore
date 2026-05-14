@@ -41,3 +41,9 @@ Thumbs.db
 data/ai-search/extracted.json
 data/ai-search/baseline.json
 data/ai-search/cost-log.json
+
+# Scrape runtime cache — multi-MB JSON snapshot of the latest scrape
+# run, consumed by ingest-scraped.ts. NOT bundled into the app
+# (the server-imported src/lib/data/deals.ts is now a small
+# hand-curated seed, ~12KB). Re-generate with `npm run scrape`.
+scripts/data-cache/

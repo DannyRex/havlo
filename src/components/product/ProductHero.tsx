@@ -290,7 +290,7 @@ export default function ProductHero({ offer, countryCode, totalStores }: Props) 
             merchant page. Short, honest, no scary language. */}
         <p className="text-[12px] text-ink-3 leading-relaxed mb-7 -mt-1">
           Price and availability shown reflect our last check
-          {offer.scrapedAt ? <> {timeAgo(offer.scrapedAt)}</> : null}. The merchant may have updated either since — we&apos;ll send you to their page so you can verify before you buy.
+          {offer.scrapedAt ? <> {timeAgo(offer.scrapedAt)}</> : null}. The merchant may have updated either since. We&apos;ll send you to their page so you can verify before you buy.
         </p>
 
         {/* Useful info row — small facts shoppers want before clicking

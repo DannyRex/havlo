@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, TrendingDown } from "lucide-react";
 import { deals as staticDeals } from "@/lib/data/deals";
-import { getServerCountry } from "@/lib/country-server";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { filterDealsForCountry } from "@/lib/country";
 import type { Deal } from "@/types";
@@ -189,12 +188,11 @@ function CollageCard({
   );
 }
 
-export default async function CTA() {
-  /* getServerCountry reads the cookie set by middleware. Synchronous
-     here even though pickCollage is async — pickCollage hits the
-     live browse provider so we await it for the country's actual
-     catalog before rendering. */
-  const country = getServerCountry();
+/* `country` arrives as a prop from the page so this component stays
+   statically renderable per /[country]/. The cookies() read here was
+   one of the six locations that forced the homepage out of ISR
+   (May 2026 perf fix). */
+export default async function CTA({ country }: { country: import("@/lib/country").Country }) {
   const collage = await pickCollage(country);
 
   return (

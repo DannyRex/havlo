@@ -5,7 +5,6 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import ThemeProvider from "@/components/ui/ThemeProvider";
 import { CountryProvider } from "@/components/providers/CountryProvider";
-import { getServerCountry } from "@/lib/country-server";
 import JsonLd from "@/components/seo/JsonLd";
 import GoogleAnalytics from "@/components/seo/GoogleAnalytics";
 import Skimlinks from "@/components/seo/Skimlinks";
@@ -144,10 +143,21 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  /* Read country from cookie on the server so the first paint already
-     shows the user's flag/currency — no FOUC swap on hydration. */
-  const initialCountry = getServerCountry();
+  /* No cookie read here. Reading cookies() in the root layout
+     forces every page (including /[country]/...) to render
+     dynamically — defeating the revalidate=1800 ISR declared on
+     the homepage and pushing TTFB from ~150ms to 3-5s. May 2026
+     perf investigation traced 60+ Supabase queries per visit to
+     this single line.
 
+     CountryProvider now hydrates from the URL pathname (then cookie,
+     then default) on mount — see CountryProvider's useEffect.
+     Brief navbar-flag flash on first hydration is the trade-off
+     for ISR-able layouts. Acceptable for non-conversion surfaces.
+     Country-scoped pages still render with the correct currency in
+     their initial HTML because every landing component now accepts
+     `country` as a prop derived from params.country (which DOESN'T
+     trigger dynamic rendering). */
   return (
     <html lang="en" className={`${inter.variable} ${displayFont.variable} ${logoFont.variable} scroll-smooth`} suppressHydrationWarning>
       <head>
@@ -168,7 +178,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-[100dvh] flex flex-col antialiased font-sans bg-bg text-ink">
         <ThemeProvider>
-          <CountryProvider initialCode={initialCountry.code}>
+          <CountryProvider>
             <Navbar />
             <main className="flex-1">{children}</main>
             <Footer />

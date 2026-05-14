@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { getActiveBrowseProvider } from "@/lib/providers";
-import { getServerCountry } from "@/lib/country-server";
-import { filterDealsForCountry } from "@/lib/country";
+import { filterDealsForCountry, type Country } from "@/lib/country";
 import { classifyDeal, spaceByStore } from "@/lib/providers/curated-helper";
 import type { Deal } from "@/types";
 import MasonryCard from "@/components/deals/MasonryCard";
@@ -42,13 +41,15 @@ function seededShuffle<T>(items: T[], rng: () => number): T[] {
   return arr;
 }
 
-export default async function TrendingDeals() {
+/* `country` arrives as a prop from the page so this component stays
+   statically renderable per /[country]/. Removing the cookies() read
+   here was part of the May 2026 perf fix that unlocked ISR caching. */
+export default async function TrendingDeals({ country }: { country: Country }) {
   /* Pull from whichever browse provider is active (DB when populated,
      static fallback otherwise). Sort by discount → over-sample top N
      → shuffle → per-store cap → take 16. */
   const provider = await getActiveBrowseProvider();
 
-  const country = getServerCountry();
   const isNG = country.code === "ng";
 
   const qualityFilter = (d: Deal) =>

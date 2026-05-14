@@ -1,4 +1,3 @@
-import { getServerCountry } from "@/lib/country-server";
 import { StoreLogoChip, type StoreEntry } from "./StoreLogoChip";
 
 /* Per-country marquee rosters.
@@ -211,8 +210,10 @@ function Track({ stores, ariaHidden = false }: { stores: StoreEntry[]; ariaHidde
   );
 }
 
-export default function StoreLogos() {
-  const country = getServerCountry();
+/* `country` arrives as a prop from the page so this component stays
+   statically renderable per /[country]/. The cookies() read here
+   would otherwise force the homepage out of ISR (May 2026 perf fix). */
+export default function StoreLogos({ country }: { country: import("@/lib/country").Country }) {
   const stores = ROSTERS[country.code] ?? ROSTERS.ng;
 
   return (

@@ -1,10 +1,10 @@
+import { unstable_cache } from "next/cache";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { categories } from "@/lib/data/categories";
 import CategoryTileLink from "./CategoryTileLink";
 import { getActiveBrowseProvider } from "@/lib/providers";
-import { getServerCountry } from "@/lib/country-server";
-import { filterDealsForCountry, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
+import { filterDealsForCountry, inferStoreCountry, isGlobalIntlStore, type Country } from "@/lib/country";
 import type { Deal } from "@/types";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
@@ -35,77 +35,74 @@ const ICON_FOR: Record<string, IconComp> = {
    swap and can absorb an extra column. */
 const browsable = categories.filter((c) => c.slug !== "all" && !c.hidden);
 
-export default async function CategoryGrid() {
-  /* Counts MUST match what /deals?category=X actually shows.
+/* Per-category counts, cached by country.
 
-     This component was last revised to fetch with `minDiscount: 5`
-     and `origin: 'intl'` for non-NG, which DIDN'T match /api/deals.
-     /api/deals defaults to `minDiscount: 0` (since the curated
-     SerpAPI catalog ingests with discount_percent=0 by design) and
-     uses an in-memory `inferStoreCountry`-based bucket for the
-     local/intl split (not the DB-level `is_international` flag,
-     which is a USD-currency proxy and treats UK retailers stored
-     as USD as 'international' too).
+   Why unstable_cache: the per-category fan-out fires
+   `provider.fetchDeals` once for every browsable slug (10 today)
+   and each fetchDeals does the dual-pass (4 + 2 = 6 Supabase
+   queries) — that's 60 RPCs per render. Wrapping in
+   unstable_cache collapses repeat calls within the TTL window into
+   ONE compute pass per country.
 
-     The combined mismatch undercounted every tile by hundreds to
-     thousands of deals (worst: Beauty NG ~1600 short, Fashion NG
-     ~1400 short). Verified May 2026 via
-     scripts/diagnose-category-counts.ts.
+   Cache key includes the country code so /uk and /ng don't collide.
+   Cache tag `category-counts` lets a future cron call
+   revalidateTag('category-counts') after each ingest run if we want
+   sub-5min freshness — but the 5-min TTL is already tighter than
+   the 30-min ISR window for the page itself, so the counts can't
+   be more than 5 minutes stale.
 
-     Fix: mirror /api/deals' exact pipeline:
-       1. Fetch per category with minDiscount=0, origin=all.
-       2. filterDealsForCountry (country gate).
-       3. For non-NG: apply effectiveOrigin='intl' via inferStoreCountry
-          (drop stores anchored in the user's own country, since the
-          default /deals view shows cross-border for non-NG).
-       4. For NG: use the full country-filtered count (effectiveOrigin
-          stays 'all' for NG by default).
+   Tags this as part of the May 2026 perf fix that unlocked ISR for
+   /[country] (see [country]/page.tsx for the full story). */
+const fetchCategoryCounts = (country: Country) =>
+  unstable_cache(
+    async (): Promise<Record<string, number>> => {
+      const provider = await getActiveBrowseProvider();
+      const isNG = country.code === "ng";
+      const slugs = browsable.map((c) => c.slug);
 
-     Per-category fan-out (not single global) preserves the 8000-row
-     page cap per category — important for high-inventory slugs like
-     fashion / beauty / home. Cost is ~10 parallel queries; with
-     revalidate=300 on the country home, ~120 q/hr worst case. */
-  const country = getServerCountry();
-  const isNG = country.code === "ng";
-  const provider = await getActiveBrowseProvider();
+      const perCategory = await Promise.all(
+        slugs.map((slug) =>
+          provider.fetchDeals({
+            categorySlug: slug,
+            minDiscount:  0,
+            origin:       "all",
+          }),
+        ),
+      );
 
-  const slugs = browsable.map((c) => c.slug);
-  const perCategory = await Promise.all(
-    slugs.map((slug) =>
-      provider.fetchDeals({
-        categorySlug: slug,
-        minDiscount:  0,
-        origin:       "all",
-      }),
-    ),
+      const isLocalToUser = (d: Deal): boolean => {
+        const sc = inferStoreCountry(d.storeId, d.storeName);
+        if (sc !== null) return sc.toLowerCase() === country.code.toLowerCase();
+        if (isGlobalIntlStore(d.storeId, d.storeName)) return false;
+        return d.currency === country.currency;
+      };
+
+      const counts: Record<string, number> = {};
+      for (let i = 0; i < slugs.length; i++) {
+        const countryFiltered = filterDealsForCountry(perCategory[i], country);
+        const finalCount = isNG
+          ? countryFiltered.length
+          : countryFiltered.filter((d) => !isLocalToUser(d)).length;
+        counts[slugs[i]] = finalCount;
+      }
+      return counts;
+    },
+    /* Cache key parts — must include country.code for per-country
+       isolation. Including the slug list prevents stale results if
+       categories.ts changes (rare but worth defending against). */
+    ["category-counts", country.code, browsable.map((c) => c.slug).join(",")],
+    {
+      revalidate: 300, // 5 min — tighter than the page's 30-min ISR
+      tags:       ["category-counts"],
+    },
   );
 
-  /* Same isLocalToUser logic as /api/deals — store-roster-based with
-     currency fallback. Keep these two in sync; the next refactor
-     should extract into a shared helper. */
-  const isLocalToUser = (d: Deal): boolean => {
-    const sc = inferStoreCountry(d.storeId, d.storeName);
-    if (sc !== null) return sc.toLowerCase() === country.code.toLowerCase();
-    /* Global cross-border stores (AliExpress, Shein, Temu, …) are
-       NEVER local. Without this short-circuit AliExpress USD-priced
-       rows misclassified as local for US visitors via the bare
-       currency-match fallback below — same fix shape applied across
-       /api/deals + all card components. */
-    if (isGlobalIntlStore(d.storeId, d.storeName)) return false;
-    return d.currency === country.currency;
-  };
-
-  const counts: Record<string, number> = {};
-  for (let i = 0; i < slugs.length; i++) {
-    const countryFiltered = filterDealsForCountry(perCategory[i], country);
-    /* /api/deals computes effectiveOrigin = !isNG ? 'intl' : origin.
-       For non-NG with default origin=all, that's 'intl' → only items
-       NOT local to the user. For NG default origin=all → all items. */
-    const finalCount = isNG
-      ? countryFiltered.length
-      : countryFiltered.filter((d) => !isLocalToUser(d)).length;
-    counts[slugs[i]] = finalCount;
-  }
+/* `country` arrives as a prop from the page so this component stays
+   statically renderable per /[country]/. The cookies() read here
+   was the biggest single source of dynamic-SSR pressure — 60 RPCs
+   per visit on a route that should be ISR-cached. */
+export default async function CategoryGrid({ country }: { country: Country }) {
+  const counts = await fetchCategoryCounts(country)();
 
   return (
     <section className="py-12 sm:py-20 bg-bg">

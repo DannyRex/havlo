@@ -41,12 +41,37 @@ export function CountryProvider({ initialCode, children }: Props) {
   const pathname = usePathname();
   const [code, setCode] = useState<string>(initialCode ?? DEFAULT_COUNTRY);
 
-  /* If the server didn't ship an initial code (e.g. first visit before
-     middleware runs), hydrate from the cookie on the client. */
+  /* Hydration order on mount: URL pathname → cookie → default.
+
+     Why URL first: after the May 2026 perf fix the root layout no
+     longer reads cookies() (so the layout stays ISR-able), which
+     means initialCode is undefined for everyone on first render.
+     The HTML emitted by the server uses the default country (NG).
+     If we ONLY hydrated from cookie, a UK visitor on /uk would
+     briefly flash NG in the navbar before the cookie kicked in.
+
+     URL-first hydration eliminates that flash for country-scoped
+     pages: a visitor on /uk/... gets the navbar updated to UK
+     synchronously on first useEffect tick. Cookie is the fallback
+     for global pages (/about, /contact) where the URL has no
+     country segment. Default is the safety net.
+
+     `initialCode` (when supplied) still wins so any caller that
+     CAN provide a server-side country code (e.g. a future
+     [country]/layout.tsx) isn't forced through this client path. */
   useEffect(() => {
     if (initialCode) return;
+    /* URL pathname check — first segment is the country if it
+       matches our supported set. Same logic the middleware uses. */
+    if (typeof window !== "undefined") {
+      const seg = window.location.pathname.split("/")[1]?.toLowerCase();
+      if (seg && COUNTRY_CODES.has(seg)) {
+        setCode(seg);
+        return;
+      }
+    }
     const c = readCookie(COUNTRY_COOKIE);
-    if (c) setCode(c);
+    if (c && COUNTRY_CODES.has(c)) setCode(c);
   }, [initialCode]);
 
   const setCountry = useCallback(
