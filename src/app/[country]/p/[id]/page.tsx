@@ -38,12 +38,16 @@ import { COUNTRIES } from "@/lib/country";
 import { SITE_URL, buildBreadcrumbList, buildHreflangAlternates } from "@/lib/seo";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { pgFtsFindDupes } from "@/lib/search/pg-fts";
-import { isOfferAllowedForCountry } from "@/lib/country";
+import { isOfferAllowedForCountry, filterDealsForCountry } from "@/lib/country";
 import { usdToNgn } from "@/lib/utils";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
+import { getActiveBrowseProvider } from "@/lib/providers";
+import { getCategory } from "@/lib/data/categories";
 import JsonLd from "@/components/seo/JsonLd";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import SimilarProducts from "@/components/product/SimilarProducts";
+import FallbackCategoryRail from "@/components/product/FallbackCategoryRail";
+import type { Deal } from "@/types";
 
 /* Offers churn frequently (every ingest cycle adds + retires rows).
    ISR revalidate keeps the cached HTML fresh without re-rendering
@@ -381,6 +385,82 @@ export default async function ProductPage({ params }: PageProps) {
     return true;
   });
 
+  /* Fallback rail — when FTS finds no usable dupes, the rest of
+     the PDP would render as a hero + a blank wall. User report
+     May 2026: "shouldn't there always be similar items in the PDP
+     page?" Yes — always show SOMETHING below the hero so the page
+     doesn't feel abandoned.
+
+     Strategy (in order of preference):
+       1. Same-category deals, country-filtered (most relevant).
+       2. Trending deals across all categories (last resort — only
+          fires when the offer has no category_slug AND categorical
+          fallback returned nothing).
+
+     The category fetch runs against the active browse provider and
+     reuses the country filter we apply everywhere else, so a UK
+     visitor doesn't see Konga rows in their "More from Electronics"
+     fallback. Limit 8 matches SimilarProducts so the visual rhythm
+     stays consistent.
+
+     Skipped entirely when filteredDupes already has rows — that's
+     ~95% of PDPs (per the rate noted on the LiveAlternatives
+     removal comment) so the extra fetch only runs for the long
+     tail of products without DB-matched alternatives.
+
+     Cache key includes category + country so the fallback rail
+     stays per-country aware. 5-min TTL is tighter than the page's
+     1-hour ISR so the rail can't drift further than the page. */
+  let fallbackDeals: Deal[] = [];
+  if (filteredDupes.length === 0) {
+    const fetchFallbackCached = unstable_cache(
+      async (categorySlug: string | null, countryCode: string) => {
+        const provider = await getActiveBrowseProvider();
+        const deals = await provider.fetchDeals({
+          /* `categorySlug: undefined` falls through to "all" inside the
+             provider — which is exactly the trending-deals fallback we
+             want when the anchor has no category. */
+          categorySlug: categorySlug ?? undefined,
+          minDiscount:  0,
+          origin:       "all",
+        });
+        return deals;
+      },
+      ["pdp-fallback"],
+      { revalidate: 300, tags: ["pdp-fallback"] },
+    );
+    const raw = await fetchFallbackCached(offer.category_slug, country.code);
+    const countryFiltered = filterDealsForCountry(raw, country);
+
+    /* Exclude the anchor offer + any offer that's a same-store match
+       on title (covers the SKU-variant case where a merchant lists
+       the same display title at two prices). Same shape as the
+       dupes filter above so the fallback rail can't surface "this
+       same product" or a near-clone of it. */
+    const anchorTitleKey = normaliseTitle(offer.title);
+    fallbackDeals = countryFiltered
+      .filter((d) => d.id !== offer.offer_id)
+      .filter((d) => {
+        if (normaliseTitle(d.title) === anchorTitleKey && d.storeId === offer.store_id) {
+          return false;
+        }
+        return true;
+      })
+      /* Quality floor — drop very-low-confidence rows (extremely short
+         titles, prices that look counterfeit). Same gate /deals applies
+         on its initial pool. */
+      .filter((d) => d.title.length >= 10 && d.title.length <= 90)
+      .slice(0, 8);
+  }
+
+  /* Display label for the fallback section header. categories.ts owns
+     the canonical name ("Home & Kitchen" not "home"); fall back to a
+     plain capitalised slug when the slug isn't in the registry. */
+  const fallbackCategoryName = offer.category_slug
+    ? getCategory(offer.category_slug)?.name ??
+      offer.category_slug.charAt(0).toUpperCase() + offer.category_slug.slice(1)
+    : null;
+
   /* JSON-LD: Product schema (with offers) + BreadcrumbList. Google
      Rich Results use these for the price + availability badge in
      SERPs. Image, brand, category, price, currency, availability —
@@ -510,7 +590,7 @@ export default async function ProductPage({ params }: PageProps) {
           priceStats={priceStats}
         />
 
-        {filteredDupes.length > 0 && (
+        {filteredDupes.length > 0 ? (
           <section className="mt-12 sm:mt-16">
             <header className="mb-6 sm:mb-8">
               <h2 className="text-[22px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
@@ -522,7 +602,25 @@ export default async function ProductPage({ params }: PageProps) {
             </header>
             <SimilarProducts dupes={filteredDupes} countryCode={country.code} />
           </section>
-        )}
+        ) : fallbackDeals.length > 0 ? (
+          /* Fallback rail — no direct dupes for this product, so we
+             show same-category deals (or trending when category is
+             absent). Different header copy reflects that these
+             aren't direct alternatives, they're "more in this
+             space". Same masonry layout as SimilarProducts so the
+             rhythm of the page is unchanged. */
+          <section className="mt-12 sm:mt-16">
+            <header className="mb-6 sm:mb-8">
+              <h2 className="text-[22px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
+                {fallbackCategoryName ? `More ${fallbackCategoryName} deals` : "More deals to browse"}
+              </h2>
+              <p className="text-sm sm:text-base text-ink-2 mt-1.5">
+                We could not find direct alternatives for this product. Here are top picks {fallbackCategoryName ? `from ${fallbackCategoryName.toLowerCase()}` : "across the catalog"}.
+              </p>
+            </header>
+            <FallbackCategoryRail deals={fallbackDeals} />
+          </section>
+        ) : null}
 
         {/* Live deals rail removed (May 2026).
             Earlier this surface fetched /api/live-search on mount,
