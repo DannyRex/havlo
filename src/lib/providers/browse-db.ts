@@ -126,49 +126,99 @@ export const dbBrowseProvider: BrowseProvider = {
       q.sort === "price_desc" ? "price_desc" :
       "discount";
 
-    const PASS_A_MAX = 4000;
-    const PASS_B_MAX = 2000;
+    /* PostgREST hard-caps RPC responses at db-max-rows=1000 on the
+       Supabase project (verified May 2026 — .range(0, 5999) doesn't
+       override). So requesting p_max_rows=4000 silently returns 1000.
+       Knowing this, we split the fetch into THREE explicit passes,
+       each capped at 1000 by PostgREST. Total ~3000 rows after merge
+       + dedupe.
 
-    const passAArgs = {
+       Pass A — country-local pool (origin='local', country=X):
+                Returns up to 1000 rows of stores anchored to the
+                user's country. Top by discount-desc within local
+                pool. Guarantees ASOS / Currys / John Lewis for UK,
+                Konga / 3C Hub / Slot for NG, etc.
+
+       Pass B — cross-border pool (origin='intl', no country):
+                Returns up to 1000 rows of is_international=true
+                stores (AliExpress 4683 / DHgate 358 / Shein /
+                Banggood). NO country priority so cross-border is
+                guaranteed inclusion regardless of how big the
+                user's country pool is. THIS IS THE FIX for the
+                May 2026 "UK intl=0" bug.
+
+       Pass C — 0%-only freshness pool (zero_discount=true, country=X):
+                Returns up to 1000 rows of 0%-discount local stores
+                so HealthPlus / Ajebomarket / Supermart / Bitmarte
+                still surface in NG dropdown even though their rows
+                sort last in Pass A's discount-desc.
+
+       Pass A is unconditional. Pass B is unconditional (cross-border
+       is always relevant). Pass C only fires when the user's sort
+       allows 0% rows (sortIsDiscountBiased && userFloorAllowsZero),
+       same condition as the prior 0%-only Pass B. */
+    const PASS_MAX = 1000;
+
+    const passABase = {
       p_category:       q.categorySlug && q.categorySlug !== "all" ? q.categorySlug : null,
       p_min_discount:   typeof q.minDiscount === "number" && q.minDiscount > 0 ? q.minDiscount : 0,
       p_sort:           rpcSort,
       p_search:         q.search?.trim().replace(/[(),]/g, " ") || null,
-      p_origin:         q.origin && q.origin !== "all" ? q.origin : "all",
       p_store_ids:      q.stores && q.stores.length > 0 ? q.stores : null,
-      p_max_rows:       PASS_A_MAX,
+      p_max_rows:       PASS_MAX,
       p_zero_discount_only: false,
-      /* p_country (migration 0022) — scopes the RPC to a single
-         market's pool so AliExpress + cross-border volume can't
-         starve smaller national catalogs (NG 0%-only retailers
-         were the user-reported case). null = backward-compatible
-         global behaviour. */
-      p_country:        q.country ? q.country.toUpperCase() : null,
-    };
-    const passBArgs = {
-      ...passAArgs,
-      p_max_rows:           PASS_B_MAX,
-      p_zero_discount_only: true,
-      p_min_discount:       0, // override — Pass B ignores user floor
     };
 
-    /* Both RPC calls in parallel, plus the popularity record. */
-    const [passAResult, passBResult, popularity] = await Promise.all([
+    /* Pass A — country-local. Filter rows to is_international=false
+       so we only get anchored-local retailers. Country priority
+       inside the RPC then puts the user's country first. */
+    const passAArgs = {
+      ...passABase,
+      p_origin:  "local",
+      p_country: q.country ? q.country.toUpperCase() : null,
+    };
+
+    /* Pass B — cross-border. is_international=true rows, no country
+       filter, no country priority. AliExpress / DHgate / Shein /
+       Banggood etc. Top 1000 by discount-desc. */
+    const passBArgs = {
+      ...passABase,
+      p_origin:  "intl",
+      p_country: null,
+    };
+
+    /* Pass C — 0%-only local fallback. Surfaces pharmacy / grocery
+       feeds that ingest at retail price (discount_percent=0) and
+       would otherwise drop out of Pass A's discount-desc sort.
+       Conditional on sort being discount-biased + user allowing 0%. */
+    const passCArgs = {
+      ...passABase,
+      p_origin:  "local",
+      p_country: q.country ? q.country.toUpperCase() : null,
+      p_zero_discount_only: true,
+      p_min_discount: 0,
+    };
+    const runPassC = sortIsDiscountBiased && userFloorAllowsZero;
+
+    /* All three RPC calls in parallel, plus the popularity record. */
+    const [passAResult, passBResult, passCResult, popularity] = await Promise.all([
       supa.rpc("browse_deals", passAArgs),
-      runPassB ? supa.rpc("browse_deals", passBArgs) : Promise.resolve({ data: null, error: null }),
+      supa.rpc("browse_deals", passBArgs),
+      runPassC ? supa.rpc("browse_deals", passCArgs) : Promise.resolve({ data: null, error: null }),
       getPopularityRecord().catch(() => ({} as Record<string, number>)),
     ]);
 
-    /* Stop on first error, surface curated as fallback so the page
-       isn't blank if Supabase had a transient hiccup. Same recovery
-       posture as the previous fan-out. */
+    /* Stop on Pass A error (most critical). Pass B/C errors are
+       non-fatal — degraded pool is better than no pool. */
     if (passAResult.error) {
-      console.warn("[browse-db] browse_deals RPC error:", passAResult.error.message);
+      console.warn("[browse-db] browse_deals Pass A RPC error:", passAResult.error.message);
       return getCuratedDeals(q);
     }
-    if (runPassB && passBResult.error) {
-      console.warn("[browse-db] browse_deals (pass B) RPC error:", passBResult.error.message);
-      // Pass B failure is non-fatal — Pass A's data is still useful.
+    if (passBResult.error) {
+      console.warn("[browse-db] browse_deals Pass B RPC error:", passBResult.error.message);
+    }
+    if (runPassC && passCResult.error) {
+      console.warn("[browse-db] browse_deals Pass C RPC error:", passCResult.error.message);
     }
 
     const allRows: BestOfferRow[] = [];
@@ -183,6 +233,7 @@ export const dbBrowseProvider: BrowseProvider = {
     };
     merge(passAResult.data as unknown as BestOfferRow[] | null);
     merge(passBResult.data as unknown as BestOfferRow[] | null);
+    merge(passCResult.data as unknown as BestOfferRow[] | null);
 
     /* Drop offers whose URL points at Google Shopping (legacy SerpAPI
        ingest residue). Without SerpAPI to resolve, those clicks land
