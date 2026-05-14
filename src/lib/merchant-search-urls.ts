@@ -67,6 +67,15 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "ao":             { name: "AO.com",           searchUrl: (q) => `https://ao.com/search?q=${encodeURIComponent(q)}`,                                            homepage: "https://ao.com" },
   "boots":          { name: "Boots",            searchUrl: (q) => `https://www.boots.com/sitesearch?searchTerm=${encodeURIComponent(q)}`,                        homepage: "https://www.boots.com" },
   "marks-spencer":  { name: "Marks & Spencer",  searchUrl: (q) => `https://www.marksandspencer.com/s/q-${encodeURIComponent(q)}`,                                homepage: "https://www.marksandspencer.com" },
+  /* TODO(audit-may-2026): Selfridges' ?qz= is ignored — landing
+     page returns 88,699 unrelated catalog rows. CLI verification
+     blocked by their anti-bot (every curl 403s regardless of UA).
+     Needs browser-based verification through Claude in Chrome to
+     find the working URL pattern (likely ?q= or ?searchTerm= or
+     a path-based /search/{query}). Keeping the broken pattern
+     here for now rather than guess-fixing — the audit captures
+     the failure mode so users land on a clearly-broken state
+     instead of a subtly-wrong one. */
   "selfridges":     { name: "Selfridges",       searchUrl: (q) => `https://www.selfridges.com/GB/en/cat/?qz=${encodeURIComponent(q)}`,                           homepage: "https://www.selfridges.com" },
   "sports-direct":  { name: "Sports Direct",    searchUrl: (q) => `https://www.sportsdirect.com/searchresults.html?DescriptionFilter=${encodeURIComponent(q)}`, homepage: "https://www.sportsdirect.com" },
   "asos":           { name: "ASOS",             searchUrl: (q) => `https://www.asos.com/search/?q=${encodeURIComponent(q)}`,                                     homepage: "https://www.asos.com" },
@@ -157,6 +166,13 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
      parked GoDaddy "domain for sale" page. The real ZA storefront
      is on .co.za. */
   "outdoorphoto":     { name: "Outdoorphoto",    searchUrl: (q) => `https://www.outdoorphoto.co.za/catalogsearch/result/?q=${encodeURIComponent(q)}`, homepage: "https://www.outdoorphoto.co.za" },
+  /* Audit May 2026 row 27: storeId "al-ramil-al-abyad" had no entry
+     AND the smart fallback synthesised alramilalabyad.com which
+     NXDOMAINs. Probe May 2026 found the actual storefront at
+     alramil.ae (WordPress / WooCommerce — `?s=` is the search
+     param). The merchant's full name "Al Ramil Al Abyad" is their
+     trading name; the short domain is what's live. */
+  "al-ramil-al-abyad":{ name: "Al Ramil Al Abyad", searchUrl: (q) => `https://alramil.ae/?s=${encodeURIComponent(q)}`,                                homepage: "https://alramil.ae" },
   "mediamarkt":     { name: "MediaMarkt",    searchUrl: (q) => `https://www.mediamarkt.de/de/search.html?query=${encodeURIComponent(q)}`,         homepage: "https://www.mediamarkt.de" },
   "saturn":         { name: "Saturn",        searchUrl: (q) => `https://www.saturn.de/de/search.html?query=${encodeURIComponent(q)}`,             homepage: "https://www.saturn.de" },
   "otto":           { name: "Otto",          searchUrl: (q) => `https://www.otto.de/suche/${encodeURIComponent(q)}/`,                             homepage: "https://www.otto.de" },
@@ -206,6 +222,12 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   /* User-reported: storeName "Marks Electrical" was slugifying to
      markselectrical.com (404). Correct brand domain is
      markselectrical.co.uk. */
+  /* Marks Electrical: URL pattern itself is fine (200 OK in curl,
+     302 to non-www form). Audit reported "no result tiles render
+     in the rendered page" — likely a JS-SPA where the search
+     results render client-side after fetch. Real browsers see
+     results; the audit captured the empty-html-shell snapshot
+     before JS finished. Not a config bug; nothing to fix here. */
   "marks-electrical":           { name: "Marks Electrical",    searchUrl: (q) => `https://www.markselectrical.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.markselectrical.co.uk" },
   /* Currys business storefront — same brand, same search path as
      consumer Currys. Curated alias so the search URL works
@@ -301,6 +323,11 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
 
   /* — ZA ─────────────────────────────────────────── */
   "superbalist":                { name: "Superbalist",       searchUrl: (q) => `https://superbalist.com/search?keyword=${encodeURIComponent(q)}`,            homepage: "https://superbalist.com" },
+  /* TODO(audit-may-2026): Makro's ?text= is ignored — landing
+     returns the full "All Categories (100,000 products)" view.
+     Anti-bot blocks every curl + WebFetch attempt, so the right
+     URL pattern needs browser verification. Common Hybris/SAP
+     storefronts use ?q= or /search/?text=, neither verified yet. */
   "makro":                      { name: "Makro",             searchUrl: (q) => `https://www.makro.co.za/search?text=${encodeURIComponent(q)}`,               homepage: "https://www.makro.co.za" },
   "yuppiechef":                 { name: "Yuppiechef",        searchUrl: (q) => `https://www.yuppiechef.com/shop.htm?searchValue=${encodeURIComponent(q)}`,    homepage: "https://www.yuppiechef.com" },
   "checkers":                   { name: "Checkers",          searchUrl: (q) => `https://www.checkers.co.za/c-2256/All-Departments?q=${encodeURIComponent(q)}`, homepage: "https://www.checkers.co.za" },
