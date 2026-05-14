@@ -99,8 +99,16 @@ where country is null
 -- ── Part 3: refresh product_best_offers to expose store_country ──
 --   Surfaces stores.country in the view so browse_deals can filter
 --   without a per-call extra join. Same row-shape PLUS the new
---   column; existing consumers ignore the additional field, no
---   breakage.
+--   column appended AT THE END — Postgres's CREATE OR REPLACE VIEW
+--   only allows additive column changes, never reordering or
+--   renaming. Adding `store_country` in the middle of the SELECT
+--   list (between `is_international` and `store_logo_url`) trips
+--   Postgres into thinking we're renaming `store_logo_url` and
+--   raises:
+--     ERROR: cannot change name of view column "store_logo_url"
+--            to "store_country"
+--   Order doesn't matter for the RPC below (it references columns
+--   by name) so appending is the right call.
 create or replace view product_best_offers as
 select
   p.id                   as product_id,
@@ -119,8 +127,8 @@ select
   o.source_country,
   s.name                 as store_name,
   s.is_international,
-  s.country              as store_country,
-  s.logo_url             as store_logo_url
+  s.logo_url             as store_logo_url,
+  s.country              as store_country
 from products p
 join lateral (
   select * from offers
