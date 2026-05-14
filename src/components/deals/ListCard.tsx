@@ -103,7 +103,11 @@ export default function ListCard({ deal, linkHref }: Props) {
      retailers so Currys / Argos / Walmart / etc. search-fallback
      URLs surface as "from" prices, matching the existing Amazon
      treatment. See isStoreSearchUrl() for the detection rules. */
-  const isPriceFromOnly = isStoreSearchUrl(deal.url);
+  /* Precomputed by /api/deals (May 2026 payload trim) — fall back
+     to the old client-side detection for callers passing full Deal
+     objects with `url` populated. */
+  const isPriceFromOnly = (deal as Deal & { isPriceFromOnly?: boolean }).isPriceFromOnly
+    ?? (deal.url ? isStoreSearchUrl(deal.url) : false);
 
   /* Three-step cross-border check (matches MasonryCard exactly).
      Step 2 — the global-intl short-circuit — fixes AliExpress /

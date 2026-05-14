@@ -77,7 +77,31 @@ const VALID_ORIGINS = new Set<OriginFilter>(["all", "local", "intl"]);
    matches. iPhone is universally recognised across all seven
    markets and reliably has stock to surface. */
 
-export default function DealFeed() {
+/* Server-passed initial state — lets /deals/page.tsx do the FIRST
+   /api/deals fetch on the server so the initial HTML carries
+   real cards instead of a skeleton. The first paint shows content
+   immediately; the skeleton only flashes on subsequent client-side
+   filter changes. Big wall-clock UX win on poor networks. */
+interface DealFeedProps {
+  initialItems?:        Deal[];
+  initialTotal?:        number;
+  initialHasMore?:      boolean;
+  initialOriginCounts?: { all: number; local: number; intl: number };
+  /* Aggregate of stores in the current filter context, for the Stores
+     dropdown. Renamed from `initialStores` to `initialStoreOptions`
+     to avoid colliding with the local `initialStores` const that
+     parses the URL ?stores=… into a Set<string> for the selected-
+     stores state below. */
+  initialStoreOptions?: Array<{ id: string; name: string; count: number }>;
+}
+
+export default function DealFeed({
+  initialItems,
+  initialTotal,
+  initialHasMore,
+  initialOriginCounts,
+  initialStoreOptions,
+}: DealFeedProps = {}) {
   /* Read initial filter state from URL params so /deals?category=phones
      (linked from homepage CategoryGrid tiles) lands on the correct
      filtered view instead of the default "all". */
@@ -146,11 +170,23 @@ export default function DealFeed() {
       ? (initialOriginRaw as OriginFilter)
       : "local";
 
-  const [items, setItems]       = useState<Deal[]>([]);
-  const [total, setTotal]       = useState(0);
-  const [hasMore, setHasMore]   = useState(false);
-  const [loading, setLoading]   = useState(true);
+  /* Initial state seeded from props (when page.tsx pre-fetched on the
+     server) so first paint shows real cards, not the skeleton. When
+     props are absent (legacy callers, dev paths) we fall back to the
+     old empty-array + loading=true behaviour. */
+  const [items, setItems]       = useState<Deal[]>(initialItems ?? []);
+  const [total, setTotal]       = useState(initialTotal ?? 0);
+  const [hasMore, setHasMore]   = useState(initialHasMore ?? false);
+  /* loading=false on first render IF we have server-passed items.
+     The first useEffect would otherwise re-fetch immediately and
+     show the skeleton anyway; we'll suppress that with a ref. */
+  const [loading, setLoading]   = useState(!initialItems);
   const [loadingMore, setLoadingMore] = useState(false);
+  /* Track whether we've consumed the SSR'd initial fetch yet. The
+     filter-change effect below skips its first run when this is
+     unset AND initialItems was provided — so the user doesn't see
+     a content → skeleton → content flicker on first paint. */
+  const hasConsumedInitialRef = useRef(!initialItems);
 
   const [category, setCategory] = useState(initialCategory);
   const [tier, setTier]         = useState<DiscountTier>(initialTier);
@@ -168,14 +204,14 @@ export default function DealFeed() {
   const [searchDebounced, setSearchDebounced] = useState(initialSearch);
   const [origin, setOrigin]     = useState<OriginFilter>(initialOrigin);
   const [originCounts, setOriginCounts] =
-    useState<{ all: number; local: number; intl: number }>();
+    useState<{ all: number; local: number; intl: number } | undefined>(initialOriginCounts);
   /* Selected store IDs from the StoreFilter popover. Persists to URL
      via buildParams (?stores=argos,currys). */
   const [selectedStores, setSelectedStores] = useState<Set<string>>(initialStores);
   /* All stores currently available in the filtered pool. Comes back
      in the /api/deals response alongside items + counts. Empty until
      the first fetch lands. */
-  const [storeOptions, setStoreOptions] = useState<StoreOption[]>([]);
+  const [storeOptions, setStoreOptions] = useState<StoreOption[]>(initialStoreOptions ?? []);
 
   /* Mobile-only view-mode toggle (grid masonry vs list rows). Tablet +
      desktop always show masonry — toggle UI is hidden via sm:hidden.
@@ -247,6 +283,17 @@ export default function DealFeed() {
 
   // Reset + first page on filter change
   useEffect(() => {
+    /* SSR'd-content optimisation: skip the very first effect run when
+       page.tsx pre-fetched and passed initialItems. The state is
+       already populated; re-fetching here would clear items + show
+       the skeleton, defeating the SSR-prefetch entirely. From the
+       SECOND run onward (any filter change) we behave as before. */
+    if (!hasConsumedInitialRef.current) {
+      hasConsumedInitialRef.current = true;
+      offsetRef.current = PAGE_SIZE;
+      return;
+    }
+
     const mySeq = ++fetchSeqRef.current;
     setLoading(true);
     setItems([]);

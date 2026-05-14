@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
+import { isStoreSearchUrl } from "@/lib/utils";
 import type { OriginFilter, SortOption } from "@/types";
 
 /* No `export const dynamic = "force-dynamic"` here.
@@ -251,8 +252,58 @@ export async function GET(req: NextRequest) {
       : qualifyingByOrigin;
 
     const total = all.length;
-    const items = all.slice(offset, offset + limit);
+    const sliced = all.slice(offset, offset + limit);
     const hasMore = offset + limit < total;
+
+    /* Trim per-item payload before serialising. The full Deal shape
+       carries 21 fields totalling ~1.9KB per row — but the cards only
+       read 14, and the single biggest field is `url` (Google Shopping
+       URLs run 1000+ chars per row, ~55% of the per-item payload).
+
+       Cards link to the PDP first (`/p/{id}`), not directly to the
+       merchant, so the URL itself is never read on the deals surface.
+       The only consumer of `url` was `isStoreSearchUrl(deal.url)` to
+       decide whether to show a "from $X" prefix — pre-compute that
+       boolean server-side and ship just the bit.
+
+       Net per-item: ~1.9KB → ~500 bytes (75% reduction). 24-item
+       page: 57KB → ~14KB on the wire. Big win on poor networks +
+       Vercel egress. */
+    const items = sliced.map((d) => ({
+      id:              d.id,
+      title:           d.title,
+      /* `description` shipped as empty string — duplicates `title`
+         in 99%+ of rows and isn't read by any card surface. Keeps
+         the Deal type satisfied without bloating the wire. */
+      description:     "",
+      category:        d.category,
+      categorySlug:    d.categorySlug,
+      storeId:         d.storeId,
+      storeName:       d.storeName,
+      originalPrice:   d.originalPrice,
+      salePrice:       d.salePrice,
+      discountPercent: d.discountPercent,
+      currency:        d.currency,
+      imageUrl:        d.imageUrl,
+      imageGradient:   d.imageGradient,
+      imageEmoji:      d.imageEmoji,
+      /* `url` intentionally empty — Google Shopping URLs are 1KB+
+         each and the cards link to PDP first (`/p/{id}`), not
+         directly to the merchant. The full URL lives on the
+         offer record fetched by the PDP itself. */
+      url:             "",
+      expiresAt:       null,
+      isHot:           false,
+      isFeatured:      false,
+      tags:            [],
+      saves:           0,
+      clicks:          0,
+      postedAt:        d.postedAt,
+      /* Pre-computed boolean — cards read this instead of running
+         isStoreSearchUrl(deal.url) themselves (which can't work
+         anyway now that url is empty). */
+      isPriceFromOnly: isStoreSearchUrl(d.url),
+    }));
 
     /* Cache window bumped May 2026 from s-maxage=60/swr=300 to
        s-maxage=600/swr=3600 — Supabase egress crossed the free-tier

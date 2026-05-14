@@ -172,7 +172,14 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
      the cheapest reference we have for the product family, not a
      guarantee for the specific item the user lands on. The "from "
      prefix tells the user that explicitly. */
-  const isPriceFromOnly = isStoreSearchUrl(deal.url);
+  /* `isPriceFromOnly` arrives precomputed from /api/deals (May 2026
+     payload trim — `deal.url` is no longer shipped to cards because
+     the click model routes to PDP first, and Google Shopping URLs
+     run 1KB+ each). Fall back to the old client-side detection for
+     callers (TrendingDeals, MasonryGrid) that still pass full Deal
+     objects with a url field. */
+  const isPriceFromOnly = (deal as Deal & { isPriceFromOnly?: boolean }).isPriceFromOnly
+    ?? (deal.url ? isStoreSearchUrl(deal.url) : false);
 
   /* Cross-border classification — three-step decision:
        1. If inferStoreCountry returns a country, store is local
