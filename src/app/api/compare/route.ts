@@ -71,10 +71,35 @@ export async function GET(req: NextRequest) {
   try {
     const country = getServerCountry();
     let result: SearchOutput;
-    /* Primary path: FTS over the user's query. */
-    if (q.trim()) {
+    /* Resolution priority — pid first when present.
+
+       When pid is in the URL the user has explicitly clicked a
+       specific product (PDP "Compare prices" CTA, chip click, etc.).
+       That's an EXPLICIT signal — much stronger than FTS-on-title
+       which is a guess. Use the pid to anchor the comparison
+       directly; only fall through to FTS when pid lookup misses
+       (catalog shift between chip generation and click).
+
+       Why this ordering matters: FTS scoring on noisy/short titles
+       can pick the wrong anchor by latching onto a single shared
+       token. User report May 2026: searching "Hank Luxury -
+       Bluetooth Key & Item Finder For Smartp" with the correct pid
+       in the URL returned "Burgundy Luxury Shoe For Men" as anchor
+       (FTS matched on the "luxury" token + the actual Hank Luxury
+       product was lower-ranked in FTS results, so the pid backstop
+       never fired because FTS was non-empty). Pid-first eliminates
+       this whole class of bug.
+
+       FTS still runs as the fallback for queries that arrive
+       WITHOUT a pid (homepage search, paste-a-link results, manual
+       /compare?q= URL entry). */
+    if (pid) {
+      result = await pgFtsFindByProductId(pid);
+    }
+    if ((!pid || result!.mode === "empty") && q.trim()) {
       result = await pgFtsFindSimilar(q);
-    } else {
+    }
+    if (!result! || result!.mode === "empty" && !q.trim() && !pid) {
       result = { mode: "empty", query: "", suggestions: [] };
     }
 
@@ -121,14 +146,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    /* Backstop: if we have a pid AND the FTS path returned empty,
-       fetch the product directly. This catches chip clicks where
-       the catalog shifted between the chip-pool generation and the
-       click (orphan cleanup, signature merge, etc.) so users always
-       see the comparison the chip promised them. */
-    if (pid && result.mode === "empty") {
-      result = await pgFtsFindByProductId(pid);
-    }
+    /* (Pid resolution moved ABOVE the FTS path — see comment near
+       the top of this try block. The pid-as-fallback pattern that
+       used to live here is now pid-as-primary.) */
     const filtered = country.code === "ng" ? result : filterByCountry(result, country);
     return NextResponse.json(filtered, { headers });
   } catch (err) {

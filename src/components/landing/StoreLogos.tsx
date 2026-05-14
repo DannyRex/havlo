@@ -280,8 +280,13 @@ export default function StoreLogos({ country }: { country: import("@/lib/country
           <p className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-3">
             Searched on Havlo
           </p>
+          {/* Suffix appears for every market including Nigeria —
+              the NG-specific empty-string branch was a regression
+              from an earlier "Nigerians know their stores" framing
+              that's no longer the active copy. Audit May 2026
+              flagged the missing "in Nigeria" tail on /ng. */}
           <h2 className="text-[22px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight max-w-xl mx-auto">
-            We check the stores you already know{country.code === "ng" ? "" : ` in ${country.name}`}.
+            We check the stores you already know in {country.name}.
           </h2>
         </div>
 

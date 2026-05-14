@@ -27,7 +27,7 @@
      SimilarProducts a thin masonry around MasonryCard. */
 
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Script from "next/script";
 
 import { getCountry } from "@/lib/country";
@@ -273,9 +273,33 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 /* ── Page ─────────────────────────────────────────────────────────── */
 
+/* Synthetic-id prefixes (mirrors src/lib/pdp-url.ts's
+   isSyntheticId). When a user lands on /[country]/p/aliex-{id}
+   (or paapi-/konga-/serp-) directly — typed URL, bookmark, share
+   link from before the May-2026 routing fix — the offers table
+   has no row for that ID and fetchOffer returns null, which used
+   to call notFound() and return a hard 404.
+
+   Live-search synthetic IDs aren't persisted (live-search persist
+   is paused for Supabase egress), so we can't recover the
+   product data without re-running the SerpAPI / AliExpress query.
+   Best-effort UX: redirect to /deals so the visitor sees real
+   products instead of a 404 dead end. The route's metadata stays
+   noindex so Google doesn't have us indexing dead URLs anyway. */
+const SYNTHETIC_PDP_PREFIXES = ["aliex-", "paapi-", "konga-", "serp-"];
+
 export default async function ProductPage({ params }: PageProps) {
   const country = getCountry(params.country);
   if (!COUNTRIES.some((c) => c.code === country.code)) notFound();
+
+  /* Synthetic-id soft redirect — see SYNTHETIC_PDP_PREFIXES
+     comment. User report May 2026: /ng/p/aliex-1005007312017504
+     returned a hard 404 when typed/shared as a URL even though
+     the link-generation path (pdpUrlForOffer) routes those
+     correctly to /p/live. */
+  if (SYNTHETIC_PDP_PREFIXES.some((p) => params.id.startsWith(p))) {
+    redirect(`/${country.code}/deals`);
+  }
 
   const offer = await fetchOffer(params.id);
   if (!offer) notFound();

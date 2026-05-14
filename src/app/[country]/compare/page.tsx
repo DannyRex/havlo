@@ -213,6 +213,22 @@ function CompareContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialKey, initialQuery, initialPid]);
 
+  /* PDP back-link breadcrumb. PdpBackLink reads sessionStorage to
+     route "Back to results" → the originating compare URL when the
+     user arrived via a client-side <Link> click (document.referrer
+     doesn't update for App Router internal navigations). Write our
+     full URL on every relevant change so the most recent compare
+     view is always the back-target. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      sessionStorage.setItem(
+        "havlo:lastCompareUrl",
+        JSON.stringify({ url: window.location.href, ts: Date.now() }),
+      );
+    } catch { /* private mode or quota exceeded — silent no-op */ }
+  }, [initialQuery, initialPid, initialKey]);
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
       <SearchBar

@@ -329,18 +329,29 @@ export default function ProductHero({ offer, countryCode, totalStores, priceStat
             (curated Amazon slugs like 'amazon-us-iphone-15-pro-max')
             return empty from the backstop and are harmless — the
             primary FTS path is still the main route for those. */}
-        <Link
-          href={(() => {
-            const params = new URLSearchParams({ q: offer.title, mode: "similar" });
-            if (offer.productId) params.set("pid", offer.productId);
-            return `/${countryCode}/compare?${params.toString()}`;
-          })()}
-          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-border-strong text-ink font-medium text-[14px] hover:bg-surface-2 transition-colors mb-4"
-        >
-          {typeof totalStores === "number" && totalStores > 1
-            ? <>Compare prices across {totalStores} stores</>
-            : <>Compare prices across stores</>}
-        </Link>
+        {/* Hide the CTA entirely when totalStores <= 1. Clicking
+            a "Compare prices" button only to land on a comparison
+            of one store is a dead-end UX — the price-bar above
+            already says "1 store · watching for more · only
+            listing" so the user knows there's nothing to compare.
+            Show the CTA only when there's a real comparison
+            available (N >= 2). User audit May 2026 flagged the
+            "Compare prices across stores" label (no count) as
+            inconsistent with the "across N stores" format used
+            for N >= 2 — hiding rather than relabelling avoids
+            the doubly-misleading "compare 1 store" framing. */}
+        {typeof totalStores === "number" && totalStores > 1 && (
+          <Link
+            href={(() => {
+              const params = new URLSearchParams({ q: offer.title, mode: "similar" });
+              if (offer.productId) params.set("pid", offer.productId);
+              return `/${countryCode}/compare?${params.toString()}`;
+            })()}
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-border-strong text-ink font-medium text-[14px] hover:bg-surface-2 transition-colors mb-4"
+          >
+            Compare prices across {totalStores} stores
+          </Link>
+        )}
 
         {/* Price-vs-market visual signal. Replaces the previous
             "Last checked / Store country" tiles + the standalone
