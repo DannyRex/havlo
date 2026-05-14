@@ -342,12 +342,82 @@ function CompareContent() {
       })()}
 
       {/* ── Loading skeletons ── */}
+      {/* Mirrors the real "similar" mode layout so the transition
+          from skeleton → content doesn't reflow the page (anchor
+          hero card with image + text + price + nested store rows,
+          then a cheaper-alternatives grid below). Previous skeleton
+          was a flat list of bare rectangles that didn't match the
+          anchor card's structure or the dupes grid that appears
+          underneath, so the page jumped when content loaded.
+
+          User report May 2026: "compare page skeleton not in line
+          with page content." */}
       {loading && (
-        <div className="mt-10 max-w-3xl mx-auto space-y-3">
-          <div className="skeleton h-28 rounded-2xl" />
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="skeleton h-16 rounded-xl" />
-          ))}
+        <div className="mt-8 sm:mt-10" aria-hidden="true">
+          {/* Anchor hero card — same outer shell as the real one
+              (max-w-3xl, rounded-2xl, p-4 sm:p-6) so the bounding
+              box stays put when real content takes over. */}
+          <div className="max-w-3xl mx-auto mb-8 sm:mb-10">
+            <div className="rounded-2xl border border-border bg-surface p-4 sm:p-6 overflow-hidden">
+              <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
+                {/* Product image placeholder — w-full on mobile (h-40),
+                    fixed 112×112 on sm+ to match the real image cell. */}
+                <div className="skeleton w-full sm:w-28 h-40 sm:h-28 rounded-xl flex-shrink-0" />
+                <div className="flex-1 w-full space-y-2.5">
+                  {/* Eyebrow row ("Your pick" + brand). */}
+                  <div className="flex items-center gap-2">
+                    <div className="skeleton h-3.5 w-16 rounded" />
+                    <div className="skeleton h-3 w-12 rounded" />
+                  </div>
+                  {/* Title — 2 lines. */}
+                  <div className="skeleton h-4 sm:h-5 w-full rounded" />
+                  <div className="skeleton h-4 sm:h-5 w-2/3 rounded" />
+                  {/* Price + savings line. */}
+                  <div className="flex items-baseline gap-3 pt-1">
+                    <div className="skeleton h-6 w-24 rounded" />
+                    <div className="skeleton h-3 w-32 rounded" />
+                  </div>
+                  {/* Alternatives savings caption. */}
+                  <div className="skeleton h-3 w-40 rounded" />
+                </div>
+              </div>
+              {/* Store rows section inside the anchor card. */}
+              <div className="mt-5 pt-5 border-t border-border">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="skeleton h-3 w-28 rounded" />
+                  <div className="skeleton h-3 w-24 rounded hidden sm:block" />
+                </div>
+                <div className="space-y-1.5">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-border">
+                      <div className="skeleton w-10 h-10 rounded-lg shrink-0" />
+                      <div className="flex-1 space-y-1.5 min-w-0">
+                        <div className="skeleton h-3.5 w-28 rounded" />
+                        <div className="skeleton h-3 w-40 rounded" />
+                      </div>
+                      <div className="skeleton h-5 w-16 rounded shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Cheaper-alternatives grid placeholder — matches the
+              dupes section below the anchor card. */}
+          <div className="max-w-5xl mx-auto">
+            <div className="skeleton h-5 w-44 rounded mb-2" />
+            <div className="skeleton h-3 w-64 rounded mb-6" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="space-y-2">
+                  <div className="skeleton aspect-[4/5] sm:aspect-[5/6] rounded-2xl" />
+                  <div className="skeleton h-3 w-1/2 rounded" />
+                  <div className="skeleton h-4 w-full rounded" />
+                  <div className="skeleton h-3 w-1/3 rounded" />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -644,7 +714,7 @@ function CompareContent() {
                         Wirecutter / NYT pattern of putting the
                         disclosure right where commercial action happens. */}
                     <p className="mt-2 text-[10px] text-ink-3/85 leading-relaxed">
-                      Some links earn Havlo a commission. The price you pay doesn&apos;t change, and we never adjust ranking based on who pays us.{" "}
+                      The price you pay doesn&apos;t change, and we never adjust ranking based on who pays us.{" "}
                       <Link href={`/how-we-make-money`} className="underline underline-offset-2 hover:text-ink-2 transition-colors">
                         How this works
                       </Link>
