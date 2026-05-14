@@ -73,6 +73,17 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "matalan":        { name: "Matalan",          searchUrl: (q) => `https://www.matalan.co.uk/search?q=${encodeURIComponent(q)}`,                                 homepage: "https://www.matalan.co.uk" },
 
   // ── Amazon marketplaces ────────────────────────────────────────
+  /* Audit May 2026: storeId "amazon-uk" was missing from this table
+     (key was only "amazon-co-uk" matching the domain, not the DB
+     slug). Pass-2 substring matching in merchantSearchUrl then
+     matched "amazon-uk".includes("amazon") and routed the user to
+     amazon.com with the US affiliate tag (havlo-20). Audit row 18
+     caught it: UK product clicked, US Amazon served. Fix: register
+     BOTH slugs — amazon-uk matches the DB convention used by
+     ingest + affiliate.ts; amazon-co-uk preserved for legacy
+     callers (cashback.ts, older ingest rows). Both route to the
+     same UK marketplace + UK affiliate tag. */
+  "amazon-uk":      { name: "Amazon UK",  searchUrl: (q) => `https://www.amazon.co.uk/s?k=${encodeURIComponent(q)}`, homepage: "https://www.amazon.co.uk" },
   "amazon-co-uk":   { name: "Amazon UK",  searchUrl: (q) => `https://www.amazon.co.uk/s?k=${encodeURIComponent(q)}`, homepage: "https://www.amazon.co.uk" },
   "amazon-de":      { name: "Amazon DE",  searchUrl: (q) => `https://www.amazon.de/s?k=${encodeURIComponent(q)}`,    homepage: "https://www.amazon.de" },
   "amazon-ae":      { name: "Amazon AE",  searchUrl: (q) => `https://www.amazon.ae/s?k=${encodeURIComponent(q)}`,    homepage: "https://www.amazon.ae" },
@@ -107,6 +118,16 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "ajio":           { name: "Ajio",          searchUrl: (q) => `https://www.ajio.com/search/?text=${encodeURIComponent(q)}`,                      homepage: "https://www.ajio.com" },
   "tatacliq":       { name: "Tata CLiQ",     searchUrl: (q) => `https://www.tatacliq.com/search/?searchCategory=all&text=${encodeURIComponent(q)}`, homepage: "https://www.tatacliq.com" },
   "takealot":       { name: "Takealot",      searchUrl: (q) => `https://www.takealot.com/all?qsearch=${encodeURIComponent(q)}`,                   homepage: "https://www.takealot.com" },
+  /* Audit May 2026 row 33: storeId "cash-converters" had no entry,
+     so /api/go's smart fallback synthesised cashconverters.com which
+     redirects to a global splash page (no search). The real ZA
+     storefront is on .co.za. */
+  "cash-converters":  { name: "Cash Converters", searchUrl: (q) => `https://www.cashconverters.co.za/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.cashconverters.co.za" },
+  /* Audit May 2026 row 35: storeId "outdoorphoto" had no entry, so
+     the smart fallback synthesised outdoorphoto.com which is a
+     parked GoDaddy "domain for sale" page. The real ZA storefront
+     is on .co.za. */
+  "outdoorphoto":     { name: "Outdoorphoto",    searchUrl: (q) => `https://www.outdoorphoto.co.za/catalogsearch/result/?q=${encodeURIComponent(q)}`, homepage: "https://www.outdoorphoto.co.za" },
   "mediamarkt":     { name: "MediaMarkt",    searchUrl: (q) => `https://www.mediamarkt.de/de/search.html?query=${encodeURIComponent(q)}`,         homepage: "https://www.mediamarkt.de" },
   "saturn":         { name: "Saturn",        searchUrl: (q) => `https://www.saturn.de/de/search.html?query=${encodeURIComponent(q)}`,             homepage: "https://www.saturn.de" },
   "otto":           { name: "Otto",          searchUrl: (q) => `https://www.otto.de/suche/${encodeURIComponent(q)}/`,                             homepage: "https://www.otto.de" },
@@ -189,7 +210,12 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
      structure. */
 
   /* — US ─────────────────────────────────────────── */
-  "fashion-nova":               { name: "Fashion Nova",      searchUrl: (q) => `https://www.fashionnova.com/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.fashionnova.com" },
+  /* Audit May 2026 row 21: bare /search?q=... returns a 302 to
+     /en-gb without preserving the query — users land on the UK
+     homepage with no search context. Forcing the /en-us locale
+     prefix bypasses the geo-redirect and keeps the query intact.
+     Most Fashion Nova traffic from Havlo is US/cross-border anyway. */
+  "fashion-nova":               { name: "Fashion Nova",      searchUrl: (q) => `https://www.fashionnova.com/en-us/search?q=${encodeURIComponent(q)}`,      homepage: "https://www.fashionnova.com/en-us" },
   "old-navy":                   { name: "Old Navy",          searchUrl: (q) => `https://oldnavy.gap.com/browse/search.do?searchText=${encodeURIComponent(q)}`, homepage: "https://oldnavy.gap.com" },
   "gap":                        { name: "Gap",               searchUrl: (q) => `https://www.gap.com/browse/search.do?searchText=${encodeURIComponent(q)}`,  homepage: "https://www.gap.com" },
   "abercrombie-fitch":          { name: "Abercrombie & Fitch", searchUrl: (q) => `https://www.abercrombie.com/shop/us/search?searchTerm=${encodeURIComponent(q)}`, homepage: "https://www.abercrombie.com" },
@@ -221,7 +247,12 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "wickes":                     { name: "Wickes",            searchUrl: (q) => `https://www.wickes.co.uk/search?text=${encodeURIComponent(q)}`,              homepage: "https://www.wickes.co.uk" },
 
   /* — DE ─────────────────────────────────────────── */
-  "cotton-on":                  { name: "Cotton On",         searchUrl: (q) => `https://cottonon.com/US/search/?q=${encodeURIComponent(q)}`,                 homepage: "https://cottonon.com" },
+  /* Audit May 2026 row 26: hardcoded /US/ forces every user to the
+     US storefront regardless of country. Drop the locale segment so
+     Cotton On's edge router picks the right storefront for the
+     visitor (cottonon.com routes to /AU/ /US/ /NZ/ /ZA/ /UK/ by
+     IP). Lands on the right region without us picking wrong. */
+  "cotton-on":                  { name: "Cotton On",         searchUrl: (q) => `https://cottonon.com/search/?q=${encodeURIComponent(q)}`,                    homepage: "https://cottonon.com" },
 
   /* — AE ─────────────────────────────────────────── */
   "lulu-hypermarket":           { name: "LuLu Hypermarket",  searchUrl: (q) => `https://www.luluhypermarket.com/en-ae/search/?q=${encodeURIComponent(q)}`,    homepage: "https://www.luluhypermarket.com" },
