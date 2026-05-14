@@ -17,6 +17,7 @@ import { displayStoreName } from "@/lib/store-display";
 import InfoTip from "@/components/ui/InfoTip";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { USD_FX, formatLocal, inferStoreCountry, isGlobalIntlStore, type Country } from "@/lib/country";
+import { pdpUrlForDeal } from "@/lib/pdp-url";
 import type { Deal } from "@/types";
 
 /* Convert any Deal price (NGN or USD) into the user's preferred
@@ -147,7 +148,13 @@ export default function ListCard({ deal, linkHref }: Props) {
          merchant info and a "View at {Merchant}" CTA — the actual
          /api/go affiliate-wrapped outbound now fires at that CTA
          click instead of this card click. Matches MasonryCard. */
-      href={linkHref ?? `/${country.code}/p/${deal.id}`}
+      /* Default href uses pdpUrlForDeal so synthetic IDs from live
+         search providers (aliex-, paapi-, konga-, serp-) route to
+         /p/live instead of 404ing the standard /p/[id] route. The
+         live-search persist path is paused, so those IDs never
+         resolve in the offers table. linkHref override still wins
+         where callers need a custom destination. */
+      href={linkHref ?? pdpUrlForDeal(country.code, deal)}
       aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${displayStore}. Open details.`}
       className="group flex gap-3 items-start p-2.5 rounded-2xl border border-border bg-surface hover:border-border-strong hover:shadow-card transition-all"
     >

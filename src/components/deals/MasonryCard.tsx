@@ -29,6 +29,7 @@ import {
 import { getCashbackForStore } from "@/lib/cashback";
 import InfoTip from "@/components/ui/InfoTip";
 import { track } from "@/lib/analytics";
+import { pdpUrlForDeal } from "@/lib/pdp-url";
 import type { Deal } from "@/types";
 
 interface Props {
@@ -240,7 +241,13 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
          Net effect: one extra hop for the user, more page views per
          session, and the affiliate chokepoint still fires on every
          actual purchase-intent click. */
-      href={linkHref ?? `/${country.code}/p/${deal.id}`}
+      /* Default href uses pdpUrlForDeal so synthetic IDs from live
+         search providers (aliex-, paapi-, konga-, serp-) route to
+         /p/live instead of 404ing the standard /p/[id] route. The
+         live-search persist path is paused, so those IDs never
+         resolve in the offers table. linkHref override still wins
+         where callers need a custom destination (rare). */
+      href={linkHref ?? pdpUrlForDeal(country.code, deal)}
       aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${displayStore}. Open details.`}
       className="group block"
       onClick={() => {

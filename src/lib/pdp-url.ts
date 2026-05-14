@@ -14,12 +14,28 @@
 import type { Deal } from "@/types";
 import type { StoreOffer } from "@/lib/search";
 
-/** True when the offer was sourced from the live SerpAPI provider
-    (synthetic id) or has no id at all (sniffed external page). */
+/** True when the offer was sourced from a live search provider
+    (synthetic id) or has no id at all (sniffed external page).
+
+    Every live SearchProvider mints its OWN prefix and none of those
+    rows land in the offers table because live-search persist is
+    paused (see src/app/api/live-search/route.ts for the egress
+    context). So all four provider prefixes 404 the standard
+    /p/[id] route — they MUST route to /p/live instead.
+
+    User report May 2026: /ng/p/aliex-1005007312017504 returned 404.
+    Same shape would have hit paapi-* (Amazon PA-API) and konga-*
+    affiliate rows for any user who tried.
+
+    serp-, aliex-, paapi-, konga- — keep this list in sync with the
+    search providers in src/lib/providers/search-*.ts. */
+const SYNTHETIC_PROVIDER_PREFIXES = ["serp-", "aliex-", "paapi-", "konga-"];
+
 function isSyntheticId(id: string | null | undefined): boolean {
   if (!id) return true;
-  // SerpAPI-provider rows from /api/live-search start with "serp-"
-  if (id.startsWith("serp-")) return true;
+  for (const prefix of SYNTHETIC_PROVIDER_PREFIXES) {
+    if (id.startsWith(prefix)) return true;
+  }
   // Synthetic dupe IDs use a colon separator (storeId:productKey)
   if (id.includes(":")) return true;
   return false;
