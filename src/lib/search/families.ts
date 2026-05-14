@@ -48,7 +48,33 @@ export const PRODUCT_FAMILIES: Record<string, string[]> = {
   tv:          ["smart tv", "qled", "led tv", "uhd tv", "4k tv", "oled tv", "oled smart"],
   watch:       ["smartwatch", "smart watch", "apple watch", "garmin", "fitbit", "fossil"],
   camera:      ["dslr", "mirrorless", "camcorder", "gopro"],
-  footwear:    ["air force", "air jordan", "adidas samba", "nike dunk", "crocs", "stan smith", "yeezy", "ultra boost", "running shoe", "running shoes", "sneaker", "sneakers", "trainer", "trainers"],
+  /* Sneaker SUB-families. Listed BEFORE the catch-all "footwear"
+     family so a "Nike Dunk Low" title detects as nike_dunk and a
+     "Nike Air Force 1" title detects as nike_af1 — different
+     families, so familiesIncompatible() blocks the cross-model
+     dupe leak. Without these sub-families, both detected as just
+     "footwear" and a Nike Dunk anchor pulled in Air Force 1
+     trainers as "alternatives" (audit May 2026 caught this on
+     /uk/compare?q=Nike+Dunk+Low+Black/White+Panda).
+
+     Order matters within the sneaker block too. Specific model
+     tokens BEFORE the generic brand+silhouette tokens so the
+     match latches onto the most specific signal. */
+  nike_dunk:        ["nike dunk", "dunk low", "dunk high", "dunk mid"],
+  nike_af1:         ["air force 1", "air force one", "af1", "air force"],
+  nike_air_max:     ["air max 90", "air max 95", "air max 97", "air max 1", "air max"],
+  nike_jordan:      ["air jordan", "jordan 1", "jordan 3", "jordan 4", "jordan 11"],
+  nike_blazer:      ["blazer mid", "blazer low", "blazer 77"],
+  nike_cortez:      ["cortez"],
+  adidas_samba:     ["samba og", "samba"],
+  adidas_yeezy:     ["yeezy boost", "yeezy"],
+  adidas_stansmith: ["stan smith"],
+  adidas_ultraboost: ["ultra boost", "ultraboost", "ultra-boost"],
+  adidas_gazelle:   ["gazelle"],
+  /* Catch-all footwear for generic shoes that don't hit a specific
+     sub-family. Crocs / Birkenstocks / etc. and anything that just
+     reads "running shoe" / "trainer". */
+  footwear:    ["crocs", "birkenstock", "running shoe", "running shoes", "sneaker", "sneakers", "trainer", "trainers"],
   mouse:       ["mx master", "g502", "gaming mouse", "wireless mouse", "computer mouse"],
   keyboard:    ["mechanical keyboard", "gaming keyboard", "magic keyboard"],
   appliance:   ["instant pot", "pressure cooker", "slow cooker", "air fryer", "stand mixer", "kitchenaid", "blender", "rice cooker", "toaster"],

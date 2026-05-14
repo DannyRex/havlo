@@ -495,6 +495,17 @@ export default async function ProductPage({ params }: PageProps) {
        dupes filter above so the fallback rail can't surface "this
        same product" or a near-clone of it. */
     const anchorTitleKey = normaliseTitle(offer.title);
+    /* Looser price band than the dupes pipeline (0.25-3x) since
+       the fallback rail is a "browse more in this space" affordance,
+       not a direct comparison. Anything within 0.1x-10x of anchor
+       reads as plausibly the same shopping context. Audit May 2026
+       caught a ₦15K key-finder PDP showing ₦720K Samsung phones in
+       its fallback rail (~50x ratio) — visually jarring even for an
+       exploration rail. The 0.1-10x band drops obvious mismatches
+       while still surfacing legit accessory↔primary or budget↔
+       premium variations within a category. */
+    const FALLBACK_FLOOR_RATIO   = 0.10;
+    const FALLBACK_CEILING_RATIO = 10.00;
     fallbackDeals = countryFiltered
       .filter((d) => d.id !== offer.offer_id)
       .filter((d) => {
@@ -507,6 +518,20 @@ export default async function ProductPage({ params }: PageProps) {
          titles, prices that look counterfeit). Same gate /deals applies
          on its initial pool. */
       .filter((d) => d.title.length >= 10 && d.title.length <= 90)
+      /* Price-band gate — anchor-relative band so a cheap anchor
+         doesn't get padded with luxury items and vice versa. Only
+         applies when both sides have a usable price (anchorPriceNgn
+         is defined above by this point in the file). */
+      .filter((d) => {
+        if (anchorPriceNgn <= 0 || d.salePrice <= 0) return true;
+        /* Convert d.salePrice to NGN if the deal is USD-priced.
+           Same shape utility usdToNgn is already imported above
+           and used by the dupes pipeline. */
+        const dealNgn = d.currency === "USD" ? usdToNgn(d.salePrice) : d.salePrice;
+        if (dealNgn < anchorPriceNgn * FALLBACK_FLOOR_RATIO)   return false;
+        if (dealNgn > anchorPriceNgn * FALLBACK_CEILING_RATIO) return false;
+        return true;
+      })
       .slice(0, 8);
   }
 

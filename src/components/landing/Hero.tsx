@@ -226,7 +226,15 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
           {/* Uses the server-passed country (not useCountry) so the
               phrase is present in SSR — useCountry wouldn't resolve
               until hydration. */}
-          <span className="sm:hidden">Paste a link or search any product. We find it cheaper in {countryPhrase(countryCode, countryName)}.</span>
+          {/* Same sentence structure across breakpoints — was
+              divergent ("We find it cheaper" mobile vs "Havlo finds
+              cheaper alternatives across the stores you already
+              know" desktop). Audit May 2026 flagged the mismatch.
+              Now both read as parallel "Havlo finds it cheaper" /
+              "Havlo finds cheaper alternatives" with the longer
+              tail kept for desktop where there's space for the
+              "stores you already know" framing. */}
+          <span className="sm:hidden">Paste a link or search any product. Havlo finds it cheaper in {countryPhrase(countryCode, countryName)}.</span>
           <span className="hidden sm:inline">Paste a link or search any product. Havlo finds cheaper alternatives across the stores you already know in {countryPhrase(countryCode, countryName)}.</span>
         </p>
 

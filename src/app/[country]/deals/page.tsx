@@ -155,7 +155,25 @@ export default async function DealsPage({
     <>
       <JsonLd data={breadcrumb} />
       <Suspense>
+        {/* `key={country.code}` forces React to UN-mount + RE-mount
+            DealFeed when the visitor switches countries. Without
+            this, DealFeed's filter state (initialised from URL via
+            useState on first render) survives the navigation and
+            silently keeps the old country's category / origin /
+            store-filter selections. The audit May 2026 caught the
+            visible symptom: switching from /uk/deals?category=
+            phones to NG landed on /ng/deals?origin=local with
+            ?category=phones silently stripped because state
+            survived the country swap, then wrote back the old
+            origin via the URL-sync useEffect.
+
+            Re-mount cost: a brief skeleton flicker during the
+            country swap (the new country's SSR'd initial fetch
+            still seeds the freshly-mounted DealFeed, so it's
+            faster than a full client cold-start). Worth it for
+            correct state semantics. */}
         <DealFeed
+          key={country.code}
           initialItems={initial?.items}
           initialTotal={initial?.total}
           initialHasMore={initial?.hasMore}
