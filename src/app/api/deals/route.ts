@@ -1,10 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { isStoreSearchUrl } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
-import type { OriginFilter, SortOption } from "@/types";
+import type { Deal, OriginFilter, SortOption } from "@/types";
+
+/* Cached pool fetch — the heaviest part of /api/deals.
+ *
+ * Why: load-more was 5–8s per page (and slowing on each subsequent
+ * page) because every offset request re-ran the full provider.fetchDeals
+ * pipeline: 2x browse_deals RPC calls pulling up to 6000 rows, JS
+ * filter + dedupe, sort. The slice(offset, offset + limit) at the
+ * end is the only thing that varies per page — the underlying pool
+ * is identical for offset=0, 24, 48, 72, … of the same query.
+ *
+ * Wrapping the fetch in unstable_cache means the first page warms a
+ * 5-minute cache entry keyed on (categorySlug, minDiscount=0, sort,
+ * search) — and EVERY subsequent page request for that query reuses
+ * the same Deal[] array in memory. Page 2+ becomes ~50ms instead
+ * of 6s. The country filter + origin bucketing + storesAggregate
+ * still runs per request because country is per-visitor and origin
+ * + storesAggregate need to honor the user's selection.
+ *
+ * Cache key intentionally OMITS country, origin, and offset:
+ *   - country: filtered downstream (one cached pool serves UK + US visitors)
+ *   - origin: filtered downstream (one cached pool serves all/local/intl)
+ *   - offset: the slice happens AFTER the cache (different page = same pool)
+ *
+ * 5-minute TTL aligns with browse_deals' freshness window. The deals
+ * grid changes when scrapers re-run (every 30 min in current cadence),
+ * so 5 min of staleness is invisible to users.
+ */
+const fetchPoolCached = unstable_cache(
+  async (params: {
+    categorySlug?: string;
+    sort:          SortOption;
+    search?:       string;
+  }): Promise<Deal[]> => {
+    const provider = await getActiveBrowseProvider();
+    return provider.fetchDeals({
+      categorySlug: params.categorySlug,
+      /* Intentionally NOT passing the user's minDiscount — see route
+         body for the broad/qualifying split rationale. */
+      minDiscount:  0,
+      sort:         params.sort,
+      search:       params.search,
+      origin:       "all",
+    });
+  },
+  ["deals-pool"],
+  { revalidate: 300, tags: ["deals-pool"] },
+);
 
 /* No `export const dynamic = "force-dynamic"` here.
 
@@ -126,15 +174,16 @@ export async function GET(req: NextRequest) {
        the default tier; this change just makes that data visible
        in the dropdown for higher tiers too. */
     const userMinDiscount = minDiscount ? parseInt(minDiscount, 10) : 0;
-    const allRawAcrossOrigins = await provider.fetchDeals({
+    /* Pool fetch goes through fetchPoolCached (defined at module top)
+       so all paginations of the same query share one warm RPC result.
+       Pre-cache: each load-more was 5-8s (full RPC pipeline per offset).
+       Post-cache: page 2+ is ~50ms (memory hit). The country filter +
+       origin bucketing + storesAggregate below run per request because
+       those are visitor-specific concerns. */
+    const allRawAcrossOrigins = await fetchPoolCached({
       categorySlug: category,
-      /* Intentionally NOT passing the user's minDiscount — see
-         comment above. Pass 0 to force browse-db's Pass B to fire
-         even when the user has a stricter tier picked. */
-      minDiscount: 0,
       sort,
       search,
-      origin: "all",
     });
 
     /* Country store filter — pure-function, runs over Deal[] */
