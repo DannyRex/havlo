@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { unstable_cache } from "next/cache";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
@@ -16,43 +15,76 @@ import type { Deal, OriginFilter, SortOption } from "@/types";
  * end is the only thing that varies per page — the underlying pool
  * is identical for offset=0, 24, 48, 72, … of the same query.
  *
- * Wrapping the fetch in unstable_cache means the first page warms a
- * 5-minute cache entry keyed on (categorySlug, minDiscount=0, sort,
- * search) — and EVERY subsequent page request for that query reuses
- * the same Deal[] array in memory. Page 2+ becomes ~50ms instead
- * of 6s. The country filter + origin bucketing + storesAggregate
- * still runs per request because country is per-visitor and origin
- * + storesAggregate need to honor the user's selection.
+ * Plain in-memory Map cache (NOT Next.js unstable_cache): I tried
+ * unstable_cache first but it didn't help in production — likely
+ * because the route is auto-detected as dynamic (searchParams +
+ * cookies reads) which interacts oddly with Next 14's data-cache
+ * registration for module-level wrapped functions. A plain Map is
+ * dumb-simple and provably effective: same Vercel function instance
+ * = cache hit, period.
+ *
+ * Per-instance trade-off: Vercel auto-scales, so different instances
+ * have separate caches. But Vercel also reuses instances for ~5 min
+ * after each request, so a user paginating through 20 pages of /uk/
+ * deals almost always hits the same warm instance for pages 2-N.
+ * Cross-user cache hits depend on instance reuse; worst case each
+ * cold instance does one heavy fetch then caches.
  *
  * Cache key intentionally OMITS country, origin, and offset:
  *   - country: filtered downstream (one cached pool serves UK + US visitors)
  *   - origin: filtered downstream (one cached pool serves all/local/intl)
  *   - offset: the slice happens AFTER the cache (different page = same pool)
  *
- * 5-minute TTL aligns with browse_deals' freshness window. The deals
- * grid changes when scrapers re-run (every 30 min in current cadence),
- * so 5 min of staleness is invisible to users.
+ * 5-minute TTL aligns with browse_deals' freshness window (scrapers
+ * re-run every 30 min, so 5 min of staleness is invisible to users).
  */
-const fetchPoolCached = unstable_cache(
-  async (params: {
-    categorySlug?: string;
-    sort:          SortOption;
-    search?:       string;
-  }): Promise<Deal[]> => {
-    const provider = await getActiveBrowseProvider();
-    return provider.fetchDeals({
-      categorySlug: params.categorySlug,
-      /* Intentionally NOT passing the user's minDiscount — see route
-         body for the broad/qualifying split rationale. */
-      minDiscount:  0,
-      sort:         params.sort,
-      search:       params.search,
-      origin:       "all",
+interface PoolCacheEntry {
+  data:     Deal[];
+  expires:  number;
+}
+const POOL_CACHE = new Map<string, PoolCacheEntry>();
+const POOL_TTL_MS = 5 * 60 * 1000;
+
+async function fetchPoolCached(params: {
+  categorySlug?: string;
+  sort:          SortOption;
+  search?:       string;
+}): Promise<Deal[]> {
+  /* Stable key — JSON.stringify omits undefined fields so absent
+     category/search produces the same key as explicitly-undefined.
+     Sort is always defined (server defaults to "relevance"). */
+  const key = JSON.stringify(params);
+  const now = Date.now();
+
+  const cached = POOL_CACHE.get(key);
+  if (cached && cached.expires > now) return cached.data;
+
+  const provider = await getActiveBrowseProvider();
+  const data = await provider.fetchDeals({
+    categorySlug: params.categorySlug,
+    /* Intentionally NOT passing the user's minDiscount — see route
+       body for the broad/qualifying split rationale. */
+    minDiscount:  0,
+    sort:         params.sort,
+    search:       params.search,
+    origin:       "all",
+  });
+
+  POOL_CACHE.set(key, { data, expires: now + POOL_TTL_MS });
+
+  /* Opportunistic eviction — every Nth set, drop expired entries to
+     keep the Map from growing unbounded under freeform-search load.
+     N=20 keeps amortized cost low without leaking. forEach avoids
+     the for-of iterator that needs downlevelIteration in this
+     project's tsconfig (target=es2017). */
+  if (POOL_CACHE.size > 20) {
+    POOL_CACHE.forEach((v, k) => {
+      if (v.expires <= now) POOL_CACHE.delete(k);
     });
-  },
-  ["deals-pool"],
-  { revalidate: 300, tags: ["deals-pool"] },
-);
+  }
+
+  return data;
+}
 
 /* No `export const dynamic = "force-dynamic"` here.
 
