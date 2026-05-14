@@ -5,7 +5,7 @@ import Hero from "@/components/landing/Hero";
 import TrendingDeals from "@/components/landing/TrendingDeals";
 import CashbackTeaser from "@/components/landing/CashbackTeaser";
 import CategoryGrid from "@/components/landing/CategoryGrid";
-import StoreLogos, { getTotalStoreCount } from "@/components/landing/StoreLogos";
+import StoreLogos, { getStoreCountForCountry } from "@/components/landing/StoreLogos";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import CTA from "@/components/landing/CTA";
 import RefreshOnInterval from "@/components/ui/RefreshOnInterval";
@@ -138,12 +138,27 @@ export default function HomePage({ params }: { params: { country: string } }) {
   ]);
 
   /* Hero trust pill ("Live · scanning prices across N stores")
-     uses the TOTAL store count across every market — the user's
-     home roster under-represents Havlo's actual coverage and the
-     pill is meant to signal app-wide scope, not the local marquee
-     length. The per-country marquee below still uses
-     getStoreCountForCountry. */
-  const storeCount = getTotalStoreCount();
+     uses the PER-COUNTRY roster count so it matches the marquee
+     below and the country selector's implicit scope. User report
+     May 2026 (country-awareness audit): "87 stores pill hardcoded
+     across all markets — needs to read per-market store count
+     from the same source the country selector uses."
+
+     Previous version called getTotalStoreCount() (deduped 87 across
+     every market) on the theory that the per-country roster
+     under-represents Havlo's coverage. But showing the same 87 on
+     every homepage made the headline credibility signal feel
+     synthetic — and contradicted the per-country deals counts
+     immediately below the hero (UK shows 1,921 / 738 / 2,659 etc.,
+     so a flat 87 stores reads as inconsistent).
+
+     The ROSTERS in StoreLogos.tsx are hand-curated per country
+     (NG=22, UK=22, US=21, DE=11, AE=12, IN=11, ZA=10). They are
+     the same dataset the marquee renders. If the live DB has more
+     stores than the roster (audit showed UK ~32 distinct stores
+     in DB vs 22 in roster), upgrade ROSTERS rather than swap this
+     to a DB query — keeps a single source of truth. */
+  const storeCount = getStoreCountForCountry(country.code);
 
   return (
     <>

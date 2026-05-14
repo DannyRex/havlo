@@ -97,11 +97,20 @@ export function CountryProvider({ initialCode, children }: Props) {
          (server-rendered components served from CDN cache, client
          bundle pinned to the old country in some surfaces).
 
-         New behaviour:
+         Current behaviour:
            1. If the URL has a country segment (/ng/deals, /uk/compare,
               etc.), REWRITE that segment to the new country and
               navigate. The /[country] route param is the source of
               truth so this swaps the entire page context.
+
+              SEARCH PARAMS preserved (May 2026 user report from the
+              country-awareness audit: "Country switch loses URL
+              state. I was on /ng/deals?category=beauty&minDiscount=20
+              &sort=newest&origin=local, picked UK from the selector,
+              landed on /uk/deals?origin=local — category,
+              minDiscount, sort all silently stripped."). Users
+              comparing the same category across markets shouldn't
+              have to re-apply every filter after each swap.
            2. If no country segment is in the URL (rare — legal
               pages, the bare /), do a hard reload via
               window.location.reload() to bust any stale RSC payload
@@ -110,7 +119,13 @@ export function CountryProvider({ initialCode, children }: Props) {
       const segments = pathname.split("/");
       if (segments[1] && COUNTRY_CODES.has(segments[1])) {
         segments[1] = normalized;
-        router.push(segments.join("/") || `/${normalized}`);
+        const newPath = segments.join("/") || `/${normalized}`;
+        /* window.location.search includes the leading "?" or is
+           "" when no params present, so concatenation is safe in
+           both cases. The current-search read happens at click
+           time so the very-latest URL state wins. */
+        const currentSearch = typeof window !== "undefined" ? window.location.search : "";
+        router.push(`${newPath}${currentSearch}`);
       } else if (typeof window !== "undefined") {
         window.location.reload();
       } else {

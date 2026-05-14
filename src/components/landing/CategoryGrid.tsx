@@ -4,8 +4,7 @@ import { ArrowUpRight } from "lucide-react";
 import { categories } from "@/lib/data/categories";
 import CategoryTileLink from "./CategoryTileLink";
 import { getActiveBrowseProvider } from "@/lib/providers";
-import { filterDealsForCountry, inferStoreCountry, isGlobalIntlStore, type Country } from "@/lib/country";
-import type { Deal } from "@/types";
+import { filterDealsForCountry, type Country } from "@/lib/country";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
   BeautyIcon, SportsIcon, EarbudsIcon, AppliancesIcon, ElectronicsIcon,
@@ -57,7 +56,6 @@ const fetchCategoryCounts = (country: Country) =>
   unstable_cache(
     async (): Promise<Record<string, number>> => {
       const provider = await getActiveBrowseProvider();
-      const isNG = country.code === "ng";
       const slugs = browsable.map((c) => c.slug);
 
       const perCategory = await Promise.all(
@@ -70,20 +68,27 @@ const fetchCategoryCounts = (country: Country) =>
         ),
       );
 
-      const isLocalToUser = (d: Deal): boolean => {
-        const sc = inferStoreCountry(d.storeId, d.storeName);
-        if (sc !== null) return sc.toLowerCase() === country.code.toLowerCase();
-        if (isGlobalIntlStore(d.storeId, d.storeName)) return false;
-        return d.currency === country.currency;
-      };
+      /* Count rule (May 2026): tile count = countryFiltered.length
+         for EVERY market (was: intl-only for non-NG, all for NG).
 
+         The old non-NG branch counted only cross-border rows
+         (`!isLocalToUser`), which produced inflated tile counts
+         for markets with small native catalogs but rich
+         cross-border allowlists. User report from the country-
+         awareness audit: "ZA homepage advertises ~600 Electronics
+         deals while /za/deals only has 21 total". Root cause:
+         tile counted ~600 ZA-intl Electronics (AliExpress + DHgate
+         after the cross-border-pool fixes), but the tile click
+         landed on /deals which defaulted to the local tab showing
+         5 ZA-anchored Electronics.
+
+         Fix here is the count side. The tile href (below) is also
+         updated to set ?origin=all so the LANDING page matches
+         the tile count — single number, end-to-end consistent. */
       const counts: Record<string, number> = {};
       for (let i = 0; i < slugs.length; i++) {
         const countryFiltered = filterDealsForCountry(perCategory[i], country);
-        const finalCount = isNG
-          ? countryFiltered.length
-          : countryFiltered.filter((d) => !isLocalToUser(d)).length;
-        counts[slugs[i]] = finalCount;
+        counts[slugs[i]] = countryFiltered.length;
       }
       return counts;
     },
@@ -158,7 +163,14 @@ export default async function CategoryGrid({ country }: { country: Country }) {
             return (
               <CategoryTileLink
                 key={cat.id}
-                href={`/${country.code}/deals?category=${cat.slug}`}
+                /* origin=all forces the deals page to skip its
+                   default "local"-tab initialOrigin so the user
+                   lands on the SAME count we showed on the tile.
+                   Without this the tile's all-pool count would
+                   contradict the post-click local-tab count and
+                   reproduce the "ZA homepage says 600 Electronics
+                   but /za/deals shows 21" mismatch. */
+                href={`/${country.code}/deals?category=${cat.slug}&origin=all`}
                 category={cat.slug}
                 position={idx}
                 className="group relative block aspect-[4/5] sm:aspect-[5/6] overflow-hidden rounded-2xl border border-border bg-surface hover:border-ink/40 hover:bg-surface-2 transition-all duration-300"
