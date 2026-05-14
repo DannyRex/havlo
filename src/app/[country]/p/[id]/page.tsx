@@ -28,9 +28,7 @@
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import Script from "next/script";
-import { ChevronLeft } from "lucide-react";
 
 import { getCountry } from "@/lib/country";
 import { unstable_cache } from "next/cache";
@@ -47,6 +45,7 @@ import JsonLd from "@/components/seo/JsonLd";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import SimilarProducts from "@/components/product/SimilarProducts";
 import FallbackCategoryRail from "@/components/product/FallbackCategoryRail";
+import PdpBackLink from "@/components/product/PdpBackLink";
 import type { Deal } from "@/types";
 
 /* Offers churn frequently (every ingest cycle adds + retires rows).
@@ -571,17 +570,16 @@ export default async function ProductPage({ params }: PageProps) {
       />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        {/* Back link — to deals by default since most PDP visits arrive
-            from /deals. Cheap navigation context that beats a bare
-            browser-back button (which may not exist on direct PDP
-            landings from a share link or SERP). */}
-        <Link
-          href={`/${country.code}/deals`}
-          className="inline-flex items-center gap-1 text-xs sm:text-sm text-ink-3 hover:text-ink transition-colors mb-5 sm:mb-7"
-        >
-          <ChevronLeft size={14} aria-hidden="true" />
-          Back to deals
-        </Link>
+        {/* Back link — context-aware via document.referrer.
+            Defaults to /[country]/deals (most PDP visits arrive
+            from there). Upgrades to the referrer URL when the
+            visitor came from /compare so they land back on the
+            exact search results view they left — query, filters,
+            and pagination preserved. Beats a bare browser-back
+            button (which may not exist on direct PDP landings
+            from a share link or SERP). See PdpBackLink for the
+            referrer matching logic. */}
+        <PdpBackLink countryCode={country.code} />
 
         <ProductHero
           offer={heroData}
