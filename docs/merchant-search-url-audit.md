@@ -313,12 +313,34 @@ For each merchant in the tables above:
 
 3. Classify the destination as exactly one of:
 
+   > **Important — what counts as success.** The URLs you're
+   > auditing here are the **merchant search fallback** (priority
+   > 2 from the resolution chain above). Their ideal outcome is
+   > a search-results page populated with the query — NOT a
+   > product detail page (PDP). The resolver only falls through
+   > to a merchant search URL when it couldn't resolve to a PDP
+   > via passthrough / cache_hit / serpapi_resolved. So `ok`
+   > here means "the fallback works correctly": the merchant's
+   > own search returns real results for the query. PDP-landing
+   > is tested separately in the PDP probe step below.
+
+   - **`pdp`** — The search URL redirected directly to a product
+     detail page (PDP), not a search results page. This is
+     unusual but happens when the merchant's search recognises a
+     SKU-like query and auto-routes (e.g. Argos's search redirects
+     a known SKU to its PDP). Treat this as a SUPER-ok outcome —
+     the user gets the best possible landing without us having to
+     go through the SerpAPI relay-resolution path.
+
    - **`ok`** — Real search results page for `lawn mower` (or
      whatever query is in the URL). The page shows a grid of
      products related to the query. The URL in the address bar
      either matches what you opened or is a clean redirect to the
      merchant's canonical search URL (e.g. with extra tracking
-     params appended).
+     params appended). **Note:** this is a search results page,
+     NOT a product detail page. A PDP destination would be even
+     better but it's not what this URL family targets — the
+     resolver tries hard to reach PDPs via other means first.
 
    - **`empty`** — Merchant's search page LOADS correctly but
      returns zero results for `lawn mower`. The URL pattern is
