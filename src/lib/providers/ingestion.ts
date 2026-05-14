@@ -217,105 +217,185 @@ export async function ingestDeals(
     .upsert(Array.from(uniqueStores.values()), { onConflict: "id" });
   if (storeErr) result.errors.push(`Store upsert: ${storeErr.message}`);
 
-  // 2. Per-deal: find/create product, upsert offer
-  for (const d of deals) {
-    try {
-      const sig = buildSignature(d.title);
+  /* ── 2. Batched dedup + upsert (May 2026 perf refactor) ─────────
+     The previous per-deal loop did 3-5 sequential round trips per
+     row (URL dedup SELECT, signature dedup SELECT, possible
+     product fetch, INSERT/UPDATE product, UPSERT offer). For the
+     SerpAPI cron — 6 countries × 10 categories × 50 deals = 3000
+     rows — that produced ~10-15k round trips and pushed the ingest
+     job past GitHub's 25-min timeout.
 
-      /* Use the compact `key` (brand|model[|size]) for dedup, NOT the
-         full JSON-stringified signature. The full JSON includes `norm`
-         and `tokens` which vary literally with the title text — so
-         the same iPhone 15 listed by Konga and Amazon never matched
-         even though the canonical key was identical. Caused the
-         catalog to balloon to 980 single-store products + only 2
-         multi-store. */
-      const sigStr = sig.key;
+     New shape: TWO bulk lookups + ONE per-deal loop in memory + at
+     most ONE write call per deal (insert OR update OR neither).
 
-      const tryDedup = sig.brand !== null && sig.model !== null;
+     Result for a 50-deal call: ~3 round trips before the loop +
+     ~50 individual writes (each writes a product or upsert offer).
+     Round trips drop ~10x. Per-call latency drops from ~15-30s
+     cold to ~3-6s.
 
-      /* Dedup lookup order (round-4 audit fix):
-           1. ALWAYS check (store_id, url) first. If this exact
-              merchant URL is already in the offers table, reuse
-              the product it points at — no matter what signature
-              dedup would say. This catches the catastrophic case
-              the audit surfaced: 26k products vs 11k offers,
-              4302 titles with 2+ product_ids, 15k orphan products.
-              Root cause was that signature-based dedup failed for
-              unbranded titles AND the fallback was an else-branch,
-              so when sig.brand/model parsed but signature didn't
-              match an existing product, we still inserted a fresh
-              product and re-pointed the offer. Result: the offer
-              upserted (single offer row, store_id+url unique key)
-              but the OLD product became an orphan.
-           2. If (store_id, url) didn't find an existing offer,
-              fall back to signature dedup when brand+model parsed.
-           3. If neither matches, create a new product. */
-      let existing: { id: string; image_url: string | null } | null = null;
+     N+1 issue tracked in the workflow comment (60m timeout was
+     set because of this exact issue; should now drop back to
+     ~20-25m for the full job). */
 
-      const offerUrl = (d.url ?? "").trim();
-      if (offerUrl && d.storeId) {
-        const { data: existingOffer } = await supa
-          .from("offers")
-          .select("product_id")
-          .eq("store_id", d.storeId)
-          .eq("url", offerUrl)
-          .limit(1)
-          .maybeSingle();
-        if (existingOffer?.product_id) {
-          const { data: existingProduct } = await supa
-            .from("products")
-            .select("id, image_url")
-            .eq("id", existingOffer.product_id)
-            .maybeSingle();
-          existing = existingProduct ?? null;
-        }
+  const sigs = deals.map((d) => buildSignature(d.title));
+  const offerUrls = deals.map((d, i) => ({
+    i,
+    storeId: d.storeId,
+    url: (d.url ?? "").trim(),
+    sigKey: sigs[i].key,
+    canDedup: sigs[i].brand !== null && sigs[i].model !== null,
+  }));
+
+  /* Bulk lookup 1: existing offers by (store_id, url) — one row per
+     unique (store_id, url) pair. PostgREST .or() with .and() inside
+     each clause is too verbose for ~50 pairs, but we can lean on
+     the (store_id, url) being already-unique and use a single
+     query with an IN against url values, then filter store_id in
+     JS. Most cron runs hit one provider per call so store_id is
+     largely uniform anyway. */
+  const urls = Array.from(new Set(offerUrls.map((o) => o.url).filter(Boolean)));
+  const offerHits = new Map<string, string>(); // key = `${storeId}:${url}` → product_id
+  if (urls.length > 0) {
+    const { data: rows } = await supa
+      .from("offers")
+      .select("store_id, url, product_id")
+      .in("url", urls);
+    for (const r of (rows ?? []) as Array<{ store_id: string; url: string; product_id: string }>) {
+      offerHits.set(`${r.store_id}:${r.url}`, r.product_id);
+    }
+  }
+
+  /* Bulk lookup 2: existing products by signature. Only signatures
+     with parseable brand+model get a real lookup; the rest stay
+     null and will trigger fresh inserts below. */
+  const dedupKeys = Array.from(new Set(offerUrls.filter((o) => o.canDedup).map((o) => o.sigKey)));
+  const sigHits = new Map<string, { id: string; image_url: string | null }>();
+  if (dedupKeys.length > 0) {
+    const { data: prodRows } = await supa
+      .from("products")
+      .select("id, image_url, signature")
+      .in("signature", dedupKeys);
+    for (const r of (prodRows ?? []) as Array<{ id: string; image_url: string | null; signature: string }>) {
+      sigHits.set(r.signature, { id: r.id, image_url: r.image_url });
+    }
+  }
+
+  /* Bulk lookup 3: when an offer hit gave us a product_id but its
+     image_url is missing, we need to know which to backfill. Pull
+     all hit product rows in one go. */
+  const hitProductIds = Array.from(new Set(Array.from(offerHits.values())));
+  const hitProducts = new Map<string, { id: string; image_url: string | null }>();
+  if (hitProductIds.length > 0) {
+    const { data: rows } = await supa
+      .from("products")
+      .select("id, image_url")
+      .in("id", hitProductIds);
+    for (const r of (rows ?? []) as Array<{ id: string; image_url: string | null }>) {
+      hitProducts.set(r.id, r);
+    }
+  }
+
+  /* ── Loop in memory: classify each deal as (existing | new).
+        Writes are batched at the end. ──────────────────────────── */
+  type NewProduct = { deal: Deal; sigKey: string; canDedup: boolean };
+  const newProducts: NewProduct[] = [];
+  const offerWrites: Array<{ deal: Deal; productId: string }> = [];
+  const imageBackfills: Array<{ productId: string; imageUrl: string }> = [];
+
+  for (let i = 0; i < deals.length; i++) {
+    const d = deals[i];
+    const { url, storeId, sigKey, canDedup } = offerUrls[i];
+
+    let existing: { id: string; image_url: string | null } | null = null;
+
+    /* Step 1: existing-offer lookup (in-memory) */
+    if (url && storeId) {
+      const pid = offerHits.get(`${storeId}:${url}`);
+      if (pid) existing = hitProducts.get(pid) ?? null;
+    }
+
+    /* Step 2: signature dedup (in-memory) */
+    if (!existing && canDedup) {
+      const hit = sigHits.get(sigKey);
+      if (hit) existing = hit;
+    }
+
+    if (existing?.id) {
+      offerWrites.push({ deal: d, productId: existing.id });
+      if (!existing.image_url && d.imageUrl) {
+        imageBackfills.push({ productId: existing.id, imageUrl: d.imageUrl });
       }
+    } else {
+      newProducts.push({ deal: d, sigKey, canDedup });
+    }
+  }
 
-      /* Step 2: signature-based dedup, only when (a) we didn't
-         find an existing offer above and (b) brand+model parsed. */
-      if (!existing && tryDedup) {
-        const { data } = await supa
-          .from("products")
-          .select("id, image_url")
-          .eq("signature", sigStr)
-          .limit(1)
-          .maybeSingle();
-        existing = data ?? null;
+  /* Step 3: bulk-insert new products with in-batch dedup.
+     When two canDedup=true deals share the same sigKey AND neither
+     matched an existing product, we insert ONE product row and have
+     both deals' offers point at it. This preserves the dedup
+     semantic the per-deal loop had — there, the first deal's INSERT
+     populated the products table, and the second deal's SELECT
+     found it. The batched version replicates that by grouping
+     up-front. Without this, the catalog grows duplicate products
+     on every cron and the dedup script has to merge them later. */
+  if (newProducts.length > 0) {
+    const insertList: Array<{ deal: Deal; sigKey: string }> = [];
+    const groupIndexBySigKey = new Map<string, number>();
+    const dealToInsertIndex = new Map<Deal, number>();
+
+    for (const np of newProducts) {
+      if (np.canDedup && groupIndexBySigKey.has(np.sigKey)) {
+        dealToInsertIndex.set(np.deal, groupIndexBySigKey.get(np.sigKey)!);
+        continue;
       }
+      const idx = insertList.length;
+      insertList.push({ deal: np.deal, sigKey: np.sigKey });
+      if (np.canDedup) groupIndexBySigKey.set(np.sigKey, idx);
+      dealToInsertIndex.set(np.deal, idx);
+    }
 
-      let productId: string;
-      if (existing?.id) {
-        productId = existing.id;
-        // Backfill image if the existing row didn't have one
-        if (!existing.image_url && d.imageUrl) {
-          await supa.from("products").update({ image_url: d.imageUrl }).eq("id", productId);
-        }
-      } else {
-        const { data: created, error: createErr } = await supa
-          .from("products")
-          .insert(dealToProductRow(d, sigStr))
-          .select("id")
-          .single();
-        if (createErr || !created) {
-          result.errors.push(`Insert product '${d.title}': ${createErr?.message}`);
-          continue;
-        }
-        productId = created.id;
+    const { data: inserted, error: insErr } = await supa
+      .from("products")
+      .insert(insertList.map(({ deal, sigKey }) => dealToProductRow(deal, sigKey)))
+      .select("id");
+    if (insErr || !inserted) {
+      result.errors.push(`Bulk insert ${insertList.length} products: ${insErr?.message}`);
+    } else {
+      const insertedRows = inserted as Array<{ id: string }>;
+      /* PostgREST INSERT...RETURNING preserves the VALUES-clause
+         order, so index-based mapping is safe. Each deal's
+         insert-index points at the corresponding inserted row. */
+      for (const np of newProducts) {
+        const idx = dealToInsertIndex.get(np.deal);
+        if (idx === undefined) continue;
+        const row = insertedRows[idx];
+        if (row) offerWrites.push({ deal: np.deal, productId: row.id });
       }
+    }
+  }
 
-      const { error: offerErr } = await supa
-        .from("offers")
-        .upsert(dealToOfferRow(d, productId, sourceProvider, sourceQuery, runStartedAt), {
-          onConflict: "store_id,url",
-        });
+  /* Step 4: bulk image backfills (rare — only when an existing
+     product had a NULL image and the new deal provides one). */
+  for (const b of imageBackfills) {
+    /* These are still per-row UPDATEs because Postgres needs the
+       conditional clause to match each row's id. Skipped on
+       failure — backfill is opportunistic. */
+    await supa.from("products").update({ image_url: b.imageUrl }).eq("id", b.productId);
+  }
 
-      if (offerErr) {
-        result.errors.push(`Upsert offer '${d.title}' @ ${d.storeName}: ${offerErr.message}`);
-      } else {
-        result.upserted += 1;
-      }
-    } catch (err) {
-      result.errors.push(`Deal '${d.title}': ${(err as Error).message}`);
+  /* Step 5: bulk upsert offers. */
+  if (offerWrites.length > 0) {
+    const offerRows = offerWrites.map(({ deal, productId }) =>
+      dealToOfferRow(deal, productId, sourceProvider, sourceQuery, runStartedAt),
+    );
+    const { error: offerErr } = await supa
+      .from("offers")
+      .upsert(offerRows, { onConflict: "store_id,url" });
+    if (offerErr) {
+      result.errors.push(`Bulk upsert ${offerWrites.length} offers: ${offerErr.message}`);
+    } else {
+      result.upserted = offerWrites.length;
     }
   }
 

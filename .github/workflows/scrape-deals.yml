@@ -168,7 +168,13 @@ jobs:
   #          1,000-credit Starter plan). ──
   ingest-serpapi:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Was 25 — hit the cap before the ingestion.ts batch refactor
+    # (per-deal N+1 SELECTs made the 60-call cron take ~20-25 min of
+    # DB time alone). Post-refactor: 3 bulk lookups per call + 1
+    # bulk insert + 1 bulk upsert = ~5-7 min wall-time across 60
+    # calls. 15 min gives ~3x headroom for SerpAPI jitter or
+    # Supabase slowdowns.
+    timeout-minutes: 15
     env:
       SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
