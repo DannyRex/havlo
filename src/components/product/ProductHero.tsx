@@ -68,12 +68,18 @@ interface Props {
       user knows how much broader the compare view is than the PDP. */
   totalStores?: number;
   /** Stats for the price-vs-market bar. Computed in the page from
-      the dupes data. When undefined, the bar renders the
-      "single-store" / "no comparison" variant. */
+      the dupes data. ALL VALUES IN NGN — pgFtsFindDupes already
+      normalises landedPrice via priceInNgn, and the page coerces
+      the anchor's USD-stored price to NGN before mixing. The bar's
+      formatPriceForUser handles the user-currency conversion at
+      render time, so passing user-currency values here would
+      double-convert and round to 0 (May 2026 bug). When undefined,
+      the bar renders the "single-store" / "no comparison" variant. */
   priceStats?: {
-    lowest:  number;   // user-currency
-    highest: number;   // user-currency
-    count:   number;   // OTHER stores compared (excludes anchor)
+    thisPriceNgn: number;  // anchor price normalised to NGN
+    lowest:  number;       // NGN
+    highest: number;       // NGN
+    count:   number;       // OTHER stores compared (excludes anchor)
   };
 }
 
@@ -109,17 +115,18 @@ export default function ProductHero({ offer, countryCode, totalStores, priceStat
   /* Primary price in the user's currency. */
   const primaryAmount = convertToUserCurrency(offer.currentPrice, offer.currency, country);
 
-  /* Convert priceStats (NGN-internal, from pgFtsFindDupes) into the
-     user's display currency so the bar's lowest/highest match the
-     primary price's units. Without this conversion, a UK user sees
-     "£8" as the primary but the bar reads in raw NGN values. */
-  const userPriceStats = priceStats
-    ? {
-        lowest:  convertToUserCurrency(priceStats.lowest,  "NGN", country),
-        highest: convertToUserCurrency(priceStats.highest, "NGN", country),
-        count:   priceStats.count,
-      }
-    : undefined;
+  /* PriceComparisonBar takes NGN values and runs the user-currency
+     conversion at render time via formatPriceForUser. Pass priceStats
+     through unchanged. The previous version converted to user currency
+     here AND let the bar convert again, which produced "£0 cheapest /
+     £0 highest" on every UK PDP because the second division by 1600
+     rounds typical product prices to zero. The single-store fallback
+     (no priceStats) still needs an NGN anchor value for the bar's
+     props, computed inline below. */
+  const anchorPriceNgn = offer.currency === "USD"
+    ? Math.round(offer.currentPrice * USD_FX.NGN)
+    : offer.currentPrice;
+
   const primaryStr = country.currency === "NGN"
     ? formatCompact(primaryAmount)
     : country.currency === "USD"
@@ -330,10 +337,10 @@ export default function ProductHero({ offer, countryCode, totalStores, priceStat
             the last time I or havlo checked it?" — fixed via
             "Verified by Havlo" labelling inside the bar. */}
         <PriceComparisonBar
-          thisPrice={primaryAmount}
-          lowestPrice={userPriceStats?.lowest ?? primaryAmount}
-          highestPrice={userPriceStats?.highest ?? primaryAmount}
-          comparedStoreCount={userPriceStats?.count ?? 0}
+          thisPriceNgn={priceStats?.thisPriceNgn ?? anchorPriceNgn}
+          lowestPriceNgn={priceStats?.lowest ?? anchorPriceNgn}
+          highestPriceNgn={priceStats?.highest ?? anchorPriceNgn}
+          comparedStoreCount={priceStats?.count ?? 0}
           country={country}
           lastCheckedAt={offer.scrapedAt}
           storeCountry={dealStoreCountry}

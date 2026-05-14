@@ -24,16 +24,21 @@
 
 import { Check, Globe, AlertCircle, Info } from "lucide-react";
 import { formatPriceForUser } from "@/lib/utils";
-import { type Country, getCountry } from "@/lib/country";
+import { type Country } from "@/lib/country";
 import { timeAgo } from "@/lib/utils";
 
 interface Props {
-  /** Current offer's price in the user's display currency. */
-  thisPrice:    number;
-  /** Cheapest known price across this product's dupes (same currency). */
-  lowestPrice:  number;
-  /** Dearest known price across this product's dupes (same currency). */
-  highestPrice: number;
+  /** Current offer's price IN NGN. formatPriceForUser converts to
+      the user's currency at render time. Passing user-currency
+      values here would cause double-conversion: the formatter
+      assumes its input is NGN and divides by 1600 before applying
+      the target FX rate, so a "£20 already-converted" value would
+      become £0 (May 2026 bug). */
+  thisPriceNgn:    number;
+  /** Cheapest known price across this product's dupes, IN NGN. */
+  lowestPriceNgn:  number;
+  /** Dearest known price across this product's dupes, IN NGN. */
+  highestPriceNgn: number;
   /** Number of OTHER stores compared (excludes this offer). 0 = single-store. */
   comparedStoreCount: number;
   /** Country object — drives currency formatting. */
@@ -47,9 +52,9 @@ interface Props {
 }
 
 export default function PriceComparisonBar({
-  thisPrice,
-  lowestPrice,
-  highestPrice,
+  thisPriceNgn,
+  lowestPriceNgn,
+  highestPriceNgn,
   comparedStoreCount,
   country,
   lastCheckedAt,
@@ -113,12 +118,14 @@ export default function PriceComparisonBar({
     );
   }
 
-  /* Compute the position of `thisPrice` along the [lowest, highest]
+  /* Compute the position of `thisPriceNgn` along the [lowest, highest]
      range. 0 = matches lowest (best deal), 1 = matches highest (worst).
      Clamped to [0,1] so a slightly-above-highest price still renders
-     at the right end (defensive — should be rare). */
-  const range  = Math.max(highestPrice - lowestPrice, 1); // avoid /0
-  const offset = Math.max(0, Math.min(1, (thisPrice - lowestPrice) / range));
+     at the right end (defensive — should be rare). The math is unit-
+     agnostic (it's a ratio), so it works with either NGN or any
+     other consistent currency input. */
+  const range  = Math.max(highestPriceNgn - lowestPriceNgn, 1); // avoid /0
+  const offset = Math.max(0, Math.min(1, (thisPriceNgn - lowestPriceNgn) / range));
 
   /* Position the marker at offset% from left. Cap visually inset by
      a few pixels so the marker isn't clipped at the bar's edges. */
@@ -137,8 +144,8 @@ export default function PriceComparisonBar({
      offer ISN'T the cheapest but is still notably cheaper than the
      worst comparable price. Only render when meaningful (>5%
      savings) so we don't surface "Save 1%" noise. */
-  const savePctVsHighest = highestPrice > 0
-    ? Math.round(((highestPrice - thisPrice) / highestPrice) * 100)
+  const savePctVsHighest = highestPriceNgn > 0
+    ? Math.round(((highestPriceNgn - thisPriceNgn) / highestPriceNgn) * 100)
     : 0;
   const showSavings = savePctVsHighest >= 5 && offset > 0.05;
 
@@ -161,7 +168,7 @@ export default function PriceComparisonBar({
           background:
             "linear-gradient(90deg, rgb(16,185,129) 0%, rgb(16,185,129) 33%, rgb(245,158,11) 50%, rgb(239,68,68) 67%, rgb(239,68,68) 100%)",
         }}
-        aria-label={`${verdict.label}. ${formatPriceForUser(thisPrice, country)} of a ${formatPriceForUser(lowestPrice, country)}–${formatPriceForUser(highestPrice, country)} range across ${comparedStoreCount + 1} stores.`}
+        aria-label={`${verdict.label}. ${formatPriceForUser(thisPriceNgn, country)} of a ${formatPriceForUser(lowestPriceNgn, country)} to ${formatPriceForUser(highestPriceNgn, country)} range across ${comparedStoreCount + 1} stores.`}
       >
         {/* Position marker — sized to clearly stand above the bar */}
         <div
@@ -174,14 +181,14 @@ export default function PriceComparisonBar({
       {/* Range labels — anchor + dearest. Both formatted in user
           currency so the comparison is apples-to-apples. */}
       <div className="flex items-center justify-between text-[11px] text-ink-3 tabular-nums mb-3">
-        <span>{formatPriceForUser(lowestPrice, country)}<span className="ml-1 opacity-70">cheapest</span></span>
-        <span>{formatPriceForUser(highestPrice, country)}<span className="ml-1 opacity-70">highest</span></span>
+        <span>{formatPriceForUser(lowestPriceNgn, country)}<span className="ml-1 opacity-70">cheapest</span></span>
+        <span>{formatPriceForUser(highestPriceNgn, country)}<span className="ml-1 opacity-70">highest</span></span>
       </div>
 
       {/* Optional savings line — only when meaningful */}
       {showSavings && (
         <p className="text-[12px] text-ink-2 mb-3">
-          You&apos;d save <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatPriceForUser(highestPrice - thisPrice, country)}</span> vs the highest known price.
+          You&apos;d save <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatPriceForUser(highestPriceNgn - thisPriceNgn, country)}</span> vs the highest known price.
         </p>
       )}
 
@@ -209,25 +216,8 @@ export default function PriceComparisonBar({
   );
 }
 
-/* Convenience helper: build PriceComparisonBar input from a list of
-   dupe prices + the anchor offer's price. Centralises the math so
-   the page.tsx call site stays tidy. */
-export function priceStatsFromDupes(
-  thisPriceUser: number,
-  dupePricesUser: number[],
-): { lowest: number; highest: number; count: number } {
-  if (dupePricesUser.length === 0) {
-    return { lowest: thisPriceUser, highest: thisPriceUser, count: 0 };
-  }
-  /* Include `thisPriceUser` in the range — covers the case where
-     this offer is BELOW every dupe (anchor wins) or ABOVE every dupe
-     (anchor loses). The marker still positions correctly. */
-  const allPrices = [thisPriceUser, ...dupePricesUser];
-  const lowest  = Math.min(...allPrices);
-  const highest = Math.max(...allPrices);
-  return { lowest, highest, count: dupePricesUser.length };
-}
-
-/* Re-exported so the import is a one-liner in PDP page.tsx — keeps
-   the component co-located with its country helper. */
-export { getCountry as resolveCountry };
+/* Removed: priceStatsFromDupes + resolveCountry re-export.
+   Both were unused (PDP page.tsx builds priceStats inline now)
+   and the helper hard-coded the old "user-currency" convention
+   that produced the May 2026 £0/£0 bug. The bar's contract is
+   now strict NGN — see Props above. */

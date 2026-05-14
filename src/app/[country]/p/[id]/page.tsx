@@ -39,6 +39,7 @@ import { SITE_URL, buildBreadcrumbList, buildHreflangAlternates } from "@/lib/se
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { pgFtsFindDupes } from "@/lib/search/pg-fts";
 import { isOfferAllowedForCountry } from "@/lib/country";
+import { usdToNgn } from "@/lib/utils";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 import JsonLd from "@/components/seo/JsonLd";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
@@ -434,17 +435,28 @@ export default async function ProductPage({ params }: PageProps) {
      after country filtering, so the comparison reflects what the
      user can actually click through to.
 
-     Math: anchor price = offer.current_price; dupe prices = each
-     dupe's cheapest offer (already country-filtered above). Both
-     stay in NGN until the UI converts via formatPriceForUser. */
+     Currency contract: dupePricesNgn are NGN (pgFtsFindDupes
+     converts via priceInNgn at query time). offer.current_price is
+     in offer.currency (USD for SerpAPI rows, NGN for native NG
+     scraper rows). We MUST normalise the anchor to NGN before
+     mixing — otherwise Math.min(7.62 USD, 12000 NGN) returns 7.62
+     and the bar's downstream conversion produces "£0 cheapest".
+     User report May 2026: PDP shows "Great price across 4 stores"
+     with £0 cheapest / £0 highest because the USD anchor leaked
+     into an NGN aggregate then got divided by 1600 again at the
+     formatter. */
+  const anchorPriceNgn = offer.currency === "USD"
+    ? usdToNgn(offer.current_price)
+    : offer.current_price;
   const dupePricesNgn: number[] = filteredDupes.flatMap((d) => {
     const cheapestOffer = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
     return cheapestOffer ? [cheapestOffer.landedPrice] : [];
   });
   const priceStats = dupePricesNgn.length > 0
     ? {
-        lowest:  Math.min(offer.current_price, ...dupePricesNgn),
-        highest: Math.max(offer.current_price, ...dupePricesNgn),
+        thisPriceNgn: anchorPriceNgn,
+        lowest:  Math.min(anchorPriceNgn, ...dupePricesNgn),
+        highest: Math.max(anchorPriceNgn, ...dupePricesNgn),
         count:   dupePricesNgn.length,
       }
     : undefined;
