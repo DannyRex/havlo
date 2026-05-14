@@ -1030,24 +1030,39 @@ export async function pgFtsFindSimilar(
       // Stable sort: score desc, then preserve original FTS rank as tiebreak
       .sort((a, b) => b.score - a.score);
 
-    /* Confidence floor (P0 #2): when the top-scoring candidate
-       hasn't matched the bare minimum signal, prefer empty over
-       confidently wrong. Only fires for queries with NO known family
-       — for known families the family gate is already a strong
-       precision signal and we don't want to also penalize a
-       legitimate but imperfect lexical match (e.g. 'PlayStation 5
-       Slim' anchoring on 'PlayStation 5 Standard' when the Slim
+    /* Confidence floor: when the candidates haven't matched the
+       bare minimum query-token signal, prefer empty over
+       confidently wrong. Only fires for queries with NO known
+       family — for known families the family gate is already a
+       strong precision signal and we don't want to also penalize
+       a legitimate but imperfect lexical match (e.g. 'PlayStation
+       5 Slim' anchoring on 'PlayStation 5 Standard' when the Slim
        SKU isn't in the DB). For unknown-family queries (e.g.
        'summer dress'), require 2+ token hits so a 'summer rug'
-       candidate doesn't anchor on a single weak overlap. */
+       candidate doesn't anchor on a single weak overlap.
+
+       Updated May 2026 (audit retest): apply the floor to EVERY
+       candidate, not just the top. The previous version only
+       checked candidates[0]; if that one passed minScore but
+       failed downstream validation (resolveAnchorFromRow returns
+       null for things like implausible prices), the loop tried
+       candidates[1+] without re-checking minScore. User report:
+       query "Hank Luxury Bluetooth Key Finder" returned "S75
+       Bluetooth Speaker" as anchor — Hank Luxury (score 5) hit
+       the priceLooksPlausible floor (mis-categorised as 'phones'),
+       resolveAnchorFromRow returned null, loop fell through to
+       S75 (score 1) which slipped past the unchecked confidence
+       floor. */
     if (candidates.length === 0) return null;
+    let qualifyingCandidates = candidates;
     if (!familyConstraint) {
       const queryTokens = query.toLowerCase().split(/\s+/).filter((t) => t.length >= 2);
       const minScore = queryTokens.length <= 1 ? 1 : 2;
-      if (candidates[0].score < minScore) return null;
+      qualifyingCandidates = candidates.filter((c) => c.score >= minScore);
+      if (qualifyingCandidates.length === 0) return null;
     }
 
-    for (const { row } of candidates) {
+    for (const { row } of qualifyingCandidates) {
       const anchor = await resolveAnchorFromRow(row);
       if (anchor) return { row, anchor };
     }

@@ -40,10 +40,19 @@ interface Props {
 }
 
 const COMPARE_URL_STORAGE_KEY = "havlo:lastCompareUrl";
-/* Storage entries older than 5 min are treated as stale — likely
-   the user navigated elsewhere then back to a PDP, and the
-   previous compare URL is no longer the right back-target. */
-const STALE_AFTER_MS = 5 * 60 * 1000;
+/* Storage entries older than 15 SECONDS are treated as stale.
+   Shortened from 5 min after the audit-retest caught a leak: a
+   user who visited /compare then later went /deals → PDP saw
+   "Back to results" routing to the old compare URL because the
+   breadcrumb was still fresh. 15 seconds covers the realistic
+   compare → "View product" → PDP click latency (~1-3 seconds)
+   with comfortable headroom, but expires before the user can
+   meaningfully navigate away to /deals or anywhere else.
+
+   For full-page-load cases (typed URL, hard refresh), the
+   document.referrer fallback below still kicks in regardless of
+   storage staleness. */
+const STALE_AFTER_MS = 15 * 1000;
 
 interface CompareBreadcrumb {
   url: string;

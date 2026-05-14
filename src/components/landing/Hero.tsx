@@ -226,16 +226,18 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
           {/* Uses the server-passed country (not useCountry) so the
               phrase is present in SSR — useCountry wouldn't resolve
               until hydration. */}
-          {/* Same sentence structure across breakpoints — was
-              divergent ("We find it cheaper" mobile vs "Havlo finds
-              cheaper alternatives across the stores you already
-              know" desktop). Audit May 2026 flagged the mismatch.
-              Now both read as parallel "Havlo finds it cheaper" /
-              "Havlo finds cheaper alternatives" with the longer
-              tail kept for desktop where there's space for the
-              "stores you already know" framing. */}
-          <span className="sm:hidden">Paste a link or search any product. Havlo finds it cheaper in {countryPhrase(countryCode, countryName)}.</span>
-          <span className="hidden sm:inline">Paste a link or search any product. Havlo finds cheaper alternatives across the stores you already know in {countryPhrase(countryCode, countryName)}.</span>
+          {/* Identical copy at every breakpoint. Audit-retest May
+              2026 caught the mobile/desktop divergence even after
+              the first unification attempt (mobile said "Havlo
+              finds it cheaper", desktop kept the long "cheaper
+              alternatives across the stores you already know"
+              tail). One sentence everywhere — concise enough for
+              mobile, honest about what Havlo does, mentions the
+              country. The longer "stores you already know"
+              variant is now the brand-consistency framing surfaced
+              elsewhere on the page (StoreLogos section) so the
+              hero stays compact. */}
+          Paste a link or search any product. Havlo finds it cheaper in {countryPhrase(countryCode, countryName)}.
         </p>
 
         {/* Composer — mobile-optimised */}

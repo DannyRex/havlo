@@ -209,6 +209,59 @@ export default function DealFeed({
   /* Selected store IDs from the StoreFilter popover. Persists to URL
      via buildParams (?stores=argos,currys). */
   const [selectedStores, setSelectedStores] = useState<Set<string>>(initialStores);
+  /* Country-switch state re-sync. The page.tsx server component
+     already passes a fresh `key={country.code}` so DealFeed
+     SHOULD re-mount on country change — but in practice Suspense
+     can keep the old instance mounted while the new server
+     render fetches, so the key change doesn't always trigger
+     re-mount. Belt-and-braces: explicitly re-read URL params
+     and reset filter state when country.code changes. Skip the
+     first run (initial mount uses useState(initial...) values
+     which are already correct).
+
+     Audit May 2026: switching from /uk/deals?category=phones to
+     NG via the dropdown landed at /ng/deals?origin=local —
+     ?category=phones was silently dropped because the OLD
+     DealFeed instance kept its state (category="phones" was
+     wiped to "all" on the URL-sync write back to the new
+     country's URL). With this re-sync, switching country
+     re-reads the URL params (which CountryProvider preserved)
+     and state stays correct. */
+  const countryRef = useRef(country.code);
+  useEffect(() => {
+    if (countryRef.current === country.code) return;
+    countryRef.current = country.code;
+    /* Re-read every filter from the live URL. CountryProvider
+       preserves search params on country switch, so any
+       category / tier / sort / search / origin / stores in the
+       URL survives and we just sync state to it. */
+    const newCategoryRaw = searchParams.get("category") ?? "all";
+    const newCategory    = validCategorySlugs.has(newCategoryRaw) ? newCategoryRaw : "all";
+    setCategory(newCategory);
+    const newTierRaw = searchParams.get("minDiscount") ?? "all";
+    setTier(VALID_TIERS.has(newTierRaw as DiscountTier) ? (newTierRaw as DiscountTier) : "all");
+    const newSortRaw = searchParams.get("sort") ?? "relevance";
+    setSort(VALID_SORTS.has(newSortRaw as SortOption) ? (newSortRaw as SortOption) : "relevance");
+    const newSearch = searchParams.get("search") ?? "";
+    setSearchInput(newSearch);
+    setSearchDebounced(newSearch);
+    const newOriginRaw = searchParams.get("origin");
+    const newOrigin: OriginFilter =
+      newOriginRaw && VALID_ORIGINS.has(newOriginRaw as OriginFilter)
+        ? (newOriginRaw as OriginFilter)
+        : "local";
+    setOrigin(newOrigin);
+    const newStoresRaw = searchParams.get("stores") ?? "";
+    setSelectedStores(new Set(
+      newStoresRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
+    ));
+    /* Force a re-fetch by un-consuming the initial guard. The
+       useEffect on buildParams will see new values and run
+       /api/deals against the new country. */
+    hasConsumedInitialRef.current = true;
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [country.code]);
+
   /* All stores currently available in the filtered pool. Comes back
      in the /api/deals response alongside items + counts. Empty until
      the first fetch lands. */
