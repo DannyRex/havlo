@@ -16,6 +16,9 @@ import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-la
 import AnimateIn from "@/components/ui/AnimateIn";
 import DealUnavailableBanner from "@/components/feedback/DealUnavailableBanner";
 import { formatNaira, formatPriceForUser, getClickThroughUrl } from "@/lib/utils";
+import {
+  effectiveLandedPrice, effectiveDeliveryDays, anyCrossBorderForUser, isCrossBorderForUser,
+} from "@/lib/landed-price";
 import { trackClick } from "@/lib/trackClick";
 import { sniffToAnchor } from "@/lib/sniff-to-anchor";
 import { getCashbackForUrl } from "@/lib/cashback";
@@ -394,23 +397,25 @@ function CompareContent() {
                       across the offer set. Both numbers are real to the
                       user since they come from real offers below. */}
                   {result.anchor.offers.length > 0 && result.anchor.bestPrice > 0 && (() => {
-                    const sorted = [...result.anchor.offers]
+                    /* Sort + spread by EFFECTIVE landed price (country-
+                       aware) so a UK shopper looking at a UK retailer
+                       doesn't see a 30% landed estimate baked into the
+                       headline price. effectiveLandedPrice returns
+                       offer.price for stores local-to-user, and
+                       offer.landedPrice only for true cross-border. */
+                    const withEff = result.anchor.offers
                       .filter((o) => o.landedPrice > 0)
-                      .sort((a, b) => a.landedPrice - b.landedPrice);
-                    const cheapest = sorted[0];
-                    const dearest  = sorted[sorted.length - 1];
-                    const spread   = dearest && cheapest && dearest.landedPrice > cheapest.landedPrice
-                      ? dearest.landedPrice - cheapest.landedPrice
+                      .map((o) => ({ o, eff: effectiveLandedPrice(o, country) }))
+                      .sort((a, b) => a.eff - b.eff);
+                    const cheapest = withEff[0];
+                    const dearest  = withEff[withEff.length - 1];
+                    const spread   = dearest && cheapest && dearest.eff > cheapest.eff
+                      ? dearest.eff - cheapest.eff
                       : 0;
                     return (
                       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
                         <span className="text-lg sm:text-xl font-bold text-ink">
-                          {/* formatPriceForUser converts the internal-NGN
-                              amount that pgFtsFindSimilar returns into the
-                              visiting user's currency. Fixes the bug
-                              where /us/compare and /uk/compare etc. were
-                              showing ₦ on cards. */}
-                          {formatPriceForUser(cheapest?.landedPrice ?? result.anchor.bestPrice, country)}
+                          {formatPriceForUser(cheapest?.eff ?? result.anchor.bestPrice, country)}
                         </span>
                         {spread > 0 && (
                           <span className="text-xs text-ink-3">
@@ -454,19 +459,24 @@ function CompareContent() {
               {result.anchor.offers.length >= 1 && (() => {
                 /* Dedup pass first: collapse same-store + same-price
                    rows. Round to nearest ₦100 so trivial FX-rounding
-                   differences don't leak through as separate rows. */
+                   differences don't leak through as separate rows.
+                   Keys + sort key now use the COUNTRY-AWARE effective
+                   landed price (no 30% adder for local stores). */
                 const seen = new Set<string>();
                 const deduped = result.anchor.offers
                   .filter((o) => o.landedPrice > 0)
                   .filter((o) => {
-                    const key = `${o.storeId}|${Math.round(o.landedPrice / 100) * 100}`;
+                    const eff = effectiveLandedPrice(o, country);
+                    const key = `${o.storeId}|${Math.round(eff / 100) * 100}`;
                     if (seen.has(key)) return false;
                     seen.add(key);
                     return true;
                   });
-                const sorted = deduped.sort((a, b) => a.landedPrice - b.landedPrice);
+                const sorted = deduped.sort(
+                  (a, b) => effectiveLandedPrice(a, country) - effectiveLandedPrice(b, country),
+                );
                 if (sorted.length === 0) return null;
-                const cheapest = sorted[0].landedPrice;
+                const cheapest = effectiveLandedPrice(sorted[0], country);
                 /* Single-store mode: render a clean go-to-store row.
                    Drop the green 'Best price' treatment + the star
                    + the right-side 'Sorted cheapest first' caption
@@ -491,10 +501,13 @@ function CompareContent() {
                     <ul className="space-y-1.5">
                       {sorted.map((offer, i) => {
                         const isBest   = !isSingleStore && i === 0;
-                        const savings  = offer.landedPrice - cheapest;
+                        const eff      = effectiveLandedPrice(offer, country);
+                        const savings  = eff - cheapest;
                         const subtitle = (offer.productTitle && offer.productTitle !== result.anchor.title)
                           ? offer.productTitle
                           : null;
+                        const offerDeliveryDays = effectiveDeliveryDays(offer, country);
+                        const showCrossBorderTag = isCrossBorderForUser(offer, country);
                         return (
                           <li key={`${offer.storeId}-${offer.price}-${i}`}>
                             {/* Whole row is the click target — Spoken pattern.
@@ -569,8 +582,8 @@ function CompareContent() {
                                   </p>
                                 ) : (
                                   <p className="text-[11px] text-ink-3 mt-0.5">
-                                    {offer.deliveryDays
-                                      ? `${offer.deliveryDays} ${offer.deliveryDays === 1 ? "day" : "days"} delivery`
+                                    {offerDeliveryDays
+                                      ? `${offerDeliveryDays} ${offerDeliveryDays === 1 ? "day" : "days"} delivery`
                                       : "Delivery varies"}
                                   </p>
                                 )}
@@ -578,7 +591,7 @@ function CompareContent() {
 
                               <div className="text-right shrink-0">
                                 <p className={`text-base font-bold tabular-nums ${isBest ? "text-success" : "text-ink"}`}>
-                                  {formatPriceForUser(offer.landedPrice, country)}
+                                  {formatPriceForUser(eff, country)}
                                 </p>
                                 {savings > 0 && (
                                   <p className="text-[11px] text-ink-3 tabular-nums">
@@ -599,12 +612,15 @@ function CompareContent() {
                       })}
                     </ul>
 
-                    {/* Always-visible landed-cost disclosure — replaces
-                        the per-row tooltip that didn't work on mobile.
-                        Single line, plain English, mobile-safe. Renders
-                        only when at least one row in the table is
-                        cross-border (otherwise it's irrelevant copy). */}
-                    {sorted.some((o) => o.isInternational && o.landedCostExtra > 0) && (
+                    {/* Always-visible landed-cost disclosure. Gated on
+                        anyCrossBorderForUser — i.e. ONLY when at least
+                        one row in the displayed table is cross-border
+                        FOR THIS VISITOR. Previous gate used the raw
+                        `o.isInternational` DB flag, so the disclaimer
+                        appeared even on UK retailer rows for UK users
+                        (Currys / Argos / John Lewis all carry the flag
+                        because SerpAPI normalises them to USD). */}
+                    {anyCrossBorderForUser(sorted, country) && (
                       <p className="mt-3 text-[11px] text-ink-3 leading-relaxed">
                         <span className="text-amber-500">⚑</span>{" "}
                         Cross-border prices include a ~30% landed estimate (shipping + customs).

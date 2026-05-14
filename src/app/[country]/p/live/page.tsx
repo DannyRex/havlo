@@ -146,14 +146,19 @@ export default async function LivePdpPage({ params, searchParams }: PageProps) {
   /* Dedupe + drop the synthetic anchor itself from the YML rail.
      Same shape as /p/[id]. Synthetic anchors don't have a product_id,
      so the anchor filter relies on title-exact match + the dedupe
-     pass behind it. */
+     pass behind it. Title-key collapse catches duplicate dupes the
+     FTS engine occasionally splits across signatures. */
   const seenIds = new Set<string>();
+  const seenTitles = new Set<string>();
   const filteredDupes = countryFilteredDupes.filter((d) => {
     if (offer.title && d.title === offer.title) return false;
     const best = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
     const id = best?.offerId || (best?.storeId + ":" + d.key);
     if (seenIds.has(id)) return false;
     seenIds.add(id);
+    const titleKey = d.title.toLowerCase().replace(/\s+/g, " ").trim();
+    if (seenTitles.has(titleKey)) return false;
+    seenTitles.add(titleKey);
     return true;
   });
 

@@ -7,6 +7,7 @@ import { formatPriceForUser } from "@/lib/utils";
 import { pdpUrlForOffer } from "@/lib/pdp-url";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
+import { effectiveLandedPrice } from "@/lib/landed-price";
 import { trackClick } from "@/lib/trackClick";
 import type { DupeResult, StoreOffer } from "@/lib/search";
 
@@ -97,10 +98,19 @@ export default function DupeCard({
           {dupe.title}
         </h3>
 
-        {/* Price + savings line */}
+        {/* Price + savings line — country-aware. dupe.bestPrice is the
+            ingest-time landedPrice (price + 30% for stores flagged
+            international). For a visitor in the store's anchored
+            country (UK shopper, UK retailer) the landed adder is
+            wrong — they pay the merchant price directly. Recompute
+            from the cheapest offer using effectiveLandedPrice so the
+            headline matches the merchant's own checkout total. */}
         <div className="mt-2.5 flex items-baseline gap-2">
           <span className="text-base font-bold text-ink">
-            {formatPriceForUser(dupe.bestPrice, country)}
+            {formatPriceForUser(
+              bestOffer ? effectiveLandedPrice(bestOffer, country) : dupe.bestPrice,
+              country,
+            )}
           </span>
           {hasSavings && (
             <span className="text-[11px] text-success font-semibold">

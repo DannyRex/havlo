@@ -319,7 +319,8 @@ export async function ingestDeals(
     }
   }
 
-  // 3. Staleness sweep — only when the caller asserts full-catalog scope.
+  // 3a. Full-catalog sweep — only when the caller asserts scope.
+  //     Aggressive: marks every offer in the store NOT seen this run.
   if (options.sweepScope?.store) {
     await sweepStaleOffers(supa, {
       storeId: options.sweepScope.store,
@@ -327,6 +328,34 @@ export async function ingestDeals(
       batchSize: result.upserted,
       result,
     });
+  }
+
+  /* 3b. TTL sweep — runs on EVERY ingest path regardless of source.
+        Conservative: marks offers whose `last_seen_at` is older than
+        TTL_DAYS for stores we touched THIS run. Catches the gap that
+        per-category SerpAPI / per-SKU UK retailer / curated ingest
+        used to leave open: their offers had no sweep wired in, so
+        delisted SKUs sat in_stock=true forever.
+
+        Why per-store and not catalog-wide: a UK retailer ingest
+        run shouldn't accidentally touch Konga rows — only the
+        stores actually present in `deals` get swept. The cron
+        `npx tsx scripts/sweep-stale-offers.ts --apply` covers
+        whole-catalog cleanup for stores that nothing's ingesting.
+
+        Conservative threshold (30 days) so a normal scrape cadence
+        miss doesn't trigger false flips; the per-store sweep above
+        handles fast-moving full catalogs. */
+  if (result.upserted > 0) {
+    const touchedStores = Array.from(new Set(deals.map((d) => d.storeId).filter(Boolean)));
+    /* Skip stores already covered by the full-catalog sweep above
+       (it ran a more aggressive flip already; the TTL pass would
+       be a no-op anyway). */
+    const sweepedAlready = options.sweepScope?.store ? new Set([options.sweepScope.store]) : new Set<string>();
+    const stores = touchedStores.filter((s) => !sweepedAlready.has(s));
+    if (stores.length > 0) {
+      await ttlSweepForStores(supa, stores, runStartedAt, result);
+    }
   }
 
   // 4. Close the run record
@@ -432,5 +461,59 @@ async function sweepStaleOffers(
     console.log(
       `[ingest] sweep ${storeId}: ${flippedCount} offer(s) marked out-of-stock (not seen in run starting ${runStartedAt}).`,
     );
+  }
+}
+
+/* ── TTL sweep for partial-scope ingest paths ────────────────────── */
+
+/** Days before a non-touched offer (per touched-store) gets flipped
+    to in_stock=false by the auto-TTL pass. Conservative — should be
+    much longer than the typical scrape cadence so a single missed
+    run can't nuke an active catalogue. The whole-catalog cron
+    (scripts/sweep-stale-offers.ts) covers stores nothing's
+    ingesting. */
+const TTL_DAYS = 30;
+
+/**
+ * Per-store TTL sweep. For each store the caller touched in this
+ * run, flip offers older than TTL_DAYS to in_stock=false.
+ *
+ * Single SQL UPDATE per store. No per-row guard like the full-catalog
+ * sweep — TTL is conservative enough (30 days) that we trust it
+ * regardless of batch size. SerpAPI / UK retailer / curated ingest
+ * paths all benefit automatically; they don't need to know about it.
+ */
+async function ttlSweepForStores(
+  supa:         NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  storeIds:     string[],
+  runStartedAt: string,
+  result:       IngestResult,
+): Promise<void> {
+  const threshold = new Date(
+    new Date(runStartedAt).getTime() - TTL_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
+  let totalFlipped = 0;
+  for (const storeId of storeIds) {
+    const { data: flipped, error: sweepErr } = await supa
+      .from("offers")
+      .update({ in_stock: false })
+      .eq("store_id", storeId)
+      .eq("in_stock", true)
+      .lt("last_seen_at", threshold)
+      .select("id");
+    if (sweepErr) {
+      result.errors.push(`TTL sweep for ${storeId}: ${sweepErr.message}`);
+      continue;
+    }
+    const n = flipped?.length ?? 0;
+    if (n > 0) {
+      totalFlipped += n;
+      console.log(
+        `[ingest] TTL sweep ${storeId}: ${n} offer(s) older than ${TTL_DAYS}d marked out-of-stock.`,
+      );
+    }
+  }
+  if (totalFlipped > 0) {
+    console.log(`[ingest] TTL sweep total: ${totalFlipped} offers across ${storeIds.length} stores.`);
   }
 }

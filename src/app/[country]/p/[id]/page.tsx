@@ -322,14 +322,29 @@ export default async function ProductPage({ params }: PageProps) {
      already groups by signature, but FTS scoring can occasionally
      split near-identical titles into separate groups). */
   const seenIds = new Set<string>();
+  const seenTitles = new Set<string>();
   const filteredDupes = countryFilteredDupes.filter((d) => {
     if (offer.product_id && d.key === offer.product_id) return false;
     if (offer.offer_id && d.offers.some((o) => o.offerId === offer.offer_id)) return false;
     if (offer.title && d.title === offer.title) return false;
+    /* Dedupe by best-offer id (defensive — dupes engine already
+       groups by signature, but FTS scoring sometimes splits near-
+       identical titles into separate groups). */
     const best = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
     const id = best?.offerId || (best?.storeId + ":" + d.key);
     if (seenIds.has(id)) return false;
     seenIds.add(id);
+    /* Also dedupe by NORMALISED title — the dupes engine can return
+       the same product TWICE under different keys when one row was
+       ingested with a slightly different signature (whitespace /
+       punctuation variance). User report May 2026: PDP YML rail
+       showed two identical "Motorola Razr 60 Ultra" cards from
+       Currys at £902. Title-collapse keeps the first, drops the
+       rest. Lowercase + collapse-whitespace keeps "Razr 60  Ultra"
+       and "razr 60 ultra" matched together. */
+    const titleKey = d.title.toLowerCase().replace(/\s+/g, " ").trim();
+    if (seenTitles.has(titleKey)) return false;
+    seenTitles.add(titleKey);
     return true;
   });
 
