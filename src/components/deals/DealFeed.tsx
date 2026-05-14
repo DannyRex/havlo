@@ -380,10 +380,22 @@ export default function DealFeed({
     setLoadingMore(true);
     fetch(`/api/deals?${buildParams(offsetRef.current)}`)
       .then((r) => r.json())
-      .then(({ items: more, hasMore: hm, error }) => {
+      .then(({ items: more, total: nextTotal, hasMore: hm, originCounts: nextOriginCounts, stores: nextStores, error }) => {
         if (error) return;
         setItems((prev) => [...prev, ...more]);
         setHasMore(hm);
+        /* Refresh the metadata from every paginated response too.
+           Without this, the user can land on /uk/deals with initial
+           state carrying a different origin's total (SSR vs client
+           default mismatch), pagination appends Local items but
+           `total` still reads the "all" count, and the end-of-list
+           message reads "That's all 1531 deals for now" while only
+           551 cards have actually rendered (May 2026 bug). The
+           backend now returns the same metadata on every page, so
+           propagating it here keeps the UI consistent. */
+        if (typeof nextTotal === "number") setTotal(nextTotal);
+        if (nextOriginCounts) setOriginCounts(nextOriginCounts);
+        if (Array.isArray(nextStores)) setStoreOptions(nextStores);
         offsetRef.current += PAGE_SIZE;
       })
       .catch(() => {})

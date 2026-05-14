@@ -136,13 +136,25 @@ export default async function DealsPage({
     const v = searchParams[k];
     return Array.isArray(v) ? v[0] : v;
   };
+  /* origin default must match DealFeed's client-side default ("local"
+     for every market since May 2026). When the URL has no ?origin=,
+     we fetch the local pool server-side. Without this, SSR pulled
+     the "all" pool (broader), DealFeed initialized state with that
+     data, but the tab UI said "Local" — and DealFeed skipped its
+     first refetch (initialItems was set). Result: the user saw a
+     551-label "Local" tab pre-populated with 1531 "all" items, and
+     the end-of-list message read "That's all 1,531 deals for now"
+     even though only ~24 had rendered. User report May 2026: "on uk
+     local, i get That's all 1,531 deals for now when it hasn't
+     loaded up to that number and there aren't up to that number
+     based on the label on the tab." */
   const initial = await fetchInitialDeals({
     country:  country.code,
     category: pickFirst("category"),
     tier:     pickFirst("minDiscount"),
     sort:     pickFirst("sort"),
     search:   pickFirst("search"),
-    origin:   pickFirst("origin"),
+    origin:   pickFirst("origin") ?? "local",
     stores:   pickFirst("stores"),
   });
 
