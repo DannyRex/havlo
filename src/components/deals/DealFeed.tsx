@@ -245,6 +245,43 @@ export default function DealFeed({
      debouncing, a slow first fetch could land after a faster second
      fetch and clobber the result. */
   const fetchSeqRef = useRef(0);
+
+  /* originCounts key — the set of filter inputs that ACTUALLY affect
+     the All/Local/Intl badge values. Used to gate badge-refresh so
+     they don't flicker on every origin tab click.
+
+     Per src/app/api/deals/route.ts, originCounts is derived from
+     `qualifyingCountryFiltered` which is invariant to `origin` and
+     `selectedStores`. The same three counts come back regardless of
+     which tab the user clicks. But in practice the badges DID drift
+     between tab clicks because:
+
+       1. POOL_CACHE has a 5-min TTL — if the cache miss falls
+          between two clicks, the second click triggers a fresh DB
+          fetch that may see slightly different rows (ingest churn).
+       2. Different Vercel function instances hold separate
+          POOL_CACHE Maps — consecutive clicks routed to different
+          instances both miss-and-fill from their own DB hits.
+
+     Client-side fix: only call setOriginCounts when one of the
+     inputs that ACTUALLY drives the badge math has changed since
+     the last refresh. Otherwise hold the previous values. The badges
+     are now stable across origin tab clicks even when the backend
+     returns slightly different numbers per request.
+
+     User report May 2026: "switching tabs in the deals page changes
+     the number count. should not be." */
+  const computeOriginCountsKey = () => JSON.stringify({
+    category, tier, sort, search: searchDebounced, country: country.code,
+  });
+  /* Initialise on mount with the current filter state so the FIRST
+     origin tab click is already stable. Without this, ref.current
+     would be null and the very first click would flip the badges
+     (because null !== newKey) before stability kicks in for
+     subsequent clicks. useRef's initializer only runs once, so the
+     ref keeps the mount-time key until a non-origin filter change
+     updates it. */
+  const originCountsKeyRef = useRef<string>(computeOriginCountsKey());
   const router = useRouter();
   /* `country` is lifted to the top of the component (above
      initialOrigin) — see comment near the top of DealFeed. */
@@ -309,7 +346,15 @@ export default function DealFeed({
         setItems(items);
         setTotal(total);
         setHasMore(hasMore);
-        if (originCounts) setOriginCounts(originCounts);
+        /* Refresh badge counts only when the inputs that drive them
+           changed — origin and selectedStores don't, so origin tab
+           clicks no longer flicker the badges. See originCountsKeyRef
+           comment for the full rationale. */
+        const newKey = computeOriginCountsKey();
+        if (originCounts && newKey !== originCountsKeyRef.current) {
+          setOriginCounts(originCounts);
+          originCountsKeyRef.current = newKey;
+        }
         if (Array.isArray(stores)) setStoreOptions(stores);
         offsetRef.current = PAGE_SIZE;
         /* Scroll AFTER items have rendered. Doing it synchronously in the
@@ -394,7 +439,15 @@ export default function DealFeed({
            backend now returns the same metadata on every page, so
            propagating it here keeps the UI consistent. */
         if (typeof nextTotal === "number") setTotal(nextTotal);
-        if (nextOriginCounts) setOriginCounts(nextOriginCounts);
+        /* Same gating as the first-page fetch — don't let load-more
+           responses overwrite stable origin badge counts. The user's
+           origin choice doesn't change during pagination, so the
+           counts MUST stay stable here. */
+        const newKey = computeOriginCountsKey();
+        if (nextOriginCounts && newKey !== originCountsKeyRef.current) {
+          setOriginCounts(nextOriginCounts);
+          originCountsKeyRef.current = newKey;
+        }
         if (Array.isArray(nextStores)) setStoreOptions(nextStores);
         offsetRef.current += PAGE_SIZE;
       })
