@@ -68,13 +68,29 @@ export default function PdpLoading() {
             {/* Secondary CTA — outline pill */}
             <div className="skeleton h-11 w-full max-w-xs rounded-full mb-7" />
 
-            {/* Info tiles — 2-col grid on sm+, 1-col on mobile.
-                Two tiles match the real "Last checked" + "Store country"
-                pair (out-of-stock tile is conditional and rare, so
-                skipping it here keeps the skeleton uncluttered). */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="skeleton h-16 rounded-xl" />
-              <div className="skeleton h-16 rounded-xl" />
+            {/* PriceComparisonBar skeleton — single full-width card
+                that replaced the old "Last checked / Store country"
+                two-tile pair in May 2026. Matches the real bar's
+                shape: headline row, gradient bar, range labels,
+                and footer fact strip. */}
+            <div className="rounded-2xl bg-surface border border-border p-4 sm:p-5">
+              {/* Headline + "across N stores" */}
+              <div className="flex items-baseline justify-between gap-3 mb-3">
+                <div className="skeleton h-4 w-28 rounded" />
+                <div className="skeleton h-3 w-20 rounded" />
+              </div>
+              {/* Gradient bar placeholder */}
+              <div className="skeleton h-2 w-full rounded-full mb-2" />
+              {/* Range labels — cheapest / highest at edges */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="skeleton h-3 w-16 rounded" />
+                <div className="skeleton h-3 w-16 rounded" />
+              </div>
+              {/* Footer fact strip — verification + ships-from */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-3 border-t border-border">
+                <div className="skeleton h-3 w-32 rounded" />
+                <div className="skeleton h-3 w-24 rounded" />
+              </div>
             </div>
           </div>
         </section>

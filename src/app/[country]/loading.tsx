@@ -82,6 +82,56 @@ export default function HomepageLoading() {
           </div>
         </div>
       </section>
+
+      {/* NewsletterStrip skeleton — bg-surface section between
+          StoreLogos and CTA. Heading + body + email form row.
+          Matches NewsletterStrip.tsx max-w-4xl + text-center. */}
+      <section className="py-12 sm:py-20 bg-surface border-y border-border">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="skeleton h-7 sm:h-8 w-2/3 max-w-md rounded-lg mx-auto mb-4" />
+          <div className="skeleton h-4 w-full max-w-md rounded mx-auto mb-2" />
+          <div className="skeleton h-4 w-3/4 max-w-sm rounded mx-auto mb-7 sm:mb-8" />
+          <div className="flex flex-col sm:flex-row gap-2.5 max-w-md mx-auto">
+            <div className="skeleton h-12 flex-1 rounded-full" />
+            <div className="skeleton h-12 w-full sm:w-32 rounded-full" />
+          </div>
+        </div>
+      </section>
+
+      {/* CTA skeleton — final hero-style section. Dark feel in the
+          real component (white text on ink-3 background) but the
+          skeleton renders the same shape via shimmer-on-surface so
+          the silhouette matches without committing to the dark
+          treatment that flashes wrong on theme change. */}
+      <section className="py-14 sm:py-24 bg-bg">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="rounded-2xl sm:rounded-3xl bg-surface border border-border p-6 sm:p-12 lg:p-16">
+            <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
+              {/* Copy column */}
+              <div>
+                <div className="space-y-2 mb-5">
+                  <div className="skeleton h-10 sm:h-14 w-full rounded-lg" />
+                  <div className="skeleton h-10 sm:h-14 w-3/4 rounded-lg" />
+                </div>
+                <div className="space-y-2 mb-8">
+                  <div className="skeleton h-4 w-full rounded" />
+                  <div className="skeleton h-4 w-2/3 rounded" />
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="skeleton h-12 w-full sm:w-44 rounded-full" />
+                  <div className="skeleton h-12 w-full sm:w-40 rounded-full" />
+                </div>
+              </div>
+              {/* Visual column — placeholder card stack */}
+              <div className="hidden lg:flex flex-col gap-3">
+                <div className="skeleton h-20 rounded-2xl" />
+                <div className="skeleton h-20 rounded-2xl" />
+                <div className="skeleton h-20 rounded-2xl" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
