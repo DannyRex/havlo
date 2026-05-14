@@ -52,6 +52,20 @@ interface PoolCacheEntry {
 const POOL_CACHE = new Map<string, PoolCacheEntry>();
 const POOL_TTL_MS = 5 * 60 * 1000;
 
+/* Cache key version prefix — bump whenever the merged-pool shape
+   changes (e.g., 3-pass refactor) so any stale entries from old
+   function instances become unreachable. Old instances may still
+   be serving traffic after a deploy until Vercel drains them, and
+   while they're alive they refresh their own caches on TTL expiry
+   using their old code. Versioning the key sidesteps that:
+   {country:"ng",sort:"relevance"} from the old code can never
+   match {country:"ng",sort:"relevance"} from the new code because
+   the new code prefixes its key with this version. May 2026
+   user report: "NG intl back to 15 (Amazon-only) hours after the
+   3-pass deploy" — caused by an old instance that kept refreshing
+   the default-sort NG cache entry. */
+const POOL_CACHE_VERSION = "v3-3pass";
+
 async function fetchPoolCached(params: {
   categorySlug?: string;
   sort:          SortOption;
@@ -60,8 +74,9 @@ async function fetchPoolCached(params: {
 }): Promise<Deal[]> {
   /* Stable key — JSON.stringify omits undefined fields so absent
      category/search produces the same key as explicitly-undefined.
-     Sort is always defined (server defaults to "relevance"). */
-  const key = JSON.stringify(params);
+     Sort is always defined (server defaults to "relevance"). The
+     POOL_CACHE_VERSION prefix invalidates pre-refactor entries. */
+  const key = `${POOL_CACHE_VERSION}:${JSON.stringify(params)}`;
   const now = Date.now();
 
   const cached = POOL_CACHE.get(key);
