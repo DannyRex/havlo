@@ -22,6 +22,65 @@ import { convertAliexpressUrl, aliexpressApiActive } from "@/lib/aliexpress-conv
 import { getServerCountry } from "@/lib/country-server";
 import { merchantSearchUrl, merchantHomepage, smartFallbackUrl } from "@/lib/merchant-search-urls";
 
+/* Click-resolution telemetry. Every redirect writes one row to
+   click_resolutions so we can debug "this click went to the wrong
+   URL" by querying the log instead of guessing from screenshots.
+   See scripts/db/0021-click-resolutions.sql for the schema +
+   convenience view (click_resolutions_recent_by_store). */
+type ResolutionStep =
+  | "passthrough"
+  | "cache_hit"
+  | "serpapi_resolved"
+  | "merchant_search"
+  | "smart_fallback"
+  | "merchant_homepage"
+  | "havlo_compare"
+  | "havlo_deals"
+  | "missing_url";
+
+interface LogInput {
+  offerId:        string | null;
+  storeId:        string | null;
+  storeName:      string | null;
+  titleHint:      string | null;
+  originalUrl:    string;
+  resolvedUrl:    string;
+  step:           ResolutionStep;
+  country:        string | null;
+  serpapiAttempted: boolean;
+  serpapiResolved:  boolean;
+  userAgent:      string | null;
+  referer:        string | null;
+}
+
+/* Fire-and-forget — never await the insert from the request path so
+   click latency stays at "one redirect". If the DB write fails the
+   click still goes through; we lose the telemetry row, not the
+   redirect. Errors swallowed so a transient Supabase blip never
+   leaks a 500 to the user. */
+function logResolution(input: LogInput): void {
+  void (async () => {
+    try {
+      const supa = getSupabaseAdmin();
+      if (!supa) return;
+      await supa.from("click_resolutions").insert({
+        offer_id:          input.offerId,
+        store_id:          input.storeId,
+        store_name:        input.storeName,
+        title_hint:        input.titleHint,
+        original_url:      input.originalUrl,
+        resolved_url:      input.resolvedUrl,
+        resolution_step:   input.step,
+        country:           input.country,
+        serpapi_attempted: input.serpapiAttempted,
+        serpapi_resolved:  input.serpapiResolved,
+        user_agent:        input.userAgent?.slice(0, 500) ?? null,
+        referer:           input.referer?.slice(0, 500) ?? null,
+      });
+    } catch {/* swallow — telemetry must never break the redirect path */}
+  })();
+}
+
 interface ResolvedRow {
   resolved_url: string;
   resolved_at:  string;
@@ -155,8 +214,24 @@ export async function GET(req: NextRequest) {
      product search page". */
   const storeIdHint   = req.nextUrl.searchParams.get("store")?.trim()     ?? "";
   const storeNameHint = req.nextUrl.searchParams.get("storeName")?.trim() ?? "";
+  const offerIdHint   = req.nextUrl.searchParams.get("id")?.trim()        ?? "";
   const country = getServerCountry();
   const ctx = { country: country.code };
+
+  /* Shared telemetry context. Each redirect branch calls logResolution
+     with the same baseline + its own step + resolved URL. */
+  const userAgent = req.headers.get("user-agent");
+  const referer   = req.headers.get("referer");
+  const baseLog = {
+    offerId:      offerIdHint || null,
+    storeId:      storeIdHint || null,
+    storeName:    storeNameHint || null,
+    titleHint:    titleHint || null,
+    originalUrl:  target ?? "",
+    country:      country.code,
+    userAgent,
+    referer,
+  };
 
   /* Missing url param: redirect home instead of returning a plain-text
      "Missing url" body. Chrome was interpreting the text/plain
@@ -166,10 +241,9 @@ export async function GET(req: NextRequest) {
      url field. The empty-string param hit the early return and
      downloaded a junk file. */
   if (!target) {
-    return NextResponse.redirect(
-      new URL(`/${country.code}`, req.nextUrl.origin),
-      307,
-    );
+    const homeUrl = new URL(`/${country.code}`, req.nextUrl.origin).toString();
+    logResolution({ ...baseLog, originalUrl: "", resolvedUrl: homeUrl, step: "missing_url", serpapiAttempted: false, serpapiResolved: false });
+    return NextResponse.redirect(homeUrl, 307);
   }
 
   /* AliExpress: prefer the official API converter (proper attribution,
@@ -184,9 +258,20 @@ export async function GET(req: NextRequest) {
   /* Final redirect helper — wraps the resolved URL with the right
      affiliate tag (when any) right before sending the user out. The
      wrap is the LAST step so it applies regardless of whether we
-     resolved a Google relay or had a direct URL to begin with. */
-  const sendOut = (url: string) =>
-    NextResponse.redirect(wrapWithAffiliate(url, ctx), 307);
+     resolved a Google relay or had a direct URL to begin with.
+     The telemetry log captures the PRE-wrap URL so we can see the
+     resolver's decision separately from the affiliate tag layer. */
+  const sendOut = (url: string, step: ResolutionStep, opts: { serpapiAttempted?: boolean; serpapiResolved?: boolean } = {}) => {
+    const wrapped = wrapWithAffiliate(url, ctx).toString();
+    logResolution({
+      ...baseLog,
+      resolvedUrl: url,
+      step,
+      serpapiAttempted: opts.serpapiAttempted ?? false,
+      serpapiResolved:  opts.serpapiResolved  ?? false,
+    });
+    return NextResponse.redirect(wrapped, 307);
+  };
 
   /* Direct merchant URLs pass through with a single redirect — but
      AliExpress URLs go through the API converter first when active,
@@ -194,21 +279,24 @@ export async function GET(req: NextRequest) {
   if (!isGoogleRelay(target)) {
     if (isAliexpress(target) && aliexpressApiActive()) {
       const tracked = await convertAliexpressUrl(target);
-      if (tracked) return NextResponse.redirect(tracked, 307);
+      if (tracked) {
+        logResolution({ ...baseLog, resolvedUrl: tracked, step: "passthrough", serpapiAttempted: false, serpapiResolved: false });
+        return NextResponse.redirect(tracked, 307);
+      }
       // API call failed → fall through to wrapWithAffiliate fallback
     }
-    return sendOut(target);
+    return sendOut(target, "passthrough");
   }
 
   /* Google relay — try cache first, then SerpAPI. */
   const cached = await readCache(target);
-  if (cached) return sendOut(cached);
+  if (cached) return sendOut(cached, "cache_hit");
 
   const resolved = await resolveViaSerpApi(target);
   if (resolved) {
     // Fire-and-forget — don't block redirect on cache write
     void writeCache(target, resolved);
-    return sendOut(resolved);
+    return sendOut(resolved, "serpapi_resolved", { serpapiAttempted: true, serpapiResolved: true });
   }
 
   /* Last resort — Google relay we couldn't resolve.
@@ -239,9 +327,7 @@ export async function GET(req: NextRequest) {
      title and the store is in our hand-built table. */
   if (titleHint && (storeIdHint || storeNameHint)) {
     const m = merchantSearchUrl(storeIdHint, storeNameHint, titleHint);
-    if (m) {
-      return NextResponse.redirect(wrapWithAffiliate(m.url, ctx), 307);
-    }
+    if (m) return sendOut(m.url, "merchant_search", { serpapiAttempted: true, serpapiResolved: false });
   }
 
   /* Step 2: smart fallback for long-tail merchants not in the
@@ -257,18 +343,14 @@ export async function GET(req: NextRequest) {
      When neither fires, fall through to Havlo /compare. */
   if (storeIdHint || storeNameHint) {
     const m = smartFallbackUrl(storeIdHint, storeNameHint, titleHint);
-    if (m) {
-      return NextResponse.redirect(wrapWithAffiliate(m.url, ctx), 307);
-    }
+    if (m) return sendOut(m.url, "smart_fallback", { serpapiAttempted: true, serpapiResolved: false });
   }
 
   /* Step 3: merchant homepage from the curated table when we have a
      store but no title and smart fallback didn't fire. */
   if (storeIdHint || storeNameHint) {
     const m = merchantHomepage(storeIdHint, storeNameHint);
-    if (m) {
-      return NextResponse.redirect(wrapWithAffiliate(m.url, ctx), 307);
-    }
+    if (m) return sendOut(m.url, "merchant_homepage", { serpapiAttempted: true, serpapiResolved: false });
   }
 
   /* Step 4: havlo /compare when we have a title but absolutely no
@@ -277,14 +359,14 @@ export async function GET(req: NextRequest) {
   if (titleHint) {
     const compareUrl = new URL(`${req.nextUrl.origin}/${country.code}/compare`);
     compareUrl.searchParams.set("q", titleHint);
+    logResolution({ ...baseLog, resolvedUrl: compareUrl.toString(), step: "havlo_compare", serpapiAttempted: true, serpapiResolved: false });
     return NextResponse.redirect(compareUrl, 307);
   }
 
   /* Step 5: absolute last resort — havlo /deals. Reached only when
      we have neither merchant nor title information AND can't resolve
      the relay URL. Rare. */
-  return NextResponse.redirect(
-    new URL(`/${country.code}/deals`, req.nextUrl.origin),
-    307,
-  );
+  const dealsUrl = new URL(`/${country.code}/deals`, req.nextUrl.origin).toString();
+  logResolution({ ...baseLog, resolvedUrl: dealsUrl, step: "havlo_deals", serpapiAttempted: true, serpapiResolved: false });
+  return NextResponse.redirect(dealsUrl, 307);
 }
