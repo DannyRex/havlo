@@ -136,18 +136,18 @@ export default async function DealsPage({
     const v = searchParams[k];
     return Array.isArray(v) ? v[0] : v;
   };
-  /* origin default must match DealFeed's client-side default ("all"
-     for every market — reverted from the "local" default that left
-     visitors to thin-native-catalog markets like UK/US/DE seeing
-     a sparse Local view on first paint when the All view has the
-     broader cross-border catalogue they genuinely shop). */
+  /* origin default must match DealFeed's client-side default
+     ("local" — see comment in DealFeed.tsx for the full history;
+     founder direction May 2026 to revert to local-first). When the
+     URL has no ?origin=, we fetch the local pool server-side so
+     SSR + client first-paint agree. */
   const initial = await fetchInitialDeals({
     country:  country.code,
     category: pickFirst("category"),
     tier:     pickFirst("minDiscount"),
     sort:     pickFirst("sort"),
     search:   pickFirst("search"),
-    origin:   pickFirst("origin") ?? "all",
+    origin:   pickFirst("origin") ?? "local",
     stores:   pickFirst("stores"),
   });
 

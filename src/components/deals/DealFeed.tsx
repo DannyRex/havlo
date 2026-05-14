@@ -151,24 +151,25 @@ export default function DealFeed({
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean),
   );
-  /* Default origin is "all" for every market.
+  /* Default origin is "local" for every market.
 
-     Reverted from "local" (May 2026 follow-up): the local-only
-     default made markets with thin native catalogues (UK ~9 local
-     stores, US ~9, DE ~11) look like Havlo had no deals. Visitors
-     landing on /uk/deals saw a sparse 50-row Local view by
-     default when the All view has ~3,000 cross-border rows the
-     visitor genuinely shops via freight forwarders / direct ship.
+     History:
+       v1 — country-aware: NG → "all", others → "local".
+       v2 — "local" everywhere. Anchored visitors in stores they
+            already trust on first paint.
+       v3 — "all" everywhere. Made thin-native markets look richer.
+       v4 (current) — back to "local". Founder direction May 2026:
+            "revert default selection to local." Trust + same-day
+            stores beat catalogue-breadth perception for first
+            impression. "All" tab is one tap away.
 
-     "All" surfaces the broader catalogue on first visit; users who
-     want only country-anchored stores can flip to Local with one
-     tap. The explicit ?origin= URL override still wins so
-     deep-links from social / newsletters resolve as authored. */
+     The explicit ?origin= URL override always wins so deep-links
+     from social / newsletters resolve as authored. */
   const initialOriginRaw = searchParams.get("origin");
   const initialOrigin: OriginFilter =
     initialOriginRaw && VALID_ORIGINS.has(initialOriginRaw as OriginFilter)
       ? (initialOriginRaw as OriginFilter)
-      : "all";
+      : "local";
 
   /* Initial state seeded from props (when page.tsx pre-fetched on the
      server) so first paint shows real cards, not the skeleton. When
