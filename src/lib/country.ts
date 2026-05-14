@@ -563,7 +563,24 @@ export function filterDealsForCountry<T extends DealLike>(deals: T[], country: C
     if (isStoreInCountry(d, country.code)) return true;
     const tag = dealCountryTag(d);
     if (tag === country.code) return true;
-    if (tag === null && d.currency === country.currency) return true;
+    if (tag === null && d.currency === country.currency) {
+      /* Untagged + currency-match used to pass unconditionally. That
+         leaked UK retailers (QVC UK, ASOS, John Lewis, Matalan) into
+         the US INTL pool because every SerpAPI row is normalised to
+         USD at ingest — so a UK retailer's row has currency=USD
+         which matches a US visitor's currency=USD, no country tag,
+         passes. QA report May 2026: "/us/deals?origin=intl shows UK
+         retailers as if they were international US options."
+
+         Fix: when the store's name/id IS recognised as belonging to
+         another country's roster (via inferStoreCountry), drop it
+         even if currency matches. Truly unknown stores still pass
+         (inferStoreCountry returns null → keep, matches the prior
+         "broadly relevant" bias). */
+      const inferred = inferStoreCountry(d.storeId, d.storeName);
+      if (inferred === null) return true;
+      return inferred.toLowerCase() === country.code.toLowerCase();
+    }
     return false;
   });
 

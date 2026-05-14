@@ -118,7 +118,7 @@ export default async function CategoryGrid({ country }: { country: Country }) {
             </p>
           </div>
           <Link
-            href="/deals"
+            href={`/${country.code}/deals`}
             className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-ink-2 hover:text-ink transition-colors shrink-0"
           >
             See all →
@@ -158,7 +158,7 @@ export default async function CategoryGrid({ country }: { country: Country }) {
             return (
               <CategoryTileLink
                 key={cat.id}
-                href={`/deals?category=${cat.slug}`}
+                href={`/${country.code}/deals?category=${cat.slug}`}
                 category={cat.slug}
                 position={idx}
                 className="group relative block aspect-[4/5] sm:aspect-[5/6] overflow-hidden rounded-2xl border border-border bg-surface hover:border-ink/40 hover:bg-surface-2 transition-all duration-300"

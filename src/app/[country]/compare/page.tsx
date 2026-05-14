@@ -101,8 +101,12 @@ function CompareContent() {
     setResult(null);
     setSniffLoading(true);
 
+    /* Preserve country prefix — bare /compare triggers middleware
+       redirect to /{cookie-country}/compare, which would route a
+       /uk visitor back to /us if their cookie is stale. Same fix
+       shape as DealFeed.tsx (May 2026). */
     router.replace(
-      `/compare?q=${encodeURIComponent(rawUrl)}&mode=similar`,
+      `/${country.code}/compare?q=${encodeURIComponent(rawUrl)}&mode=similar`,
       { scroll: false },
     );
 
@@ -173,7 +177,8 @@ function CompareContent() {
     setSniffResult(null);
     const params = new URLSearchParams({ q, mode: "similar" });
     if (pid) params.set("pid", pid);
-    router.replace(`/compare?${params.toString()}`, { scroll: false });
+    /* Country-prefixed — see comment on line 104. */
+    router.replace(`/${country.code}/compare?${params.toString()}`, { scroll: false });
     setLoading(true);
     setResult(null);
 

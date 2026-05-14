@@ -150,15 +150,24 @@ export default async function LivePdpPage({ params, searchParams }: PageProps) {
      FTS engine occasionally splits across signatures. */
   const seenIds = new Set<string>();
   const seenTitles = new Set<string>();
+  const seenStoreTitle = new Set<string>();
+  const normaliseTitle = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, "");
   const filteredDupes = countryFilteredDupes.filter((d) => {
-    if (offer.title && d.title === offer.title) return false;
+    if (offer.title && normaliseTitle(d.title) === normaliseTitle(offer.title)) return false;
     const best = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
     const id = best?.offerId || (best?.storeId + ":" + d.key);
     if (seenIds.has(id)) return false;
     seenIds.add(id);
-    const titleKey = d.title.toLowerCase().replace(/\s+/g, " ").trim();
+    const titleKey = normaliseTitle(d.title);
     if (seenTitles.has(titleKey)) return false;
     seenTitles.add(titleKey);
+    /* Same-store same-title collapse — catches Fashion-Nova-style
+       variant duplication where one merchant offers the same named
+       item at two prices (different SKU sizes / colors). Same shape
+       as /p/[id]. */
+    const storeTitleKey = `${best?.storeId ?? ""}|${titleKey}`;
+    if (seenStoreTitle.has(storeTitleKey)) return false;
+    seenStoreTitle.add(storeTitleKey);
     return true;
   });
 

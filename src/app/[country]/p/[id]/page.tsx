@@ -323,10 +323,18 @@ export default async function ProductPage({ params }: PageProps) {
      split near-identical titles into separate groups). */
   const seenIds = new Set<string>();
   const seenTitles = new Set<string>();
+  const seenStoreTitle = new Set<string>();
+  /* Normalise titles by stripping ALL non-alphanumeric characters and
+     lowercasing. Catches the cases the original whitespace-collapse
+     missed: invisible Unicode, smart-quotes, en-dash vs hyphen,
+     trailing punctuation variants. "Fashion Nova Alena Pleated Crepe
+     Mini Dress" and "Fashion-Nova: Alena Pleated Crepe Mini Dress"
+     collapse to the same key. */
+  const normaliseTitle = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, "");
   const filteredDupes = countryFilteredDupes.filter((d) => {
     if (offer.product_id && d.key === offer.product_id) return false;
     if (offer.offer_id && d.offers.some((o) => o.offerId === offer.offer_id)) return false;
-    if (offer.title && d.title === offer.title) return false;
+    if (offer.title && normaliseTitle(d.title) === normaliseTitle(offer.title)) return false;
     /* Dedupe by best-offer id (defensive — dupes engine already
        groups by signature, but FTS scoring sometimes splits near-
        identical titles into separate groups). */
@@ -334,17 +342,27 @@ export default async function ProductPage({ params }: PageProps) {
     const id = best?.offerId || (best?.storeId + ":" + d.key);
     if (seenIds.has(id)) return false;
     seenIds.add(id);
-    /* Also dedupe by NORMALISED title — the dupes engine can return
-       the same product TWICE under different keys when one row was
-       ingested with a slightly different signature (whitespace /
-       punctuation variance). User report May 2026: PDP YML rail
-       showed two identical "Motorola Razr 60 Ultra" cards from
-       Currys at £902. Title-collapse keeps the first, drops the
-       rest. Lowercase + collapse-whitespace keeps "Razr 60  Ultra"
-       and "razr 60 ultra" matched together. */
-    const titleKey = d.title.toLowerCase().replace(/\s+/g, " ").trim();
+    /* Title-key + store-title-key dedupes.
+
+       title-key: catches dupes where two DupeResults share a title
+       (FTS engine occasionally splits identical titles across keys
+       when ingest left slight signature variance).
+
+       store-title-key: catches the user-reported May 2026 case where
+       /us/p/{fashion-nova-mini-dress} surfaced "Fashion Nova Alena
+       Pleated Crepe Mini Dress" twice — once at $13 and once at $16.
+       Same merchant, same title, different SKU variants (different
+       size or color). Each variant has its own product_id so
+       title-only dedupe wouldn't catch it — but the SAME merchant
+       offering the SAME named item at two prices is, from the
+       shopper's perspective, the same product. Keep the cheapest;
+       drop the rest. */
+    const titleKey = normaliseTitle(d.title);
     if (seenTitles.has(titleKey)) return false;
     seenTitles.add(titleKey);
+    const storeTitleKey = `${best?.storeId ?? ""}|${titleKey}`;
+    if (seenStoreTitle.has(storeTitleKey)) return false;
+    seenStoreTitle.add(storeTitleKey);
     return true;
   });
 

@@ -100,6 +100,11 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "DHgate",        domain: "dhgate.com" },
   ],
   us: [
+    /* US roster — May 2026 expansion (QA report: marquee was thin
+       on US fashion / beauty / home retailers). Adding Macy's,
+       Sephora, Ulta, Lowe's, Home Depot, Kohl's, JCPenney filled
+       the gap. DHgate added to the cross-border tail to match the
+       UK / NG marquees. */
     { name: "Amazon",     domain: "amazon.com" },
     { name: "Walmart",    domain: "walmart.com" },
     { name: "Best Buy",   domain: "bestbuy.com" },
@@ -107,12 +112,20 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "eBay",       domain: "ebay.com" },
     { name: "Newegg",     domain: "newegg.com" },
     { name: "Costco",     domain: "costco.com" },
+    { name: "Macy's",     domain: "macys.com" },
     { name: "Nordstrom",  domain: "nordstrom.com" },
+    { name: "Sephora",    domain: "sephora.com" },
+    { name: "Ulta",       domain: "ulta.com" },
+    { name: "Home Depot", domain: "homedepot.com" },
+    { name: "Lowe's",     domain: "lowes.com" },
+    { name: "Kohl's",     domain: "kohls.com" },
+    { name: "JCPenney",   domain: "jcpenney.com" },
     { name: "Wayfair",    domain: "wayfair.com" },
     { name: "Etsy",       domain: "etsy.com" },
     { name: "SHEIN",      domain: "shein.com" },
     { name: "Temu",       domain: "temu.com" },
     { name: "AliExpress", domain: "aliexpress.com" },
+    { name: "DHgate",     domain: "dhgate.com" },
   ],
   de: [
     { name: "Amazon DE",  domain: "amazon.de" },

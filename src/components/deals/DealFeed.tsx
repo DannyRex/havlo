@@ -314,8 +314,19 @@ export default function DealFeed() {
     const current = searchParams.toString();
     if (desired === current) return;
 
-    router.replace(desired ? `/deals?${desired}` : "/deals", { scroll: false });
-  }, [category, tier, sort, searchDebounced, origin, selectedStores, router, searchParams]);
+    /* Preserve the country prefix when writing the URL back. The
+       bare /deals path triggers a middleware redirect to
+       /{cookie-country}/deals on the next navigation — which used
+       to silently route a visitor from /ng/deals (URL country)
+       back to /us/deals (cookie country) every time they touched a
+       filter. QA report May 2026: "navigating to /ng/deals while
+       cookie=US rewrote the URL to /us/deals?origin=local". The
+       fix is to keep the URL prefix the user actually navigated
+       to — country.code reads URL-first via CountryProvider's
+       useEffect, so this stays correct on country-scoped pages. */
+    const prefix = `/${country.code}`;
+    router.replace(desired ? `${prefix}/deals?${desired}` : `${prefix}/deals`, { scroll: false });
+  }, [category, tier, sort, searchDebounced, origin, selectedStores, router, searchParams, country.code]);
 
   const loadMore = useCallback(() => {
     if (loadingMore || !hasMore) return;
@@ -434,8 +445,13 @@ export default function DealFeed() {
       <div className="mb-4">
         <OriginToggle active={origin} onChange={setOrigin} counts={originCounts} />
         {origin === "intl" && (
+          /* Copy is country-aware. The previous hardcoded "₦ estimate"
+             leaked Naira onto /us, /uk, /de etc. — QA report May 2026
+             flagged "USD with a ₦ estimate" appearing on /us/deals.
+             For NG users the NGN-converted estimate is the actionable
+             number; for non-NG users it's the user's local currency. */
           <p className="mt-2 text-[11px] sm:text-xs text-ink-3 px-1">
-            Prices shown in USD with a ₦ estimate. Delivery and duties may apply.
+            Prices shown in USD with a {country.code === "ng" ? "₦" : country.currency} estimate. Delivery and duties may apply.
           </p>
         )}
       </div>
