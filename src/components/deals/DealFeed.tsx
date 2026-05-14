@@ -274,13 +274,27 @@ export default function DealFeed({
   const computeOriginCountsKey = () => JSON.stringify({
     category, tier, sort, search: searchDebounced, country: country.code,
   });
-  /* Initialise on mount with the current filter state so the FIRST
-     origin tab click is already stable. Without this, ref.current
-     would be null and the very first click would flip the badges
-     (because null !== newKey) before stability kicks in for
-     subsequent clicks. useRef's initializer only runs once, so the
-     ref keeps the mount-time key until a non-origin filter change
-     updates it. */
+  /* Initialise on mount with the current filter state so origin tab
+     clicks AFTER the first authoritative client response stay stable.
+     `hasReceivedClientCountsRef` separately tracks whether we've heard
+     from the API at all — until we have, every response refreshes
+     unconditionally (so a bad SSR snapshot doesn't lock us in).
+
+     The SSR initial fetch in /[country]/deals/page.tsx can return:
+       • null on network error → initialOriginCounts is undefined
+         → badges render no count → first client fetch populates.
+       • {all:0, local:0, intl:0} on RPC failure / curated fallback
+         → badges render "0" → without this gate we'd lock in zero.
+       • A correct snapshot → badges render correctly → first client
+         fetch will likely return the same numbers (origin invariant)
+         → visual no-op.
+
+     User report May 2026: "sometimes the count is zero until the
+     country is changed." Root cause was the previous fix's
+     "initialise ref on mount" assuming SSR was always trustworthy.
+     Now SSR is a placeholder; the first client response is the
+     authority. */
+  const hasReceivedClientCountsRef = useRef(false);
   const originCountsKeyRef = useRef<string>(computeOriginCountsKey());
   const router = useRouter();
   /* `country` is lifted to the top of the component (above
@@ -346,14 +360,21 @@ export default function DealFeed({
         setItems(items);
         setTotal(total);
         setHasMore(hasMore);
-        /* Refresh badge counts only when the inputs that drive them
-           changed — origin and selectedStores don't, so origin tab
-           clicks no longer flicker the badges. See originCountsKeyRef
-           comment for the full rationale. */
+        /* Refresh badge counts on:
+             1. The first ever client response (overrides bad SSR
+                snapshots — e.g. all-zero counts from RPC failure).
+             2. Any subsequent response where the badge-relevant
+                filter inputs changed (origin and selectedStores
+                don't, so origin tab clicks no longer flicker).
+           See originCountsKeyRef comment for the full rationale. */
         const newKey = computeOriginCountsKey();
-        if (originCounts && newKey !== originCountsKeyRef.current) {
+        const shouldRefresh =
+          !hasReceivedClientCountsRef.current ||
+          newKey !== originCountsKeyRef.current;
+        if (originCounts && shouldRefresh) {
           setOriginCounts(originCounts);
           originCountsKeyRef.current = newKey;
+          hasReceivedClientCountsRef.current = true;
         }
         if (Array.isArray(stores)) setStoreOptions(stores);
         offsetRef.current = PAGE_SIZE;
@@ -442,11 +463,18 @@ export default function DealFeed({
         /* Same gating as the first-page fetch — don't let load-more
            responses overwrite stable origin badge counts. The user's
            origin choice doesn't change during pagination, so the
-           counts MUST stay stable here. */
+           counts MUST stay stable here. Load-more still counts as a
+           valid client response, so it flips hasReceivedClientCounts
+           the same way (covers the "SSR bad, user paginated before
+           any other filter change" edge case). */
         const newKey = computeOriginCountsKey();
-        if (nextOriginCounts && newKey !== originCountsKeyRef.current) {
+        const shouldRefresh =
+          !hasReceivedClientCountsRef.current ||
+          newKey !== originCountsKeyRef.current;
+        if (nextOriginCounts && shouldRefresh) {
           setOriginCounts(nextOriginCounts);
           originCountsKeyRef.current = newKey;
+          hasReceivedClientCountsRef.current = true;
         }
         if (Array.isArray(nextStores)) setStoreOptions(nextStores);
         offsetRef.current += PAGE_SIZE;
