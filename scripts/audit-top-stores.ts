@@ -24,10 +24,12 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { inferStoreCountry } from "../src/lib/country";
-import { config } from "dotenv";
-import { resolve } from "path";
 
-config({ path: resolve(__dirname, "..", ".env.local") });
+/* Match the existing repo convention (see scripts/dedup-products.ts).
+   Node 20.6+ exposes process.loadEnvFile() as a built-in so we don't
+   need to depend on dotenv. The optional-chain swallows older Node
+   silently — fall back to whatever's in process.env. */
+try { process.loadEnvFile?.(".env.local"); } catch {/* env may be set externally */}
 
 interface StoreRow {
   store_id:    string;
@@ -53,29 +55,51 @@ if (!SUPA_URL || !SUPA_KEY) {
 const supa = createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: false } });
 
 async function fetchTopStores(): Promise<StoreRow[]> {
-  /* PostgREST aggregate via RPC would be cleanest, but the offers
-     table is small enough to pull store_id + join store_name in a
-     single query and aggregate in-process. Filter for in_stock=true
-     because out-of-stock offers can't drive clicks. */
-  const { data, error } = await supa
-    .from("offers")
-    .select("store_id, in_stock, stores(name)")
-    .eq("in_stock", true)
-    .limit(500_000);
+  /* PostgREST silently caps a single SELECT at 1000 rows regardless of
+     the .limit() value we ask for (same cap migration 0019 added the
+     browse_deals RPC to defeat for the deals feed). We have to
+     paginate via .range() if we want a true count.
 
-  if (error) throw new Error(`Supabase: ${error.message}`);
-  if (!data) return [];
-
+     Filter for in_stock=true because out-of-stock offers can't drive
+     clicks. The dashboard agent prompt asks the audit agent to focus
+     on stores that actually surface deals to users. */
+  const PAGE = 1000;
   const counts = new Map<string, { name: string; count: number }>();
-  for (const row of data as Array<{ store_id: string; stores: { name: string } | { name: string }[] | null }>) {
-    const storesField = row.stores;
-    const store = Array.isArray(storesField) ? storesField[0] : storesField;
-    const name  = store?.name ?? row.store_id;
-    const key   = row.store_id;
-    const cur   = counts.get(key);
-    if (cur) cur.count += 1;
-    else counts.set(key, { name, count: 1 });
+  let from = 0;
+  let pagesRead = 0;
+  for (;;) {
+    const { data, error } = await supa
+      .from("offers")
+      .select("store_id, in_stock, stores(name)")
+      .eq("in_stock", true)
+      .range(from, from + PAGE - 1);
+
+    if (error) throw new Error(`Supabase page ${pagesRead}: ${error.message}`);
+    if (!data || data.length === 0) break;
+
+    for (const row of data as Array<{ store_id: string; stores: { name: string } | { name: string }[] | null }>) {
+      const storesField = row.stores;
+      const store = Array.isArray(storesField) ? storesField[0] : storesField;
+      const name  = store?.name ?? row.store_id;
+      const key   = row.store_id;
+      const cur   = counts.get(key);
+      if (cur) cur.count += 1;
+      else counts.set(key, { name, count: 1 });
+    }
+
+    pagesRead += 1;
+    /* Stop when the page came back short — that's the last page. */
+    if (data.length < PAGE) break;
+    from += PAGE;
+    /* Defensive ceiling so a runaway loop can't hammer Supabase. The
+       offers table is on the order of 100k–500k rows, so 1000 pages
+       is plenty of headroom. */
+    if (pagesRead > 1000) {
+      console.error(`Stopped after ${pagesRead} pages — investigate row count.`);
+      break;
+    }
   }
+  console.error(`Scanned ${pagesRead} page(s), ${counts.size} distinct stores.`);
 
   return [...counts.entries()]
     .map(([store_id, { name, count }]) => ({ store_id, store_name: name, offer_count: count }))

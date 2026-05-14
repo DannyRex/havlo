@@ -199,6 +199,25 @@ export async function GET(req: NextRequest) {
       effectiveOrigin === "intl"  ? qualifyingIntl  :
       qualifyingCountryFiltered;
 
+    /* Degraded-response detector — fires when browse_deals RPC failed
+       upstream and getCuratedDeals() served the response instead. In
+       that case every item has a storeId like amazon-uk-* / amazon-us-*
+       / amazon-de-* (the curated catalog is Amazon-only). Production
+       data is never Amazon-only; even sparse markets surface a few
+       cross-border stores. We use this as the cache-poisoning safeguard:
+       when degraded, the response gets `Cache-Control: no-store` so
+       Vercel + Next.js + browser caches all refuse to retain it.
+
+       Why this matters: the SSR fetch in /[country]/deals/page.tsx now
+       uses cache: "no-store" (May 2026 fix). But this header is a
+       second layer of defence — any future re-enabling of fetch cache,
+       any CDN downstream, any client-side cache, all see no-store and
+       refuse to retain the bad response. */
+    const looksLikeCuratedFallback =
+      allRawAcrossOrigins.length > 0 &&
+      allRawAcrossOrigins.length <= 80 &&
+      allRawAcrossOrigins.every((d) => d.storeId.startsWith("amazon-") || d.storeId === "amazon");
+
     /* Build the stores aggregate as a HYBRID:
 
        • Store LIST comes from the broad pool — every store in the
@@ -353,7 +372,16 @@ export async function GET(req: NextRequest) {
         status: 200,
         headers: {
           "Content-Type":  "application/json",
-          "Cache-Control": "s-maxage=600, stale-while-revalidate=3600",
+          /* Degraded responses (browse_deals RPC fell back to curated)
+             are explicitly NOT cached — see looksLikeCuratedFallback
+             check above. Production responses keep the normal SWR
+             cache so warm visitors hit the edge. */
+          "Cache-Control": looksLikeCuratedFallback
+            ? "private, no-store, no-cache, max-age=0, must-revalidate"
+            : "s-maxage=600, stale-while-revalidate=3600",
+          /* Diagnostic header so we can grep nginx / Vercel logs for
+             fallback hits and know when to investigate the RPC. */
+          "X-Havlo-Degraded": looksLikeCuratedFallback ? "curated-fallback" : "ok",
         },
       },
     );
