@@ -155,18 +155,63 @@ const COUNTRY_CROSS_BORDER: Record<string, string[]> = {
     /* Cross-region globals NG buyers also reach. */
     "wish.com", "alibaba.com", "lightinthebox", "geekbuying",
   ],
-  uk: ["aliexpress", "shein", "temu", "dhgate", "banggood"],
-  us: ["aliexpress", "shein", "temu", "dhgate"],
-  de: ["aliexpress", "shein", "temu", "dhgate", "banggood"],
-  ae: ["aliexpress", "shein", "temu", "amazon.com", "amazon.co.uk"],
+  /* Non-NG cross-border lists expanded May 2026 to credit the full
+     set of global retailers a shopper in each market can plausibly
+     reach. The previous lists were tight (4-5 entries: AliExpress,
+     SHEIN, Temu, DHgate, Banggood) which under-counted Wish /
+     Alibaba / Lightinthebox / Geekbuying / Trendyol — globals that
+     ship worldwide. The new entries also feed the Hero store-count
+     pill via getCrossBorderStoreCountForCountry so non-NG markets
+     show "local + intl" counts that match the user's actual reach,
+     not just the country's marquee. NG list is unchanged — already
+     comprehensive (UK retailers + US retailers via freight
+     forwarders). */
+  uk: ["aliexpress", "shein", "temu", "dhgate", "banggood", "wish.com", "alibaba.com", "lightinthebox", "geekbuying", "trendyol"],
+  us: ["aliexpress", "shein", "temu", "dhgate", "wish.com", "alibaba.com", "lightinthebox", "geekbuying", "trendyol"],
+  de: ["aliexpress", "shein", "temu", "dhgate", "banggood", "wish.com", "alibaba.com", "lightinthebox", "geekbuying", "trendyol"],
+  ae: ["aliexpress", "shein", "temu", "amazon.com", "amazon.co.uk", "dhgate", "banggood", "wish.com", "alibaba.com", "trendyol"],
   // Shein officially banned in India since 2020. Import duties make
   // most Western cross-border purchases impractical except Amazon Global.
-  in: ["aliexpress"],
-  za: ["aliexpress", "shein", "temu", "amazon.com"],
+  // The expanded global tail (Wish / AliExpress) still passes Indian
+  // customs at low value thresholds.
+  in: ["aliexpress", "amazon.com", "wish.com", "alibaba.com"],
+  za: ["aliexpress", "shein", "temu", "amazon.com", "amazon.co.uk", "dhgate", "banggood", "wish.com", "alibaba.com", "trendyol"],
 };
 
 function crossBorderListFor(countryCode: string): string[] {
   return COUNTRY_CROSS_BORDER[countryCode] ?? DEFAULT_CROSS_BORDER;
+}
+
+/* Canonicalise a cross-border allowlist entry to a stable 8-char
+   slug so retailer variants collapse:
+     "best buy" / "best-buy" / "bestbuy"  → "bestbuy"
+     "john lewis" / "john-lewis" / "johnlewis" → "johnlewi"
+     "ao.com" / "ao-com" → "aocom"
+   Used by both getCrossBorderStoreCountForCountry and the slug-set
+   exporter that StoreLogos uses for its local+intl union count. */
+function canonicaliseStoreSlug(entry: string): string {
+  return entry.toLowerCase().replace(/[-.\s&_]/g, "").slice(0, 8);
+}
+
+/* Canonical set of cross-border retailer slugs reachable from a
+   given market. Public because StoreLogos.tsx unions this with
+   the ROSTERS local set to compute the "local + intl" Hero pill. */
+export function crossBorderSlugsForCountry(countryCode: string): Set<string> {
+  const list = COUNTRY_CROSS_BORDER[countryCode.toLowerCase()] ?? DEFAULT_CROSS_BORDER;
+  const seen = new Set<string>();
+  for (const entry of list) {
+    const canon = canonicaliseStoreSlug(entry);
+    if (canon.length >= 3) seen.add(canon);
+  }
+  return seen;
+}
+
+/* Approximate count of unique cross-border retailers a shopper in
+   this country can reach via Havlo. Wraps crossBorderSlugsForCountry
+   and returns just the size. May 2026 user request from the
+   country-awareness audit follow-up. */
+export function getCrossBorderStoreCountForCountry(countryCode: string): number {
+  return crossBorderSlugsForCountry(countryCode).size;
 }
 
 /* Stores that are NG-anchored — never appropriate outside Nigeria.

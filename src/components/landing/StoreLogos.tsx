@@ -1,4 +1,5 @@
 import { StoreLogoChip, type StoreEntry } from "./StoreLogoChip";
+import { crossBorderSlugsForCountry } from "@/lib/country";
 
 /* Per-country marquee rosters.
 
@@ -182,10 +183,52 @@ const ROSTERS: Record<string, StoreEntry[]> = {
 };
 
 /* Public helper: how many stores does Havlo cover for the given
-   country? Used by the per-country marquee below. Defaults to NG
-   roster when the country code is unknown. */
+   country? Returns LOCAL (the country's ROSTERS entries) PLUS
+   INTL (the country's cross-border allowlist from country.ts,
+   deduped to unique retailer slugs). The marquee at the bottom
+   of the homepage shows only the ROSTERS entries; this count
+   credits the full cross-border reach so the hero pill reflects
+   what a shopper in this country can actually reach via Havlo.
+
+   May 2026 user request from the country-awareness audit follow-
+   up: "for the 87 hardcoded, instead of just per country, can we
+   do local + intl stores. eg In NG, add local and the intl stores
+   and show that, do so for all countries."
+
+   For NG the cross-border list is huge (NG shoppers use UK Argos /
+   US Walmart / Macy's / Sephora / etc.) so the pill jumps from
+   the prior 22 → roughly 50+. For UK / US / DE / etc. the cross-
+   border allowlist is tighter (4-5 entries: AliExpress, SHEIN,
+   Temu, DHgate, Banggood) so the bump is smaller — but the count
+   still shifts to "local + the 4 universal cross-border globals"
+   which is the correct framing per market. */
 export function getStoreCountForCountry(countryCode: string): number {
-  return (ROSTERS[countryCode] ?? ROSTERS.ng).length;
+  const roster = ROSTERS[countryCode] ?? ROSTERS.ng;
+  /* Set-union: canonicalise every roster domain AND every cross-
+     border allowlist entry to a stable 8-char slug, then count
+     distinct slugs across both sets. "AliExpress" in the roster
+     (domain "aliexpress.com" → "aliexpre") collapses with the
+     allowlist's "aliexpress" → "aliexpre" so it's counted once.
+
+     For NG: 22 roster ∪ ~70 cross-border canonicals - ~5 overlap
+       = ~87 reachable retailers
+     For UK: 22 roster ∪ ~10 cross-border ∪ ~4 overlap
+       = ~28 reachable retailers
+     For IN: 11 roster ∪ ~4 cross-border ∪ ~1 overlap (AliExpress)
+       = ~14 reachable retailers */
+  const canonicalise = (s: string): string =>
+    s.toLowerCase().replace(/[-.\s&_]/g, "").slice(0, 8);
+  const union = new Set<string>();
+  for (const entry of roster) {
+    if (entry.domain) union.add(canonicalise(entry.domain));
+  }
+  /* Set is iterable but our tsconfig (target=es2017) doesn't allow
+     `for…of` on iterables without --downlevelIteration. Array.from
+     gives the same result without that flag. */
+  Array.from(crossBorderSlugsForCountry(countryCode)).forEach((slug) =>
+    union.add(slug),
+  );
+  return union.size;
 }
 
 /* Public helper: TOTAL distinct stores Havlo covers across every

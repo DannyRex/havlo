@@ -5,6 +5,63 @@ Total entries (incl. alias keys): **177**
 
 Sample query used in the URLs below: `lawn mower` (encoded as `lawn%20mower`)
 
+## Resolution priority — what the resolver actually tries to do
+
+When a Havlo user clicks "View at {Merchant}" on a PDP, the
+`/api/go` route walks this priority order. The merchant search
+URLs cataloged in this doc are the **fallback** (steps 4-6), NOT
+the primary destination — they only fire when the resolver can't
+reach a direct product page.
+
+1. **Passthrough** — if `offer.url` is already a direct merchant
+   PDP URL (e.g. `https://www.matalan.co.uk/products/jersey-tie-midi-dress-grey`),
+   redirect straight there. **This is the goal.** The resolver
+   only walks to step 2+ when the original URL is a Google
+   Shopping relay that hasn't been resolved yet.
+
+2. **Cache hit** — same-day Google relay we've already resolved
+   to a direct PDP for another visitor. Reuses the cached PDP URL,
+   skipping the SerpAPI credit. **Still a PDP destination.**
+
+3. **SerpAPI resolution** — for unresolved Google relays, hit
+   SerpAPI's `google_product` endpoint to get the merchant's
+   direct PDP URL for the productid embedded in the relay.
+   Hostname-verified against the expected merchant before
+   trusting the result — if SerpAPI returns Walmart for a
+   Fashion-Nova-tagged relay, we reject and fall through.
+   **PDP when it works; falls through on miss.**
+
+4. **Merchant search URL** (this doc) — when steps 1-3 all fail
+   for a Google relay, we drop the user on the merchant's own
+   search page with their product title in the search box. **Not
+   a PDP, but at least the right merchant + the right query.**
+   Most users find the product they wanted in the first or
+   second result.
+
+5. **Smart fallback** — guess the merchant's homepage from
+   storeName + country TLD when no curated search entry exists.
+
+6. **Merchant homepage / Havlo `/compare` / `/deals`** — last
+   resort, never the goal.
+
+### What "good" looks like per priority level
+
+| Step | Best destination | What this audit verifies |
+|---|---|---|
+| 1-3 (PDP) | The exact product page the user clicked | Live test of `/api/go` with a real offer URL — outside this doc's scope. Covered by `docs/click-resolver-audit-agent-v2.md`. |
+| 4 (search) | Merchant's search results page populated with the query | **This is what this doc audits.** Verify each URL pattern still lands on a real search results page. |
+| 5-6 | Merchant homepage | Always works (we own the URL); no audit needed. |
+
+This audit is specifically about step 4 — the merchant search URL
+fallback. A passing audit here means **the safety net works when
+the PDP-resolution path fails**. It does NOT mean every Havlo
+click ends up on a search page — most clicks land directly on a
+PDP via steps 1-3.
+
+---
+
+
+
 ## NG — 10 merchants
 
 | Store ID | Display name | Homepage | Sample search URL |
@@ -216,13 +273,30 @@ Sample query used in the URLs below: `lawn mower` (encoded as `lawn%20mower`)
 
 ## Agent prompt (copy from here)
 
-You are a QA agent verifying outbound search URLs for Havlo
-(https://havlo.io). Havlo redirects shoppers to a merchant's own
-search page as a fallback when it can't resolve a Google Shopping
-relay. The URLs were authored by hand; some are 6+ months old and
-some merchants change their search endpoint silently. Your job is
-to confirm whether each search URL still produces a real search
-results page on the live merchant site.
+You are a QA agent verifying outbound URLs for Havlo
+(https://havlo.io). Havlo prefers to land each click on the
+merchant's specific product detail page (PDP). When that's not
+possible, it falls back to the merchant's search results page
+with the product title in the search box. Your job is two-part:
+
+1. **PDP probe** (priority 1) — for a small subset of merchants,
+   open the sample search URL and pick the FIRST product card in
+   the results. Confirm clicking it lands on a real PDP for that
+   product. This tests whether the merchant's own search ranks
+   plausibly for the test query.
+
+2. **Search URL audit** (priority 2 — the bulk of this run) — for
+   every merchant in the tables above, confirm the sample search
+   URL itself produces a real search results page on the live
+   merchant site. This URL is the safety net when Havlo's PDP-
+   resolution path fails.
+
+A passing audit means: priority-2 fallback works for every
+merchant. Priority-1 PDP landing has its own dedicated audit
+flow (see `docs/click-resolver-audit-agent-v2.md` for full Havlo-
+side click testing). Don't re-do that here — just spot-check 3-5
+merchants per market to confirm their search → first-result-click
+chain reaches a real PDP.
 
 ### Procedure
 
@@ -297,6 +371,34 @@ For each merchant in the tables above:
      we can compare against the URL we were trying to hit.
    - **Notes** — empty if `ok`, otherwise a one-line description
      of what went wrong.
+
+### PDP probe (priority 1 — spot-check, 3-5 merchants per market)
+
+For 3-5 randomly-picked merchants per market (NG / UK / US / DE /
+AE / IN / ZA), after the search results load (verdict = `ok`), do
+ONE additional step:
+
+1. Click the FIRST product card in the search results.
+2. Confirm the destination is a real product detail page —
+   product image, price, "Add to cart" / "Buy now" button visible,
+   a clear product title at the top.
+3. If yes → record this PDP-probe outcome as a separate column
+   in your report: **`pdp-ok`** for that merchant.
+4. If the click lands on a category page, listing page, broken
+   page, or "no results" page instead of a PDP → record as
+   **`pdp-fail`** with a one-line description.
+
+This is purely confirmatory — we already know merchant search
+pages work (that's the prior verdict). The PDP probe answers the
+follow-up question: *does the merchant's search rank a plausible
+product first for this query*, so that when Havlo eventually
+sends a user here as a fallback, the first thing they see is a
+buyable item.
+
+If a merchant's `ok` search page surfaces 0 relevant results (e.g.
+generic "lawn mower" matched 200 unrelated products on Selfridges)
+then `pdp-fail` is the right call — the search URL is technically
+correct but unhelpful in practice.
 
 ### Constraints
 
