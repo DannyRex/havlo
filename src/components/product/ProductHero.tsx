@@ -311,9 +311,30 @@ export default function ProductHero({ offer, countryCode, totalStores, priceStat
             totalStores is known and > 1, so the user can see at a
             glance how broad the compare view will be. Falls back to
             generic copy when the count isn't computable (e.g. a curated
-            row without a dupes pre-fetch). */}
+            row without a dupes pre-fetch).
+
+            We pass `pid` (the anchor's product_id) alongside `q` so
+            /api/compare's pid-backstop can find the product directly
+            when FTS over the title misses. FTS misses are common for
+            unique product titles — pg_trgm similarity is naturally
+            low for short or unusual phrasings. User report May 2026:
+            "coming from the pdp page of S61 Wireless Bluetooth
+            Speaker Superbass Microphone, i clicked compare across
+            stores and it didn't find anything." That's the exact
+            shape FTS struggles with — a model code + generic terms,
+            no canonical brand/SKU to anchor scoring on. The
+            backstop in /api/compare:129 picks the product up by ID
+            and returns the anchor + any dupes, so the user always
+            sees their product on /compare. Synthetic productIds
+            (curated Amazon slugs like 'amazon-us-iphone-15-pro-max')
+            return empty from the backstop and are harmless — the
+            primary FTS path is still the main route for those. */}
         <Link
-          href={`/${countryCode}/compare?q=${encodeURIComponent(offer.title)}&mode=similar`}
+          href={(() => {
+            const params = new URLSearchParams({ q: offer.title, mode: "similar" });
+            if (offer.productId) params.set("pid", offer.productId);
+            return `/${countryCode}/compare?${params.toString()}`;
+          })()}
           className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-border-strong text-ink font-medium text-[14px] hover:bg-surface-2 transition-colors mb-4"
         >
           {typeof totalStores === "number" && totalStores > 1
