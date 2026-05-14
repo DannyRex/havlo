@@ -8,7 +8,7 @@ import { ImageResponse } from "next/og";
 import { OgShell, OG_SIZE } from "@/components/seo/og-shell";
 
 export const runtime    = "edge";
-export const alt        = "How Havlo makes money — affiliate transparency";
+export const alt        = "How Havlo makes money - affiliate transparency";
 export const size       = OG_SIZE;
 export const contentType = "image/png";
 
@@ -19,7 +19,7 @@ export default function HowWeMakeMoneyOG() {
         eyebrow="Transparency"
         headline="How Havlo"
         subline="makes money."
-        subhead="Affiliate links, no inflated prices, no bias on results — the cheapest store still ranks first."
+        subhead="Affiliate links, no inflated prices, no bias on results - the cheapest store still ranks first."
       />
     ),
     size,

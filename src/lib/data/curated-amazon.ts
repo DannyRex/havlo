@@ -68,7 +68,7 @@ const PRODUCTS: CuratedProduct[] = [
   {
     slug: "iphone-15-pro-max",
     title: "Apple iPhone 15 Pro Max 256GB",
-    description: "A17 Pro chip, titanium frame, 5x optical zoom — Apple's current flagship phone.",
+    description: "A17 Pro chip, titanium frame, 5x optical zoom - Apple's current flagship phone.",
     category: "Phones",
     categorySlug: "phones",
     searchQuery: "iPhone 15 Pro Max 256GB",

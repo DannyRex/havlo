@@ -408,7 +408,7 @@ async function sweepStaleOffers(
 
   if (batchSize < MIN_DEALS_FOR_SWEEP) {
     console.warn(
-      `[ingest] sweep skipped for ${storeId}: only ${batchSize} deals upserted (< ${MIN_DEALS_FOR_SWEEP}). Looks like a broken scrape — leaving existing offers untouched.`,
+      `[ingest] sweep skipped for ${storeId}: only ${batchSize} deals upserted (< ${MIN_DEALS_FOR_SWEEP}). Looks like a broken scrape - leaving existing offers untouched.`,
     );
     return;
   }
@@ -435,7 +435,7 @@ async function sweepStaleOffers(
 
   if (existingCount && batchSize < existingCount * MIN_BATCH_FRACTION_OF_EXISTING) {
     console.warn(
-      `[ingest] sweep skipped for ${storeId}: batch (${batchSize}) is < ${Math.round(MIN_BATCH_FRACTION_OF_EXISTING * 100)}% of existing in-stock (${existingCount}). Looks like a partial scrape — leaving existing offers untouched.`,
+      `[ingest] sweep skipped for ${storeId}: batch (${batchSize}) is < ${Math.round(MIN_BATCH_FRACTION_OF_EXISTING * 100)}% of existing in-stock (${existingCount}). Looks like a partial scrape - leaving existing offers untouched.`,
     );
     return;
   }

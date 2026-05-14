@@ -5,7 +5,7 @@ import { ImageResponse } from "next/og";
 import { OgShell, OG_SIZE } from "@/components/seo/og-shell";
 
 export const runtime    = "edge";
-export const alt        = "Cashback on Havlo — coming soon";
+export const alt        = "Cashback on Havlo - coming soon";
 export const size       = OG_SIZE;
 export const contentType = "image/png";
 

@@ -1696,7 +1696,7 @@ export const posts: BlogPost[] = [
             for a $500 item from Amazon US, you should budget about
             ₦1.05M landed in Lagos.
           </strong>{" "}
-          That's roughly the item plus 30% — and that 30% is what we
+          That's roughly the item plus 30% - and that 30% is what we
           show on every cross-border deal card on Havlo for exactly
           this reason.
         </p>
@@ -1820,7 +1820,7 @@ export const posts: BlogPost[] = [
           Every cross-border deal on Havlo shows an &ldquo;Estimated
           total&rdquo; with the +30% applied. Tap the info icon for
           the breakdown. The number is a planning estimate, not a
-          quote — your actual total varies by carrier, weight, and
+          quote - your actual total varies by carrier, weight, and
           customs assessment. We use 30% because that lands the right
           ballpark for 70%+ of small-electronics imports based on
           shipper data we sample monthly.
@@ -1848,7 +1848,7 @@ export const posts: BlogPost[] = [
         </p>
         <p>
           We tested these against the AirPods Pro 2 (USB-C) over a
-          two-week stretch — commute, calls, gym, plane — and ranked
+          two-week stretch - commute, calls, gym, plane - and ranked
           by what actually matters in daily use.
         </p>
 

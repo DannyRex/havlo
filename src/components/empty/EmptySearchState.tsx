@@ -149,7 +149,7 @@ export default function EmptySearchState({ query, source, browseHref, suggestion
               Did you mean one of these?
             </h3>
             <p className="text-sm text-ink-3 leading-relaxed">
-              We didn&apos;t find an exact match for &ldquo;{query}&rdquo; — these are the closest.
+              We didn&apos;t find an exact match for &ldquo;{query}&rdquo; - these are the closest.
             </p>
           </>
         ) : (

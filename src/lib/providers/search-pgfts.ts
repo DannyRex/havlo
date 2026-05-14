@@ -78,7 +78,7 @@ export const pgFtsSearchProvider: SearchProvider = {
     if (error) {
       // Function may not exist if migration 0002 hasn't been applied — fall through silently
       if (error.message?.includes("function") && error.message?.includes("does not exist")) {
-        console.warn("[pg-fts] search_products_fts RPC not found — has 0002-fts-search.sql been applied?");
+        console.warn("[pg-fts] search_products_fts RPC not found - has 0002-fts-search.sql been applied?");
         return [];
       }
       throw new ProviderError(this.id, error.message);

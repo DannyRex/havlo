@@ -80,7 +80,7 @@ export function notifyProductMatchFound({ query, country, offers }: Args): Email
   const offerRows = offers.slice(0, 5).map((o) => {
     return `<p style="margin:0 0 14px 0;line-height:1.5;">
 <a href="${escapeAttr(o.url)}" style="color:#0057FF;text-decoration:none;font-weight:600;">${escapeHtml(o.title)}</a>
-<br/><span style="color:#1f2937;">${escapeHtml(o.price)}</span> <span style="color:#64748b;">— ${escapeHtml(o.storeName)}</span>
+<br/><span style="color:#1f2937;">${escapeHtml(o.price)}</span> <span style="color:#64748b;">- ${escapeHtml(o.storeName)}</span>
 </p>`;
   }).join("\n");
 

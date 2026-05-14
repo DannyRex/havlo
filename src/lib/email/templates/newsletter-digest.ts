@@ -1,4 +1,4 @@
-/* Twice-weekly deals digest — sent by scripts/cron/send-newsletter.ts
+/* Twice-weekly deals digest - sent by scripts/cron/send-newsletter.ts
    right after the Mon + Thurs scrape cron finishes ingesting fresh
    inventory.
 
@@ -12,7 +12,7 @@
    get only their slug; nulls get the catch-all roundup. */
 
 interface DigestDeal {
-  /** Cleaned title — what shows on the card. */
+  /** Cleaned title - what shows on the card. */
   title:           string;
   /** Display price string already formatted in the user's country
       currency (e.g. "₦425,000", "£249.99"). The template renders it
@@ -24,21 +24,21 @@ interface DigestDeal {
   originalDisplay: string | null;
   discountPercent: number;
   storeName:       string;
-  /** Absolute outbound URL — already routed through /api/go so the
+  /** Absolute outbound URL - already routed through /api/go so the
       affiliate wrap fires on click. */
   url:             string;
 }
 
 interface Args {
   country: string | null;
-  /** Optional category filter — when set, the digest covers a single
+  /** Optional category filter - when set, the digest covers a single
       category (phones, audio, …) and the subject/headline call it
       out. Null = cross-category roundup. */
   category?: string | null;
   /** Display name of the category for the subject line (e.g. "Phones",
       "Audio"). Not used when category is null. */
   categoryLabel?: string;
-  /** The deals themselves — pre-filtered and ranked by the cron. */
+  /** The deals themselves - pre-filtered and ranked by the cron. */
   deals: DigestDeal[];
 }
 
@@ -70,14 +70,14 @@ export function newsletterDigest({ country, category, categoryLabel, deals }: Ar
 
   const intro = opener(category ?? null);
 
-  /* Plain text version — readable in any email client, regardless of
+  /* Plain text version - readable in any email client, regardless of
      HTML rendering. Each deal gets a short block: title, price, store,
      direct link. */
   const dealLines: string[] = [];
   for (const d of deals) {
     dealLines.push(
       `${d.title}`,
-      `  ${d.priceDisplay}${d.originalDisplay ? ` (was ${d.originalDisplay})` : ""}${d.discountPercent > 0 ? ` — ${d.discountPercent}% off` : ""} at ${d.storeName}`,
+      `  ${d.priceDisplay}${d.originalDisplay ? ` (was ${d.originalDisplay})` : ""}${d.discountPercent > 0 ? ` - ${d.discountPercent}% off` : ""} at ${d.storeName}`,
       `  ${d.url}`,
       ``,
     );
@@ -98,7 +98,7 @@ export function newsletterDigest({ country, category, categoryLabel, deals }: Ar
     `Reply "remove" anytime to drop off the list.`,
   ].join("\n");
 
-  /* HTML version — same content, lightly styled. Inline styles only
+  /* HTML version - same content, lightly styled. Inline styles only
      (no <style> block) for max email-client compatibility. */
   const dealsHtml = deals.map((d) => `
 <div style="border-top:1px solid #e2e8f0;padding:14px 0;">
@@ -130,7 +130,7 @@ ${dealsHtml}
   return { subject, text, html };
 }
 
-/* Minimal HTML escape — prevents merchant titles or URLs containing
+/* Minimal HTML escape - prevents merchant titles or URLs containing
    ampersands / quotes / angle brackets from breaking the rendered
    email or being interpreted as markup. */
 function escape(s: string): string {

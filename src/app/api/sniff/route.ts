@@ -346,7 +346,7 @@ async function normalizeTitle(
           content:
             `Store: ${store}\n` +
             `Raw title: ${rawTitle}\n\n` +
-            `Return JSON: { "title": "<clean product name + key specs (storage, color, RAM, screen size, etc.) — no store name, no ads>", "brand": "<brand name or null>" }`,
+            `Return JSON: { "title": "<clean product name + key specs (storage, color, RAM, screen size, etc.) - no store name, no ads>", "brand": "<brand name or null>" }`,
         },
       ],
     });

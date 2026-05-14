@@ -146,7 +146,7 @@ function resolveCountry(requested: string | undefined): { country: string; warne
   const cc = (requested ?? FALLBACK_COUNTRY).toLowerCase();
   if (SUPPORTED_GL.has(cc)) return { country: cc, warned: false };
   console.warn(
-    `[serpapi-shopping] Country "${cc}" not supported by Google Shopping — falling back to "${FALLBACK_COUNTRY}"`,
+    `[serpapi-shopping] Country "${cc}" not supported by Google Shopping - falling back to "${FALLBACK_COUNTRY}"`,
   );
   return { country: FALLBACK_COUNTRY, warned: true };
 }

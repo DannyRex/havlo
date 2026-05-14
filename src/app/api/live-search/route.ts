@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
       {
         items: [],
         providers: [],
-        note: "Live search paused for the rest of this month — monthly budget reached. Returning catalog-only results via /api/compare and /api/deals.",
+        note: "Live search paused for the rest of this month - monthly budget reached. Returning catalog-only results via /api/compare and /api/deals.",
         budget: { calls: budget.calls, cap: budget.cap, monthKey: budget.monthKey },
       },
       /* Short cache so we re-check budget within minutes if a
