@@ -105,34 +105,33 @@ export default function ListCard({ deal, linkHref }: Props) {
      treatment. See isStoreSearchUrl() for the detection rules. */
   const isPriceFromOnly = isStoreSearchUrl(deal.url);
 
-  /* Secondary price hint — shows the deal's NATIVE currency (what
-     the merchant actually charges) when the user's display currency
-     is different. Was hardcoded to NGN, which surfaced "≈ ₦806K" on
-     /uk/deals — a non-sequitur for a UK shopper looking at a Currys
-     listing. Round-4 QA caught. The primary already shows the user's
-     local currency (via convertToUserCurrency above); the secondary
-     reveals the merchant's actual charge so the user knows what
-     they'll see at checkout. */
-  const isUSD = deal.currency === "USD";
-  const ngnEquivStr = !sameCcy && isUSD
-    ? `≈ $${deal.salePrice.toFixed(2)}`
-    : null;
-
-  /* Cross-border total estimate (price + ~30% shipping/customs).
-     Now formatted in the user's currency. Replaces the previous
-     hardcoded ₦ rendering that broke for non-NG mobile users. */
-  /* Cross-border check uses store country (not currency) — same fix
-     applied in MasonryCard. SerpAPI normalises all UK retailer
-     prices to USD, so a currency-only check would mark every Argos
-     row as cross-border for UK users. */
   /* Three-step cross-border check (matches MasonryCard exactly).
      Step 2 — the global-intl short-circuit — fixes AliExpress /
      Shein / Temu being flagged as local for US users by the bare
-     currency-match fallback. */
+     currency-match fallback. Hoisted ABOVE the secondary-price
+     and landed-cost code (May 2026) so both gate on the corrected
+     check, not the raw `!sameCcy` which fires for UK Currys
+     (USD-stored, GBP user). */
   const dealStoreCountry = inferStoreCountry(deal.storeId, deal.storeName);
   const storeIsLocalToUser = dealStoreCountry !== null && dealStoreCountry.toLowerCase() === country.code.toLowerCase();
   const storeIsGlobalIntl  = dealStoreCountry === null && isGlobalIntlStore(deal.storeId, deal.storeName);
   const isCrossBorder = !storeIsLocalToUser && (storeIsGlobalIntl || !sameCcy);
+
+  /* Secondary price hint — shows the deal's NATIVE currency (what
+     the merchant actually charges) when the store is GENUINELY
+     cross-border for this visitor. For local stores the stored
+     "USD" is a SerpAPI normalisation artifact; surfacing "≈ $X.XX"
+     on a Currys listing to a UK shopper reads as if Currys prices
+     in USD, which they don't. User report May 2026: "Currys is UK,
+     not intl. Why does the price show USD?" */
+  const isUSD = deal.currency === "USD";
+  const ngnEquivStr = isCrossBorder && !sameCcy && isUSD
+    ? `≈ $${deal.salePrice.toFixed(2)}`
+    : null;
+
+  /* Cross-border total estimate (price + ~30% shipping/customs).
+     Already gated on isCrossBorder — same store-roster check, no
+     change. */
   const landedNgnStr = isCrossBorder ? `≈ ${formatLocal(Math.round(primarySale * 1.30), country)}` : null;
 
   return (

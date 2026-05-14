@@ -174,57 +174,46 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
      prefix tells the user that explicitly. */
   const isPriceFromOnly = isStoreSearchUrl(deal.url);
 
-  /* Landed-cost estimate for cross-border purchases. Uses the same
-     30% markup as the /compare anchor row (offerToStoreOffer in
-     pg-fts.ts) so users see consistent numbers across surfaces.
-     The 30% covers shipping + customs + handling fees as a rough
-     blanket estimate — accurate-ish for clothing / small
-     electronics, may overstate for heavy items or undercut for
-     fashion behind import duties. The 'Estimate' label and tooltip
-     make the assumption explicit so users don't treat it as a
-     quote. Only renders when the deal's currency differs from the
-     user's display currency (proxy for 'this is cross-border'). */
-  const isCrossBorder = !sameCcy;
-  const landedFmt = isCrossBorder
-    ? formatLocal(Math.round(primarySale * 1.30), country)
-    : null;
-
-  /* Secondary price (the original-currency hint) — small, italic, below the
-     primary line. Skipped when currency matches. NGN gets formatCompact for
-     the "₦47K" feel; USD gets formatUSDPrice; others use Intl. */
-  let secondaryStr: string | null = null;
-  if (!sameCcy) {
-    if (dealCcy === "NGN") secondaryStr = `≈ ${formatCompact(deal.salePrice)}`;
-    else if (dealCcy === "USD") secondaryStr = `≈ ${formatUSDPrice(deal.salePrice)}`;
-    else secondaryStr = `≈ ${formatLocal(deal.salePrice, { ...country, currency: dealCcy } as Country)}`;
-  }
-
-  /* "INTL" chip = the deal's store isn't anchored in the user's
-     country. Was: dealCcy !== userCcy. That broke for UK users
-     because SerpAPI normalises all prices to USD before storing,
-     so an Argos row in the UK pool has currency=USD even though
-     the store is UK-local. Result: every UK retailer card showed
-     "INTL" on /uk/deals.
-
-     Fix: check the store's country via the store-name → country
-     inference. Argos / Currys / Boots → "UK" → matches UK user
-     → no INTL badge. AliExpress / Shein → null → cross-border →
-     INTL badge stays. The currency-mismatch is now a fall-back
-     signal only when store country is unknown. */
   /* Cross-border classification — three-step decision:
        1. If inferStoreCountry returns a country, store is local
           IFF it matches the user's country.
        2. If store has no country anchor BUT is in GLOBAL_INTL_STORES
           (AliExpress, Shein, Temu, DHgate…), it's ALWAYS cross-
-          border, regardless of currency match. This fixes the
-          previous bug where AliExpress (USD-priced) flagged as
-          "local" for US users via the currency fallback.
-       3. Otherwise fall back to currency-mismatch. */
+          border, regardless of currency match.
+       3. Otherwise fall back to currency-mismatch.
+     Hoisted ABOVE landedFmt + secondaryStr (May 2026) so both gate
+     on the corrected check, not the raw `!sameCcy` which fires for
+     UK Currys (stored as USD but local for UK users). */
   const dealStoreCountry = inferStoreCountry(deal.storeId, deal.storeName);
   const storeIsLocalToUser = dealStoreCountry !== null && dealStoreCountry.toLowerCase() === country.code.toLowerCase();
   const storeIsGlobalIntl  = dealStoreCountry === null && isGlobalIntlStore(deal.storeId, deal.storeName);
   const isCrossBorderForUser = !storeIsLocalToUser && (storeIsGlobalIntl || !sameCcy);
   const showIntl = showOriginBadge && isCrossBorderForUser;
+
+  /* Landed-cost estimate for cross-border purchases. Uses the same
+     30% markup as the /compare anchor row (offerToStoreOffer in
+     pg-fts.ts) so users see consistent numbers across surfaces.
+     Gated on isCrossBorderForUser, NOT bare !sameCcy — UK Currys
+     (USD-stored, GBP user) shouldn't show "≈ £1,173 (landed)" since
+     no cross-border shipping applies. */
+  const landedFmt = isCrossBorderForUser
+    ? formatLocal(Math.round(primarySale * 1.30), country)
+    : null;
+
+  /* Secondary price (the original-currency hint) — small, italic,
+     below the primary line. Only renders when the store is GENUINELY
+     cross-border for this visitor. For local stores the stored "USD"
+     is a SerpAPI normalisation artifact (every UK / US / DE retailer
+     normalises to USD at ingest); surfacing "≈ $1,141.73 in USD" on
+     a Currys card to a UK shopper reads as if Currys prices in USD,
+     which they don't. User report May 2026: "Currys is UK, not intl.
+     Why does the price show USD?" */
+  let secondaryStr: string | null = null;
+  if (isCrossBorderForUser && !sameCcy) {
+    if (dealCcy === "NGN") secondaryStr = `≈ ${formatCompact(deal.salePrice)}`;
+    else if (dealCcy === "USD") secondaryStr = `≈ ${formatUSDPrice(deal.salePrice)}`;
+    else secondaryStr = `≈ ${formatLocal(deal.salePrice, { ...country, currency: dealCcy } as Country)}`;
+  }
 
   return (
     <Link

@@ -100,15 +100,7 @@ export default function ProductHero({ offer, countryCode, totalStores }: Props) 
       ? formatUSDPrice(primaryAmount)
       : formatLocal(primaryAmount, country);
 
-  /* Secondary price — show the original currency hint when it
-     differs from the user's, matching MasonryCard's pattern so the
-     PDP price visualisation feels familiar. */
   const sameCcy = offer.currency === country.currency;
-  let secondaryStr: string | null = null;
-  if (!sameCcy) {
-    if (offer.currency === "NGN") secondaryStr = `≈ ${formatCompact(offer.currentPrice)}`;
-    else if (offer.currency === "USD") secondaryStr = `≈ ${formatUSDPrice(offer.currentPrice)}`;
-  }
 
   /* "from" price prefix — when the outbound link is a store search
      URL rather than a specific product page (Currys, Argos, John
@@ -125,6 +117,21 @@ export default function ProductHero({ offer, countryCode, totalStores }: Props) 
   const storeIsLocalToUser = dealStoreCountry !== null && dealStoreCountry.toLowerCase() === country.code.toLowerCase();
   const storeIsGlobalIntl  = dealStoreCountry === null && isGlobalIntlStore(offer.storeId, offer.storeName);
   const isCrossBorder      = !storeIsLocalToUser && (storeIsGlobalIntl || !sameCcy);
+
+  /* Secondary price — only show the original-currency hint when the
+     store is genuinely cross-border for this visitor. For local
+     stores the stored "USD" is a SerpAPI normalisation artifact
+     (every UK / US / DE retailer is normalised to USD at ingest);
+     surfacing "≈ $1,141.73 in USD" on a Currys card to a UK shopper
+     reads as if Currys prices in USD, which they don't. User report
+     May 2026: "Currys is UK, not intl. Why does the price show
+     USD?" — gated behind isCrossBorder so the secondary only
+     renders when the foreign-currency context is real. */
+  let secondaryStr: string | null = null;
+  if (!sameCcy && isCrossBorder) {
+    if (offer.currency === "NGN") secondaryStr = `≈ ${formatCompact(offer.currentPrice)}`;
+    else if (offer.currency === "USD") secondaryStr = `≈ ${formatUSDPrice(offer.currentPrice)}`;
+  }
 
   /* Resolved /api/go URL for the View-at-merchant CTA. The wrapper
      attaches the title + storeId + storeName fallback hints so
