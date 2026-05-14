@@ -108,9 +108,12 @@ export default function PriceComparisonBar({
   const range  = Math.max(highestPriceNgn - lowestPriceNgn, 1); // avoid /0
   const offset = Math.max(0, Math.min(1, (thisPriceNgn - lowestPriceNgn) / range));
 
-  /* Position the marker at offset% from left. Cap visually inset by
-     a few pixels so the marker isn't clipped at the bar's edges. */
-  const markerLeftPct = Math.max(2, Math.min(98, offset * 100));
+  /* Position the marker at offset% from left. Cap visually inset
+     by enough pixels that the wider triangle marker can keep its
+     full shape visible at the edges. With the SVG triangle being
+     14px wide and the bar typically ~280-360px, an inset of 3%
+     keeps the triangle base fully on-bar even at the extremes. */
+  const markerLeftPct = Math.max(3, Math.min(97, offset * 100));
 
   /* Verdict label + color — drives both the headline copy and the
      marker bg. Three buckets matched to the green / amber / red
@@ -123,13 +126,17 @@ export default function PriceComparisonBar({
      explicit. Without an override the multi-store wording would
      read "Lowest price" which is the right framing only when
      there's something to compare against. */
+  /* Verdict carries a TEXT color class (used for the SVG marker via
+     currentColor) alongside the BG class (was the only field before;
+     now unused since the dot marker is gone but kept around in case
+     a future surface wants a colored chip in the same hue). */
   const verdict = isSingleStore
-    ? { label: "Best price tracked", colour: "text-emerald-600 dark:text-emerald-400", marker: "bg-emerald-500" }
+    ? { label: "Best price tracked", colour: "text-emerald-600 dark:text-emerald-400", marker: "bg-emerald-500", markerFill: "text-emerald-500" }
     : offset <= 0.33
-      ? { label: "Great price", colour: "text-emerald-600 dark:text-emerald-400", marker: "bg-emerald-500" }
+      ? { label: "Great price",      colour: "text-emerald-600 dark:text-emerald-400", marker: "bg-emerald-500", markerFill: "text-emerald-500" }
       : offset <= 0.66
-        ? { label: "Average price", colour: "text-amber-600 dark:text-amber-400", marker: "bg-amber-500" }
-        : { label: "Above average", colour: "text-red-600 dark:text-red-400", marker: "bg-red-500" };
+        ? { label: "Average price",  colour: "text-amber-600 dark:text-amber-400",    marker: "bg-amber-500",   markerFill: "text-amber-500" }
+        : { label: "Above average",  colour: "text-red-600 dark:text-red-400",        marker: "bg-red-500",     markerFill: "text-red-500" };
 
   /* Savings vs the dearest known price — useful framing when this
      offer ISN'T the cheapest but is still notably cheaper than the
@@ -173,24 +180,59 @@ export default function PriceComparisonBar({
         </span>
       </div>
 
-      {/* The bar — 3-zone gradient + position marker */}
-      <div
-        className="relative h-2 rounded-full mb-2 overflow-hidden"
-        style={{
-          background:
-            "linear-gradient(90deg, rgb(16,185,129) 0%, rgb(16,185,129) 33%, rgb(245,158,11) 50%, rgb(239,68,68) 67%, rgb(239,68,68) 100%)",
-        }}
-        aria-label={
-          isSingleStore
-            ? `Best price tracked. ${formatPriceForUser(thisPriceNgn, country)} is the only listing we've found so far.`
-            : `${verdict.label}. ${formatPriceForUser(thisPriceNgn, country)} of a ${formatPriceForUser(lowestPriceNgn, country)} to ${formatPriceForUser(highestPriceNgn, country)} range across ${comparedStoreCount + 1} stores.`
-        }
-      >
-        {/* Position marker — sized to clearly stand above the bar */}
+      {/* The bar — 3-zone gradient + downward-pointing triangle
+          marker. Triangle sits ABOVE the bar in a non-clipped
+          wrapper so the marker stays fully visible even when the
+          anchor price sits at the very low or very high end of
+          the range (was clipped by the bar's overflow:hidden +
+          rounded corners on the previous round-dot variant). The
+          triangle's tip points down at the exact position on the
+          bar; the larger silhouette + page-bg halo reads as a
+          definitive "you are here" marker at any glance distance.
+
+          User report May 2026: "make the mark on the comparison
+          bar spectrum more obvious, maybe like a triangle or
+          something. When it's at the edge, it's not very visible
+          currently." */}
+      <div className="relative mb-2">
+        {/* Triangle marker — positioned above the bar so it never
+            clips. Translate the horizontal anchor to centre on the
+            tip; -translate-y aligns the tip just touching the bar
+            top. */}
         <div
-          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full ${verdict.marker} ring-2 ring-bg shadow-md`}
+          className={`absolute top-0 -translate-x-1/2 -translate-y-[10px] z-10 pointer-events-none ${verdict.markerFill}`}
           style={{ left: `${markerLeftPct}%` }}
           aria-hidden="true"
+        >
+          <svg width="14" height="11" viewBox="0 0 14 11" className="block drop-shadow-sm">
+            {/* Downward-pointing triangle. Stroke is the page
+                background (theme-aware via --bg-rgb) so the
+                triangle gets a visible halo against any of the
+                three gradient zones underneath. Fill is the
+                verdict colour via currentColor. */}
+            <path
+              d="M7 11 L0.5 0.5 L13.5 0.5 Z"
+              fill="currentColor"
+              stroke="rgb(var(--bg-rgb))"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+        {/* Bar itself. overflow-hidden stays — the gradient
+            corners are kept clean; the marker lives in the wrapper
+            ABOVE this div now, not as a child. */}
+        <div
+          className="relative h-2 rounded-full overflow-hidden"
+          style={{
+            background:
+              "linear-gradient(90deg, rgb(16,185,129) 0%, rgb(16,185,129) 33%, rgb(245,158,11) 50%, rgb(239,68,68) 67%, rgb(239,68,68) 100%)",
+          }}
+          aria-label={
+            isSingleStore
+              ? `Best price tracked. ${formatPriceForUser(thisPriceNgn, country)} is the only listing we've found so far.`
+              : `${verdict.label}. ${formatPriceForUser(thisPriceNgn, country)} of a ${formatPriceForUser(lowestPriceNgn, country)} to ${formatPriceForUser(highestPriceNgn, country)} range across ${comparedStoreCount + 1} stores.`
+          }
         />
       </div>
 
