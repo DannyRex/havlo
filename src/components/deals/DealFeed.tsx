@@ -528,13 +528,33 @@ export default function DealFeed({
         <input
           id="deals-search"
           type="text"
-          aria-label="Filter these deals by product name. Use the Stores button above to filter by store. Press Enter to search across all stores."
+          aria-label="Filter these deals by product name. Use the Stores button above to filter by store."
           placeholder="Search these deals, try 'iPhone'…"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && searchInput.trim()) {
-              router.push(`/compare?q=${encodeURIComponent(searchInput.trim())}&mode=similar`);
+            /* Enter now commits the current filter and dismisses the
+               keyboard (mobile) instead of teleporting the user to
+               /compare. Previous behaviour: pressing Enter routed
+               to /compare?q={input}&mode=similar — which contradicted
+               the visual model (input filters this page as you type)
+               and surprised users who expected Enter to mean "I'm
+               done typing". User report May 2026: "search for a
+               product on deals page, it filters the results on that
+               page, but when I hit enter, it takes me to compare
+               page. could that be confusing?"
+
+               Cross-store comparison is still reachable via any
+               product card → PDP → "Compare prices across N stores"
+               CTA, which is the canonical drill-down. */
+            if (e.key === "Enter") {
+              e.preventDefault();
+              /* Bypass the 300ms debounce so the filter snaps
+                 immediately (no perceptible delay if the user types
+                 then hits Enter quickly). Blurring also closes the
+                 on-screen keyboard on mobile. */
+              setSearchDebounced(searchInput.trim());
+              (e.target as HTMLInputElement).blur();
             }
           }}
           className="w-full pl-11 pr-10 py-3 rounded-full text-base text-ink placeholder:text-ink-3 bg-surface border border-border-strong focus:border-brand focus:shadow-input outline-none transition-all"

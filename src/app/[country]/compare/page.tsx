@@ -15,7 +15,8 @@ import TrendingChipRail from "@/components/compare/TrendingChipRail";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
 import DealUnavailableBanner from "@/components/feedback/DealUnavailableBanner";
-import { formatNaira, formatPriceForUser, getClickThroughUrl } from "@/lib/utils";
+import { formatNaira, formatPriceForUser } from "@/lib/utils";
+import { pdpUrlForOffer } from "@/lib/pdp-url";
 import {
   effectiveLandedPrice, effectiveDeliveryDays, anyCrossBorderForUser, isCrossBorderForUser,
 } from "@/lib/landed-price";
@@ -518,23 +519,26 @@ function CompareContent() {
                             {/* Whole row is the click target — Spoken pattern.
                                 Visual chevron at the end implies 'go to this
                                 store'. Less chrome than a separate button,
-                                bigger tap area on mobile. */}
+                                bigger tap area on mobile.
+
+                                Click model (May 2026 user request): route
+                                to the PDP for this offer instead of
+                                jumping straight outbound. Matches the
+                                site-wide "PDP before merchant" pattern
+                                used on /deals, TrendingDeals, and the
+                                PDP "You may also like" rail. The PDP
+                                reveals the price-bar, cashback rate at
+                                this specific store, delivery estimate,
+                                and a clear "View at {Merchant}" CTA
+                                that fires the same /api/go affiliate
+                                wrap — so revenue is unchanged, just
+                                one extra fast internal page view per
+                                click. pdpUrlForOffer falls back to
+                                /p/live for synthetic offers (no
+                                offerId), so live SerpAPI rows still
+                                land on a meaningful page. */}
                             <a
-                              href={getClickThroughUrl({
-                                url: offer.url,
-                                id: `${result.anchor.key}-${offer.storeId}`,
-                                /* Title + store hints let /api/go fall
-                                   back to the merchant's own search URL
-                                   when Google-relay resolution fails
-                                   (round-4 fix). User lands on the
-                                   actual retailer, not a havlo error
-                                   page or a Google consent gate. */
-                                title:     result.anchor.title,
-                                storeId:   offer.storeId,
-                                storeName: offer.storeName,
-                              })}
-                              target="_blank"
-                              rel="noopener noreferrer sponsored"
+                              href={pdpUrlForOffer(country.code, offer)}
                               onClick={() => trackClick(result.anchor.key, query, i, "anchor-comparison")}
                               className={`group flex items-center gap-3 p-3 rounded-xl border transition-all ${
                                 isBest
