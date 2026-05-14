@@ -48,7 +48,7 @@ on:
         description: "Parallel browsers (1-3 sane range)"
         type:        string
         required:    false
-        default:     "1"
+        default:     "2"
       dry_run:
         description: "Dry run (no DB writes)"
         type:        boolean
@@ -90,7 +90,7 @@ jobs:
       - name: Resolve relay URLs
         run: |
           LIMIT="${{ github.event.inputs.limit || '500' }}"
-          CONCURRENCY="${{ github.event.inputs.concurrency || '1' }}"
+          CONCURRENCY="${{ github.event.inputs.concurrency || '2' }}"
           DRY_RUN_FLAG=""
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             DRY_RUN_FLAG="--dry-run"

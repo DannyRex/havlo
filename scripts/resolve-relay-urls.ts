@@ -231,7 +231,12 @@ async function workerLoop(
      429s wastes minutes producing zero useful results. */
   let consecutive429s = 0;
   const BASE_PACE_MS = 1_500;
-  const MAX_PACE_MS  = 15_000;
+  /* Capped at 8s (was 15s). First production run drained only ~51
+     rows in 50 minutes because backoff at 15s + Playwright ~5s nav
+     = ~20s per row once Google started rate-limiting. 8s gives
+     enough recovery time without strangling throughput when the
+     ramp settles. */
+  const MAX_PACE_MS  = 8_000;
 
   for (const row of rows) {
     const relayUrl    = unwrapApiGo(row.url);
@@ -239,7 +244,9 @@ async function workerLoop(
     /* Pace = base × 2^consecutive429s, capped. Each 429 doubles
        the wait; one clean resolve halves it. Adds 0-400ms jitter
        so we don't metronome. */
-    const exponent = Math.min(consecutive429s, 6);
+    /* Cap the doubling at 3 — beyond that the pace is already at
+       MAX_PACE_MS and adding to the counter just delays recovery. */
+    const exponent = Math.min(consecutive429s, 3);
     const paceMs   = Math.min(BASE_PACE_MS * Math.pow(2, exponent), MAX_PACE_MS);
     const jitter   = Math.floor(Math.random() * 400);
     await new Promise((r) => setTimeout(r, paceMs + jitter));
