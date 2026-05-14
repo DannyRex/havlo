@@ -349,16 +349,24 @@ export async function GET(req: NextRequest) {
        Approach: shuffle the top SHUFFLE_WINDOW items with a time-
        bucketed seed. Items outside the shuffle window keep their
        original relevance order so coarse ranking is preserved.
-       Rotation cadence ~10 min matches the s-maxage edge cache so
-       returning visitors see fresh top-of-page about once per
-       cache lifecycle.
+
+       Rotation cadence: 60 seconds. Paired with a matching
+       s-maxage=60 edge cache for sort=relevance responses (see
+       header logic at the bottom of this handler), so a fresh
+       shuffle lands at the edge about once per minute. The
+       in-memory POOL_CACHE (5 min TTL) absorbs the DB cost — the
+       cache miss every minute just rebuilds the response from the
+       same hot pool, no extra Supabase RPCs.
 
        User report May 2026: "adjust the algorithm of sort by
        relevance so it's somewhat random or the user at least
-       sees new items from time to time." */
+       sees new items from time to time." Initial ship was a
+       10-min bucket (matched then-current cache TTL). Follow-up:
+       "cant relevance rotate on every call or more frequently?"
+       Tightened to 60s. */
     if (sort === "relevance" && qualifyingByOrigin.length > 12) {
       const SHUFFLE_WINDOW    = 60;                    // top 60 rotate among themselves
-      const ROTATION_BUCKET_MS = 10 * 60 * 1000;       // new shuffle every 10 minutes
+      const ROTATION_BUCKET_MS = 60 * 1000;            // new shuffle every 60 seconds
       const bucket = Math.floor(Date.now() / ROTATION_BUCKET_MS);
       /* Per-country seed component so /uk and /ng don't share a
          shuffle (two markets, two separate orderings — preserves
@@ -555,19 +563,36 @@ export async function GET(req: NextRequest) {
 
        Cache key varies by full URL (every filter combo gets its own
        slot), so this won't accidentally serve UK results to NG users. */
+    /* Cache window varies by sort:
+
+         relevance → s-maxage=60, swr=120
+           Matches the 60-second rotation bucket in the shuffle
+           pass above. The edge holds each shuffled snapshot for
+           ~1 minute, then a fresh shuffle gets baked into the next
+           cache fill. Returning visitors see meaningfully different
+           top-of-list ~once per minute.
+
+         everything else → s-maxage=600, swr=3600
+           newest / discount / price sorts have stable, intentional
+           orderings — no value in re-cooking the response every
+           minute. The 10-min window keeps Supabase egress in budget
+           (was the original tuning post-May-2026 cache bump).
+
+         degraded → no-store
+           browse_deals RPC fall-through served the curated catalog.
+           Don't cache the degraded shape — next request retries. */
+    const cacheControlHeader =
+      looksLikeCuratedFallback ? "private, no-store, no-cache, max-age=0, must-revalidate" :
+      sort === "relevance"     ? "s-maxage=60, stale-while-revalidate=120"                 :
+                                 "s-maxage=600, stale-while-revalidate=3600";
+
     return new Response(
       JSON.stringify({ items, total, hasMore, originCounts, stores: storesAggregate, provider: provider.id }),
       {
         status: 200,
         headers: {
           "Content-Type":  "application/json",
-          /* Degraded responses (browse_deals RPC fell back to curated)
-             are explicitly NOT cached — see looksLikeCuratedFallback
-             check above. Production responses keep the normal SWR
-             cache so warm visitors hit the edge. */
-          "Cache-Control": looksLikeCuratedFallback
-            ? "private, no-store, no-cache, max-age=0, must-revalidate"
-            : "s-maxage=600, stale-while-revalidate=3600",
+          "Cache-Control": cacheControlHeader,
           /* Diagnostic header so we can grep nginx / Vercel logs for
              fallback hits and know when to investigate the RPC. */
           "X-Havlo-Degraded": looksLikeCuratedFallback ? "curated-fallback" : "ok",
