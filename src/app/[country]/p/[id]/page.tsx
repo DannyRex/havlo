@@ -33,6 +33,7 @@ import Script from "next/script";
 import { ChevronLeft } from "lucide-react";
 
 import { getCountry } from "@/lib/country";
+import { unstable_cache } from "next/cache";
 import { COUNTRIES } from "@/lib/country";
 import { SITE_URL, buildBreadcrumbList, buildHreflangAlternates } from "@/lib/seo";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
@@ -283,13 +284,23 @@ export default async function ProductPage({ params }: PageProps) {
      the same title (user report May 2026: "filter by iPhone 15 Pro
      shows multiple products on /deals but PDP shows no cheaper
      alternatives"). */
-  /* Limit halved from 16 → 8 May 2026 to relieve Supabase egress
-     (pgFtsFindDupes hydrates per-product offer rows, so doubling the
-     anchor count roughly doubled the egress per PDP view). The "You
-     may also like" rail renders ~6 cards by default with a "Show
-     more" toggle; 8 hydrated candidates is enough headroom for the
-     country filter below to drop a couple and still feel populated. */
-  const dupes = await pgFtsFindDupes(offer.title, 0, { limit: 8 });
+  /* Cached dupes fetch — wraps pgFtsFindDupes in unstable_cache so
+     repeat PDP loads within the 5-minute window don't re-run the
+     FTS + per-product offer hydration. Cache key includes the
+     anchor title (the only thing the FTS query depends on). 5-min
+     TTL is tighter than the page's 1-hour ISR window, so the cache
+     can't drift further than the page itself.
+
+     Limit halved from 16 → 8 May 2026 to relieve Supabase egress
+     (pgFtsFindDupes hydrates per-product offer rows). 8 hydrated
+     candidates is enough headroom for the country filter below to
+     drop a couple and still feel populated. */
+  const fetchDupesCached = unstable_cache(
+    async (title: string) => pgFtsFindDupes(title, 0, { limit: 8 }),
+    ["pdp-dupes"],
+    { revalidate: 300, tags: ["pdp-dupes"] },
+  );
+  const dupes = await fetchDupesCached(offer.title);
 
   /* Drop dupe-offers from stores that aren't appropriate for the
      visitor's market (e.g. NG-anchored Konga rows on a UK PDP).
@@ -405,6 +416,28 @@ export default async function ProductPage({ params }: PageProps) {
     { name: offer.title,      url: `${SITE_URL}/${country.code}/p/${offer.offer_id}` },
   ]);
 
+  /* Price-vs-market stats. Reads the cheapest landedPrice (which is
+     country-aware after the May 2026 effectiveLandedPrice fix —
+     local stores use base price, cross-border keeps the ~30%
+     landed estimate). Limits to dupes that have at least one offer
+     after country filtering, so the comparison reflects what the
+     user can actually click through to.
+
+     Math: anchor price = offer.current_price; dupe prices = each
+     dupe's cheapest offer (already country-filtered above). Both
+     stay in NGN until the UI converts via formatPriceForUser. */
+  const dupePricesNgn: number[] = filteredDupes.flatMap((d) => {
+    const cheapestOffer = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
+    return cheapestOffer ? [cheapestOffer.landedPrice] : [];
+  });
+  const priceStats = dupePricesNgn.length > 0
+    ? {
+        lowest:  Math.min(offer.current_price, ...dupePricesNgn),
+        highest: Math.max(offer.current_price, ...dupePricesNgn),
+        count:   dupePricesNgn.length,
+      }
+    : undefined;
+
   const productSchema = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -447,7 +480,12 @@ export default async function ProductPage({ params }: PageProps) {
           Back to deals
         </Link>
 
-        <ProductHero offer={heroData} countryCode={country.code} totalStores={totalStores} />
+        <ProductHero
+          offer={heroData}
+          countryCode={country.code}
+          totalStores={totalStores}
+          priceStats={priceStats}
+        />
 
         {filteredDupes.length > 0 && (
           <section className="mt-12 sm:mt-16">

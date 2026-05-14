@@ -14,7 +14,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { ExternalLink, Tag, Clock, Store as StoreIcon, Globe } from "lucide-react";
+import { ExternalLink, Tag, Store as StoreIcon, Globe } from "lucide-react";
 import {
   cleanTitle,
   proxiedImageUrl,
@@ -22,9 +22,9 @@ import {
   formatUSDPrice,
   formatCompact,
   isStoreSearchUrl,
-  timeAgo,
 } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
+import PriceComparisonBar from "@/components/product/PriceComparisonBar";
 import {
   USD_FX,
   formatLocal,
@@ -67,6 +67,14 @@ interface Props {
       Drives the "Compare prices across N stores" CTA label so the
       user knows how much broader the compare view is than the PDP. */
   totalStores?: number;
+  /** Stats for the price-vs-market bar. Computed in the page from
+      the dupes data. When undefined, the bar renders the
+      "single-store" / "no comparison" variant. */
+  priceStats?: {
+    lowest:  number;   // user-currency
+    highest: number;   // user-currency
+    count:   number;   // OTHER stores compared (excludes anchor)
+  };
 }
 
 /* Convert any price (NGN or USD) to the user's preferred currency.
@@ -86,7 +94,7 @@ function convertToUserCurrency(
   return country.currency === "USD" ? Math.round(out * 100) / 100 : Math.round(out);
 }
 
-export default function ProductHero({ offer, countryCode, totalStores }: Props) {
+export default function ProductHero({ offer, countryCode, totalStores, priceStats }: Props) {
   const country = getCountry(countryCode);
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -100,6 +108,18 @@ export default function ProductHero({ offer, countryCode, totalStores }: Props) 
 
   /* Primary price in the user's currency. */
   const primaryAmount = convertToUserCurrency(offer.currentPrice, offer.currency, country);
+
+  /* Convert priceStats (NGN-internal, from pgFtsFindDupes) into the
+     user's display currency so the bar's lowest/highest match the
+     primary price's units. Without this conversion, a UK user sees
+     "£8" as the primary but the bar reads in raw NGN values. */
+  const userPriceStats = priceStats
+    ? {
+        lowest:  convertToUserCurrency(priceStats.lowest,  "NGN", country),
+        highest: convertToUserCurrency(priceStats.highest, "NGN", country),
+        count:   priceStats.count,
+      }
+    : undefined;
   const primaryStr = country.currency === "NGN"
     ? formatCompact(primaryAmount)
     : country.currency === "USD"
@@ -294,68 +314,31 @@ export default function ProductHero({ offer, countryCode, totalStores }: Props) 
             : <>Compare prices across stores</>}
         </Link>
 
-        {/* Price-staleness disclosure. We refresh the catalog on a
-            scrape cadence (every few hours for most stores), so the
-            price/availability shown here is a snapshot — not live. The
-            merchant CAN change either between our last scrape and the
-            user's click-through. Better to set the expectation upfront
-            than have users feel misled when they hit a 4xx on the
-            merchant page. Short, honest, no scary language. */}
-        <p className="text-[12px] text-ink-3 leading-relaxed mb-7 -mt-1">
-          Price and availability shown reflect our last check
-          {offer.scrapedAt ? <> {timeAgo(offer.scrapedAt)}</> : null}. The merchant may have updated either since. We&apos;ll send you to their page so you can verify before you buy.
-        </p>
+        {/* Price-vs-market visual signal. Replaces the previous
+            "Last checked / Store country" tiles + the standalone
+            staleness paragraph. The bar shows where THIS price sits
+            between the cheapest and dearest known prices for the
+            same product across other stores — a strong "is this a
+            good deal?" cue at a glance. The verification + ships-
+            from facts now live INSIDE the bar's footer strip,
+            keeping the same trust signals but inverting the
+            information hierarchy: comparison signal first, facts
+            secondary.
 
-        {/* Useful info row — small facts shoppers want before clicking
-            through. Affiliate disclosure removed (May 2026) — it lives
-            on /how-we-make-money for users who want the detail, and
-            peer comparison sites (Dupe, etc.) don't surface it inline
-            on each PDP. The remaining tiles are direct trust signals:
-              • Last seen — when our scraper last checked
-              • Store country — retailer anchor (or 'International')
-              • Out of stock notice — only when in_stock = false */}
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[13px]">
-          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-surface border border-border">
-            <Clock size={14} className="text-ink-3 mt-0.5 shrink-0" aria-hidden="true" />
-            <div>
-              <dt className="text-ink-3 text-[11px] uppercase tracking-[0.08em] font-semibold mb-0.5">
-                Last checked
-              </dt>
-              <dd className="text-ink-2">{timeAgo(offer.scrapedAt)}</dd>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-surface border border-border">
-            <StoreIcon size={14} className="text-ink-3 mt-0.5 shrink-0" aria-hidden="true" />
-            <div>
-              <dt className="text-ink-3 text-[11px] uppercase tracking-[0.08em] font-semibold mb-0.5">
-                Store country
-              </dt>
-              <dd className="text-ink-2">
-                {dealStoreCountry ? dealStoreCountry : "International"}
-              </dd>
-            </div>
-          </div>
-
-          {/* Out-of-stock tile — only when in_stock is explicitly false.
-              Defaults to in-stock when the field is missing (the
-              product_best_offers view filters for in_stock=true by
-              construction, so the column drops out of the projection
-              and would otherwise show the badge for every row). */}
-          {offer.inStock === false && (
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-300/40 sm:col-span-2">
-              <Clock size={14} className="text-red-500 mt-0.5 shrink-0" aria-hidden="true" />
-              <div>
-                <dt className="text-red-700 dark:text-red-300 text-[11px] uppercase tracking-[0.08em] font-semibold mb-0.5">
-                  Out of stock
-                </dt>
-                <dd className="text-red-800/80 dark:text-red-200/80">
-                  Last seen unavailable. Cheaper alternatives below may still be in stock.
-                </dd>
-              </div>
-            </div>
-          )}
-        </dl>
+            QA report May 2026: "the boring last checked + store
+            country tiles. Last Checked is not intuitive — is it
+            the last time I or havlo checked it?" — fixed via
+            "Verified by Havlo" labelling inside the bar. */}
+        <PriceComparisonBar
+          thisPrice={primaryAmount}
+          lowestPrice={userPriceStats?.lowest ?? primaryAmount}
+          highestPrice={userPriceStats?.highest ?? primaryAmount}
+          comparedStoreCount={userPriceStats?.count ?? 0}
+          country={country}
+          lastCheckedAt={offer.scrapedAt}
+          storeCountry={dealStoreCountry}
+          outOfStock={offer.inStock === false}
+        />
       </div>
     </section>
   );
