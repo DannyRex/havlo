@@ -307,18 +307,29 @@ export async function GET(req: NextRequest) {
 
     /* Cache window bumped May 2026 from s-maxage=60/swr=300 to
        s-maxage=600/swr=3600 — Supabase egress crossed the free-tier
-       cap (127% on 11 May, charts pinned the spike to fan-out reads
-       from this endpoint). 10 minutes of staleness is invisible to
-       browsers (prices on the deals feed move on hour-scale, not
-       minute-scale) and the SWR window means a stale page renders
-       instantly while a fresh one warms in the background.
+       cap. 10 minutes of staleness is invisible to browsers (prices
+       on the deals feed move on hour-scale, not minute-scale) and
+       the SWR window means a stale page renders instantly while a
+       fresh one warms in the background.
 
-       Cache key still varies by full URL (every filter combo gets
-       its own slot), so this won't accidentally serve UK results to
-       NG users or vice versa. */
-    return NextResponse.json(
-      { items, total, hasMore, originCounts, stores: storesAggregate, provider: provider.id },
-      { headers: { "Cache-Control": "s-maxage=600, stale-while-revalidate=3600" } },
+       Manual Response (not NextResponse.json) — bypasses the Next 14
+       quirk where dynamic routes silently strip user-set
+       Cache-Control headers in favour of `private, no-cache,
+       no-store`. The QA verified post-deploy that NextResponse.json's
+       header didn't reach the wire. Returning a plain Response with
+       headers explicitly set bypasses Next's response-wrapper.
+
+       Cache key varies by full URL (every filter combo gets its own
+       slot), so this won't accidentally serve UK results to NG users. */
+    return new Response(
+      JSON.stringify({ items, total, hasMore, originCounts, stores: storesAggregate, provider: provider.id }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type":  "application/json",
+          "Cache-Control": "s-maxage=600, stale-while-revalidate=3600",
+        },
+      },
     );
   } catch (err) {
     console.error("[/api/deals]", err);
