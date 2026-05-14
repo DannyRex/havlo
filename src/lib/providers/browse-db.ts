@@ -157,6 +157,11 @@ export const dbBrowseProvider: BrowseProvider = {
        is always relevant). Pass C only fires when the user's sort
        allows 0% rows (sortIsDiscountBiased && userFloorAllowsZero),
        same condition as the prior 0%-only Pass B. */
+    /* Cache-bust marker — bump this any time the multi-pass shape
+       changes so old function instances with stale POOL_CACHE
+       entries get recycled by Vercel. */
+    const PASS_VERSION = "v2-cross-border-guaranteed";
+    void PASS_VERSION;
     const PASS_MAX = 1000;
 
     const passABase = {
