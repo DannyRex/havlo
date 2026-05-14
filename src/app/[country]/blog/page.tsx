@@ -21,18 +21,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowUpRight, Calendar, Clock } from "lucide-react";
+import { ArrowUpRight, Calendar, Clock, Globe } from "lucide-react";
 import { getPostsForCountry } from "@/lib/blog/posts";
 import { COUNTRIES, getCountry } from "@/lib/country";
 import { SITE_URL, buildHreflangAlternates } from "@/lib/seo";
-
-const FLAG_FOR: Record<string, string> = Object.fromEntries(
-  COUNTRIES.map((c) => [c.code, c.flag]),
-);
-function flagFor(code: string): string {
-  if (code === "all") return "🌍";
-  return FLAG_FOR[code] ?? "🌐";
-}
+import CountryFlag from "@/components/ui/CountryFlag";
 
 export function generateStaticParams() {
   return COUNTRIES.map((c) => ({ country: c.code }));
@@ -80,7 +73,9 @@ export default function CountryBlogIndex({
 
         <header className="mb-10 sm:mb-14">
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-3 mb-3 inline-flex items-center gap-1.5">
-            <span aria-hidden="true">{country.flag}</span>
+            {/* SVG flag — renders cross-platform (Windows Chrome
+                showed the emoji as a bare country-code box). */}
+            <CountryFlag code={country.code} size={14} />
             <span>{country.name} · Blog</span>
           </p>
           <h1 className="text-3xl sm:text-5xl font-bold text-ink tracking-[-0.025em] leading-[1.05] mb-4">
@@ -113,7 +108,9 @@ export default function CountryBlogIndex({
                               key={c}
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-2 border border-border text-[10px] uppercase tracking-[0.06em] text-ink-3"
                             >
-                              <span aria-hidden="true">{flagFor(c)}</span>
+                              {c === "all"
+                                ? <Globe size={11} className="text-ink-3" aria-hidden="true" />
+                                : <CountryFlag code={c} size={14} />}
                               <span>{c === "all" ? "Global" : c.toUpperCase()}</span>
                             </span>
                           ))}

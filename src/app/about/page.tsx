@@ -15,6 +15,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import CountryFlag from "@/components/ui/CountryFlag";
 
 const SITE_URL = "https://havlo.io";
 
@@ -32,14 +33,16 @@ export const metadata: Metadata = {
   },
 };
 
+/* code uses our internal scheme (uk for Great Britain) — the
+   <CountryFlag> component maps to the right CDN slug downstream. */
 const COVERAGE = [
-  { flag: "🇳🇬", name: "Nigeria" },
-  { flag: "🇬🇧", name: "United Kingdom" },
-  { flag: "🇺🇸", name: "United States" },
-  { flag: "🇦🇪", name: "United Arab Emirates" },
-  { flag: "🇩🇪", name: "Germany" },
-  { flag: "🇮🇳", name: "India" },
-  { flag: "🇿🇦", name: "South Africa" },
+  { code: "ng", name: "Nigeria" },
+  { code: "uk", name: "United Kingdom" },
+  { code: "us", name: "United States" },
+  { code: "ae", name: "United Arab Emirates" },
+  { code: "de", name: "Germany" },
+  { code: "in", name: "India" },
+  { code: "za", name: "South Africa" },
 ];
 
 export default function AboutPage() {
@@ -154,7 +157,7 @@ export default function AboutPage() {
                 key={c.name}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-2 border border-border"
               >
-                <span aria-hidden="true">{c.flag}</span>
+                <CountryFlag code={c.code} size={18} />
                 <span className="text-ink-2">{c.name}</span>
               </div>
             ))}

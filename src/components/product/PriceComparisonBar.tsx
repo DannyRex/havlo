@@ -121,8 +121,8 @@ export default function PriceComparisonBar({
      listing to be more expensive than), but the headline phrasing
      ("Best price tracked") makes the "we've only seen one" caveat
      explicit. Without an override the multi-store wording would
-     read "Cheapest of the bunch" which implies a bunch — misleading
-     when comparedStoreCount === 0. */
+     read "Lowest price" which is the right framing only when
+     there's something to compare against. */
   const verdict = isSingleStore
     ? { label: "Best price tracked", colour: "text-emerald-600 dark:text-emerald-400", marker: "bg-emerald-500" }
     : offset <= 0.33
@@ -146,7 +146,12 @@ export default function PriceComparisonBar({
   const headlineText = isSingleStore
     ? "Best price tracked"
     : offset === 0
-      ? "Cheapest of the bunch"
+      /* Renamed from "Cheapest of the bunch" (May 2026, founder
+         direction): plain English, parallel to the other verdict
+         labels ("Great price" / "Average price" / "Above average")
+         which all read as 2-word noun phrases. "Of the bunch" was
+         the only marketing-flavour idiom in the verdict set. */
+      ? "Lowest price"
       : verdict.label;
 
   /* Right-side subtitle. "across N stores" reads weird at N=1.

@@ -14,6 +14,7 @@ import { Check, ChevronDown, Globe } from "lucide-react";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { COUNTRIES } from "@/lib/country";
 import { cn } from "@/lib/utils";
+import CountryFlag from "@/components/ui/CountryFlag";
 
 const COUNTRY_CODES = new Set(COUNTRIES.map((c) => c.code));
 
@@ -67,13 +68,11 @@ export default function CountrySelect({ dropUp = false }: Props = {}) {
         aria-label={`Country: ${country.name}. Change.`}
         className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-full text-sm font-medium text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors"
       >
-        <span
-          aria-hidden="true"
-          className="text-base leading-none flag-emoji"
-          suppressHydrationWarning
-        >
-          {country.flag}
-        </span>
+        {/* SVG flag — renders identically on Windows / Linux /
+            macOS / headless. Replaces the regional-indicator emoji
+            that Windows Chrome shows as a bare country code in a
+            box. See CountryFlag for rationale. */}
+        <CountryFlag code={country.code} size={20} />
         <span
           className="hidden sm:inline text-[12px] tracking-wider"
           suppressHydrationWarning
@@ -87,8 +86,15 @@ export default function CountrySelect({ dropUp = false }: Props = {}) {
         <div
           role="listbox"
           aria-label="Choose country"
+          /* w-64 (256px) up from w-56 (224px). The narrower width
+             clipped "United Kingdom" on mobile inside the drawer
+             where the available width is constrained. 32px extra
+             absorbs the longest country name with breathing room
+             and the dropdown still fits inside the mobile drawer
+             (w-72 = 288px). User report May 2026: "on mobile,
+             United Kindom is truncated. Fix that." */
           className={cn(
-            "absolute right-0 w-56 rounded-xl bg-bg border border-border shadow-2xl z-50 overflow-hidden",
+            "absolute right-0 w-64 rounded-xl bg-bg border border-border shadow-2xl z-50 overflow-hidden",
             dropUp ? "bottom-full mb-2" : "top-full mt-2",
           )}
         >
@@ -124,7 +130,7 @@ export default function CountrySelect({ dropUp = false }: Props = {}) {
                         : "text-ink-2 hover:bg-surface-2 hover:text-ink",
                     )}
                   >
-                    <span aria-hidden="true" className="text-lg leading-none flag-emoji">{c.flag}</span>
+                    <CountryFlag code={c.code} size={22} />
                     <span className="flex-1 truncate">{c.name}</span>
                     <span className="text-[11px] text-ink-3 tabular-nums">{c.currency}</span>
                     {/* Use text-ink so the check adapts to both themes —
