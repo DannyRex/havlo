@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { TrendingDown, ArrowRight, Plane, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { formatPriceForUser } from "@/lib/utils";
@@ -50,9 +51,30 @@ export default function DupeCard({
     return offer.currency !== country.currency && offer.isInternational;
   };
 
+  /* Whole-card click target — Link wraps the upper portion (image +
+     caption + primary CTA button) so taps on any of those route to
+     the PDP. The "+N more stores" expandable below stays OUTSIDE
+     the Link so its per-store Links don't nest (invalid HTML +
+     React hydration warning).
+
+     User report May 2026: "shouldn't the card be clickable and not
+     only the view on merchant button?" */
+  const cardHref = bestOffer ? pdpUrlForOffer(country.code, { ...bestOffer, title: dupe.title }) : null;
+
   return (
     <div className="group relative flex flex-col rounded-2xl border border-border bg-surface overflow-hidden hover:border-border-strong hover:-translate-y-0.5 hover:shadow-card transition-all duration-200">
 
+      {/* Whole upper-card Link target. Wraps image + caption +
+          primary CTA so the card is fully clickable (not just the
+          button). Stops at the "+N more stores" expandable below
+          so those nested links don't violate the no-nested-anchors
+          HTML rule. */}
+      <Link
+        href={cardHref ?? "#"}
+        onClick={() => bestOffer && trackClick(dupe.key, query, rank, mode)}
+        className="block"
+        aria-label={`View ${dupe.title} details`}
+      >
       {/* Savings badge — perfect circle, top-right, on the image */}
       {hasSavings && (
         <div
@@ -120,26 +142,18 @@ export default function DupeCard({
           )}
         </div>
 
-        {/* Primary store CTA — best (cheapest) offer prominent.
-
-            Click model (May 2026): routes to the PDP for this
-            specific offer (or /p/live for offers without a real
-            DB id), not outbound to the merchant. /api/go's
-            affiliate wrap still fires when the user clicks the
-            "View at {merchant}" CTA on that PDP — keeping the
-            chokepoint intact while ensuring "no product across the
-            site goes directly to merchant" (user rule). */}
+        {/* Primary CTA — visual only. The whole upper-card Link
+            wrapper handles the click. This span carries the same
+            button styling so the user has the familiar visual
+            anchor + arrow affordance, but no nested anchor. Text
+            updated from "View on {Store}" to "View product" to
+            match the PDP-first click model — clicking takes you
+            to a Havlo PDP, not directly to the merchant. */}
         {bestOffer && (
-          <a
-            href={pdpUrlForOffer(country.code, { ...bestOffer, title: dupe.title })}
-            onClick={() => trackClick(dupe.key, query, rank, mode)}
-            className="mt-3 inline-flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-ink text-bg text-xs font-semibold hover:opacity-90 transition-opacity"
+          <span
+            className="mt-3 inline-flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-ink text-bg text-xs font-semibold group-hover:opacity-90 transition-opacity"
           >
             <span className="inline-flex items-center gap-1.5 min-w-0">
-              {/* bg-surface-2 instead of bg-white — logos with
-                  white/light marks on transparent bg were invisible
-                  in both modes against the white container. Same
-                  fix applied in PriceResults + compare anchor rows. */}
               <span className="w-4 h-4 rounded overflow-hidden bg-surface-2 shrink-0 flex items-center justify-center">
                 <Image
                   src={bestOffer.storeLogoUrl}
@@ -150,17 +164,22 @@ export default function DupeCard({
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                 />
               </span>
-              <span className="truncate">View on {displayStoreName(bestOffer.storeName)}</span>
+              <span className="truncate">View product</span>
               {isIntlForUser(bestOffer) && bestOffer.landedCostExtra > 0 && (
                 <Plane size={11} className="text-amber-300 shrink-0" />
               )}
             </span>
-            {/* Internal navigation to the PDP for this offer —
-                visual cue is an arrow rather than ExternalLink so
-                the user knows the click stays on Havlo first. */}
             <ArrowRight size={12} className="shrink-0 opacity-80" />
-          </a>
+          </span>
         )}
+      </div>
+      </Link>
+      {/* "+N more stores" expandable lives OUTSIDE the upper-card
+          Link so each per-store Link below doesn't nest invalidly.
+          Wrapper picks up the card's hover styles via the parent
+          `group` class on the outer div. */}
+      <div className="px-3.5 pb-3.5">
+
 
         {/* Other offers — collapsible */}
         {extraStores > 0 && (

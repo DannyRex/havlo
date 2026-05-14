@@ -333,19 +333,34 @@ export default async function ProductPage({ params }: PageProps) {
      already groups by signature, but FTS scoring can occasionally
      split near-identical titles into separate groups). */
   const seenIds = new Set<string>();
-  const seenTitles = new Set<string>();
   const seenStoreTitle = new Set<string>();
-  /* Normalise titles by stripping ALL non-alphanumeric characters and
-     lowercasing. Catches the cases the original whitespace-collapse
-     missed: invisible Unicode, smart-quotes, en-dash vs hyphen,
-     trailing punctuation variants. "Fashion Nova Alena Pleated Crepe
-     Mini Dress" and "Fashion-Nova: Alena Pleated Crepe Mini Dress"
-     collapse to the same key. */
+  /* Normalise titles for comparison — strip non-alphanumerics +
+     lowercase. Catches invisible Unicode, smart-quotes, en-dash vs
+     hyphen, trailing punctuation. */
   const normaliseTitle = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, "");
   const filteredDupes = countryFilteredDupes.filter((d) => {
+    /* Drop the ANCHOR product itself from the YML rail. Three signals:
+         1. d.key === anchor product_id (DupeResult.key IS product_id).
+         2. d.offers contains the anchor offer_id.
+         3. NORMALISED title matches AND a dupe-offer's storeId
+            matches the anchor's storeId. (Same product at the SAME
+            store IS the anchor; same title at a DIFFERENT store is
+            a legit cheaper alternative — keep those.)
+
+       Fix May 2026: previous title-only check (line 348 below
+       removed) was too aggressive and dropped legit alternatives.
+       User report: "Compare across 3 stores" but compare page only
+       showed 1, with "Only seen at this store" wrongly rendered
+       even though /compare found alternatives. Root cause: a
+       Google Pixel 9a 128GB at Currys was filtered out because its
+       title matched the Very anchor's title — but Currys is a
+       different store offering the same product, exactly what the
+       PDP "Compare prices across N stores" CTA promises. */
     if (offer.product_id && d.key === offer.product_id) return false;
     if (offer.offer_id && d.offers.some((o) => o.offerId === offer.offer_id)) return false;
-    if (offer.title && normaliseTitle(d.title) === normaliseTitle(offer.title)) return false;
+    if (offer.title && offer.store_id && normaliseTitle(d.title) === normaliseTitle(offer.title)) {
+      if (d.offers.some((o) => o.storeId === offer.store_id)) return false;
+    }
     /* Dedupe by best-offer id (defensive — dupes engine already
        groups by signature, but FTS scoring sometimes splits near-
        identical titles into separate groups). */
@@ -353,24 +368,12 @@ export default async function ProductPage({ params }: PageProps) {
     const id = best?.offerId || (best?.storeId + ":" + d.key);
     if (seenIds.has(id)) return false;
     seenIds.add(id);
-    /* Title-key + store-title-key dedupes.
-
-       title-key: catches dupes where two DupeResults share a title
-       (FTS engine occasionally splits identical titles across keys
-       when ingest left slight signature variance).
-
-       store-title-key: catches the user-reported May 2026 case where
-       /us/p/{fashion-nova-mini-dress} surfaced "Fashion Nova Alena
-       Pleated Crepe Mini Dress" twice — once at $13 and once at $16.
-       Same merchant, same title, different SKU variants (different
-       size or color). Each variant has its own product_id so
-       title-only dedupe wouldn't catch it — but the SAME merchant
-       offering the SAME named item at two prices is, from the
-       shopper's perspective, the same product. Keep the cheapest;
-       drop the rest. */
+    /* Same-store + same-title dedupe — catches the SKU-variant case
+       (Fashion Nova "Alena Pleated Crepe Mini Dress" at $13 and $16
+       are different sizes / colours, same merchant + same display
+       title; treat as one). Per-store; legit alternatives at OTHER
+       stores survive. */
     const titleKey = normaliseTitle(d.title);
-    if (seenTitles.has(titleKey)) return false;
-    seenTitles.add(titleKey);
     const storeTitleKey = `${best?.storeId ?? ""}|${titleKey}`;
     if (seenStoreTitle.has(storeTitleKey)) return false;
     seenStoreTitle.add(storeTitleKey);
@@ -397,18 +400,26 @@ export default async function ProductPage({ params }: PageProps) {
      Curated Amazon PDPs (product_id is the synthetic slug, not a
      real DB row) have a single anchor store — Amazon — so the
      fallback to 1 is correct for that path. */
-  let totalStores = 1;
-  const supaForCount = getSupabaseAdmin();
-  if (supaForCount && offer.product_id && !offer.offer_id.startsWith("amazon-")) {
-    const { data: siblingOffers } = await supaForCount
-      .from("offers")
-      .select("store_id")
-      .eq("product_id", offer.product_id)
-      .eq("in_stock", true);
-    if (siblingOffers && siblingOffers.length > 0) {
-      totalStores = new Set(siblingOffers.map((o) => o.store_id)).size;
-    }
-  }
+  /* totalStores aligned with what /compare ACTUALLY shows: this
+     anchor + the country/dedup-filtered alternatives. Was previously
+     a separate offers-table COUNT(distinct store_id) which often
+     OVER-counted versus /compare's display (because /compare uses
+     pgFtsFindSimilar on title which can drop products that
+     product_id-grouping would include, and country-filtering removes
+     more on top). User report May 2026: "Compare across 3 stores"
+     CTA but compare page only shows 1 alternative. New formula: 1
+     anchor + filteredDupes.length distinct store entries. The dupes
+     engine already de-duplicates by store-store-title (see filter
+     above), so no double-counting risk. */
+  const dupeStoreSet = new Set(filteredDupes.map((d) => {
+    const best = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
+    return best?.storeId ?? d.key;
+  }));
+  /* Always include the anchor's own store in the total — even if
+     filteredDupes is empty, the user-facing count is "1 store"
+     (this one), not "0 stores". */
+  if (offer.store_id) dupeStoreSet.add(offer.store_id);
+  const totalStores = Math.max(1, dupeStoreSet.size);
   const breadcrumb = buildBreadcrumbList([
     { name: "Havlo",          url: `${SITE_URL}/${country.code}` },
     { name: country.name,     url: `${SITE_URL}/${country.code}` },
