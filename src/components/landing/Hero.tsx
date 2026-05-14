@@ -11,19 +11,31 @@ import {
 import { useCountry } from "@/components/providers/CountryProvider";
 import type { ComponentType } from "react";
 
-type CatItem = { label: string; q: string; Icon: ComponentType<{ size?: number; className?: string }> };
+/* Each pill maps to a real category slug from src/lib/data/categories.ts
+   so /deals can apply its category filter directly (not a fuzzy text
+   search). Sub-category pills (Sneakers, TVs, Furniture) carry an
+   optional `search` so the deals page filters by category AND
+   narrows to the specific product type within it. */
+type CatItem = {
+  label: string;
+  slug:  string;
+  /** Optional text-search override applied alongside the category
+      filter when the pill is a sub-category of the slug it maps to. */
+  search?: string;
+  Icon:  ComponentType<{ size?: number; className?: string }>;
+};
 
 const CATEGORIES: CatItem[] = [
-  { label: "Phones",     q: "phone",       Icon: PhoneIcon },
-  { label: "Laptops",    q: "laptop",      Icon: LaptopIcon },
-  { label: "Sneakers",   q: "sneakers",    Icon: SneakerIcon },
-  { label: "Earbuds",    q: "earbuds",     Icon: EarbudsIcon },
-  { label: "TVs",        q: "tv",          Icon: TvIcon },
-  { label: "Home",       q: "home",        Icon: HomeIcon },
-  { label: "Fashion",    q: "fashion",     Icon: FashionIcon },
-  { label: "Beauty",     q: "skincare",    Icon: BeautyIcon },
-  { label: "Gaming",     q: "console",     Icon: GamingIcon },
-  { label: "Furniture",  q: "furniture",   Icon: FurnitureIcon },
+  { label: "Phones",     slug: "phones",                            Icon: PhoneIcon },
+  { label: "Laptops",    slug: "computing",                         Icon: LaptopIcon },
+  { label: "Sneakers",   slug: "fashion",      search: "sneakers",  Icon: SneakerIcon },
+  { label: "Earbuds",    slug: "audio",                             Icon: EarbudsIcon },
+  { label: "TVs",        slug: "electronics",  search: "tv",        Icon: TvIcon },
+  { label: "Home",       slug: "home",                              Icon: HomeIcon },
+  { label: "Fashion",    slug: "fashion",                           Icon: FashionIcon },
+  { label: "Beauty",     slug: "beauty",                            Icon: BeautyIcon },
+  { label: "Gaming",     slug: "gaming",                            Icon: GamingIcon },
+  { label: "Furniture",  slug: "home",         search: "furniture", Icon: FurnitureIcon },
 ];
 
 interface Props {
@@ -61,10 +73,42 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
   const [focused, setFocused] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
+  /* Search routing — fork on intent:
+       URL paste → /compare. The user has a specific product link,
+         sniff-to-anchor extracts the title + price + image and the
+         compare page builds a "cheaper than this exact item" view.
+       Text search → /deals. Browse intent. Search queries are
+         usually ambiguous ("phones", "iPhone 15", "running shoes")
+         and the deals grid is the right surface for choosing
+         between candidate products. From any /deals card the user
+         hits the PDP, which has a "Compare prices across N stores"
+         CTA into /compare for the deeper price-comparison view.
+
+     Why this is the right shape: routing every search through
+     /compare forced a single-product frame onto every query, which
+     broke down the moment the query was a category ("sneakers") or
+     a brand ("Adidas"). And /compare doesn't have a path TO the PDP,
+     so users who landed there with a vague query had nowhere to
+     drill into. /deals → PDP → /compare is the complete chain. */
   const submit = () => {
     const q = query.trim();
     if (!q) return;
-    router.push(`/compare?q=${encodeURIComponent(q)}&mode=similar`);
+    const isPastedUrl = /^https?:\/\//i.test(q);
+    if (isPastedUrl) {
+      router.push(`/${country.code}/compare?q=${encodeURIComponent(q)}&mode=similar`);
+      return;
+    }
+    router.push(`/${country.code}/deals?search=${encodeURIComponent(q)}`);
+  };
+
+  /* Category pill click routes to /deals with the category SLUG
+     pre-applied (not a fuzzy text search). Sub-category pills carry
+     a search term so /deals shows the right narrow slice (e.g.
+     Sneakers = category=fashion + search=sneakers). */
+  const goToCategory = (cat: CatItem) => {
+    const params = new URLSearchParams({ category: cat.slug });
+    if (cat.search) params.set("search", cat.search);
+    router.push(`/${country.code}/deals?${params.toString()}`);
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -297,15 +341,15 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
           style={{ animationDelay: "280ms" }}
         >
           <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 sm:px-0 sm:justify-center sm:flex-wrap sm:gap-2.5">
-            {CATEGORIES.map(({ label, q, Icon }) => (
+            {CATEGORIES.map((cat) => (
               <button
-                key={q}
+                key={cat.label}
                 type="button"
-                onClick={() => router.push(`/compare?q=${encodeURIComponent(q)}&mode=similar`)}
+                onClick={() => goToCategory(cat)}
                 className="cat-pill flex-shrink-0 active:scale-95"
               >
-                <Icon size={16} className="text-ink-2 group-hover:text-ink shrink-0" />
-                {label}
+                <cat.Icon size={16} className="text-ink-2 group-hover:text-ink shrink-0" />
+                {cat.label}
               </button>
             ))}
           </div>
