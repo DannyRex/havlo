@@ -6,6 +6,7 @@ import { formatPriceForUser, proxiedImageUrl, cleanTitle } from "@/lib/utils";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { displayStoreName } from "@/lib/store-display";
+import { storeLogoInvertClass } from "@/lib/store-logo-invert";
 import { trackClick } from "@/lib/trackClick";
 import type { ProductGroup, StoreOffer } from "@/lib/search";
 
@@ -116,9 +117,13 @@ export default function PriceResults({
                 {isBest ? <Trophy size={12} /> : i + 1}
               </div>
 
-              {/* Logo */}
+              {/* Logo — same theme-aware invert as DupeCard /
+                  StoreLogo so white-on-transparent wordmarks (3C Hub
+                  etc.) stay visible against light bg-surface-2 in
+                  light mode. */}
               <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-surface-2 p-1.5 shrink-0">
-                <Image src={p.storeLogoUrl} alt={p.storeName} width={28} height={28} className="object-contain"
+                <Image src={p.storeLogoUrl} alt={p.storeName} width={28} height={28}
+                       className={`object-contain ${storeLogoInvertClass(p.storeId)}`}
                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
               </div>
 
