@@ -21,6 +21,7 @@ import {
   savings,
   timeAgo,
 } from "@/lib/utils";
+import { displayStoreName } from "@/lib/store-display";
 import { useCountry } from "@/components/providers/CountryProvider";
 import {
   USD_FX, formatLocal, inferStoreCountry, isGlobalIntlStore, type Country,
@@ -156,6 +157,10 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
   const priceFmt = formatLocal(primarySale, country);
   const origFmt  = formatLocal(primaryOrig, country);
   const saveFmt  = primarySaved > 0 ? formatLocal(primarySaved, country) : null;
+  /* Display-clean storeName — collapses raw SerpAPI seller suffixes
+     ("Amazon.de - Amazon.de-Seller" → "Amazon Germany") that escaped
+     ingest-time canonicalisation on older DB rows. */
+  const displayStore = displayStoreName(deal.storeName);
 
   /* Amazon search-URL deals (curated catalog rows that link to
      /s?k=... rather than a /dp/ASIN page). The displayed price is
@@ -236,7 +241,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
          session, and the affiliate chokepoint still fires on every
          actual purchase-intent click. */
       href={linkHref ?? `/${country.code}/p/${deal.id}`}
-      aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${deal.storeName}. Open details.`}
+      aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${displayStore}. Open details.`}
       className="group block"
       onClick={() => {
         /* GA4 product_click event — fires before navigation so the
@@ -349,7 +354,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
 
       <div className="pt-2 sm:pt-2.5 px-0.5">
         <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-ink-3 mb-0.5 sm:mb-1 leading-none min-w-0">
-          <span className="font-medium text-ink-2 truncate">{deal.storeName}</span>
+          <span className="font-medium text-ink-2 truncate">{displayStore}</span>
           <span aria-hidden="true" className="shrink-0 hidden sm:inline">·</span>
           <span className="shrink-0 hidden sm:inline">{timeAgo(deal.postedAt)}</span>
         </div>

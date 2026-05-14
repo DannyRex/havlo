@@ -24,6 +24,7 @@ import {
   isStoreSearchUrl,
   timeAgo,
 } from "@/lib/utils";
+import { displayStoreName } from "@/lib/store-display";
 import {
   USD_FX,
   formatLocal,
@@ -90,6 +91,11 @@ export default function ProductHero({ offer, countryCode, totalStores }: Props) 
   const [imgFailed, setImgFailed] = useState(false);
 
   const cleanedTitle = cleanTitle(offer.title);
+  /* Normalise the storeName for display — handles raw SerpAPI strings
+     like "Amazon.co.uk - Amazon.co.uk-Seller" that escaped ingest-
+     time canonicalisation (older DB rows). Pure function, idempotent,
+     so calling on already-clean names ("Currys") is a no-op. */
+  const displayStore = displayStoreName(offer.storeName);
   const imgSrc       = offer.imageUrl ? proxiedImageUrl(offer.imageUrl) : null;
 
   /* Primary price in the user's currency. */
@@ -202,7 +208,7 @@ export default function ProductHero({ offer, countryCode, totalStores }: Props) 
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 border border-border text-[12px] text-ink-2">
             <StoreIcon size={12} aria-hidden="true" />
-            <span className="font-medium text-ink">{offer.storeName}</span>
+            <span className="font-medium text-ink">{displayStore}</span>
           </div>
           {isCrossBorder && (
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-300/40 text-[12px] text-amber-800 dark:text-amber-200">
@@ -266,7 +272,7 @@ export default function ProductHero({ offer, countryCode, totalStores }: Props) 
           rel="noopener noreferrer sponsored"
           className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-ink text-bg font-semibold text-[15px] hover:opacity-90 transition-opacity mb-3"
         >
-          View at {offer.storeName}
+          View at {displayStore}
           <ExternalLink size={16} aria-hidden="true" />
         </a>
 

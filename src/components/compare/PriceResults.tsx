@@ -5,6 +5,7 @@ import { ExternalLink, Trophy, Truck, Globe, Star } from "lucide-react";
 import { formatPriceForUser, proxiedImageUrl, cleanTitle } from "@/lib/utils";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
+import { displayStoreName } from "@/lib/store-display";
 import { trackClick } from "@/lib/trackClick";
 import type { ProductGroup, StoreOffer } from "@/lib/search";
 
@@ -144,7 +145,7 @@ export default function PriceResults({
               {/* Store info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold text-ink">{p.storeName}</span>
+                  <span className="text-sm font-semibold text-ink">{displayStoreName(p.storeName)}</span>
                   {isBest && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/20 text-success font-semibold uppercase tracking-wide">Best</span>
                   )}

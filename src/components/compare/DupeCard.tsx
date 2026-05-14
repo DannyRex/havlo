@@ -8,6 +8,7 @@ import { pdpUrlForOffer } from "@/lib/pdp-url";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { effectiveLandedPrice } from "@/lib/landed-price";
+import { displayStoreName } from "@/lib/store-display";
 import { trackClick } from "@/lib/trackClick";
 import type { DupeResult, StoreOffer } from "@/lib/search";
 
@@ -149,7 +150,7 @@ export default function DupeCard({
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                 />
               </span>
-              <span className="truncate">View on {bestOffer.storeName}</span>
+              <span className="truncate">View on {displayStoreName(bestOffer.storeName)}</span>
               {isIntlForUser(bestOffer) && bestOffer.landedCostExtra > 0 && (
                 <Plane size={11} className="text-amber-300 shrink-0" />
               )}
@@ -195,7 +196,7 @@ export default function DupeCard({
                         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                       />
                     </div>
-                    <span className="text-ink-2 truncate flex-1">{offer.storeName}</span>
+                    <span className="text-ink-2 truncate flex-1">{displayStoreName(offer.storeName)}</span>
                     <span className="font-semibold text-ink tabular-nums">{formatPriceForUser(offer.price, country)}</span>
                   </a>
                 ))}

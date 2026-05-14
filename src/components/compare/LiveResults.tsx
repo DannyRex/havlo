@@ -10,6 +10,7 @@ import {
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { USD_FX, formatLocal, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
+import { displayStoreName } from "@/lib/store-display";
 import type { Deal } from "@/types";
 
 interface Props {
@@ -81,7 +82,7 @@ function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
          "no product across the site should go directly to merchant"
          rule. */
       href={pdpUrlForDeal(country.code, deal)}
-      aria-label={`${deal.title}, ${priceFmt} at ${deal.storeName}. Open details.`}
+      aria-label={`${deal.title}, ${priceFmt} at ${displayStoreName(deal.storeName)}. Open details.`}
       className="group card card-hover overflow-hidden flex flex-col"
     >
       {/* Image — varied aspect for masonry feel */}
@@ -136,7 +137,7 @@ function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
       {/* Caption */}
       <div className="p-3 flex flex-col flex-1">
         <p className="text-[10px] uppercase tracking-[0.08em] text-ink-3 font-semibold truncate">
-          {deal.storeName}
+          {displayStoreName(deal.storeName)}
         </p>
         <p className="mt-1 text-sm font-medium text-ink leading-snug line-clamp-2 tracking-[-0.005em]">
           {deal.title}

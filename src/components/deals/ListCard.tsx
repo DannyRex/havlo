@@ -13,6 +13,7 @@ import {
   proxiedImageUrl,
   timeAgo,
 } from "@/lib/utils";
+import { displayStoreName } from "@/lib/store-display";
 import InfoTip from "@/components/ui/InfoTip";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { USD_FX, formatLocal, inferStoreCountry, isGlobalIntlStore, type Country } from "@/lib/country";
@@ -92,6 +93,7 @@ export default function ListCard({ deal, linkHref }: Props) {
   const origFmt  = formatLocal(primaryOrig, country);
   const saveFmt  = primarySaved > 0 ? formatLocal(primarySaved, country) : null;
   const hasDiscount = deal.originalPrice > deal.salePrice && deal.discountPercent > 0;
+  const displayStore = displayStoreName(deal.storeName);
 
   /* Amazon search-URL deals — see MasonryCard for the full rationale.
      The cheapest reference price is real, but the destination is a
@@ -146,7 +148,7 @@ export default function ListCard({ deal, linkHref }: Props) {
          /api/go affiliate-wrapped outbound now fires at that CTA
          click instead of this card click. Matches MasonryCard. */
       href={linkHref ?? `/${country.code}/p/${deal.id}`}
-      aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${deal.storeName}. Open details.`}
+      aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${displayStore}. Open details.`}
       className="group flex gap-3 items-start p-2.5 rounded-2xl border border-border bg-surface hover:border-border-strong hover:shadow-card transition-all"
     >
       {/* Image — square thumbnail on the left */}
@@ -185,7 +187,7 @@ export default function ListCard({ deal, linkHref }: Props) {
       {/* Right column — store · time, title, price row */}
       <div className="flex-1 min-w-0 py-1">
         <div className="flex items-center gap-1 text-[11px] text-ink-3 leading-none">
-          <span className="font-medium truncate text-ink-2">{deal.storeName}</span>
+          <span className="font-medium truncate text-ink-2">{displayStore}</span>
           <span aria-hidden="true">·</span>
           <span className="shrink-0">{timeAgo(deal.postedAt)}</span>
         </div>
