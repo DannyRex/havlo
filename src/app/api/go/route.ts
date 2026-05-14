@@ -107,6 +107,50 @@ function isGoogleRelay(u: string): boolean {
   }
 }
 
+/* Verify a URL's hostname matches the merchant the user clicked.
+   SerpAPI's google_product resolver returns the FIRST online seller
+   for a Google Shopping product, which is not necessarily the
+   merchant whose card the user clicked on Havlo. User report May
+   2026 (US retest): "View at Fashion Nova" outbound was routing
+   somewhere other than fashionnova.com — likely because SerpAPI
+   resolved the Google relay to a Walmart-third-party-seller URL
+   (Walmart listing a Fashion Nova item) and we passed that through
+   as "the resolved merchant link." The result: user clicks Fashion
+   Nova, lands on Walmart, never reaches Fashion Nova.
+
+   Fix: when we have a strong storeIdHint / storeNameHint and SerpAPI
+   returns a URL, verify the URL's hostname matches the merchant the
+   user clicked. On mismatch, treat the SerpAPI result as if it
+   failed and fall through to merchant_search (which DOES route to
+   the right merchant, just on their search page rather than the
+   specific product page).
+
+   Hostname comparison strips `www.` and accepts subdomain matches
+   (so `shop.fashionnova.com` matches `fashionnova.com`). */
+function hostnameMatchesStore(
+  url: string,
+  storeId: string | null | undefined,
+  storeName: string | null | undefined,
+): boolean {
+  try {
+    const got = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+    /* Reuse the curated merchant homepage as the source of truth for
+       the expected hostname. If we don't know the merchant at all,
+       skip the check (no signal to validate against). */
+    const m = merchantHomepage(storeId ?? "", storeName ?? "");
+    if (!m) return true;
+    const expected = new URL(m.url).hostname.toLowerCase().replace(/^www\./, "");
+    if (got === expected) return true;
+    if (got.endsWith("." + expected)) return true;
+    if (expected.endsWith("." + got)) return true;
+    return false;
+  } catch {
+    /* Malformed URL — be permissive so we don't drop otherwise-good
+       redirects on a parser quirk. */
+    return true;
+  }
+}
+
 /* Lookup a previously-resolved URL from the cache table.
    Schema (create on demand):
      CREATE TABLE resolved_clicks (
@@ -290,13 +334,40 @@ export async function GET(req: NextRequest) {
 
   /* Google relay — try cache first, then SerpAPI. */
   const cached = await readCache(target);
-  if (cached) return sendOut(cached, "cache_hit");
+  if (cached) {
+    /* Same hostname guard as the live resolve path below — a cached
+       wrong-merchant URL is just as bad as a fresh one. */
+    if (!storeIdHint && !storeNameHint) return sendOut(cached, "cache_hit");
+    if (hostnameMatchesStore(cached, storeIdHint, storeNameHint)) return sendOut(cached, "cache_hit");
+    /* Cached URL points at a different merchant than the user
+       clicked — skip it and fall through to merchant_search. The
+       cache stamp stays in place; subsequent identical relays for
+       OTHER stores might legitimately resolve to that URL. */
+  }
 
   const resolved = await resolveViaSerpApi(target);
   if (resolved) {
-    // Fire-and-forget — don't block redirect on cache write
-    void writeCache(target, resolved);
-    return sendOut(resolved, "serpapi_resolved", { serpapiAttempted: true, serpapiResolved: true });
+    /* Hostname verification — only trust the SerpAPI result if its
+       hostname matches the merchant the user clicked. Without this,
+       a Fashion-Nova-tagged Google relay can resolve to a Walmart
+       seller page and we'd happily redirect there (May 2026 user
+       report). Falls through to merchant_search on mismatch. */
+    const trustResolved = (!storeIdHint && !storeNameHint) || hostnameMatchesStore(resolved, storeIdHint, storeNameHint);
+    if (trustResolved) {
+      // Fire-and-forget — don't block redirect on cache write
+      void writeCache(target, resolved);
+      return sendOut(resolved, "serpapi_resolved", { serpapiAttempted: true, serpapiResolved: true });
+    }
+    /* serpapi_resolved fired but hostname mismatched — log a
+       diagnostic row so we can see how often this safety net
+       trips, then fall through. */
+    logResolution({
+      ...baseLog,
+      resolvedUrl: resolved,
+      step:        "serpapi_resolved",
+      serpapiAttempted: true,
+      serpapiResolved:  true,
+    });
   }
 
   /* Last resort — Google relay we couldn't resolve.

@@ -24,6 +24,14 @@ export interface BrowseQuery {
       store filter applied. Drives the "Stores" filter UI on
       /deals (multi-store checkbox panel). */
   stores?: string[];
+  /** ISO 3166-1 alpha-2 lowercase (e.g. "ng", "uk"). When set, the
+      provider scopes its fetch to that country's pool — anchored-
+      local stores plus truly global cross-border shippers. Defends
+      against pool starvation: when null, the 6000-row global RPC
+      cap leaves 0%-only NG retailers below the cut because they
+      compete with the entire international catalog. Per-country
+      fetches give every market 6000 rows of its own headroom. */
+  country?: string;
 }
 
 export interface SearchQuery {

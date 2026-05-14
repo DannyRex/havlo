@@ -138,6 +138,12 @@ export const dbBrowseProvider: BrowseProvider = {
       p_store_ids:      q.stores && q.stores.length > 0 ? q.stores : null,
       p_max_rows:       PASS_A_MAX,
       p_zero_discount_only: false,
+      /* p_country (migration 0022) — scopes the RPC to a single
+         market's pool so AliExpress + cross-border volume can't
+         starve smaller national catalogs (NG 0%-only retailers
+         were the user-reported case). null = backward-compatible
+         global behaviour. */
+      p_country:        q.country ? q.country.toUpperCase() : null,
     };
     const passBArgs = {
       ...passAArgs,

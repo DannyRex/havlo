@@ -30,8 +30,15 @@ import type { Deal, OriginFilter, SortOption } from "@/types";
  * Cross-user cache hits depend on instance reuse; worst case each
  * cold instance does one heavy fetch then caches.
  *
- * Cache key intentionally OMITS country, origin, and offset:
- *   - country: filtered downstream (one cached pool serves UK + US visitors)
+ * Cache key includes country (per-market pools, May 2026): with the
+ * country-aware browse_deals RPC (migration 0022) the underlying
+ * data set differs per market, so each country gets its own cache
+ * slot. Cross-market cache sharing was a nice egress trick but
+ * caused the NG-store-starvation problem in production — a globally
+ * sorted top 6000 left NG 0%-only retailers below the cut. Sharded
+ * pools are slightly more memory but actually correct.
+ *
+ * Cache key intentionally OMITS origin and offset:
  *   - origin: filtered downstream (one cached pool serves all/local/intl)
  *   - offset: the slice happens AFTER the cache (different page = same pool)
  *
@@ -49,6 +56,7 @@ async function fetchPoolCached(params: {
   categorySlug?: string;
   sort:          SortOption;
   search?:       string;
+  country?:      string;
 }): Promise<Deal[]> {
   /* Stable key — JSON.stringify omits undefined fields so absent
      category/search produces the same key as explicitly-undefined.
@@ -68,6 +76,7 @@ async function fetchPoolCached(params: {
     sort:         params.sort,
     search:       params.search,
     origin:       "all",
+    country:      params.country,
   });
 
   POOL_CACHE.set(key, { data, expires: now + POOL_TTL_MS });
@@ -216,6 +225,7 @@ export async function GET(req: NextRequest) {
       categorySlug: category,
       sort,
       search,
+      country: country.code,
     });
 
     /* Country store filter — pure-function, runs over Deal[] */

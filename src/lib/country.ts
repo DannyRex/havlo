@@ -440,8 +440,39 @@ export interface OfferLike {
 
 function lc(s: string): string { return s.toLowerCase(); }
 
+/* Strip every separator character (dot, hyphen, underscore, space)
+   from a lowercased string. This lets roster entries authored as
+   ".com" / "co.uk" / "marks & spencer" / "tata cliq" match storeIds
+   that ingest writes as "amazon-co-uk-amazon-co-uk-seller",
+   "marks-spencer", "tata-cliq-fashion", etc. Substring matching on
+   the literal form fails because hyphens vs dots vs spaces split the
+   string differently. The normalised form collapses all separator
+   styles to a single canonical bag-of-characters.
+
+   May 2026 retest fix: DE 0 local, AE 2 local, IN 6 local were all
+   caused by this mismatch. Roster authored "amazon.ae"; storeIds
+   ingested as "amazon-ae-seller" / "amazon-ae-retail" / etc. The
+   literal `.includes("amazon.ae")` returned false because the dot
+   isn't in the storeId. After normalisation, both sides become
+   "amazonae..." and the substring match succeeds. */
+function normalizeForMatch(s: string): string {
+  return s.replace(/[.\-_\s&]+/g, "");
+}
+
 function matchesAny(haystackLc: string, needles: string[]): boolean {
-  return needles.some((n) => haystackLc.includes(n));
+  /* Pre-compute the normalised haystack once. Avoid recomputing in
+     the loop. */
+  const haystackNorm = normalizeForMatch(haystackLc);
+  return needles.some((n) => {
+    /* Try both forms so existing exact-style entries (whole word,
+       no separators) keep working and new cross-separator matches
+       also succeed. */
+    const literalLc = n.toLowerCase();
+    if (haystackLc.includes(literalLc)) return true;
+    const needleNorm = normalizeForMatch(literalLc);
+    if (!needleNorm) return false;
+    return haystackNorm.includes(needleNorm);
+  });
 }
 
 /** True if the deal's store is one of the cross-border / global retailers
