@@ -1,0 +1,388 @@
+{
+  "generatedAt": "2026-05-14T10:26:03.525Z",
+  "description": "Focused subset of merchant clicks for the resolver audit. ~30 rows targeting the failing patterns (relay=Y SerpAPI re-resolution) plus a passthrough sanity baseline (all NG relay=N rows).",
+  "totalTargets": 38,
+  "estimatedSerpapiCredits": 28,
+  "targets": [
+    {
+      "country": "NG",
+      "storeId": "threechub",
+      "storeName": "3C Hub",
+      "offerId": "c0212c31-efcc-4cff-a410-7156d3d37e42",
+      "title": "HONOR X5B Android Mobile Smart Phone With 64GB+4GB",
+      "relay": false,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.3chub.com%2Fproducts%2Ffree-gift-or-1-000-airtime-honor-x5b-android-mobile-smart-phone-with-64gb-3gb-128gb-3gb-128gb-4gb&id=c0212c31-efcc-4cff-a410-7156d3d37e42&title=HONOR+X5B+Android+Mobile+Smart+Phone+With+64GB%2B4GB&store=threechub&storeName=3C+Hub",
+      "rawOfferUrl": "https://www.3chub.com/products/free-gift-or-1-000-airtime-honor-x5b-android-mobile-smart-phone-with-64gb-3gb-128gb-3gb-128gb-4gb"
+    },
+    {
+      "country": "NG",
+      "storeId": "ajebomarket",
+      "storeName": "Ajebomarket",
+      "offerId": "baa75853-7669-4973-b39f-0ce01d04dc6f",
+      "title": "1996 Nigeria Away Retro Jersey",
+      "relay": false,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fajebomarket.com%2Fproducts%2F1996-nigeria-away-retro-jersey&id=baa75853-7669-4973-b39f-0ce01d04dc6f&title=1996+Nigeria+Away+Retro+Jersey&store=ajebomarket&storeName=Ajebomarket",
+      "rawOfferUrl": "https://ajebomarket.com/products/1996-nigeria-away-retro-jersey"
+    },
+    {
+      "country": "NG",
+      "storeId": "bitmarte",
+      "storeName": "Bitmarte",
+      "offerId": "679df63a-b13c-42c6-bdba-afaca7f036bd",
+      "title": "White Air Force Nike",
+      "relay": false,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fbitmarte.com%2Fcustomer%2Fproduct%2Fwhite-air-force-nike&id=679df63a-b13c-42c6-bdba-afaca7f036bd&title=White+Air+Force+Nike&store=bitmarte&storeName=Bitmarte",
+      "rawOfferUrl": "https://bitmarte.com/customer/product/white-air-force-nike"
+    },
+    {
+      "country": "NG",
+      "storeId": "healthplus",
+      "storeName": "HealthPlus",
+      "offerId": "be7c0cc2-05e0-48e7-a0d3-41be47e24695",
+      "title": "Force Factor Anabolic Muscle Builder Capsules x150",
+      "relay": false,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fhealthplusnigeria.com%2Fproducts%2Fforce-factor-anabolic-muscle-builder-capsules-x150&id=be7c0cc2-05e0-48e7-a0d3-41be47e24695&title=Force+Factor+Anabolic+Muscle+Builder+Capsules+x150&store=healthplus&storeName=HealthPlus",
+      "rawOfferUrl": "https://healthplusnigeria.com/products/force-factor-anabolic-muscle-builder-capsules-x150"
+    },
+    {
+      "country": "NG",
+      "storeId": "konga",
+      "storeName": "Konga",
+      "offerId": "0754d892-8fbd-482b-a455-3e64e8dd09d3",
+      "title": "Tripod Stand For Camera- Phone With Wireless Remote",
+      "relay": false,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.konga.com%2Fproduct%2F6982327%3Fcid%3D7681&id=0754d892-8fbd-482b-a455-3e64e8dd09d3&title=Tripod+Stand+For+Camera-+Phone+With+Wireless+Remote&store=konga&storeName=Konga",
+      "rawOfferUrl": "https://www.konga.com/product/6982327?cid=7681"
+    },
+    {
+      "country": "NG",
+      "storeId": "medplus",
+      "storeName": "MedPlus",
+      "offerId": "bf7b2182-2404-4db7-8604-c29c1a4ad0e0",
+      "title": "N/A VITAMIN C 1000MG EF...",
+      "relay": false,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fmedplusnig.com%2Fproduct%2Fna-vitamin-c-1000mg-effervescent-20tab-VJDJC7&id=bf7b2182-2404-4db7-8604-c29c1a4ad0e0&title=N%2FA+VITAMIN+C+1000MG+EF...&store=medplus&storeName=MedPlus",
+      "rawOfferUrl": "https://medplusnig.com/product/na-vitamin-c-1000mg-effervescent-20tab-VJDJC7"
+    },
+    {
+      "country": "NG",
+      "storeId": "slot",
+      "storeName": "Slot",
+      "offerId": "fdae8cad-af80-4a93-a646-a6bb25bb80b7",
+      "title": "SLOT MINI BLUETOOTH SPEAKER BTS12 + SLOT TWS BLUETOOTH WITH ENC+ANC BH-T59-26% OFF",
+      "relay": false,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.slot.ng%2Fslot-mini-bluetooth-speaker-bts12-slot-tws-bluetooth-with-encanc-bh-t59.html&id=fdae8cad-af80-4a93-a646-a6bb25bb80b7&title=SLOT+MINI+BLUETOOTH+SPEAKER+BTS12+%2B+SLOT+TWS+BLUETOOTH+WITH+ENC%2BANC+BH-T59-26%25+OFF&store=slot&storeName=Slot",
+      "rawOfferUrl": "https://www.slot.ng/slot-mini-bluetooth-speaker-bts12-slot-tws-bluetooth-with-encanc-bh-t59.html"
+    },
+    {
+      "country": "NG",
+      "storeId": "supermart",
+      "storeName": "Supermart",
+      "offerId": "705d8e20-29f6-45e9-a0e2-a9d2a41a815e",
+      "title": "21st Century Magnesium 250 mg 110 Tablets",
+      "relay": false,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.supermart.ng%2Fproducts%2F21st-century-magnesium-250-mg-110-tablets&id=705d8e20-29f6-45e9-a0e2-a9d2a41a815e&title=21st+Century+Magnesium+250+mg+110+Tablets&store=supermart&storeName=Supermart",
+      "rawOfferUrl": "https://www.supermart.ng/products/21st-century-magnesium-250-mg-110-tablets"
+    },
+    {
+      "country": "UK",
+      "storeId": "argos",
+      "storeName": "Argos",
+      "offerId": "694c60bc-167a-4ff2-9adb-79294b34e865",
+      "title": "Opti Magnetic Rowing Machine",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DSports+deals%26prds%3Dproductid%3A15566233792986447714%2CheadlineOfferDocid%3A15566233792986447714%2CimageDocid%3A15442703560985455718%2Cpvt%3Aa%26hl%3Den%26gl%3Duk%26udm%3D28&id=694c60bc-167a-4ff2-9adb-79294b34e865&title=Opti+Magnetic+Rowing+Machine&store=argos&storeName=Argos",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DSports%20deals%26prds%3Dproductid%3A15566233792986447714%2CheadlineOfferDocid%3A15566233792986447714%2CimageDocid%3A15442703560985455718%2Cpvt%3Aa%26hl%3Den%26gl%3Duk%26udm%3D28"
+    },
+    {
+      "country": "UK",
+      "storeId": "boots",
+      "storeName": "Boots.com",
+      "offerId": "5c12e6a1-cd28-4e17-9b4d-c0460883cb93",
+      "title": "Hello Sunday The Everyday Essentials Bestsellers Kit",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DBeauty+deals%26prds%3Dcatalogid%3A50895103782305355%2Cproductid%3A18154131074837278722%2CheadlineOfferDocid%3A16687813996647937145%2CimageDocid%3A2892339385164593872%2Crds%3APC_10232482995929808490%7CPROD_PC_10232482995929808490%2Cgpcid%3A10232482995929808490%2Cmid%3A576462857768320201%2Cpvt%3Ahg%26hl%3Den%26gl%3Duk%26udm%3D28&id=5c12e6a1-cd28-4e17-9b4d-c0460883cb93&title=Hello+Sunday+The+Everyday+Essentials+Bestsellers+Kit&store=boots&storeName=Boots.com",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DBeauty%20deals%26prds%3Dcatalogid%3A50895103782305355%2Cproductid%3A18154131074837278722%2CheadlineOfferDocid%3A16687813996647937145%2CimageDocid%3A2892339385164593872%2Crds%3APC_10232482995929808490%7CPROD_PC_10232482995929808490%2Cgpcid%3A10232482995929808490%2Cmid%3A576462857768320201%2Cpvt%3Ahg%26hl%3Den%26gl%3Duk%26udm%3D28"
+    },
+    {
+      "country": "UK",
+      "storeId": "currys",
+      "storeName": "Currys",
+      "offerId": "ef501579-aaed-4a75-9e35-fd3c7a75f723",
+      "title": "JBL Live 770NC Wireless Over-Ear Headphones",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DAudio+deals%26prds%3Dcatalogid%3A2271093625528638548%2Cproductid%3A15907745402539930803%2CheadlineOfferDocid%3A11105913217137589482%2CimageDocid%3A12072921309506332144%2Crds%3APC_11490779504163228269%7CPROD_PC_11490779504163228269%2Cgpcid%3A11490779504163228269%2Cmid%3A576462808134737875%2Cpvt%3Ahg%26hl%3Den%26gl%3Duk%26udm%3D28&id=ef501579-aaed-4a75-9e35-fd3c7a75f723&title=JBL+Live+770NC+Wireless+Over-Ear+Headphones&store=currys&storeName=Currys",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DAudio%20deals%26prds%3Dcatalogid%3A2271093625528638548%2Cproductid%3A15907745402539930803%2CheadlineOfferDocid%3A11105913217137589482%2CimageDocid%3A12072921309506332144%2Crds%3APC_11490779504163228269%7CPROD_PC_11490779504163228269%2Cgpcid%3A11490779504163228269%2Cmid%3A576462808134737875%2Cpvt%3Ahg%26hl%3Den%26gl%3Duk%26udm%3D28"
+    },
+    {
+      "country": "UK",
+      "storeId": "halfords",
+      "storeName": "Halfords",
+      "offerId": "c72aad2b-b004-4836-93a7-64a378a04345",
+      "title": "Halfords 420L Roof Box",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DHalfords+roof+box+deals%26prds%3Dcatalogid%3A4670615970584742656%2Cproductid%3A10697104363837381225%2CheadlineOfferDocid%3A13386519356969673159%2CimageDocid%3A1829933269304376101%2Crds%3APC_5475533996525945195%7CPROD_PC_5475533996525945195%2Cgpcid%3A5475533996525945195%2Cmid%3A576462893170755571%2Cpvt%3Ahg%26hl%3Den%26gl%3Duk%26udm%3D28&id=c72aad2b-b004-4836-93a7-64a378a04345&title=Halfords+420L+Roof+Box&store=halfords&storeName=Halfords",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DHalfords%20roof%20box%20deals%26prds%3Dcatalogid%3A4670615970584742656%2Cproductid%3A10697104363837381225%2CheadlineOfferDocid%3A13386519356969673159%2CimageDocid%3A1829933269304376101%2Crds%3APC_5475533996525945195%7CPROD_PC_5475533996525945195%2Cgpcid%3A5475533996525945195%2Cmid%3A576462893170755571%2Cpvt%3Ahg%26hl%3Den%26gl%3Duk%26udm%3D28"
+    },
+    {
+      "country": "UK",
+      "storeId": "john-lewis-partners",
+      "storeName": "John Lewis & Partners",
+      "offerId": "35d7937e-f8e6-4fa0-a9fb-137fa01fdcb5",
+      "title": "Marshall Heston 60 Soundbar",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DAudio+deals%26prds%3Dcatalogid%3A823574836087488602%2Cproductid%3A17567145301646137716%2CheadlineOfferDocid%3A2233187338342107475%2CimageDocid%3A6674737543084326468%2Crds%3APC_4757172040779590691%7CPROD_PC_4757172040779590691%2Cgpcid%3A4757172040779590691%2Cmid%3A576462842986416294%2Cpvt%3Ahg%26hl%3Den%26gl%3Duk%26udm%3D28&id=35d7937e-f8e6-4fa0-a9fb-137fa01fdcb5&title=Marshall+Heston+60+Soundbar&store=john-lewis-partners&storeName=John+Lewis+%26+Partners",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DAudio%20deals%26prds%3Dcatalogid%3A823574836087488602%2Cproductid%3A17567145301646137716%2CheadlineOfferDocid%3A2233187338342107475%2CimageDocid%3A6674737543084326468%2Crds%3APC_4757172040779590691%7CPROD_PC_4757172040779590691%2Cgpcid%3A4757172040779590691%2Cmid%3A576462842986416294%2Cpvt%3Ahg%26hl%3Den%26gl%3Duk%26udm%3D28"
+    },
+    {
+      "country": "UK",
+      "storeId": "marks-electrical",
+      "storeName": "Marks Electrical",
+      "offerId": "634d9412-7057-47fb-8030-78df5d0149f5",
+      "title": "Ninja 6-in-1 Dual Zone dz300uk Air Fryer",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DMarks+%26+Spencer+Ninja+Air+Fryer+deals%26prds%3Dcatalogid%3A1726382325711360942%2Cproductid%3A16257521266672060551%2CheadlineOfferDocid%3A15940877532281193437%2CimageDocid%3A2037756727317278314%2Crds%3APC_17184278498191419800%7CPROD_PC_17184278498191419800%2Cgpcid%3A17184278498191419800%2Cpvt%3Ahg%26hl%3Den%26gl%3Duk%26udm%3D28&id=634d9412-7057-47fb-8030-78df5d0149f5&title=Ninja+6-in-1+Dual+Zone+dz300uk+Air+Fryer&store=marks-electrical&storeName=Marks+Electrical",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DMarks%20%26%20Spencer%20Ninja%20Air%20Fryer%20deals%26prds%3Dcatalogid%3A1726382325711360942%2Cproductid%3A16257521266672060551%2CheadlineOfferDocid%3A15940877532281193437%2CimageDocid%3A2037756727317278314%2Crds%3APC_17184278498191419800%7CPROD_PC_17184278498191419800%2Cgpcid%3A17184278498191419800%2Cpvt%3Ahg%26hl%3Den%26gl%3Duk%26udm%3D28"
+    },
+    {
+      "country": "UK",
+      "storeId": "matalan",
+      "storeName": "Matalan",
+      "offerId": "6ce38fba-49eb-41e1-99d0-9df86ea7a9b7",
+      "title": "Jersey Tie Midi Dress - Grey - Papaya",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DFashion+deals%26prds%3Dproductid%3A15177895374590323293%2CheadlineOfferDocid%3A15177895374590323293%2CimageDocid%3A6014796749966277350%2Crds%3ALO_15177895374590323293%7CPROD_LO_15177895374590323293%2Cpvt%3Aa%26hl%3Den%26gl%3Duk%26udm%3D28&id=6ce38fba-49eb-41e1-99d0-9df86ea7a9b7&title=Jersey+Tie+Midi+Dress+-+Grey+-+Papaya&store=matalan&storeName=Matalan",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DFashion%20deals%26prds%3Dproductid%3A15177895374590323293%2CheadlineOfferDocid%3A15177895374590323293%2CimageDocid%3A6014796749966277350%2Crds%3ALO_15177895374590323293%7CPROD_LO_15177895374590323293%2Cpvt%3Aa%26hl%3Den%26gl%3Duk%26udm%3D28"
+    },
+    {
+      "country": "UK",
+      "storeId": "next",
+      "storeName": "Next",
+      "offerId": "3feeca29-b52f-485a-81e6-f62ba8f027a4",
+      "title": "Jolie Moi Women's Puff Long Sleeve Jersey Maxi Dress",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DFashion+deals%26prds%3Dcatalogid%3A17163548407375289025%2Cproductid%3A15449900688744163284%2CheadlineOfferDocid%3A16164150805605735700%2CimageDocid%3A850527050115492511%2Crds%3APC_14627890296342697632%7CPROD_PC_14627890296342697632%2Cgpcid%3A14627890296342697632%2Cmid%3A576462549082934944%2Cpvt%3Aa%26hl%3Den%26gl%3Duk%26udm%3D28&id=3feeca29-b52f-485a-81e6-f62ba8f027a4&title=Jolie+Moi+Women%27s+Puff+Long+Sleeve+Jersey+Maxi+Dress&store=next&storeName=Next",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DFashion%20deals%26prds%3Dcatalogid%3A17163548407375289025%2Cproductid%3A15449900688744163284%2CheadlineOfferDocid%3A16164150805605735700%2CimageDocid%3A850527050115492511%2Crds%3APC_14627890296342697632%7CPROD_PC_14627890296342697632%2Cgpcid%3A14627890296342697632%2Cmid%3A576462549082934944%2Cpvt%3Aa%26hl%3Den%26gl%3Duk%26udm%3D28"
+    },
+    {
+      "country": "UK",
+      "storeId": "selfridges",
+      "storeName": "Selfridges",
+      "offerId": "de94dab4-8774-4d81-b27f-94a954563c58",
+      "title": "Adidas Women's Samba OG Low-Top Trainers",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DSelfridges+Adidas+Samba%26prds%3Dcatalogid%3A3033552466281508178%2Cproductid%3A13966065220948152817%2CheadlineOfferDocid%3A9589008242975920141%2CimageDocid%3A1420210681110103374%2Crds%3APC_12502346331856798059%7CPROD_PC_12502346331856798059%2Cgpcid%3A12502346331856798059%2Cmid%3A576462870147397282%2Cpvt%3Aa%26hl%3Den%26gl%3Duk%26udm%3D28&id=de94dab4-8774-4d81-b27f-94a954563c58&title=Adidas+Women%27s+Samba+OG+Low-Top+Trainers&store=selfridges&storeName=Selfridges",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DSelfridges%20Adidas%20Samba%26prds%3Dcatalogid%3A3033552466281508178%2Cproductid%3A13966065220948152817%2CheadlineOfferDocid%3A9589008242975920141%2CimageDocid%3A1420210681110103374%2Crds%3APC_12502346331856798059%7CPROD_PC_12502346331856798059%2Cgpcid%3A12502346331856798059%2Cmid%3A576462870147397282%2Cpvt%3Aa%26hl%3Den%26gl%3Duk%26udm%3D28"
+    },
+    {
+      "country": "UK",
+      "storeId": "amazon-uk",
+      "storeName": "Amazon UK",
+      "offerId": "5fa203ca-298d-444e-9d93-34e04c9ed065",
+      "title": "Flowflex Home Test Kit",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3Dtest+deals%26prds%3Dcatalogid%3A3852150584790925334%2Cproductid%3A1417162661592542166%2CheadlineOfferDocid%3A15105362813138630894%2CimageDocid%3A13337506048911077074%2Crds%3APC_8739924291510651159%7CPROD_PC_8739924291510651159%2Cgpcid%3A8739924291510651159%2Cmid%3A576462901686749128%2Cpvt%3Ahg%26hl%3Den%26gl%3Duk%26udm%3D28&id=5fa203ca-298d-444e-9d93-34e04c9ed065&title=Flowflex+Home+Test+Kit&store=amazon-uk&storeName=Amazon+UK",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3Dtest%20deals%26prds%3Dcatalogid%3A3852150584790925334%2Cproductid%3A1417162661592542166%2CheadlineOfferDocid%3A15105362813138630894%2CimageDocid%3A13337506048911077074%2Crds%3APC_8739924291510651159%7CPROD_PC_8739924291510651159%2Cgpcid%3A8739924291510651159%2Cmid%3A576462901686749128%2Cpvt%3Ahg%26hl%3Den%26gl%3Duk%26udm%3D28"
+    },
+    {
+      "country": "US",
+      "storeId": "best-buy",
+      "storeName": "Best Buy",
+      "offerId": "35a0d834-ea98-4bd0-9729-e3e121a35deb",
+      "title": "Google Pixel 9",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DGoogle+Pixel+9+deals%26prds%3Dcatalogid%3A625513772960203147%2Cproductid%3A15373862464162455148%2CheadlineOfferDocid%3A4864733893873904692%2CimageDocid%3A1458535541928447144%2Crds%3APC_7289913198085316365%7CPROD_PC_7289913198085316365%2Cgpcid%3A7289913198085316365%2Cmid%3A576462491484046598%2Cpvt%3Ahg%26hl%3Den%26gl%3Dus%26udm%3D28&id=35a0d834-ea98-4bd0-9729-e3e121a35deb&title=Google+Pixel+9&store=best-buy&storeName=Best+Buy",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DGoogle%20Pixel%209%20deals%26prds%3Dcatalogid%3A625513772960203147%2Cproductid%3A15373862464162455148%2CheadlineOfferDocid%3A4864733893873904692%2CimageDocid%3A1458535541928447144%2Crds%3APC_7289913198085316365%7CPROD_PC_7289913198085316365%2Cgpcid%3A7289913198085316365%2Cmid%3A576462491484046598%2Cpvt%3Ahg%26hl%3Den%26gl%3Dus%26udm%3D28"
+    },
+    {
+      "country": "US",
+      "storeId": "dick-s-sporting-goods",
+      "storeName": "DICK'S Sporting Goods",
+      "offerId": "f0757150-c043-46ad-885a-435d57645776",
+      "title": "CALIA Women's Inspire High Rise 7/8 Leggings",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DSports+deals%26prds%3Dcatalogid%3A18216525042895023719%2Cproductid%3A14764142868486872580%2CheadlineOfferDocid%3A17382670390914476712%2CimageDocid%3A10321097556987328069%2Crds%3APC_2751083246222114273%7CPROD_PC_2751083246222114273%2Cgpcid%3A2751083246222114273%2Cmid%3A576462829858514908%2Cpvt%3Aa%26hl%3Den%26gl%3Dus%26udm%3D28&id=f0757150-c043-46ad-885a-435d57645776&title=CALIA+Women%27s+Inspire+High+Rise+7%2F8+Leggings&store=dick-s-sporting-goods&storeName=DICK%27S+Sporting+Goods",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DSports%20deals%26prds%3Dcatalogid%3A18216525042895023719%2Cproductid%3A14764142868486872580%2CheadlineOfferDocid%3A17382670390914476712%2CimageDocid%3A10321097556987328069%2Crds%3APC_2751083246222114273%7CPROD_PC_2751083246222114273%2Cgpcid%3A2751083246222114273%2Cmid%3A576462829858514908%2Cpvt%3Aa%26hl%3Den%26gl%3Dus%26udm%3D28"
+    },
+    {
+      "country": "US",
+      "storeId": "fashion-nova",
+      "storeName": "Fashion Nova",
+      "offerId": "1dfebbc3-9a71-4897-ab30-1d3602472cfb",
+      "title": "Fashion Nova Pleated Short Sleeve Maxi Dress",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DFashion+deals%26prds%3Dcatalogid%3A18046201984569055782%2Cproductid%3A8537173328750063396%2CheadlineOfferDocid%3A6335080215554048339%2CimageDocid%3A640523802480223290%2Crds%3APC_5022691241007027052%7CPROD_PC_5022691241007027052%2Cgpcid%3A5022691241007027052%2Cmid%3A576462550040213180%2Cpvt%3Aa%26hl%3Den%26gl%3Dus%26udm%3D28&id=1dfebbc3-9a71-4897-ab30-1d3602472cfb&title=Fashion+Nova+Pleated+Short+Sleeve+Maxi+Dress&store=fashion-nova&storeName=Fashion+Nova",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DFashion%20deals%26prds%3Dcatalogid%3A18046201984569055782%2Cproductid%3A8537173328750063396%2CheadlineOfferDocid%3A6335080215554048339%2CimageDocid%3A640523802480223290%2Crds%3APC_5022691241007027052%7CPROD_PC_5022691241007027052%2Cgpcid%3A5022691241007027052%2Cmid%3A576462550040213180%2Cpvt%3Aa%26hl%3Den%26gl%3Dus%26udm%3D28"
+    },
+    {
+      "country": "US",
+      "storeId": "kohl-s",
+      "storeName": "Kohl's",
+      "offerId": "b5f3231a-2e71-4d6d-a441-454bc55738bb",
+      "title": "Edifier R2000DB Powered Bluetooth Bookshelf Speakers",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DAudio+deals%26prds%3Dcatalogid%3A3388307040346979865%2Cproductid%3A629566604904855963%2CheadlineOfferDocid%3A179479589073585906%2CimageDocid%3A1031699403079167925%2Crds%3APC_581656905074843190%7CPROD_PC_581656905074843190%2Cgpcid%3A581656905074843190%2Cmid%3A576462775816677156%2Cpvt%3Ahg%26hl%3Den%26gl%3Dus%26udm%3D28&id=b5f3231a-2e71-4d6d-a441-454bc55738bb&title=Edifier+R2000DB+Powered+Bluetooth+Bookshelf+Speakers&store=kohl-s&storeName=Kohl%27s",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DAudio%20deals%26prds%3Dcatalogid%3A3388307040346979865%2Cproductid%3A629566604904855963%2CheadlineOfferDocid%3A179479589073585906%2CimageDocid%3A1031699403079167925%2Crds%3APC_581656905074843190%7CPROD_PC_581656905074843190%2Cgpcid%3A581656905074843190%2Cmid%3A576462775816677156%2Cpvt%3Ahg%26hl%3Den%26gl%3Dus%26udm%3D28"
+    },
+    {
+      "country": "US",
+      "storeId": "macy-s",
+      "storeName": "Macy's",
+      "offerId": "0c88a1ec-55ca-4f22-8f59-9f4043409efb",
+      "title": "Macy's Lunar New Year Skin Care Set",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DBeauty+deals%26prds%3Dcatalogid%3A12862855940262601507%2Cproductid%3A3178097094163786952%2CheadlineOfferDocid%3A5353935812110555864%2CimageDocid%3A11646642284372736094%2Cgpcid%3A17501837025200987571%2Cmid%3A576462875146287054%2Cpvt%3Ahg%26hl%3Den%26gl%3Dus%26udm%3D28&id=0c88a1ec-55ca-4f22-8f59-9f4043409efb&title=Macy%27s+Lunar+New+Year+Skin+Care+Set&store=macy-s&storeName=Macy%27s",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DBeauty%20deals%26prds%3Dcatalogid%3A12862855940262601507%2Cproductid%3A3178097094163786952%2CheadlineOfferDocid%3A5353935812110555864%2CimageDocid%3A11646642284372736094%2Cgpcid%3A17501837025200987571%2Cmid%3A576462875146287054%2Cpvt%3Ahg%26hl%3Den%26gl%3Dus%26udm%3D28"
+    },
+    {
+      "country": "DE",
+      "storeId": "amazon-de",
+      "storeName": "Amazon.de",
+      "offerId": "6fe3d005-ee9a-4519-941d-cd4da3a7ea54",
+      "title": "Philips, Trimmers + Hair Clippers, OneBlade 360 Face + Body",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DElectronics+deals%26prds%3Dcatalogid%3A14255008105288603763%2Cproductid%3A8362088133895764678%2CheadlineOfferDocid%3A14875142881981419137%2CimageDocid%3A13299946966391483325%2Crds%3APC_708435959697412740%7CPROD_PC_708435959697412740%2Cgpcid%3A708435959697412740%2Cpvt%3Ahg%26hl%3Den%26gl%3Dde%26udm%3D28&id=6fe3d005-ee9a-4519-941d-cd4da3a7ea54&title=Philips%2C+Trimmers+%2B+Hair+Clippers%2C+OneBlade+360+Face+%2B+Body&store=amazon-de&storeName=Amazon.de",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DElectronics%20deals%26prds%3Dcatalogid%3A14255008105288603763%2Cproductid%3A8362088133895764678%2CheadlineOfferDocid%3A14875142881981419137%2CimageDocid%3A13299946966391483325%2Crds%3APC_708435959697412740%7CPROD_PC_708435959697412740%2Cgpcid%3A708435959697412740%2Cpvt%3Ahg%26hl%3Den%26gl%3Dde%26udm%3D28"
+    },
+    {
+      "country": "DE",
+      "storeId": "amazon-de-amazon-de-seller",
+      "storeName": "Amazon.de - Amazon.de-Seller",
+      "offerId": "fce39518-3b28-410a-8671-4f82984f99be",
+      "title": "FOSSiBOT F2400 Power Station Solar Panel",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DElectronics+deals%26prds%3Dcatalogid%3A16692348369700918760%2Cproductid%3A15793192086423833749%2CheadlineOfferDocid%3A9740571341000762331%2CimageDocid%3A5958914072693925964%2Crds%3APC_7077896577495704468%7CPROD_PC_7077896577495704468%2Cgpcid%3A7077896577495704468%2Cmid%3A576462852881683476%2Cpvt%3Ahg%26hl%3Den%26gl%3Dde%26udm%3D28&id=fce39518-3b28-410a-8671-4f82984f99be&title=FOSSiBOT+F2400+Power+Station+Solar+Panel&store=amazon-de-amazon-de-seller&storeName=Amazon.de+-+Amazon.de-Seller",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DElectronics%20deals%26prds%3Dcatalogid%3A16692348369700918760%2Cproductid%3A15793192086423833749%2CheadlineOfferDocid%3A9740571341000762331%2CimageDocid%3A5958914072693925964%2Crds%3APC_7077896577495704468%7CPROD_PC_7077896577495704468%2Cgpcid%3A7077896577495704468%2Cmid%3A576462852881683476%2Cpvt%3Ahg%26hl%3Den%26gl%3Dde%26udm%3D28"
+    },
+    {
+      "country": "DE",
+      "storeId": "cotton-on",
+      "storeName": "Cotton On",
+      "offerId": "73ff8ff0-55ec-4caf-a90f-0fb64753a25d",
+      "title": "Women Cotton On Body Ultra Soft T-Bar Tank",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DFashion+deals%26prds%3Dcatalogid%3A12733000825140248975%2Cproductid%3A15683006347621730694%2CheadlineOfferDocid%3A4111624993924460911%2CimageDocid%3A10758747706846136287%2Crds%3APC_14455997577867149638%7CPROD_PC_14455997577867149638%2Cgpcid%3A14455997577867149638%2Cmid%3A576462879826824666%2Cpvt%3Aa%26hl%3Den%26gl%3Dza%26udm%3D28&id=73ff8ff0-55ec-4caf-a90f-0fb64753a25d&title=Women+Cotton+On+Body+Ultra+Soft+T-Bar+Tank&store=cotton-on&storeName=Cotton+On",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DFashion%20deals%26prds%3Dcatalogid%3A12733000825140248975%2Cproductid%3A15683006347621730694%2CheadlineOfferDocid%3A4111624993924460911%2CimageDocid%3A10758747706846136287%2Crds%3APC_14455997577867149638%7CPROD_PC_14455997577867149638%2Cgpcid%3A14455997577867149638%2Cmid%3A576462879826824666%2Cpvt%3Aa%26hl%3Den%26gl%3Dza%26udm%3D28"
+    },
+    {
+      "country": "AE",
+      "storeId": "al-ramil-al-abyad",
+      "storeName": "Al Ramil Al Abyad",
+      "offerId": "08298283-7107-472a-8a7a-454c609eb60b",
+      "title": "Beko 60x60cm Freestanding Ceramic Electric Cooker fsm67320gxs",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DHome+%26+Kitchen+deals%26prds%3Dcatalogid%3A308995375849944975%2CheadlineOfferDocid%3A9583224210166048294%2CimageDocid%3A308472019927271910%2Crds%3APC_1686824392422526308%7CPROD_PC_1686824392422526308%2Cgpcid%3A1686824392422526308%2Cmid%3A576462369924530531%2Cpvt%3Ahg%26hl%3Den%26gl%3Dae%26udm%3D28&id=08298283-7107-472a-8a7a-454c609eb60b&title=Beko+60x60cm+Freestanding+Ceramic+Electric+Cooker+fsm67320gxs&store=al-ramil-al-abyad&storeName=Al+Ramil+Al+Abyad",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DHome%20%26%20Kitchen%20deals%26prds%3Dcatalogid%3A308995375849944975%2CheadlineOfferDocid%3A9583224210166048294%2CimageDocid%3A308472019927271910%2Crds%3APC_1686824392422526308%7CPROD_PC_1686824392422526308%2Cgpcid%3A1686824392422526308%2Cmid%3A576462369924530531%2Cpvt%3Ahg%26hl%3Den%26gl%3Dae%26udm%3D28"
+    },
+    {
+      "country": "AE",
+      "storeId": "amazon-ae-retail",
+      "storeName": "Amazon.ae - Retail",
+      "offerId": "c1d9fb4c-2de8-4abe-8f5f-21c70410bcf9",
+      "title": "Logitech G PRO X Superlight 2 Wireless Gaming Mouse",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DGaming+deals%26prds%3Dcatalogid%3A11055023561545325594%2Cproductid%3A17585749697127846891%2CheadlineOfferDocid%3A17324748948561561484%2CimageDocid%3A8157089761066855262%2Crds%3APC_2127972044662208544%7CPROD_PC_2127972044662208544%2Cgpcid%3A2127972044662208544%2Cmid%3A576462802352796891%2Cpvt%3Ahg%26hl%3Den%26gl%3Dae%26udm%3D28&id=c1d9fb4c-2de8-4abe-8f5f-21c70410bcf9&title=Logitech+G+PRO+X+Superlight+2+Wireless+Gaming+Mouse&store=amazon-ae-retail&storeName=Amazon.ae+-+Retail",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DGaming%20deals%26prds%3Dcatalogid%3A11055023561545325594%2Cproductid%3A17585749697127846891%2CheadlineOfferDocid%3A17324748948561561484%2CimageDocid%3A8157089761066855262%2Crds%3APC_2127972044662208544%7CPROD_PC_2127972044662208544%2Cgpcid%3A2127972044662208544%2Cmid%3A576462802352796891%2Cpvt%3Ahg%26hl%3Den%26gl%3Dae%26udm%3D28"
+    },
+    {
+      "country": "AE",
+      "storeId": "amazon-ae-seller",
+      "storeName": "Amazon.ae - Seller",
+      "offerId": "b4dd1045-a177-469e-ba7a-9c5c30aca41a",
+      "title": "Mini PC and GEEKOM A6 Ryzen 7 32GB 1TB",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DComputing+deals%26prds%3Dcatalogid%3A16410910843123619864%2Cproductid%3A4075913189961088254%2CheadlineOfferDocid%3A14956087673059396673%2CimageDocid%3A7604030269258817876%2Cgpcid%3A12687531903981795536%2Cpvt%3Ahg%26hl%3Den%26gl%3Dae%26udm%3D28&id=b4dd1045-a177-469e-ba7a-9c5c30aca41a&title=Mini+PC+and+GEEKOM+A6+Ryzen+7+32GB+1TB&store=amazon-ae-seller&storeName=Amazon.ae+-+Seller",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DComputing%20deals%26prds%3Dcatalogid%3A16410910843123619864%2Cproductid%3A4075913189961088254%2CheadlineOfferDocid%3A14956087673059396673%2CimageDocid%3A7604030269258817876%2Cgpcid%3A12687531903981795536%2Cpvt%3Ahg%26hl%3Den%26gl%3Dae%26udm%3D28"
+    },
+    {
+      "country": "IN",
+      "storeId": "ajio",
+      "storeName": "ajio.com",
+      "offerId": "5f69ecd6-d38f-453f-ace6-fe058c4c1f70",
+      "title": "Pilgrim Glow BB Cream",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DBeauty+deals%26prds%3Dcatalogid%3A17926741554048557420%2Cproductid%3A2954831560301993385%2CheadlineOfferDocid%3A10277532307672574643%2CimageDocid%3A8655730997209131846%2Crds%3APC_13514652282248800148%7CPROD_PC_13514652282248800148%2Cgpcid%3A13514652282248800148%2Cmid%3A576462764872360849%2Cpvt%3Ahg%26hl%3Den%26gl%3Din%26udm%3D28&id=5f69ecd6-d38f-453f-ace6-fe058c4c1f70&title=Pilgrim+Glow+BB+Cream&store=ajio&storeName=ajio.com",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DBeauty%20deals%26prds%3Dcatalogid%3A17926741554048557420%2Cproductid%3A2954831560301993385%2CheadlineOfferDocid%3A10277532307672574643%2CimageDocid%3A8655730997209131846%2Crds%3APC_13514652282248800148%7CPROD_PC_13514652282248800148%2Cgpcid%3A13514652282248800148%2Cmid%3A576462764872360849%2Cpvt%3Ahg%26hl%3Den%26gl%3Din%26udm%3D28"
+    },
+    {
+      "country": "IN",
+      "storeId": "amazon-india",
+      "storeName": "Amazon India",
+      "offerId": "4439b383-2ff3-47bd-a179-f52dd06309af",
+      "title": "Polk Audio Monitor XT20 Bookshelf Speaker",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DAudio+deals%26prds%3Dcatalogid%3A5300313327440812509%2Cproductid%3A13612863401087708974%2CheadlineOfferDocid%3A3184892880222907759%2CimageDocid%3A1870403364729869833%2Crds%3APC_18001839487012099099%7CPROD_PC_18001839487012099099%2Cgpcid%3A18001839487012099099%2Cmid%3A576462828350191741%2Cpvt%3Ahg%26hl%3Den%26gl%3Din%26udm%3D28&id=4439b383-2ff3-47bd-a179-f52dd06309af&title=Polk+Audio+Monitor+XT20+Bookshelf+Speaker&store=amazon-india&storeName=Amazon+India",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DAudio%20deals%26prds%3Dcatalogid%3A5300313327440812509%2Cproductid%3A13612863401087708974%2CheadlineOfferDocid%3A3184892880222907759%2CimageDocid%3A1870403364729869833%2Crds%3APC_18001839487012099099%7CPROD_PC_18001839487012099099%2Cgpcid%3A18001839487012099099%2Cmid%3A576462828350191741%2Cpvt%3Ahg%26hl%3Den%26gl%3Din%26udm%3D28"
+    },
+    {
+      "country": "IN",
+      "storeId": "amazon-in",
+      "storeName": "Amazon.in",
+      "offerId": "5c0f9d30-291a-4e6f-a961-2b5b74ee53d3",
+      "title": "Fosi Audio MC101 Stereo Amplifier",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DAudio+deals%26prds%3Dcatalogid%3A15515648690701633035%2Cproductid%3A18218612183213824440%2CheadlineOfferDocid%3A17703209882889636009%2CimageDocid%3A9941990072982909254%2Crds%3APC_1221420343858268349%7CPROD_PC_1221420343858268349%2Cgpcid%3A1221420343858268349%2Cmid%3A576462770941556825%2Cpvt%3Ahg%26hl%3Den%26gl%3Din%26udm%3D28&id=5c0f9d30-291a-4e6f-a961-2b5b74ee53d3&title=Fosi+Audio+MC101+Stereo+Amplifier&store=amazon-in&storeName=Amazon.in",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DAudio%20deals%26prds%3Dcatalogid%3A15515648690701633035%2Cproductid%3A18218612183213824440%2CheadlineOfferDocid%3A17703209882889636009%2CimageDocid%3A9941990072982909254%2Crds%3APC_1221420343858268349%7CPROD_PC_1221420343858268349%2Cgpcid%3A1221420343858268349%2Cmid%3A576462770941556825%2Cpvt%3Ahg%26hl%3Den%26gl%3Din%26udm%3D28"
+    },
+    {
+      "country": "ZA",
+      "storeId": "cash-converters",
+      "storeName": "Cash Converters",
+      "offerId": "c1dcbf57-e0de-4fff-9f92-0e33b3e79899",
+      "title": "Samsung Galaxy A26 5g - 128gb Rom + 6gb Ram - 6.7\" -",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DElectronics+deals%26prds%3Dcatalogid%3A4715441049120606172%2CheadlineOfferDocid%3A5061695521996620667%2CimageDocid%3A12069540276020907049%2Crds%3APC_17525312830161686849%7CPROD_PC_17525312830161686849%2Cgpcid%3A17525312830161686849%2Cmid%3A576462819951395787%2Cpvt%3Ahg%26hl%3Den%26gl%3Dza%26udm%3D28&id=c1dcbf57-e0de-4fff-9f92-0e33b3e79899&title=Samsung+Galaxy+A26+5g+-+128gb+Rom+%2B+6gb+Ram+-+6.7%22+-&store=cash-converters&storeName=Cash+Converters",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DElectronics%20deals%26prds%3Dcatalogid%3A4715441049120606172%2CheadlineOfferDocid%3A5061695521996620667%2CimageDocid%3A12069540276020907049%2Crds%3APC_17525312830161686849%7CPROD_PC_17525312830161686849%2Cgpcid%3A17525312830161686849%2Cmid%3A576462819951395787%2Cpvt%3Ahg%26hl%3Den%26gl%3Dza%26udm%3D28"
+    },
+    {
+      "country": "ZA",
+      "storeId": "makro",
+      "storeName": "Makro",
+      "offerId": "62e1f7b2-47b0-43b1-b488-a677aa803070",
+      "title": "Steelseries Rival 3 Wireless Gen 2",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DGaming+deals%26prds%3Dcatalogid%3A17640866760703428306%2Cproductid%3A623749897345405356%2CheadlineOfferDocid%3A17643963065813670117%2CimageDocid%3A9656717558051550274%2Crds%3APC_6183535469545441820%7CPROD_PC_6183535469545441820%2Cgpcid%3A6183535469545441820%2Cmid%3A576462536297240924%2Cpvt%3Ahg%26hl%3Den%26gl%3Dza%26udm%3D28&id=62e1f7b2-47b0-43b1-b488-a677aa803070&title=Steelseries+Rival+3+Wireless+Gen+2&store=makro&storeName=Makro",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DGaming%20deals%26prds%3Dcatalogid%3A17640866760703428306%2Cproductid%3A623749897345405356%2CheadlineOfferDocid%3A17643963065813670117%2CimageDocid%3A9656717558051550274%2Crds%3APC_6183535469545441820%7CPROD_PC_6183535469545441820%2Cgpcid%3A6183535469545441820%2Cmid%3A576462536297240924%2Cpvt%3Ahg%26hl%3Den%26gl%3Dza%26udm%3D28"
+    },
+    {
+      "country": "ZA",
+      "storeId": "outdoorphoto",
+      "storeName": "Outdoorphoto",
+      "offerId": "b6ca35ac-4bb9-4b5f-a9e9-ee3b386a58c3",
+      "title": "Sony Alpha a7S III Mirrorless Camera",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DElectronics+deals%26prds%3Dcatalogid%3A16793874706101031714%2CheadlineOfferDocid%3A6596119548232185130%2CimageDocid%3A10316374914710808242%2Crds%3APC_12311187475786240649%7CPROD_PC_12311187475786240649%2Cgpcid%3A12311187475786240649%2Cmid%3A576462810452991317%2Cpvt%3Ahg%26hl%3Den%26gl%3Dza%26udm%3D28&id=b6ca35ac-4bb9-4b5f-a9e9-ee3b386a58c3&title=Sony+Alpha+a7S+III+Mirrorless+Camera&store=outdoorphoto&storeName=Outdoorphoto",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DElectronics%20deals%26prds%3Dcatalogid%3A16793874706101031714%2CheadlineOfferDocid%3A6596119548232185130%2CimageDocid%3A10316374914710808242%2Crds%3APC_12311187475786240649%7CPROD_PC_12311187475786240649%2Cgpcid%3A12311187475786240649%2Cmid%3A576462810452991317%2Cpvt%3Ahg%26hl%3Den%26gl%3Dza%26udm%3D28"
+    },
+    {
+      "country": "Cross-border",
+      "storeId": "aliexpress",
+      "storeName": "AliExpress",
+      "offerId": "48c87cce-cd02-4f82-ab02-1b44f419191a",
+      "title": "Patch Exercise Board Kit Welding  Electrical And Electronic Technology School Training Competition",
+      "relay": false,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fs.click.aliexpress.com%2Fs%2FNdpwztbAIgDMmxGbP8fFks7yUFfsHjzlImSYmA68h7xlMRgzueFsRgokQ9f9hcpVKttxtQE2VzIoqkXJXrpOr6uR3zv7mP4CDO9CddoFf4t0QE5DXPy8Pgjhz4irfQSEjEGUmy5yF3A5gJ9h3NYjLMgqIMqa3zcpq5E2BC3W5EbV40Dm9buQxWpZzw1lbX8Zm2kZtNIa4KyDieNjsH7IU6Yv8StELKVvT9r4eFAaXPGhwHsgaDqdNcmY116r3GC2YvsOopeiiZPhJrV0cwgOQDSkW93v7gVKDqPkXyZF1oSWa6wSAOeznMFVlVZbxG9Pdnkktr9LFA5n3C4604RizQsuHeHfaUdnQlUOMd4N7af7v9v2c5FixYKTqQN2cvYC6MvC7xV0eoGQpduR28X742LC3CRCGP1om535LaOx89OFwsUrrN1StC1tJvotrzpuAH6vKkUvufw4UUpndIASu7Facf8Ztq3a1iny6xcZk9rjZ3Dtt0JF8EuoGN5pFKe1zvt7sVt84F4L3R7ilQRbdW5tyXLA0V4Gw2my6h3njD8XsfrW2Ri9gMoMM1sa9aWY6b0r6qU5nQIbOBUgBPYt8kvxsqrQoBOqOkSMnU2w1qxZR2ZTPInI8MfEZ0LUgTfpxgx2LAEjBVinoOM490ZJTfIHK6BKXWtNHJpAAIOUaIFvTBCIF2XOi4k9ZqLJ5VUthmjwfTeDOVZLI8HxZ5paH0RTFoAOr4dnoReYzd0PEpJTPQI3KUCGzV3Mao9Y41At4urvxq8x8ajRfLjd4ev6KDWT1TIl1WaLOpqsFH9pAQSknQxDWGpPro4ePiUd1xrr30SAIHdlC40NZUbXn8I0srPSj1Cfhs0hXGi6TYyfe2mGpy1vwrfCy856aFK50izJt9fsF6s8ePGEUd2aFqOaPox547G41yYGtUEvNrQDN2Mf5gZ1ToG7yuOruFSmyrWTA14oORoqNvZuNlzmYguJlTJsJtVKX5g0657M28wwPsxTz&id=48c87cce-cd02-4f82-ab02-1b44f419191a&title=Patch+Exercise+Board+Kit+Welding++Electrical+And+Electronic+Technology+School+Training+Competition&store=aliexpress&storeName=AliExpress",
+      "rawOfferUrl": "https://s.click.aliexpress.com/s/NdpwztbAIgDMmxGbP8fFks7yUFfsHjzlImSYmA68h7xlMRgzueFsRgokQ9f9hcpVKttxtQE2VzIoqkXJXrpOr6uR3zv7mP4CDO9CddoFf4t0QE5DXPy8Pgjhz4irfQSEjEGUmy5yF3A5gJ9h3NYjLMgqIMqa3zcpq5E2BC3W5EbV40Dm9buQxWpZzw1lbX8Zm2kZtNIa4KyDieNjsH7IU6Yv8StELKVvT9r4eFAaXPGhwHsgaDqdNcmY116r3GC2YvsOopeiiZPhJrV0cwgOQDSkW93v7gVKDqPkXyZF1oSWa6wSAOeznMFVlVZbxG9Pdnkktr9LFA5n3C4604RizQsuHeHfaUdnQlUOMd4N7af7v9v2c5FixYKTqQN2cvYC6MvC7xV0eoGQpduR28X742LC3CRCGP1om535LaOx89OFwsUrrN1StC1tJvotrzpuAH6vKkUvufw4UUpndIASu7Facf8Ztq3a1iny6xcZk9rjZ3Dtt0JF8EuoGN5pFKe1zvt7sVt84F4L3R7ilQRbdW5tyXLA0V4Gw2my6h3njD8XsfrW2Ri9gMoMM1sa9aWY6b0r6qU5nQIbOBUgBPYt8kvxsqrQoBOqOkSMnU2w1qxZR2ZTPInI8MfEZ0LUgTfpxgx2LAEjBVinoOM490ZJTfIHK6BKXWtNHJpAAIOUaIFvTBCIF2XOi4k9ZqLJ5VUthmjwfTeDOVZLI8HxZ5paH0RTFoAOr4dnoReYzd0PEpJTPQI3KUCGzV3Mao9Y41At4urvxq8x8ajRfLjd4ev6KDWT1TIl1WaLOpqsFH9pAQSknQxDWGpPro4ePiUd1xrr30SAIHdlC40NZUbXn8I0srPSj1Cfhs0hXGi6TYyfe2mGpy1vwrfCy856aFK50izJt9fsF6s8ePGEUd2aFqOaPox547G41yYGtUEvNrQDN2Mf5gZ1ToG7yuOruFSmyrWTA14oORoqNvZuNlzmYguJlTJsJtVKX5g0657M28wwPsxTz"
+    },
+    {
+      "country": "Cross-border",
+      "storeId": "dhgate",
+      "storeName": "DHgate",
+      "offerId": "8ff08cff-825d-4e58-a8b2-85db600cab0b",
+      "title": "Original Earphones For Apple iPhone 14 Pro Max Lightning Headphones 13 12 11 Mini X XS XR SE 6 7 8 Plus Wired In-Ear Cal",
+      "relay": false,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.dhgate.com%2Fproduct%2Foriginal-earphones-for-apple-iphone-14-pro%2F1095705226.html&id=8ff08cff-825d-4e58-a8b2-85db600cab0b&title=Original+Earphones+For+Apple+iPhone+14+Pro+Max+Lightning+Headphones+13+12+11+Mini+X+XS+XR+SE+6+7+8+Plus+Wired+In-Ear+Cal&store=dhgate&storeName=DHgate",
+      "rawOfferUrl": "https://www.dhgate.com/product/original-earphones-for-apple-iphone-14-pro/1095705226.html"
+    },
+    {
+      "country": "Cross-border",
+      "storeId": "shein",
+      "storeName": "Shein",
+      "offerId": "42de841e-fc74-4d61-b9ff-f90068593d96",
+      "title": "The Ordinary Niacinamida al 10% + Zinc al 1% 1oz/30ml,",
+      "relay": true,
+      "clickUrl": "https://havlo.io/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DThe+Ordinary+Niacinamide+deals%26prds%3Dproductid%3A15214873975894137177%2CheadlineOfferDocid%3A15214873975894137177%2CimageDocid%3A3573961208450209768%2Crds%3APC_9928065431670610974%7CPROD_PC_9928065431670610974%2Cpvt%3Ahg%26hl%3Den%26gl%3Dus%26udm%3D28&id=42de841e-fc74-4d61-b9ff-f90068593d96&title=The+Ordinary+Niacinamida+al+10%25+%2B+Zinc+al+1%25+1oz%2F30ml%2C&store=shein&storeName=Shein",
+      "rawOfferUrl": "/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop%26q%3DThe%20Ordinary%20Niacinamide%20deals%26prds%3Dproductid%3A15214873975894137177%2CheadlineOfferDocid%3A15214873975894137177%2CimageDocid%3A3573961208450209768%2Crds%3APC_9928065431670610974%7CPROD_PC_9928065431670610974%2Cpvt%3Ahg%26hl%3Den%26gl%3Dus%26udm%3D28"
+    }
+  ]
+}
