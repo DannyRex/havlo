@@ -15,14 +15,20 @@
      · highest — dearest dupe price  (or `this` if no dearer dupe)
      · count   — how many other stores were considered
 
-   Single-store products (no dupes) get a simpler "Only at this store"
-   banner instead — no comparison signal possible.
+   Single-store products (May 2026 user request): the bar STILL
+   renders — marker pinned at left edge (de facto cheapest, since
+   nothing else has been seen), headline copy adjusted to "Best
+   price tracked", range labels collapse to the single price, and
+   a hint line surfaces "watching for cheaper alternatives." Old
+   behaviour was a separate "Only seen at this store" info panel,
+   which the user reported as visually weaker than the bar layout
+   even though the comparison data was absent.
 
    Renamed the still-useful "Verified by Havlo" tile (was "Last
    checked", which QA flagged as ambiguous: who checked, when?
    "Verified by Havlo" makes the actor explicit). */
 
-import { Check, Globe, AlertCircle, Info } from "lucide-react";
+import { Check, Globe, AlertCircle } from "lucide-react";
 import { formatPriceForUser } from "@/lib/utils";
 import { type Country } from "@/lib/country";
 import { timeAgo } from "@/lib/utils";
@@ -81,49 +87,24 @@ export default function PriceComparisonBar({
     );
   }
 
-  /* Single-store product → no comparison possible. Show a simpler
-     "exclusive at this store" badge + the verification + store-country
-     facts. Still more informative than the old empty tiles. */
-  if (comparedStoreCount === 0) {
-    return (
-      <div className="rounded-2xl bg-surface border border-border p-4 sm:p-5 mb-7">
-        <div className="flex items-start gap-3">
-          <Info size={16} className="text-ink-3 shrink-0 mt-0.5" aria-hidden="true" />
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[14px] font-semibold text-ink mb-1">
-              Only seen at this store
-            </h3>
-            <p className="text-[12px] text-ink-3 leading-relaxed">
-              Havlo couldn&apos;t find this exact product elsewhere yet. Comparison rail below shows similar picks.
-            </p>
-            {(lastCheckedAt || storeCountry) && (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-[12px] text-ink-3">
-                {lastCheckedAt && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Check size={12} aria-hidden="true" />
-                    Verified by Havlo {timeAgo(lastCheckedAt)}
-                  </span>
-                )}
-                {storeCountry && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Globe size={12} aria-hidden="true" />
-                    Ships from {storeCountry}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  /* Single-store path detection. Caller passes
+     lowestPriceNgn === highestPriceNgn === thisPriceNgn when the
+     dupes engine returned no other listings for this product. We
+     keep the bar layout (per May 2026 user request — "show the
+     price bar relative to this only item price") but swap in
+     single-store copy + marker treatment below. */
+  const isSingleStore = comparedStoreCount === 0;
 
   /* Compute the position of `thisPriceNgn` along the [lowest, highest]
      range. 0 = matches lowest (best deal), 1 = matches highest (worst).
      Clamped to [0,1] so a slightly-above-highest price still renders
      at the right end (defensive — should be rare). The math is unit-
      agnostic (it's a ratio), so it works with either NGN or any
-     other consistent currency input. */
+     other consistent currency input.
+
+     For single-store the range collapses to 0 and offset = 0 — marker
+     pins at the left edge, which reads as "this IS the lowest price
+     we've tracked" (de facto cheapest because nothing else is known). */
   const range  = Math.max(highestPriceNgn - lowestPriceNgn, 1); // avoid /0
   const offset = Math.max(0, Math.min(1, (thisPriceNgn - lowestPriceNgn) / range));
 
@@ -133,31 +114,57 @@ export default function PriceComparisonBar({
 
   /* Verdict label + color — drives both the headline copy and the
      marker bg. Three buckets matched to the green / amber / red
-     gradient zones below. */
-  const verdict = offset <= 0.33
-    ? { label: "Great price", colour: "text-emerald-600 dark:text-emerald-400", marker: "bg-emerald-500" }
-    : offset <= 0.66
-      ? { label: "Average price", colour: "text-amber-600 dark:text-amber-400", marker: "bg-amber-500" }
-      : { label: "Above average", colour: "text-red-600 dark:text-red-400", marker: "bg-red-500" };
+     gradient zones below.
+
+     Single-store override: green tone is the most honest read since
+     this IS the lowest known price by definition (there's no other
+     listing to be more expensive than), but the headline phrasing
+     ("Best price tracked") makes the "we've only seen one" caveat
+     explicit. Without an override the multi-store wording would
+     read "Cheapest of the bunch" which implies a bunch — misleading
+     when comparedStoreCount === 0. */
+  const verdict = isSingleStore
+    ? { label: "Best price tracked", colour: "text-emerald-600 dark:text-emerald-400", marker: "bg-emerald-500" }
+    : offset <= 0.33
+      ? { label: "Great price", colour: "text-emerald-600 dark:text-emerald-400", marker: "bg-emerald-500" }
+      : offset <= 0.66
+        ? { label: "Average price", colour: "text-amber-600 dark:text-amber-400", marker: "bg-amber-500" }
+        : { label: "Above average", colour: "text-red-600 dark:text-red-400", marker: "bg-red-500" };
 
   /* Savings vs the dearest known price — useful framing when this
      offer ISN'T the cheapest but is still notably cheaper than the
      worst comparable price. Only render when meaningful (>5%
-     savings) so we don't surface "Save 1%" noise. */
-  const savePctVsHighest = highestPriceNgn > 0
+     savings) so we don't surface "Save 1%" noise. Suppressed
+     entirely for single-store (no "highest" to compare against). */
+  const savePctVsHighest = !isSingleStore && highestPriceNgn > 0
     ? Math.round(((highestPriceNgn - thisPriceNgn) / highestPriceNgn) * 100)
     : 0;
-  const showSavings = savePctVsHighest >= 5 && offset > 0.05;
+  const showSavings = !isSingleStore && savePctVsHighest >= 5 && offset > 0.05;
+
+  /* Headline text branches on single vs multi. Pulled out so both
+     the visible <h3> and the aria-label below stay in sync. */
+  const headlineText = isSingleStore
+    ? "Best price tracked"
+    : offset === 0
+      ? "Cheapest of the bunch"
+      : verdict.label;
+
+  /* Right-side subtitle. "across N stores" reads weird at N=1.
+     "1 store · watching for more" sets the expectation that the
+     verdict will change as we discover more listings. */
+  const subtitleText = isSingleStore
+    ? "1 store · watching for more"
+    : `across ${comparedStoreCount + 1} stores`;
 
   return (
     <div className="rounded-2xl bg-surface border border-border p-4 sm:p-5 mb-7">
       {/* Headline */}
       <div className="flex items-baseline justify-between gap-3 mb-3">
         <h3 className={`text-[15px] font-semibold ${verdict.colour}`}>
-          {offset === 0 ? "Cheapest of the bunch" : verdict.label}
+          {headlineText}
         </h3>
         <span className="text-[11px] text-ink-3 tabular-nums">
-          across {comparedStoreCount + 1} stores
+          {subtitleText}
         </span>
       </div>
 
@@ -168,7 +175,11 @@ export default function PriceComparisonBar({
           background:
             "linear-gradient(90deg, rgb(16,185,129) 0%, rgb(16,185,129) 33%, rgb(245,158,11) 50%, rgb(239,68,68) 67%, rgb(239,68,68) 100%)",
         }}
-        aria-label={`${verdict.label}. ${formatPriceForUser(thisPriceNgn, country)} of a ${formatPriceForUser(lowestPriceNgn, country)} to ${formatPriceForUser(highestPriceNgn, country)} range across ${comparedStoreCount + 1} stores.`}
+        aria-label={
+          isSingleStore
+            ? `Best price tracked. ${formatPriceForUser(thisPriceNgn, country)} is the only listing we've found so far.`
+            : `${verdict.label}. ${formatPriceForUser(thisPriceNgn, country)} of a ${formatPriceForUser(lowestPriceNgn, country)} to ${formatPriceForUser(highestPriceNgn, country)} range across ${comparedStoreCount + 1} stores.`
+        }
       >
         {/* Position marker — sized to clearly stand above the bar */}
         <div
@@ -178,17 +189,37 @@ export default function PriceComparisonBar({
         />
       </div>
 
-      {/* Range labels — anchor + dearest. Both formatted in user
-          currency so the comparison is apples-to-apples. */}
-      <div className="flex items-center justify-between text-[11px] text-ink-3 tabular-nums mb-3">
-        <span>{formatPriceForUser(lowestPriceNgn, country)}<span className="ml-1 opacity-70">cheapest</span></span>
-        <span>{formatPriceForUser(highestPriceNgn, country)}<span className="ml-1 opacity-70">highest</span></span>
-      </div>
+      {/* Range labels — multi-store shows cheapest + highest; single
+          store shows just the one price on the left ("only listing")
+          since there's no upper bound yet. */}
+      {isSingleStore ? (
+        <div className="flex items-center justify-between text-[11px] text-ink-3 tabular-nums mb-3">
+          <span>
+            {formatPriceForUser(thisPriceNgn, country)}
+            <span className="ml-1 opacity-70">only listing</span>
+          </span>
+          <span className="opacity-60">no upper bound yet</span>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between text-[11px] text-ink-3 tabular-nums mb-3">
+          <span>{formatPriceForUser(lowestPriceNgn, country)}<span className="ml-1 opacity-70">cheapest</span></span>
+          <span>{formatPriceForUser(highestPriceNgn, country)}<span className="ml-1 opacity-70">highest</span></span>
+        </div>
+      )}
 
       {/* Optional savings line — only when meaningful */}
       {showSavings && (
         <p className="text-[12px] text-ink-2 mb-3">
           You&apos;d save <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatPriceForUser(highestPriceNgn - thisPriceNgn, country)}</span> vs the highest known price.
+        </p>
+      )}
+
+      {/* Single-store hint — replaces the old "Only seen at this
+          store" panel's explanation, but in-line so the bar stays
+          the dominant visual element. */}
+      {isSingleStore && (
+        <p className="text-[12px] text-ink-2 mb-3">
+          Havlo couldn&apos;t find this exact product at another store yet. The verdict will update if a cheaper or pricier listing surfaces.
         </p>
       )}
 
