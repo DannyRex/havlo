@@ -151,24 +151,24 @@ export default function DealFeed({
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean),
   );
-  /* Default origin is "local" for every market (May 2026). Was
-     country-aware: NG → "all", others → "local". Switched to one
-     consistent default because:
-       1. Most shoppers in any market start with stores they
-          recognise — lowest-friction landing.
-       2. The "All" mix tends to be AliExpress-heavy and reads as
-          overwhelming on first scroll.
-       3. The Intl tab is one tap away for users who want
-          cross-border options; the URL state persists once
-          chosen, so the user only switches once.
+  /* Default origin is "all" for every market.
 
-     The explicit ?origin= URL override always wins so deep-links
-     from social / newsletters still resolve as authored. */
+     Reverted from "local" (May 2026 follow-up): the local-only
+     default made markets with thin native catalogues (UK ~9 local
+     stores, US ~9, DE ~11) look like Havlo had no deals. Visitors
+     landing on /uk/deals saw a sparse 50-row Local view by
+     default when the All view has ~3,000 cross-border rows the
+     visitor genuinely shops via freight forwarders / direct ship.
+
+     "All" surfaces the broader catalogue on first visit; users who
+     want only country-anchored stores can flip to Local with one
+     tap. The explicit ?origin= URL override still wins so
+     deep-links from social / newsletters resolve as authored. */
   const initialOriginRaw = searchParams.get("origin");
   const initialOrigin: OriginFilter =
     initialOriginRaw && VALID_ORIGINS.has(initialOriginRaw as OriginFilter)
       ? (initialOriginRaw as OriginFilter)
-      : "local";
+      : "all";
 
   /* Initial state seeded from props (when page.tsx pre-fetched on the
      server) so first paint shows real cards, not the skeleton. When

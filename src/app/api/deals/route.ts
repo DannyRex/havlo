@@ -335,10 +335,58 @@ export async function GET(req: NextRequest) {
     };
 
     /* Items pool: qualifying pool, narrowed to the user's origin choice. */
-    const qualifyingByOrigin =
+    let qualifyingByOrigin =
       effectiveOrigin === "local" ? qualifyingLocal :
       effectiveOrigin === "intl"  ? qualifyingIntl  :
       qualifyingCountryFiltered;
+
+    /* Relevance-rotation pass — gentle randomness so a user who hits
+       /deals more than once doesn't see the exact same top-of-list
+       every time. Only kicks in for sort=relevance (the default);
+       newest / discount / price sorts stay strictly deterministic
+       because their ordering carries explicit semantic meaning.
+
+       Approach: shuffle the top SHUFFLE_WINDOW items with a time-
+       bucketed seed. Items outside the shuffle window keep their
+       original relevance order so coarse ranking is preserved.
+       Rotation cadence ~10 min matches the s-maxage edge cache so
+       returning visitors see fresh top-of-page about once per
+       cache lifecycle.
+
+       User report May 2026: "adjust the algorithm of sort by
+       relevance so it's somewhat random or the user at least
+       sees new items from time to time." */
+    if (sort === "relevance" && qualifyingByOrigin.length > 12) {
+      const SHUFFLE_WINDOW    = 60;                    // top 60 rotate among themselves
+      const ROTATION_BUCKET_MS = 10 * 60 * 1000;       // new shuffle every 10 minutes
+      const bucket = Math.floor(Date.now() / ROTATION_BUCKET_MS);
+      /* Per-country seed component so /uk and /ng don't share a
+         shuffle (two markets, two separate orderings — preserves
+         the perception that each market has its own editorial
+         curation). */
+      const seedStr = `${bucket}:${country.code}`;
+      let h = 2166136261;
+      for (let i = 0; i < seedStr.length; i++) {
+        h ^= seedStr.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      let seed = h >>> 0;
+      const rng = () => {
+        seed = (seed + 0x6D2B79F5) >>> 0;
+        let t = seed;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      const top  = qualifyingByOrigin.slice(0, SHUFFLE_WINDOW);
+      const rest = qualifyingByOrigin.slice(SHUFFLE_WINDOW);
+      /* Fisher-Yates with the seeded rng. */
+      for (let i = top.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [top[i], top[j]] = [top[j], top[i]];
+      }
+      qualifyingByOrigin = [...top, ...rest];
+    }
 
     /* Degraded-response detector — fires when browse_deals RPC failed
        upstream and getCuratedDeals() served the response instead. In
