@@ -1,0 +1,102 @@
+name: Resolve Google Shopping relay URLs
+
+# Decoupled async resolver for Google Shopping relay URLs that
+# land in offers.url via the SerpAPI google_shopping ingest.
+#
+# Background: Google deprecated the google_product endpoint
+# (verified May 2026), so /api/go can no longer cheaply resolve
+# relay URLs at click time. The runtime falls through to
+# merchant_search instead, which still lands users on the right
+# merchant but loses the PDP-level deep link.
+#
+# This workflow chips through the relay backlog using a Playwright
+# resolver script (scripts/resolve-relay-urls.ts) on its own
+# schedule. Each run pulls up to LIMIT unresolved rows, opens
+# each in headless Chromium, captures the merchant URL from
+# Google's interstitial DOM, and writes it back to offers.url.
+#
+# Why decoupled vs inline in the SerpAPI ingest: per-row
+# resolution is ~1.5-3s of Playwright wall time. The SerpAPI
+# ingest already produces ~2,000+ relay rows per cycle (just hit
+# the 25-min Actions timeout last week). Inline resolution would
+# blow past it. Decoupled = ingest stays fast, resolution paces
+# itself, and /api/go's merchant_search fallback keeps clicks
+# working in the meantime.
+#
+# Idempotent: the script SELECTs only rows whose URL still
+# matches the relay pattern. Once resolved, a row no longer
+# matches and won't be touched again. Multiple runs converge.
+
+on:
+  schedule:
+    # Every 4 hours. With LIMIT=500 and ~2s per row average pace
+    # (accounting for Google's rate-limit ramps), each run takes
+    # ~17-20 min and resolves ~400-450 rows successfully.
+    # 6 runs/day × ~400 = ~2,400 rows/day, which drains the ~4k
+    # initial backlog in ~2 days and then steady-states against
+    # the ~600 relays/week new ingest produces.
+    - cron: "30 */4 * * *"
+  workflow_dispatch:
+    # Manual trigger lets us run a one-off with custom params.
+    inputs:
+      limit:
+        description: "Max rows to process this run"
+        type:        string
+        required:    false
+        default:     "500"
+      concurrency:
+        description: "Parallel browsers (1-3 sane range)"
+        type:        string
+        required:    false
+        default:     "1"
+      dry_run:
+        description: "Dry run (no DB writes)"
+        type:        boolean
+        required:    false
+        default:     false
+
+# Read-only — the resolver only writes to Supabase, not the repo.
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    # Generous timeout for a long backfill batch. The script's
+    # internal --limit and 429 backoff keep us inside this in
+    # practice; this is the cliff edge that prevents a stuck
+    # browser from burning a full hour.
+    timeout-minutes: 50
+    env:
+      SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache:        "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Resolve relay URLs
+        run: |
+          LIMIT="${{ github.event.inputs.limit || '500' }}"
+          CONCURRENCY="${{ github.event.inputs.concurrency || '1' }}"
+          DRY_RUN_FLAG=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+          echo "Running resolver with --limit $LIMIT --concurrency $CONCURRENCY $DRY_RUN_FLAG"
+          npx tsx scripts/resolve-relay-urls.ts \
+            --limit "$LIMIT" \
+            --concurrency "$CONCURRENCY" \
+            $DRY_RUN_FLAG
