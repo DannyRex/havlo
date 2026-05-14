@@ -94,7 +94,42 @@ async function fetchPoolCached(params: {
     country:      params.country,
   });
 
-  POOL_CACHE.set(key, { data, expires: now + POOL_TTL_MS });
+  /* Health-aware caching — don't lock users into a degraded view.
+
+     1. Empty pool → don't cache at all. Most NG/UK/US/etc requests
+        return thousands of rows; an empty response almost always
+        means a transient DB failure (browse_deals RPC blip, schema
+        change mid-ingest, Supabase pool exhaustion). Caching empty
+        means every visitor in the next 5 minutes sees "0 deals"
+        even after the DB recovers. User report May 2026:
+        "sometimes the count is zero until the country is changed"
+        — the country switch hits a different cache key that's
+        still warm with good data, and changing back hits the
+        recovered (or now-evicted) entry. Skipping the cache on
+        empty results means the very next request retries and
+        recovers as soon as the upstream comes back.
+
+     2. Curated-fallback (Amazon-only, ~80 rows) → cache for 30s,
+        not 5 min. This pool shape signals that browse_deals RPC
+        failed and we served from the curated static catalogue. We
+        want the cache to clear fast so we retry the RPC on the
+        next visit, but a tiny TTL still amortises the per-request
+        compute cost for the visitor wave that lands during a real
+        outage.
+
+     3. Healthy pool → cache for the full POOL_TTL_MS as before. */
+  const looksLikeCuratedFallback = data.length > 0 && data.length <= 80 &&
+    data.every((d) => d.storeId.startsWith("amazon-") || d.storeId === "amazon");
+
+  if (data.length === 0) {
+    /* Skip cache entirely. Next request to the same key retries the
+       DB. Caller already returned `return data` below so flow
+       proceeds normally. */
+  } else if (looksLikeCuratedFallback) {
+    POOL_CACHE.set(key, { data, expires: now + 30_000 });
+  } else {
+    POOL_CACHE.set(key, { data, expires: now + POOL_TTL_MS });
+  }
 
   /* Opportunistic eviction — every Nth set, drop expired entries to
      keep the Map from growing unbounded under freeform-search load.

@@ -672,7 +672,19 @@ export default function DealFeed({
           <div className="hidden sm:flex items-center gap-3 flex-shrink-0 ml-auto">
             {!loading && (
               <span className="text-xs text-ink-3 tabular-nums">
-                {total.toLocaleString()} deals
+                {/* Use the all-origins total instead of the
+                    origin-filtered total. Otherwise this indicator
+                    flickers per tab click (2,975 → 1,960 → 1,015) and
+                    duplicates the toggle badges' job. originCounts.all
+                    is invariant to origin AND to selectedStores, so
+                    the figure stays stable when the user toggles
+                    tabs OR ticks stores. Falls back to `total` only
+                    on the initial render before originCounts has
+                    populated, so SSR placeholder still shows
+                    something sensible. User report May 2026:
+                    "switching tabs in the deals page changes the
+                    number count. should not be." */}
+                {(originCounts?.all ?? total).toLocaleString()} deals
               </span>
             )}
 
