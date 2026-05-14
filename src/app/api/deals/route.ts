@@ -3,6 +3,7 @@ import { getActiveBrowseProvider } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { isStoreSearchUrl } from "@/lib/utils";
+import { displayStoreName } from "@/lib/store-display";
 import type { OriginFilter, SortOption } from "@/types";
 
 /* No `export const dynamic = "force-dynamic"` here.
@@ -217,38 +218,63 @@ export async function GET(req: NextRequest) {
        changes when the store is selected." The number actually
        changed because tier-filtered items came back with a smaller
        total — fixed by reconciling the two upfront. */
+    /* Consolidate the dropdown by DISPLAY name (not raw storeId).
+       SerpAPI's ingest creates one row per seller variant — Walmart
+       alone produces "walmart", "walmart-carote-official",
+       "walmart-turtle-beach", … (8+ variants). The previous
+       per-storeId aggregate showed each as a separate entry, and
+       ticking the bare "Walmart" matched only 2 of the 15 actual
+       Walmart deals. User report May 2026: "/us/deals?stores=walmart
+       shows '15' in header but '0 deals' in body."
+
+       Now every variant whose displayStoreName collapses to the
+       same canonical name (Walmart, Amazon UK, Currys, etc.) gets
+       merged into ONE dropdown entry. The entry's `id` becomes the
+       canonical display name (lowercased), and `count` sums all
+       variants' qualifying counts. The filter pass below matches
+       items by displayStoreName too, so ticking one entry catches
+       every underlying variant. */
+    const canonicalKey = (storeName: string) => displayStoreName(storeName).toLowerCase();
+
     const storesAggregate = (() => {
-      /* First pass: build the qualifying-pool counts so we have a
-         per-store-id → count map matching what the user will see. */
+      /* First pass: qualifying-pool counts grouped by canonical
+         display name. */
       const qualifyingCounts = new Map<string, number>();
       for (const d of qualifyingByOrigin) {
         if (!d.storeId) continue;
-        qualifyingCounts.set(d.storeId, (qualifyingCounts.get(d.storeId) ?? 0) + 1);
+        const key = canonicalKey(d.storeName);
+        qualifyingCounts.set(key, (qualifyingCounts.get(key) ?? 0) + 1);
       }
       /* Second pass: walk the broad pool to collect the store list
          (so 0%-only stores still appear) and stamp each with its
          qualifying count (0 when the store has no items at the
-         user's current tier). */
+         user's current tier). Keyed on canonical name; the entry's
+         `id` IS that canonical key so the URL stays human-readable
+         ("?stores=walmart" rather than a UUID). */
       const map = new Map<string, { id: string; name: string; count: number }>();
       for (const d of broadByOrigin) {
-        const id = d.storeId;
-        if (!id) continue;
-        if (map.has(id)) continue;
-        map.set(id, { id, name: d.storeName, count: qualifyingCounts.get(id) ?? 0 });
+        if (!d.storeId) continue;
+        const key  = canonicalKey(d.storeName);
+        if (map.has(key)) continue;
+        const name = displayStoreName(d.storeName);
+        map.set(key, { id: key, name, count: qualifyingCounts.get(key) ?? 0 });
       }
       /* Sort by qualifying count DESC so the stores with the most
          actionable inventory at the current tier float to the top
          of the dropdown. Stores with count=0 (visible but empty)
-         settle at the bottom — still clickable, still alphabetised
-         within the count=0 group via the client-side sort. */
+         settle at the bottom. */
       return Array.from(map.values()).sort((a, b) => b.count - a.count);
     })();
 
-    /* Apply the multi-store filter LAST so the items list narrows
-       but the storesAggregate above still surfaces all available
-       options to the filter UI. */
+    /* Multi-store filter — match by canonical display name now that
+       the dropdown's `id` is the display key. Falls back to storeId
+       match too (defensive — older clients may pass a raw storeId
+       from a shared link). */
     const all = stores && stores.length > 0
-      ? qualifyingByOrigin.filter((d) => stores.includes(d.storeId.toLowerCase()))
+      ? qualifyingByOrigin.filter((d) => {
+          if (stores.includes(d.storeId.toLowerCase())) return true;
+          return stores.includes(canonicalKey(d.storeName));
+        })
       : qualifyingByOrigin;
 
     const total = all.length;

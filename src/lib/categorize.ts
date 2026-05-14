@@ -190,6 +190,18 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
      getting tagged Gaming. */
   { pattern: /\b(joy-con|dualsense|dualshock|gaming\s*controller|game\s*controller|wireless\s*controller(?:\s*for\s*(?:ps|xbox|nintendo))?)\b/i, slug: "gaming", reason: "game controller" },
   { pattern: /\b(steam\s*deck|asus\s*rog\s*ally|legion\s*go)\b/i, slug: "gaming", reason: "handheld" },
+  /* Video game titles — high-frequency franchises that surface in the
+     SerpAPI feed via Ubisoft Store / Xbox Store / Green Man Gaming
+     etc. Without these, titles like "Assassin's Creed Odyssey" fall
+     through to NULL inference and keep whatever bad source tag the
+     ingest pipeline gave them (sometimes "beauty" via the old
+     `creed` fragrance regex, fixed in the same commit). */
+  { pattern: /\b(assassin'?s\s*creed|call\s*of\s*duty|grand\s*theft\s*auto|gta\s*[v6]|fifa\s*\d{2}|madden\s*nfl|nba\s*2k|far\s*cry|mario\s*(kart|odyssey|party|tennis|golf)|zelda|pokemon\s*(scarlet|violet|sword|shield|legends)|halo\s*(infinite|reach|\d)|fortnite|minecraft|hogwarts\s*legacy|elden\s*ring|cyberpunk\s*2077|red\s*dead\s*redemption|spider-?man\s*(remastered|miles\s*morales)|god\s*of\s*war\s*(ragnarok|ascension)|the\s*last\s*of\s*us|horizon\s*(zero\s*dawn|forbidden\s*west)|final\s*fantasy\s*(xvi|xv|14|15|7\s*remake)|street\s*fighter\s*\d|mortal\s*kombat\s*\d|resident\s*evil\s*\d|tekken\s*\d|forza\s*(horizon|motorsport))\b/i, slug: "gaming", reason: "video game title" },
+  /* Game publishers / storefronts — gating signal when the title
+     itself doesn't carry a known franchise. Bare "Ubisoft" in the
+     storeName is a strong gaming signal even if the product is a
+     generic-sounding game name. */
+  { pattern: /\b(ubisoft\s*(store|connect)?|activision|blizzard|rockstar\s*games|epic\s*games\s*store|green\s*man\s*gaming|gamestop|xbox\.com|xbox\s*store|playstation\s*store)\b/i, slug: "gaming", reason: "game publisher / store" },
 
   // ── Appliances ──
   { pattern: /\b(refrigerator|fridge|freezer|washer|dryer|dishwasher|microwave|oven|range|cooktop|stove)\b/i, slug: "appliances", reason: "major appliance" },
@@ -202,7 +214,13 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   // ── Beauty / personal care ──
   { pattern: /\b(lipstick|mascara|gloss\s*bomb|concealer|foundation|lash\s*sensational|fenty\s*beauty|charlotte\s*tilbury|eye\s*shadow|eyeliner|blush|bronzer|highlighter|primer|setting\s*spray|brush\s*set)\b/i, slug: "beauty", reason: "makeup" },
   { pattern: /\b(niacinamide|moisturizer|moisturiser|moisturizing\s*cream|cleanser|toner|serum|cerave|the\s*ordinary|exfoliator|face\s*mask|sunscreen|spf\s*\d+|retinol|hyaluronic|salicylic|glycolic|vitamin\s*c\s*serum)\b/i, slug: "beauty", reason: "skincare" },
-  { pattern: /\b(perfume|cologne|fragrance|eau\s*de\s*parfum|eau\s*de\s*toilette|edp|edt|afnan|montale|kayali|maison\s*margiela|ariana|tom\s*ford|jo\s*malone|creed|dior|chanel|gucci|versace)\s*(?:\d+ml|\d+\.\d+\s*oz|spray)?\b/i, slug: "beauty", reason: "fragrance" },
+  /* "Creed" requires a fragrance-line context — bare "creed" matched
+     "Assassin's Creed Odyssey" and routed Ubisoft gaming titles into
+     Beauty (QA report May 2026). Now requires a Creed-perfume name
+     after the word: Aventus, Millesime, Himalaya, Royal Water, etc.
+     Still catches genuine Creed perfume listings without false-
+     positiving the video game franchise. */
+  { pattern: /\b(perfume|cologne|fragrance|eau\s*de\s*parfum|eau\s*de\s*toilette|edp|edt|afnan|montale|kayali|maison\s*margiela|ariana|tom\s*ford|jo\s*malone|creed\s*(aventus|millesime|himalaya|royal|silver|green\s*irish|spring|virgin|love|imperial)|dior|chanel|gucci|versace)\s*(?:\d+ml|\d+\.\d+\s*oz|spray)?\b/i, slug: "beauty", reason: "fragrance" },
   /* ── Health & Wellness ──────────────────────────────────────────
      Promoted from a beauty sub-rule to its own category May 2026.
      Pharmacies, supplements, OTC drugs, baby health, first aid.
