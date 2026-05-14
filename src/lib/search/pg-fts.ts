@@ -756,24 +756,51 @@ export async function pgFtsFindDupes(
 /* ── Main entrypoint ──────────────────────────────────────────────── */
 
 /* Did-you-mean: top-3 closest title matches via the suggest_titles RPC
-   (scripts/db/0008-suggest-titles.sql). Used to populate the empty-mode
-   response's `suggestions` array so the EmptySearchState UI can render
-   "Did you mean…" pills. Falls through to [] gracefully if the RPC
-   isn't migrated yet — no error surface. */
+   (scripts/db/0008-suggest-titles.sql, relaxed in 0020, space-
+   insensitive in 0024). Used to populate the empty-mode response's
+   `suggestions` array so the EmptySearchState UI can render
+   "Did you mean…" pills.
+
+   May 2026: when the literal query returns nothing AND the query has
+   spaces, retry with a space-stripped variant. "lawn mower" → ""
+   (literal RPC misses) → retry "lawnmower" → matches "Lawnmower X".
+   And vice versa: "playstation" → retry "play station" rarely helps
+   (titles tend to fuse rather than split), but space-strip handles
+   both directions cleanly. Migration 0024 absorbs this logic into
+   the SQL so a single RPC call covers it; until that's applied this
+   JS retry produces the same end-result with one extra round trip
+   (only on empty literal results — rare). */
 async function fetchDidYouMean(q: string): Promise<SearchSuggestion[]> {
   const supa = getSupabaseAdmin();
   if (!supa || !q.trim() || q.trim().length < 2) return [];
-  try {
-    const { data, error } = await supa.rpc("suggest_titles", { q, max_results: 3 });
-    if (error || !data) return [];
-    return (data as Array<{ product_id: string; title: string; score: number }>).map((r) => ({
-      title: r.title,
-      key:   r.product_id,
-      score: r.score,
-    }));
-  } catch {
-    return [];
+
+  async function runOnce(query: string): Promise<SearchSuggestion[]> {
+    try {
+      const { data, error } = await supa!.rpc("suggest_titles", { q: query, max_results: 3 });
+      if (error || !data) return [];
+      return (data as Array<{ product_id: string; title: string; score: number }>).map((r) => ({
+        title: r.title,
+        key:   r.product_id,
+        score: r.score,
+      }));
+    } catch {
+      return [];
+    }
   }
+
+  /* Primary literal query. Covers the common case (single-word
+     queries, typos, etc.). */
+  const literal = await runOnce(q);
+  if (literal.length > 0) return literal;
+
+  /* Empty literal → try space-stripped if the query has whitespace.
+     "lawn mower" → "lawnmower". Skip when nothing to strip. */
+  const stripped = q.replace(/\s+/g, "");
+  if (stripped.length >= 2 && stripped !== q.trim()) {
+    return await runOnce(stripped);
+  }
+
+  return [];
 }
 
 export async function pgFtsFindSimilar(

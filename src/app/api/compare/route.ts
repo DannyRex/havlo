@@ -77,6 +77,50 @@ export async function GET(req: NextRequest) {
     } else {
       result = { mode: "empty", query: "", suggestions: [] };
     }
+
+    /* Auto-pivot (May 2026): when FTS returned empty AND a
+       suggestion looks like a clean fused / split variant of the
+       query (e.g. "lawn mower" → "Mac Allister Lawnmower"), retry
+       the search with the suggested title automatically. User sees
+       real results instead of a "Did you mean..." pill they have
+       to click. Original query preserved in `pivotedFromQuery` so
+       the UI can render a "Showing results for X · Search for
+       {original} instead" notice.
+
+       Why substring-of-stripped, not score threshold:
+       Trigram scores for short queries against long titles are
+       naturally low (0.20-0.30 typical, even for clear matches).
+       Setting a high score threshold (0.45+) misses obvious
+       fuse/split cases. Setting a low threshold (0.20) false-
+       positives on weak typo-like overlaps ("lawn mower" → "moto
+       g57 power" scored 0.238 in the suggest_titles probe).
+
+       Substring containment is the right signal: if the stripped
+       title contains the stripped query verbatim, the suggestion
+       is the same word(s) the user typed, just with or without
+       spaces. Examples:
+         - "lawn mower"   → "macallister1800wcordedpushlawnmower" ✓ contains "lawnmower"
+         - "play station" → "playstation5console"                  ✓ contains "playstation"
+         - "lawn mower"   → "motog57power"                          ✗ doesn't contain "lawnmower"
+         - "iphn"         → "iphone15promax"                        ✗ doesn't contain "iphn"
+           (correct: leaves user with the Did You Mean pill so they
+            confirm the typo correction consciously). */
+    if (q.trim() && result.mode === "empty" && result.suggestions.length > 0) {
+      const stripped = q.replace(/\s+/g, "").toLowerCase();
+      const queryLc = q.toLowerCase().trim();
+      const pivot = result.suggestions.find((s) => {
+        const titleStripped = s.title.replace(/\s+/g, "").toLowerCase();
+        return s.title.toLowerCase().trim() !== queryLc
+            && titleStripped.includes(stripped);
+      });
+      if (pivot) {
+        const pivoted = await pgFtsFindSimilar(pivot.title);
+        if (pivoted.mode !== "empty") {
+          result = { ...pivoted, query: pivot.title, pivotedFromQuery: q } as SearchOutput & { pivotedFromQuery?: string };
+        }
+      }
+    }
+
     /* Backstop: if we have a pid AND the FTS path returned empty,
        fetch the product directly. This catches chip clicks where
        the catalog shifted between the chip-pool generation and the

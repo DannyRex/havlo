@@ -24,16 +24,44 @@ function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
   const { country } = useCountry();
   const isUSD = deal.currency === "USD";
   const saved = savings(deal.originalPrice, deal.salePrice);
-  const priceFmt = isUSD ? formatUSDPrice(deal.salePrice)     : formatCompact(deal.salePrice);
-  const origFmt  = isUSD ? formatUSDPrice(deal.originalPrice) : formatCompact(deal.originalPrice);
-  const saveFmt  = saved > 0 ? (isUSD ? formatUSDPrice(saved) : formatCompact(saved)) : null;
-  /* Secondary hint — converts USD primary to the USER'S local
-     currency. Was hardcoded to NGN, which surfaced "≈ ₦806K" on
-     /uk/compare for a UK shopper (round-4 QA). Now NG sees ₦, UK
-     sees £, DE sees €, etc. Skipped when there's no conversion to
-     do (USD shopper looking at USD deal). */
-  const ngnEquiv = isUSD && country.currency !== "USD"
-    ? `≈ ${formatLocal(Math.round(deal.salePrice * USD_FX[country.currency]), country)}`
+
+  /* Currency strategy (May 2026): show the user's local currency as
+     the PRIMARY price on every live card. Was: USD primary for SerpAPI
+     rows + a small "≈ £Y" hint underneath. UK / DE / NG / etc. users
+     would see "$X.xx" as the headline price across the live-deals
+     section, while every other card on the page (anchor + dupes)
+     showed local currency. Asymmetric. User report: "All items in
+     the 9 live deals from global stores section are in usd, they
+     should be in local currency. All items at all times in all
+     pages should primarily be in local currency."
+
+     Behaviour:
+       - USD deal + user in non-USD market: primary = local currency
+         (£21, ₦12k, AED 80, etc.), secondary hint = original $X.xx
+       - USD deal + USD-market user: primary = USD (no conversion)
+       - Non-USD deal: render in stored currency via formatCompact
+         (legacy NGN path used by older non-SerpAPI ingests). */
+  const isCrossCurrency = isUSD && country.currency !== "USD";
+  const localOf = (usdAmount: number): number =>
+    country.currency === "USD"
+      ? Math.round(usdAmount * 100) / 100
+      : Math.round(usdAmount * USD_FX[country.currency]);
+  const formatLocalOrUSD = (usdAmount: number): string =>
+    country.currency === "USD"
+      ? formatUSDPrice(usdAmount)
+      : formatLocal(localOf(usdAmount), country);
+  const priceFmt = isUSD ? formatLocalOrUSD(deal.salePrice)     : formatCompact(deal.salePrice);
+  const origFmt  = isUSD ? formatLocalOrUSD(deal.originalPrice) : formatCompact(deal.originalPrice);
+  const saveFmt  = saved > 0 ? (isUSD ? formatLocalOrUSD(saved) : formatCompact(saved)) : null;
+
+  /* Secondary hint — shows the ORIGINAL USD price when we converted
+     to the user's local currency for the primary. Gives shoppers a
+     reference point for the listed-price context (especially useful
+     for cross-border deals where the original-currency price helps
+     judge whether the converted total feels right). Skipped when no
+     conversion happened. */
+  const originalHint = isCrossCurrency
+    ? `≈ ${formatUSDPrice(deal.salePrice)} in USD`
     : null;
   const hasDiscount = deal.originalPrice > deal.salePrice && deal.discountPercent > 0;
 
@@ -155,8 +183,8 @@ function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
           )}
         </div>
 
-        {ngnEquiv && (
-          <p className="text-[10px] text-ink-3 mt-0.5">{ngnEquiv}</p>
+        {originalHint && (
+          <p className="text-[10px] text-ink-3 mt-0.5">{originalHint}</p>
         )}
       </div>
     </a>
@@ -208,14 +236,14 @@ export default function LiveResults({ items, loading, providers }: Props) {
   // Don't render anything if not loading and zero results
   if (!loading && items.length === 0) return null;
 
-  /* Caption is country-aware. The original "Prices in USD, ships to
-     Nigeria." was hardcoded — it appeared on every country's /compare
-     page including UK / DE / etc., where it was misleading (a UK
-     shopper doesn't ship from the US to Nigeria). QA round 3 caught
-     this on /uk/compare. */
+  /* Caption is country-aware and reflects the new currency model:
+     prices are now shown in the user's local currency (May 2026
+     localisation pass). USD is still the source data — surfaced as
+     a secondary "≈ $X in USD" hint per card — but the headline is
+     local. */
   const caption = country.code === "ng"
-    ? "Prices in USD, ships to Nigeria."
-    : "Prices shown in USD for cross-border comparison.";
+    ? "Live picks from global stores — prices in ₦, ships to Nigeria."
+    : `Live picks from global stores — prices in ${country.currency}.`;
 
   return (
     <section className="mt-12 sm:mt-16">

@@ -504,13 +504,16 @@ export default function DealFeed({
       <div className="mb-4">
         <OriginToggle active={origin} onChange={setOrigin} counts={originCounts} />
         {origin === "intl" && (
-          /* Copy is country-aware. The previous hardcoded "₦ estimate"
-             leaked Naira onto /us, /uk, /de etc. — QA report May 2026
-             flagged "USD with a ₦ estimate" appearing on /us/deals.
-             For NG users the NGN-converted estimate is the actionable
-             number; for non-NG users it's the user's local currency. */
+          /* Copy reflects the May 2026 currency-localisation pass:
+             cards now show the user's local currency as the PRIMARY
+             price across every surface (MasonryCard, ListCard,
+             LiveResults, PDP ProductHero). Original ingest currency
+             (usually USD for SerpAPI rows) appears as a secondary
+             "≈ $X.xx in USD" hint underneath. Delivery + duties
+             reminder kept because cross-border shopping still
+             carries real cost on top of the listed price. */
           <p className="mt-2 text-[11px] sm:text-xs text-ink-3 px-1">
-            Prices shown in USD with a {country.code === "ng" ? "₦" : country.currency} estimate. Delivery and duties may apply.
+            Prices in {country.code === "ng" ? "₦" : country.currency} from international stores. Delivery and duties may apply on top of the listed price.
           </p>
         )}
       </div>
