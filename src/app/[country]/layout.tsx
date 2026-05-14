@@ -1,16 +1,31 @@
-/* Country segment validator.
-   - Validates the [country] URL param against the supported COUNTRIES roster.
-   - 404s on unsupported codes (so `/xyz/deals` doesn't render).
-   - Sets the user's preferred country in a cookie when the URL says
-     something different (so deep-linking to /uk/deals from search updates
-     their preference for subsequent navigation).
+/* Country segment validator + nested CountryProvider seed.
 
-   This layout doesn't add visual chrome — Navbar / Footer live in the
-   root layout. It exists purely to gate + sync the URL country. */
+   Two responsibilities:
+     1. 404 on unsupported country codes (`/xyz/deals` should not render).
+     2. Wrap the segment in a nested CountryProvider seeded with the
+        URL country, so client components below see the correct
+        country in their initial state — no flash, no /ng/p/ prefix
+        leaking into SSR'd /uk/p/ links.
+
+   IMPORTANT: this layout intentionally has NO cookies() / headers()
+   reads. The previous version called cookies() to sync the country
+   cookie with the URL, but ANY cookies() call in the render tree
+   forces every page below it to render dynamically — which defeated
+   the revalidate=1800 ISR declared on the homepage. May 2026 perf
+   investigation traced /[country]/ being uncached
+   (`x-vercel-cache: MISS`, `private, no-cache, no-store`) to that
+   single cookies() call.
+
+   The cookie sync the old version did was redundant anyway:
+   CountryProvider's URL-first hydration (see its useEffect) reads
+   the URL pathname on mount and sets the client-side cookie via the
+   picker if the user explicitly changes country. The middleware
+   handles bare-path → country-prefixed redirects using the cookie.
+   No server-side cookie write is needed. */
 
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
-import { COUNTRIES, COUNTRY_COOKIE, getCountry } from "@/lib/country";
+import { CountryProvider } from "@/components/providers/CountryProvider";
+import { COUNTRIES } from "@/lib/country";
 
 export function generateStaticParams() {
   return COUNTRIES.map((c) => ({ country: c.code }));
@@ -21,30 +36,15 @@ export default function CountryLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: { country: string };
+  params:   { country: string };
 }) {
   const code = params.country?.toLowerCase();
   if (!code || !COUNTRIES.some((c) => c.code === code)) notFound();
 
-  /* Sync the cookie with the URL when they disagree. Page renders
-     immediately with the URL country; the cookie write takes effect for
-     subsequent navigation (any link that doesn't carry a country prefix). */
-  const jar = cookies();
-  if (jar.get(COUNTRY_COOKIE)?.value !== code) {
-    /* cookies().set is only allowed in Server Actions / Route Handlers
-       — silently skip in RSC render. CountryProvider on the client picks
-       up the URL country via initialCode passed below. */
-    try {
-      jar.set(COUNTRY_COOKIE, code, {
-        maxAge: 60 * 60 * 24 * 365,
-        sameSite: "lax",
-        path: "/",
-      });
-    } catch {/* RSC render context — write skipped, client will sync */}
-  }
-
-  // The country is also surfaced via getServerCountry() (cookies). Children
-  // that need it should call getServerCountry directly — same source of truth.
-  void getCountry(code);
-  return <>{children}</>;
+  /* Nested CountryProvider with initialCode = URL country. Overrides
+     the root layout's default-country provider for everything inside
+     /[country]/. So /uk/deals SSR'd cards link to /uk/p/..., not
+     /ng/p/... (the bug before this layout existed — useCountry()'s
+     server-side value defaulted to NG). */
+  return <CountryProvider initialCode={code}>{children}</CountryProvider>;
 }
