@@ -574,8 +574,13 @@ export default function DealFeed({
           </button>
         )}
       </div>
+      {/* Microcopy reflects the new Enter behaviour shipped in
+          89e1d5d — Enter commits the filter + dismisses keyboard
+          rather than teleporting to /compare. Previous copy ("Press
+          Enter to search across every store for a fresh comparison")
+          was stale and contradicted the new keyboard model. */}
       <p className="text-[11px] text-ink-3 mb-4 px-4">
-        Type to filter the deals shown below. Press Enter to search across every store for a fresh comparison.
+        Filter the deals shown below by typing. Use the Stores button to narrow by retailer.
       </p>
 
       {/* Invalid-category info chip — addresses Bucket 2#17 from QA

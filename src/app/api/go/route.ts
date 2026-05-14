@@ -184,61 +184,42 @@ async function writeCache(sourceUrl: string, resolvedUrl: string) {
 
 /* Resolve a Google Shopping relay URL via SerpAPI's product endpoint.
    Returns the first online seller's direct merchant link, or null
-   when SerpAPI can't resolve it. */
-async function resolveViaSerpApi(googleUrl: string): Promise<string | null> {
-  const apiKey = process.env.SERPAPI_KEY?.trim();
-  if (!apiKey) return null;
+   when SerpAPI can't resolve it.
 
-  /* The relay URL contains a `prds=...productId...` segment we can
-     extract. Without product_id we can't resolve.
+   ─── KILLED May 2026 ──────────────────────────────────────────────
+   Google deprecated the Shopping Product API. SerpAPI now returns
+   400 with body `{"error": "The Google Product service is no longer
+   offered by Google."}` for every google_product call regardless of
+   product_id type (productid / catalogid / gpcid all 400). Verified
+   via scripts/_probe-serpapi-direct.ts against three real audit
+   IDs from UK / US / DE markets.
 
-     Round-4 QA caught a 400 from Google's consent gate when the
-     resolver fell through. The relay URL's `prds` carries multiple
-     IDs (catalogid, productid, headlineOfferDocid, gpcid, mid).
-     SerpAPI's google_product endpoint specifically wants the
-     PRODUCT_ID, not catalogid. The previous regex matched whichever
-     came first (usually catalogid) → SerpAPI returned no sellers
-     → resolver returned null → fallback redirected to the Google
-     relay → Google's consent gate broke. Now: try productid first
-     and fall back through the alternatives. */
-  const candidateIds: string[] = [];
-  try {
-    const u = new URL(googleUrl);
-    const prds = u.searchParams.get("prds") ?? "";
-    /* Pull each id type in priority order. SerpAPI's google_product
-       most often accepts the `productid:` value. catalogid + gpcid
-       are SerpAPI-resolvable fallbacks. */
-    const priorityKeys = ["productid", "catalogid", "gpcid"] as const;
-    for (const key of priorityKeys) {
-      const re = new RegExp(`${key}:(\\d+)`, "i");
-      const m = prds.match(re);
-      if (m && !candidateIds.includes(m[1])) candidateIds.push(m[1]);
-    }
-  } catch {/* fall through */}
-  if (candidateIds.length === 0) return null;
+   The May 2026 38-row resolver audit caught the downstream effect:
+   0/30 relay=Y rows produced a pdp-ok outcome. click_resolutions
+   telemetry confirmed 28/28 logged audit clicks had
+   serpapi_attempted=true, serpapi_resolved=false — every single
+   click was burning a SerpAPI credit on a dead endpoint AND adding
+   ~200ms latency before falling through to merchant_search.
 
-  /* Try each candidate ID until one returns a usable merchant URL.
-     Stops at the first hit so we burn at most one extra SerpAPI
-     credit per failed lookup. */
-  for (const productId of candidateIds) {
-    const endpoint = new URL("https://serpapi.com/search.json");
-    endpoint.searchParams.set("engine",     "google_product");
-    endpoint.searchParams.set("product_id", productId);
-    endpoint.searchParams.set("api_key",    apiKey);
+   `google_shopping` is NOT a replacement — its results also link
+   to www.google.com (another relay), so we'd need a second click-
+   through anyway. There's no current SerpAPI engine that returns
+   direct merchant PDP URLs for Google Shopping product IDs.
 
-    try {
-      const res = await fetch(endpoint.toString(), { next: { revalidate: 0 } });
-      if (!res.ok) continue;
-      const data = (await res.json()) as SerpProductResponse;
-      const sellers = data.sellers_results?.online_sellers
-        ?? data.product_results?.sellers
-        ?? [];
-      for (const s of sellers) {
-        const link = s.direct_link ?? s.link;
-        if (link && !isGoogleRelay(link)) return link;
-      }
-    } catch {/* try next candidate */}
-  }
+   Real fix (queued): resolve relay URLs at INGEST time, not click
+   time. The Playwright fleet that already scrapes catalogs can
+   visit each Google relay during ingest, capture the final
+   merchant URL after redirects, and store THAT in `offers.url`.
+   Click-time becomes pure passthrough. Eliminates SerpAPI cost
+   entirely + makes click resolution instant.
+
+   Until that ships: short-circuit here so we don't burn credits +
+   latency on a known-dead endpoint. Behaviour upstream is
+   identical to the old "resolveViaSerpApi returned null" path —
+   the GET handler still fires its merchant_search fallback chain.
+   Telemetry log step stays "merchant_search" (the actual outcome)
+   but serpapi_attempted now correctly reads `false`. */
+async function resolveViaSerpApi(_googleUrl: string): Promise<string | null> {
   return null;
 }
 
@@ -395,10 +376,17 @@ export async function GET(req: NextRequest) {
             we have one, or /deals as last resort. */
 
   /* Step 1: curated merchant search URL when we know the store +
-     title and the store is in our hand-built table. */
+     title and the store is in our hand-built table.
+
+     serpapiAttempted is now `false` everywhere in this fallback
+     chain — resolveViaSerpApi was short-circuited May 2026 after
+     the google_product API deprecation (see comment on that
+     function). The telemetry truth: we no longer make SerpAPI
+     calls for Google relays. The flag staying `true` here would
+     be a lie that distorts every cost / efficacy analysis. */
   if (titleHint && (storeIdHint || storeNameHint)) {
     const m = merchantSearchUrl(storeIdHint, storeNameHint, titleHint);
-    if (m) return sendOut(m.url, "merchant_search", { serpapiAttempted: true, serpapiResolved: false });
+    if (m) return sendOut(m.url, "merchant_search", { serpapiAttempted: false, serpapiResolved: false });
   }
 
   /* Step 2: smart fallback for long-tail merchants not in the
@@ -414,14 +402,14 @@ export async function GET(req: NextRequest) {
      When neither fires, fall through to Havlo /compare. */
   if (storeIdHint || storeNameHint) {
     const m = smartFallbackUrl(storeIdHint, storeNameHint, titleHint);
-    if (m) return sendOut(m.url, "smart_fallback", { serpapiAttempted: true, serpapiResolved: false });
+    if (m) return sendOut(m.url, "smart_fallback", { serpapiAttempted: false, serpapiResolved: false });
   }
 
   /* Step 3: merchant homepage from the curated table when we have a
      store but no title and smart fallback didn't fire. */
   if (storeIdHint || storeNameHint) {
     const m = merchantHomepage(storeIdHint, storeNameHint);
-    if (m) return sendOut(m.url, "merchant_homepage", { serpapiAttempted: true, serpapiResolved: false });
+    if (m) return sendOut(m.url, "merchant_homepage", { serpapiAttempted: false, serpapiResolved: false });
   }
 
   /* Step 4: havlo /compare when we have a title but absolutely no
@@ -430,7 +418,7 @@ export async function GET(req: NextRequest) {
   if (titleHint) {
     const compareUrl = new URL(`${req.nextUrl.origin}/${country.code}/compare`);
     compareUrl.searchParams.set("q", titleHint);
-    logResolution({ ...baseLog, resolvedUrl: compareUrl.toString(), step: "havlo_compare", serpapiAttempted: true, serpapiResolved: false });
+    logResolution({ ...baseLog, resolvedUrl: compareUrl.toString(), step: "havlo_compare", serpapiAttempted: false, serpapiResolved: false });
     return NextResponse.redirect(compareUrl, 307);
   }
 
@@ -438,6 +426,6 @@ export async function GET(req: NextRequest) {
      we have neither merchant nor title information AND can't resolve
      the relay URL. Rare. */
   const dealsUrl = new URL(`/${country.code}/deals`, req.nextUrl.origin).toString();
-  logResolution({ ...baseLog, resolvedUrl: dealsUrl, step: "havlo_deals", serpapiAttempted: true, serpapiResolved: false });
+  logResolution({ ...baseLog, resolvedUrl: dealsUrl, step: "havlo_deals", serpapiAttempted: false, serpapiResolved: false });
   return NextResponse.redirect(dealsUrl, 307);
 }
