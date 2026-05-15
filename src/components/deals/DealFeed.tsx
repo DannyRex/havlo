@@ -15,6 +15,7 @@ import CategorySubscribe from "./CategorySubscribe";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { cn } from "@/lib/utils";
 import { categories } from "@/lib/data/categories";
+import { logSearchEvent } from "@/lib/search/log-search";
 import type { Deal, DiscountTier, OriginFilter, SortOption } from "@/types";
 
 type ViewMode = "grid" | "list";
@@ -206,6 +207,11 @@ export default function DealFeed({
   const [origin, setOrigin]     = useState<OriginFilter>(initialOrigin);
   const [originCounts, setOriginCounts] =
     useState<{ all: number; local: number; intl: number } | undefined>(initialOriginCounts);
+  /* Did-you-mean suggestions returned by /api/deals when the result
+     list is empty AND a search query is present. Populates the
+     pills on EmptySearchState. Empty array = no pills, falls back
+     to the bare "Nothing found" heading. */
+  const [suggestions, setSuggestions] = useState<Array<{ title: string; key: string }>>([]);
   /* Selected store IDs from the StoreFilter popover. Persists to URL
      via buildParams (?stores=argos,currys). */
   const [selectedStores, setSelectedStores] = useState<Set<string>>(initialStores);
@@ -406,7 +412,7 @@ export default function DealFeed({
 
     fetch(`/api/deals?${buildParams(0)}`)
       .then((r) => r.json())
-      .then(({ items, total, hasMore, originCounts, stores, error }) => {
+      .then(({ items, total, hasMore, originCounts, stores, suggestions, error }) => {
         /* Bail if a newer fetch has started since we kicked off —
            prevents stale results from clobbering newer ones. */
         if (mySeq !== fetchSeqRef.current) return;
@@ -414,6 +420,24 @@ export default function DealFeed({
         setItems(items);
         setTotal(total);
         setHasMore(hasMore);
+        /* Did-you-mean pills — populated by /api/deals when the
+           displayed list is empty AND a search query is present.
+           Empty otherwise so the EmptySearchState falls back to its
+           non-suggestion variant cleanly. */
+        setSuggestions(Array.isArray(suggestions) ? suggestions : []);
+        /* Log this search to search_query_log when a search query
+           is present. Captures both zero-result misses (catalog gap
+           signal) and successful resolutions (popularity signal).
+           Skipped for pure filter-browse (no search query) since
+           that's not a search event. */
+        if (searchDebounced.trim()) {
+          logSearchEvent({
+            query: searchDebounced.trim(),
+            surface: "deals",
+            mode: "text",
+            resultCount: typeof total === "number" ? total : 0,
+          });
+        }
         /* Refresh badge counts on:
              1. The first ever client response (overrides bad SSR
                 snapshots — e.g. all-zero counts from RPC failure).
@@ -914,9 +938,16 @@ export default function DealFeed({
           filters" affordance — the recovery flow doesn't fit there. */}
       {!loading && items.length === 0 && (
         /* Use the debounced search for empty-state branching —
-           reflects what the server actually filtered against. */
+           reflects what the server actually filtered against.
+           Did-you-mean suggestions come from /api/deals via the
+           trigram-similarity RPC and are rendered as the headline
+           recovery path when present. */
         searchDebounced.trim() ? (
-          <EmptySearchState query={searchDebounced.trim()} source="deals" />
+          <EmptySearchState
+            query={searchDebounced.trim()}
+            source="deals"
+            suggestions={suggestions}
+          />
         ) : (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <Search size={32} className="text-ink-3 mb-3" strokeWidth={1.5} />

@@ -15,6 +15,7 @@ import DealUnavailableBanner from "@/components/feedback/DealUnavailableBanner";
 import { formatNaira } from "@/lib/utils";
 import { sniffToAnchor } from "@/lib/sniff-to-anchor";
 import { getCashbackForUrl } from "@/lib/cashback";
+import { logSearchEvent } from "@/lib/search/log-search";
 import { useCountry } from "@/components/providers/CountryProvider";
 import type { SearchOutput, DupeResult } from "@/lib/search";
 import type { SniffResult } from "@/app/api/sniff/route";
@@ -187,9 +188,21 @@ function CompareContent() {
         ? `/api/compare?q=${encodeURIComponent(q)}&pid=${encodeURIComponent(pid)}&mode=similar`
         : `/api/compare?q=${encodeURIComponent(q)}&mode=similar`;
       const res = await fetch(apiUrl);
-      setResult(await res.json() as SearchOutput);
+      const data = await res.json() as SearchOutput;
+      setResult(data);
+      /* Log to search_query_log. resultCount is approximate — we
+         use anchor.offers.length + dupes.length when similar mode,
+         or 0 when empty. Good enough for popularity / zero-result
+         signals. */
+      const count = data.mode === "similar"
+        ? (data.anchor?.offers.length ?? 0) + data.dupes.length
+        : data.mode === "single"
+          ? data.group.offers.length
+          : 0;
+      logSearchEvent({ query: q, surface: "compare", mode: "text", resultCount: count });
     } catch {
       setResult({ mode: "empty", query: q, suggestions: [] });
+      logSearchEvent({ query: q, surface: "compare", mode: "text", resultCount: 0 });
     } finally {
       setLoading(false);
     }

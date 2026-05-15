@@ -1,15 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
-import { ArrowUp, Link2 } from "lucide-react";
+import { useRef, useState, useEffect } from "react";
+import { ArrowUp, Link2, Search as SearchIcon, Store as StoreIcon } from "lucide-react";
 import Link from "next/link";
 import {
   PhoneIcon, LaptopIcon, SneakerIcon, EarbudsIcon, TvIcon,
   HomeIcon, FashionIcon, BeautyIcon, GamingIcon, FurnitureIcon,
 } from "@/components/ui/CategoryIcons";
 import { useCountry } from "@/components/providers/CountryProvider";
+import { logSearchEvent } from "@/lib/search/log-search";
 import type { ComponentType } from "react";
+
+/* Autocomplete suggestion shape — matches /api/suggest's response.
+   storeCount drives the "12 stores" badge so the user has a price-
+   comparison expectation set before clicking. */
+interface SuggestionItem {
+  title: string;
+  key:   string;
+  storeCount: number;
+}
 
 /* Each pill maps to a real category slug from src/lib/data/categories.ts
    so /deals can apply its category filter directly (not a fuzzy text
@@ -73,6 +83,25 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
   const [focused, setFocused] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
+  /* Search-as-you-type state.
+     Debounced fetch of /api/suggest at 200ms after the user stops
+     typing. The endpoint wraps the search_products_fts RPC and
+     returns title + product_id + storeCount per match — same data
+     /compare's anchor card would land on, so the dropdown promise
+     matches the destination. */
+  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionIndex, setSuggestionIndex] = useState(-1);
+  /* Hide-after-blur delay: 150ms gives the click handler time to
+     register before the dropdown disappears on focus loss. */
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* Track the latest debounce timer so a rapid keystroke cancels
+     the pending fetch. */
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* Sequence counter so a stale slow response can't clobber a
+     newer one — matches the deals page fetchSeq pattern. */
+  const fetchSeqRef = useRef(0);
+
   /* Search routing — fork on intent:
        URL paste → /compare. The user has a specific product link,
          sniff-to-anchor extracts the title + price + image and the
@@ -94,6 +123,10 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
     const q = query.trim();
     if (!q) return;
     const isPastedUrl = /^https?:\/\//i.test(q);
+    /* Fire-and-forget log to search_query_log. Powers popular-search
+       suggestions + zero-result reporting. sendBeacon-backed so the
+       insert survives the route change firing right after this. */
+    logSearchEvent({ query: q, surface: "hero", mode: isPastedUrl ? "url" : "text" });
     if (isPastedUrl) {
       router.push(`/${country.code}/compare?q=${encodeURIComponent(q)}&mode=similar`);
       return;
@@ -112,6 +145,73 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
     router.push(`/${country.code}/deals?search=${encodeURIComponent(q)}&origin=all`);
   };
 
+  /* Pick a specific autocomplete suggestion. Routes directly to
+     /compare with the product_id as the pid backstop so the FTS
+     ambiguity that can otherwise mis-anchor (e.g. "Hank Luxury Key
+     Finder" anchoring on "Burgundy Luxury Shoe") never fires. The
+     user has TOLD us which product they want. */
+  const pickSuggestion = (s: SuggestionItem) => {
+    /* Log the literal user query (not the picked title) as a "this
+       query resolved" event. resultCount=1 represents the chosen
+       suggestion — useful when training ranking later. */
+    logSearchEvent({
+      query: query.trim(),
+      surface: "hero",
+      mode: "text",
+      resultCount: Math.max(1, s.storeCount),
+    });
+    const params = new URLSearchParams({
+      q:    s.title,
+      pid:  s.key,
+      mode: "similar",
+    });
+    router.push(`/${country.code}/compare?${params.toString()}`);
+  };
+
+  /* Debounced suggestion fetch. Two stop conditions:
+       1. Query is a URL — autocomplete isn't useful, the sniff
+          will handle it on submit.
+       2. Query is too short — under 2 chars we don't have enough
+          signal to suggest sanely.
+     Cleanup runs on every query change to cancel pending fetches
+     before they land. */
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const q = query.trim();
+    if (q.length < 2 || /^https?:\/\//i.test(q)) {
+      setSuggestions([]);
+      setSuggestionsLoading(false);
+      setSuggestionIndex(-1);
+      return;
+    }
+    setSuggestionsLoading(true);
+    debounceRef.current = setTimeout(async () => {
+      const mySeq = ++fetchSeqRef.current;
+      try {
+        const res  = await fetch(`/api/suggest?q=${encodeURIComponent(q)}`);
+        const data = await res.json() as { items?: SuggestionItem[] };
+        if (mySeq !== fetchSeqRef.current) return; // stale
+        setSuggestions(Array.isArray(data.items) ? data.items : []);
+        setSuggestionIndex(-1);
+      } catch {
+        if (mySeq === fetchSeqRef.current) setSuggestions([]);
+      } finally {
+        if (mySeq === fetchSeqRef.current) setSuggestionsLoading(false);
+      }
+    }, 200);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query]);
+
+  /* Clean up the blur timer on unmount so a stale close-call
+     can't fire against an unmounted component. */
+  useEffect(() => {
+    return () => {
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+    };
+  }, []);
+
   /* Category pill click routes to /deals with the category SLUG
      pre-applied (not a fuzzy text search). Sub-category pills carry
      a search term so /deals shows the right narrow slice (e.g.
@@ -123,8 +223,35 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    const dropdownOpen = focused && suggestions.length > 0;
+
+    /* Arrow nav through dropdown suggestions. Wraps at the ends. */
+    if (dropdownOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      e.preventDefault();
+      setSuggestionIndex((idx) => {
+        const last = suggestions.length - 1;
+        if (e.key === "ArrowDown") return idx >= last ? 0    : idx + 1;
+        return                              idx <= 0    ? last : idx - 1;
+      });
+      return;
+    }
+
+    /* Escape closes the dropdown without submitting. */
+    if (dropdownOpen && e.key === "Escape") {
+      e.preventDefault();
+      setSuggestions([]);
+      setSuggestionIndex(-1);
+      return;
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
+      /* If a suggestion is highlighted, pick it. Otherwise fall
+         through to the freeform submit (text → /deals, url → /compare). */
+      if (dropdownOpen && suggestionIndex >= 0 && suggestionIndex < suggestions.length) {
+        pickSuggestion(suggestions[suggestionIndex]);
+        return;
+      }
       submit();
     }
   };
@@ -264,8 +391,17 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
               value={query}
               onChange={onChange}
               onKeyDown={onKeyDown}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
+              onFocus={() => {
+                setFocused(true);
+                if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+              }}
+              onBlur={() => {
+                /* 150ms delay so a click on a suggestion row in the
+                   dropdown registers BEFORE we close the dropdown.
+                   Without this the click target unmounts on blur and
+                   the navigation never fires. */
+                blurTimerRef.current = setTimeout(() => setFocused(false), 150);
+              }}
               rows={1}
               /* Shortened in round-3 QA: original "Paste a product
                  link, or search anything…" wrapped to 2 lines on
@@ -325,6 +461,89 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
               </button>
             </div>
           </div>
+
+          {/* Autocomplete dropdown — debounced 200ms after typing.
+              Renders below the composer with absolute positioning.
+              Each row shows the product title + 'N stores' badge so
+              the user knows how broad the comparison will be before
+              clicking. Click / Enter selects → /compare?pid=<id>.
+
+              Visibility rules:
+                • Visible when focused AND query >= 2 chars
+                  AND (loading OR suggestions present).
+                • Hidden for URL queries — sniff handles those on
+                  submit, autocomplete isn't useful.
+                • Hidden when the user blurs (150ms delay so clicks
+                  register before the panel unmounts).
+
+              z-index: 20 keeps it above the category-chip rail
+              below but below any global modal. mt-2 leaves a small
+              gap so the dropdown reads as a distinct surface, not
+              part of the composer. */}
+          {focused && query.trim().length >= 2 && !isUrl && (
+            (suggestionsLoading || suggestions.length > 0) && (
+              <div
+                role="listbox"
+                aria-label="Search suggestions"
+                className="absolute left-0 right-0 mt-2 z-20 rounded-2xl border border-border bg-surface shadow-[0_12px_36px_rgba(0,0,0,0.12)] overflow-hidden animate-fade-in"
+              >
+                {suggestions.length === 0 && suggestionsLoading ? (
+                  <div className="px-4 py-3 flex items-center gap-2 text-[13px] text-ink-3">
+                    <span className="w-3.5 h-3.5 rounded-full border-2 border-border border-t-ink-2 animate-spin" />
+                    Searching…
+                  </div>
+                ) : (
+                  <ul className="max-h-80 overflow-y-auto">
+                    {suggestions.map((s, idx) => {
+                      const isActive = idx === suggestionIndex;
+                      return (
+                        <li key={s.key} role="option" aria-selected={isActive}>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => pickSuggestion(s)}
+                            onMouseEnter={() => setSuggestionIndex(idx)}
+                            className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                              isActive ? "bg-surface-2" : "hover:bg-surface-2"
+                            }`}
+                          >
+                            <SearchIcon size={14} className="text-ink-3 shrink-0" aria-hidden="true" />
+                            <span className="flex-1 min-w-0 text-[14px] text-ink truncate">
+                              {s.title}
+                            </span>
+                            {s.storeCount > 0 && (
+                              <span className="shrink-0 inline-flex items-center gap-1 text-[11px] text-ink-3 tabular-nums">
+                                <StoreIcon size={11} aria-hidden="true" />
+                                {s.storeCount} {s.storeCount === 1 ? "store" : "stores"}
+                              </span>
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
+                    {/* Bottom row — explicit "Search for {query}" fallback
+                        so the user can always escape to the full-feed
+                        view from inside the dropdown. */}
+                    <li className="border-t border-border">
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={submit}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-[13px] transition-colors ${
+                          suggestionIndex === -1 ? "bg-surface-2" : "hover:bg-surface-2"
+                        }`}
+                      >
+                        <SearchIcon size={14} className="text-ink-2 shrink-0" aria-hidden="true" />
+                        <span className="text-ink-2">
+                          See all results for <span className="font-semibold text-ink">{query.trim()}</span>
+                        </span>
+                      </button>
+                    </li>
+                  </ul>
+                )}
+              </div>
+            )
+          )}
 
           {/* Helper microcopy — desktop only, mobile is busy enough */}
           <p

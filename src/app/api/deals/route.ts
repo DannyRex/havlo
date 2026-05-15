@@ -4,6 +4,7 @@ import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { isStoreSearchUrl } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
+import { fetchSearchSuggestions } from "@/lib/search/suggestions";
 import type { Deal, OriginFilter, SortOption } from "@/types";
 
 /* Cached pool fetch — the heaviest part of /api/deals.
@@ -586,8 +587,22 @@ export async function GET(req: NextRequest) {
       sort === "relevance"     ? "s-maxage=60, stale-while-revalidate=120"                 :
                                  "s-maxage=600, stale-while-revalidate=3600";
 
+    /* Did-you-mean suggestions for empty-result searches.
+       Surfaced in the empty state when the user has typed something
+       and we found no matches. /compare has done this via the API
+       since round-4 QA; /deals was missing it (May 2026 audit). One
+       suggest_titles RPC call, cheap, only fires when the displayed
+       list is genuinely zero AND a search query is present —
+       browse-mode empty (filter combo with no matches) doesn't need
+       this since filters can be relaxed. */
+    let suggestions: Array<{ title: string; key: string }> = [];
+    if (items.length === 0 && search && search.trim().length >= 2) {
+      const fetched = await fetchSearchSuggestions(search, 3);
+      suggestions = fetched.map((s) => ({ title: s.title, key: s.key }));
+    }
+
     return new Response(
-      JSON.stringify({ items, total, hasMore, originCounts, stores: storesAggregate, provider: provider.id }),
+      JSON.stringify({ items, total, hasMore, originCounts, stores: storesAggregate, provider: provider.id, suggestions }),
       {
         status: 200,
         headers: {
