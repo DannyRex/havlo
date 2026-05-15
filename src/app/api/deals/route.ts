@@ -322,14 +322,43 @@ export async function GET(req: NextRequest) {
       broadCountryFiltered;
 
     /* Apply the user's discount tier to derive the qualifying pool
-       (items + originCounts). When tier=0 this is identical to
-       broadCountryFiltered, so no extra work for default views. */
+       (items list narrowed by tier). When tier=0 this is identical
+       to broadCountryFiltered, so no extra work for default views. */
     const qualifyingCountryFiltered = userMinDiscount > 0
       ? broadCountryFiltered.filter((d) => d.discountPercent >= userMinDiscount)
       : broadCountryFiltered;
     const qualifyingLocal = qualifyingCountryFiltered.filter(isLocalToUser);
     const qualifyingIntl  = qualifyingCountryFiltered.filter((d) => !isLocalToUser(d));
-    const originCounts = {
+
+    /* Origin pill counts come from a parallel head-count call —
+       NOT from .length on the in-memory pool. Reason: the in-memory
+       pool is capped at the PostgREST db-max-rows=1000 per pass
+       (Pass A + B + C = up to ~3000 unique rows). For a market
+       with more than 3000 rows in the catalog, the pill showed
+       "exactly 1000" or "1959", which read as a UI bug — user
+       report May 2026: "/ng/deals sort=newest shows exactly
+       1000 local — is that a limit?".
+
+       Head counts use count:'exact'+head:true → returns the true
+       count via Postgres COUNT(*), no row payload, no 1000 cap.
+       The DISPLAYED list still caps at the 3-pass pool; the pill
+       reflects catalog truth so the user knows the inventory is
+       bigger than what's paginatable today.
+
+       Country-aware when present — see browse-db.ts getOriginCounts
+       for the local/intl partition. */
+    const headOriginCounts = await provider.getOriginCounts({
+      categorySlug: category,
+      minDiscount:  userMinDiscount,
+      search:       search,
+      stores:       stores,
+      country:      country.code,
+    }).catch(() => null);
+
+    /* Fallback: if the head-count call failed (provider missing
+       method, network blip), use the in-memory pool length. Less
+       accurate but never breaks the response shape. */
+    const originCounts = headOriginCounts ?? {
       all:   qualifyingCountryFiltered.length,
       local: qualifyingLocal.length,
       intl:  qualifyingIntl.length,

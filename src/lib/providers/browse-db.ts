@@ -351,7 +351,17 @@ export const dbBrowseProvider: BrowseProvider = {
       p_zero_discount_only: true,
       p_min_discount: 0,
     };
-    const runPassC = sortIsDiscountBiased && userFloorAllowsZero;
+    /* Pass C runs whenever the user's tier floor allows 0% rows.
+       Previously gated behind `sortIsDiscountBiased` too, on the
+       theory that sort=newest already surfaces 0% rows naturally
+       (they're competing on freshness). But that gate meant
+       sort=newest was capped at ~1000 unique local rows (Pass A
+       alone) — user report: '/ng/deals?sort=newest shows exactly
+       1000 local'. Lifting the gate gives sort=newest a second
+       1000-row fan-out via Pass C; rows that fall below position
+       1000 in Pass A's scraped_at order but are 0%-discount can
+       still surface. ~500-1000 extra unique rows after dedup. */
+    const runPassC = userFloorAllowsZero;
 
     /* All three RPC calls in parallel, plus the popularity record. */
     const [passAResult, passBResult, passCResult, popularity] = await Promise.all([
@@ -460,14 +470,44 @@ export const dbBrowseProvider: BrowseProvider = {
       return { all: rows.length, local, intl };
     }
 
-    /* BROWSE PATH: no search query. Three head-count queries —
-       cheap, exact, no row payload transferred. */
+    /* BROWSE PATH: no search query. Head-count queries — cheap,
+       exact, no row payload, NOT subject to the db-max-rows=1000
+       cap that affects ROW responses.
+
+       Country-aware when q.country is set. The pill needs to
+       reflect what the user can actually shop:
+         local = store_country = USER_COUNTRY
+                 (NG-anchored stores for NG visitor, UK-anchored
+                 for UK visitor, etc.)
+         intl  = is_international = true
+                 (cross-border globals — AliExpress, Shein,
+                 DHgate, plus any USD-priced retailer ingested
+                 with is_international=true)
+
+       Approximation: a UK retailer ingested USD-anchored could
+       appear in both buckets. Acceptable for the pill — the
+       displayed list still goes through filterDealsForCountry's
+       full allowlist + roster logic.
+
+       Country-blind fallback for callers that don't pass country
+       (legacy / tests). */
     const baseFilter = (qb: ReturnType<typeof supa.from>) => {
       let chain = qb.select("*", { count: "exact", head: true });
       if (q.categorySlug && q.categorySlug !== "all") chain = chain.eq("category_slug", q.categorySlug);
-      if (typeof q.minDiscount === "number") chain = chain.gte("discount_percent", q.minDiscount);
+      if (typeof q.minDiscount === "number" && q.minDiscount > 0) chain = chain.gte("discount_percent", q.minDiscount);
       return chain;
     };
+
+    const userCountry = q.country?.toUpperCase();
+    if (userCountry) {
+      const [localRes, intlRes] = await Promise.all([
+        baseFilter(supa.from("product_best_offers")).eq("store_country", userCountry),
+        baseFilter(supa.from("product_best_offers")).eq("is_international", true),
+      ]);
+      const local = localRes.count ?? 0;
+      const intl  = intlRes.count  ?? 0;
+      return { all: local + intl, local, intl };
+    }
 
     const [allRes, localRes, intlRes] = await Promise.all([
       baseFilter(supa.from("product_best_offers")),
