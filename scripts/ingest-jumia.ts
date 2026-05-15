@@ -30,7 +30,140 @@ try {
 
 import { jumiaSerpapiProvider } from "../src/lib/providers/search-jumia-serpapi";
 import { ingestDeals } from "../src/lib/providers/ingestion";
+import { getSupabaseAdmin } from "../src/lib/providers/db-client";
 import type { Deal } from "../src/types";
+
+const SERPAPI_ENDPOINT = "https://serpapi.com/search.json";
+
+/* Canonicalise a Jumia URL by stripping Google tracking params so
+   the URL keys in google_images results match what's in our DB.
+   Mirrors the helper in search-jumia-serpapi.ts. */
+function canonicaliseJumiaUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.delete("srsltid");
+    u.searchParams.delete("gclid");
+    u.searchParams.delete("gad_source");
+    u.searchParams.delete("utm_source");
+    u.searchParams.delete("utm_medium");
+    u.searchParams.delete("utm_campaign");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+interface GoogleImagesResult {
+  link?:     string;
+  original?: string;
+}
+
+/* Image backfill for niche Jumia products that didn't match the
+   site-wide google_images call during the main ingest pass.
+
+   Why this is needed: the main ingest fires ONE google_images call
+   per curated query (e.g. "iPhone 15 site:jumia.com.ng"). That
+   returns the top 100 product images for the query. Niche products
+   that exist on Jumia but rank low in image-search results
+   (Microsoft Micro Innovations Xbox variants, Scanfrost twin-tub
+   washing machines, etc.) don't get matched and land with null
+   image_url. The 22% miss rate the user reported.
+
+   Fix: after the main ingest, scan for Jumia rows with no image,
+   fire a TARGETED google_images call with the product's exact
+   title plus site:jumia.com.ng. Take the first jumia.is image
+   returned. Updates products.image_url directly.
+
+   Cost: one SerpAPI credit per missing product (~$0.005). Typical
+   backfill batch: 20-30 missing products = $0.10-$0.15 per run.
+   Trivial against the main ingest's 58-credit cost. */
+async function fetchImageForTitle(title: string, apiKey: string): Promise<string | null> {
+  const url = new URL(SERPAPI_ENDPOINT);
+  url.searchParams.set("engine", "google_images");
+  url.searchParams.set("q", `${title} site:jumia.com.ng`);
+  url.searchParams.set("gl", "ng");
+  url.searchParams.set("hl", "en");
+  url.searchParams.set("api_key", apiKey);
+
+  try {
+    const res = await fetch(url.toString());
+    if (!res.ok) return null;
+    const data = await res.json() as { images_results?: GoogleImagesResult[]; error?: string };
+    if (data.error) return null;
+    /* Prefer ng.jumia.is CDN images over Google Shopping thumbnails
+       (encrypted-tbn0.gstatic.com) — the direct CDN URLs are stable
+       and high-quality 500x500 / 680x680 product photos. Google
+       thumbnails expire and reference Google's CDN rather than
+       Jumia's. */
+    for (const img of data.images_results ?? []) {
+      if (img.original?.includes("jumia.is")) return img.original;
+    }
+    /* Fallback: first non-empty original image, even if it's a
+       Google Shopping thumbnail. Better than no image. */
+    for (const img of data.images_results ?? []) {
+      if (img.original) return img.original;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function backfillJumiaImages(apiKey: string): Promise<{ scanned: number; filled: number; errors: number }> {
+  const supa = getSupabaseAdmin();
+  if (!supa) return { scanned: 0, filled: 0, errors: 0 };
+
+  /* Find products that:
+       (a) have at least one in-stock Jumia offer, AND
+       (b) have null image_url in the products row.
+     Two-step query because Supabase JS can't filter by a foreign
+     table's column in one shot when we want the product row back.
+
+     Step 1: pull distinct product_ids from offers where
+             store_id = 'jumia' AND in_stock = true.
+     Step 2: query products where id IN (those) AND image_url IS NULL. */
+  const { data: offers } = await supa
+    .from("offers")
+    .select("product_id")
+    .eq("store_id", "jumia")
+    .eq("in_stock", true);
+
+  const ids = Array.from(new Set((offers ?? []).map((o: { product_id: string }) => o.product_id))).filter(Boolean);
+  if (ids.length === 0) return { scanned: 0, filled: 0, errors: 0 };
+
+  const { data: products } = await supa
+    .from("products")
+    .select("id, title")
+    .in("id", ids)
+    .is("image_url", null);
+
+  const missing = (products ?? []) as Array<{ id: string; title: string }>;
+  if (missing.length === 0) return { scanned: 0, filled: 0, errors: 0 };
+
+  console.log(`\n▶ Image backfill — ${missing.length} Jumia products missing image_url`);
+
+  let filled = 0;
+  let errors = 0;
+  /* Sequential — keeps SerpAPI request rate gentle. Per-product
+     calls are quick (~500ms), so 20-30 sequential takes ~15s. */
+  for (const p of missing) {
+    const img = await fetchImageForTitle(p.title, apiKey);
+    if (img) {
+      const { error } = await supa.from("products").update({ image_url: img }).eq("id", p.id);
+      if (error) {
+        errors++;
+        console.warn(`  ✗ ${p.title.slice(0, 60)} — update failed: ${error.message}`);
+      } else {
+        filled++;
+        console.log(`  ✓ ${p.title.slice(0, 60)}`);
+      }
+    } else {
+      console.log(`  · ${p.title.slice(0, 60)} — no image found`);
+    }
+  }
+
+  return { scanned: missing.length, filled, errors };
+}
 
 /* ── Curated NG query list ────────────────────────────────────────
    Each entry runs ONE SerpAPI call. Categories chosen to cover
@@ -198,6 +331,22 @@ async function main(): Promise<void> {
   const elapsedSec = Math.round((Date.now() - startedAt) / 1000);
   console.log("");
   console.log(`✓ Jumia ingest complete in ${elapsedSec}s — fetched=${totalFetched} kept=${totalKept} upserted=${totalUpserted} errors=${totalErrors}`);
+
+  /* Image backfill — runs after the main ingest so it catches BOTH
+     fresh upserts that didn't match the broad google_images call
+     AND historical rows from earlier ingest cycles that still lack
+     images. ~$0.10 per cycle on the Plus plan. */
+  const apiKey = process.env.SERPAPI_KEY?.trim();
+  if (apiKey) {
+    try {
+      const stats = await backfillJumiaImages(apiKey);
+      if (stats.scanned > 0) {
+        console.log(`✓ Image backfill — scanned=${stats.scanned} filled=${stats.filled} errors=${stats.errors}`);
+      }
+    } catch (err) {
+      console.warn("✗ Image backfill failed:", err instanceof Error ? err.message : String(err));
+    }
+  }
 }
 
 main().catch((err) => {
