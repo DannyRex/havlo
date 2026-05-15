@@ -475,22 +475,31 @@ export const dbBrowseProvider: BrowseProvider = {
        cap that affects ROW responses.
 
        Country-aware when q.country is set. The pill needs to
-       reflect what the user can actually shop:
+       reflect what the user can actually shop, not the entire
+       catalog:
          local = store_country = USER_COUNTRY
                  (NG-anchored stores for NG visitor, UK-anchored
                  for UK visitor, etc.)
-         intl  = is_international = true
-                 (cross-border globals — AliExpress, Shein,
-                 DHgate, plus any USD-priced retailer ingested
-                 with is_international=true)
+         intl  = is_international = true AND store_country IS NULL
+                 (TRUE cross-border globals only — AliExpress,
+                 Shein, Temu, DHgate, Banggood. Stores anchored
+                 to ANOTHER country — UK retailers for NG
+                 visitors, US retailers for UK visitors — are
+                 excluded because they don't realistically ship
+                 to the visitor's market.)
 
-       Approximation: a UK retailer ingested USD-anchored could
-       appear in both buckets. Acceptable for the pill — the
-       displayed list still goes through filterDealsForCountry's
-       full allowlist + roster logic.
+       Why this tightening matters: the previous version counted
+       every is_international=true row as "intl", which for NG
+       included 2,590 UK-anchored + 509 US-anchored + other
+       foreign retailers (3,500+ rows the NG shopper can't
+       actually use). User report: "ng is showing 11,915 deals
+       total, 2,525 local. that cant be, can it?" — right, the
+       11,915 included foreign-shoppable inventory. Now it shows
+       only the genuinely cross-border-shoppable globals.
 
-       Country-blind fallback for callers that don't pass country
-       (legacy / tests). */
+       Country-blind fallback (no q.country) still uses the broad
+       is_international counts — primarily for tests / legacy
+       callers. */
     const baseFilter = (qb: ReturnType<typeof supa.from>) => {
       let chain = qb.select("*", { count: "exact", head: true });
       if (q.categorySlug && q.categorySlug !== "all") chain = chain.eq("category_slug", q.categorySlug);
@@ -502,7 +511,11 @@ export const dbBrowseProvider: BrowseProvider = {
     if (userCountry) {
       const [localRes, intlRes] = await Promise.all([
         baseFilter(supa.from("product_best_offers")).eq("store_country", userCountry),
-        baseFilter(supa.from("product_best_offers")).eq("is_international", true),
+        /* True cross-border globals only: is_international=true
+           with no anchored country. Excludes foreign-country-
+           anchored retailers that don't realistically ship to
+           the visitor's market. */
+        baseFilter(supa.from("product_best_offers")).eq("is_international", true).is("store_country", null),
       ]);
       const local = localRes.count ?? 0;
       const intl  = intlRes.count  ?? 0;
