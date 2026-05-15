@@ -19,7 +19,19 @@
 
 import type { StoreOffer } from "@/lib/search";
 import { type Country, isOfferAllowedForCountry } from "@/lib/country";
-import { effectiveLandedPrice } from "@/lib/landed-price";
+import { effectiveLandedPrice, isCrossBorderForUser } from "@/lib/landed-price";
+
+/* Per-store summary the new PriceComparisonBar needs to plot dots
+   along the spectrum. One row per distinct store remaining after
+   the country + same-store-same-price dedup pass. */
+export interface PerStoreOffer {
+  storeId:       string;
+  storeName:     string;
+  storeLogoUrl:  string;
+  effectiveNgn:  number;       // country-aware (local: base; intl: landed)
+  isCrossBorder: boolean;      // for the visitor specifically
+  offerId:       string;       // for "cheaper at [Store]" deep-link
+}
 
 export interface AnchorStats {
   /** Unique-stores count for the "Compare prices across N stores" CTA.
@@ -27,17 +39,22 @@ export interface AnchorStats {
       from pgFtsAnchorOffersByProductId) still render a sensible
       label. */
   totalStores: number;
-  /** Price-comparison-bar stats. Undefined when the anchor has ≤ 1
-      offer after filtering — the bar's single-store path activates
-      via the absence of this prop. */
+  /** Price-comparison-bar summary stats. Undefined when the anchor
+      has ≤ 1 offer after filtering — the bar's single-store path
+      activates via the absence of this prop. */
   priceStats: {
     thisPriceNgn: number;
     lowest:  number;
     highest: number;
-    /** OTHER stores compared (excludes the anchor offer itself), per
-        the bar's prop contract. */
+    /** OTHER stores compared (excludes the anchor offer itself). */
     count:   number;
   } | undefined;
+  /** Per-store rows for the new bar's store-dot plotting. Always
+      present even when there's only 1 row (single-store path uses
+      this for the "you are at <Store>" labelling). Sorted cheapest
+      first by effectiveNgn so cheapest-store lookups are
+      O(1) via perStoreOffers[0]. */
+  perStoreOffers: PerStoreOffer[];
 }
 
 /* Same-store + same-effective-price dedup — country-aware via
@@ -85,9 +102,25 @@ export function computeAnchorStats(
 
   const deduped = dedupAnchorOffers(countryFiltered, country);
 
-  const effectives = deduped
-    .map((o) => effectiveLandedPrice(o, country))
-    .filter((p) => p > 0);
+  /* Per-store rows for the new PriceComparisonBar. Sorted cheapest
+     first so the bar can plot dots in display order and the
+     'cheapest at [Store]' lookup is perStoreOffers[0].
+     effectiveNgn is country-aware via effectiveLandedPrice — local
+     stores show base price, cross-border show landed (+ ~30%
+     shipping/customs estimate). */
+  const perStoreOffers: PerStoreOffer[] = deduped
+    .map((o) => ({
+      storeId:       o.storeId,
+      storeName:     o.storeName,
+      storeLogoUrl:  o.storeLogoUrl,
+      effectiveNgn:  effectiveLandedPrice(o, country),
+      isCrossBorder: isCrossBorderForUser(o, country),
+      offerId:       o.offerId,
+    }))
+    .filter((r) => r.effectiveNgn > 0)
+    .sort((a, b) => a.effectiveNgn - b.effectiveNgn);
+
+  const effectives = perStoreOffers.map((r) => r.effectiveNgn);
 
   return {
     totalStores: Math.max(1, deduped.length),
@@ -99,5 +132,6 @@ export function computeAnchorStats(
           count:   effectives.length - 1,
         }
       : undefined,
+    perStoreOffers,
   };
 }

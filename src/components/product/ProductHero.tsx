@@ -25,6 +25,8 @@ import {
 } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import PriceComparisonBar from "@/components/product/PriceComparisonBar";
+import type { PerStoreOffer } from "@/lib/pdp-stats";
+import type { PriceHistorySummary } from "@/lib/search/price-history";
 import {
   USD_FX,
   formatLocal,
@@ -67,20 +69,16 @@ interface Props {
       Drives the "Compare prices across N stores" CTA label so the
       user knows how much broader the compare view is than the PDP. */
   totalStores?: number;
-  /** Stats for the price-vs-market bar. Computed in the page from
-      the dupes data. ALL VALUES IN NGN — pgFtsFindDupes already
-      normalises landedPrice via priceInNgn, and the page coerces
-      the anchor's USD-stored price to NGN before mixing. The bar's
-      formatPriceForUser handles the user-currency conversion at
-      render time, so passing user-currency values here would
-      double-convert and round to 0 (May 2026 bug). When undefined,
-      the bar renders the "single-store" / "no comparison" variant. */
-  priceStats?: {
-    thisPriceNgn: number;  // anchor price normalised to NGN
-    lowest:  number;       // NGN
-    highest: number;       // NGN
-    count:   number;       // OTHER stores compared (excludes anchor)
-  };
+  /** Per-store breakdown for the new PriceComparisonBar (store dots
+      + cheapest-at action + verdict math). All effective prices are
+      country-aware NGN — formatPriceForUser converts at render time.
+      Empty array when the anchor pool is empty (curated PDPs with
+      synthetic product_id). */
+  perStoreOffers?: PerStoreOffer[];
+  /** Price history summary — drives "all-time low" + "this store's
+      lowest" callouts on the bar. Undefined when product_price_history
+      RPC is unavailable or the product has no history rows yet. */
+  priceHistory?: PriceHistorySummary;
 }
 
 /* Convert any price (NGN or USD) to the user's preferred currency.
@@ -100,7 +98,7 @@ function convertToUserCurrency(
   return country.currency === "USD" ? Math.round(out * 100) / 100 : Math.round(out);
 }
 
-export default function ProductHero({ offer, countryCode, totalStores, priceStats }: Props) {
+export default function ProductHero({ offer, countryCode, totalStores, perStoreOffers, priceHistory }: Props) {
   const country = getCountry(countryCode);
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -385,14 +383,29 @@ export default function ProductHero({ offer, countryCode, totalStores, priceStat
             the last time I or havlo checked it?" — fixed via
             "Verified by Havlo" labelling inside the bar. */}
         <PriceComparisonBar
-          thisPriceNgn={priceStats?.thisPriceNgn ?? anchorPriceNgn}
-          lowestPriceNgn={priceStats?.lowest ?? anchorPriceNgn}
-          highestPriceNgn={priceStats?.highest ?? anchorPriceNgn}
-          comparedStoreCount={priceStats?.count ?? 0}
+          thisPriceNgn={anchorPriceNgn}
+          /* Original price → MSRP tick mark on the spectrum.
+             Normalised to NGN inline; the bar only renders the
+             tick when originalPriceNgn > thisPriceNgn. */
+          originalPriceNgn={
+            offer.originalPrice && offer.originalPrice > 0
+              ? (offer.currency === "USD"
+                  ? Math.round(offer.originalPrice * USD_FX.NGN)
+                  : offer.originalPrice)
+              : undefined
+          }
+          thisStoreId={offer.storeId}
+          thisStoreName={displayStore}
+          thisIsCrossBorder={isCrossBorder}
           country={country}
+          perStoreOffers={perStoreOffers ?? []}
+          priceHistory={priceHistory}
           lastCheckedAt={offer.scrapedAt}
           storeCountry={dealStoreCountry}
           outOfStock={offer.inStock === false}
+          countryCode={countryCode}
+          productId={offer.productId}
+          productSearchTitle={offer.title}
         />
       </div>
     </section>

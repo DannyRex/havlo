@@ -38,6 +38,7 @@ import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { pgFtsFindDupes, pgFtsAnchorOffersByProductId } from "@/lib/search/pg-fts";
 import { isOfferAllowedForCountry, filterDealsForCountry } from "@/lib/country";
 import { computeAnchorStats } from "@/lib/pdp-stats";
+import { fetchProductPriceHistory, rollupPriceHistory } from "@/lib/search/price-history";
 import { usdToNgn } from "@/lib/utils";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 import { getActiveBrowseProvider } from "@/lib/providers";
@@ -599,11 +600,32 @@ export default async function ProductPage({ params }: PageProps) {
      anchorOffers is fetched in parallel with dupes above
      (Promise.all) so the two reads complete in one network
      round-trip rather than two serial ones. */
-  const { totalStores, priceStats } = computeAnchorStats(
+  const { totalStores, perStoreOffers } = computeAnchorStats(
     anchorOffers,
     anchorPriceNgn,
     country,
   );
+
+  /* Price-history rollup for the new bar's "lowest tracked / at
+     this store: £X" callouts. Cached at 5min — same window as the
+     dupes + anchor caches so the spectrum doesn't drift further
+     than the rest of the page.
+
+     fetchProductPriceHistory returns null when the migration
+     hasn't been applied or the product has no history rows yet
+     (curated synthetic-ids). In both cases the bar falls back to
+     the current-prices-only spectrum gracefully. */
+  const fetchPriceHistoryCached = unstable_cache(
+    async (productId: string) => fetchProductPriceHistory(productId, 90),
+    ["pdp-price-history"],
+    { revalidate: 300, tags: ["pdp-price-history"] },
+  );
+  const priceHistoryRows = offer.product_id
+    ? await fetchPriceHistoryCached(offer.product_id)
+    : null;
+  const priceHistorySummary = priceHistoryRows
+    ? rollupPriceHistory(priceHistoryRows, offer.store_id, usdToNgn) ?? undefined
+    : undefined;
   const breadcrumb = buildBreadcrumbList([
     { name: "Havlo",          url: `${SITE_URL}/${country.code}` },
     { name: country.name,     url: `${SITE_URL}/${country.code}` },
@@ -656,7 +678,8 @@ export default async function ProductPage({ params }: PageProps) {
           offer={heroData}
           countryCode={country.code}
           totalStores={totalStores}
-          priceStats={priceStats}
+          perStoreOffers={perStoreOffers}
+          priceHistory={priceHistorySummary}
         />
 
         {filteredDupes.length > 0 ? (
