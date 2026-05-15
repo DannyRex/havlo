@@ -297,7 +297,7 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
           rel="noopener noreferrer sponsored"
           className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-ink text-bg font-semibold text-[15px] hover:opacity-90 transition-opacity mb-3"
         >
-          View at {displayStore}
+          Visit {displayStore}
           <ExternalLink size={16} aria-hidden="true" />
         </a>
 
@@ -384,16 +384,6 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             "Verified by Havlo" labelling inside the bar. */}
         <PriceComparisonBar
           thisPriceNgn={anchorPriceNgn}
-          /* Original price → MSRP tick mark on the spectrum.
-             Normalised to NGN inline; the bar only renders the
-             tick when originalPriceNgn > thisPriceNgn. */
-          originalPriceNgn={
-            offer.originalPrice && offer.originalPrice > 0
-              ? (offer.currency === "USD"
-                  ? Math.round(offer.originalPrice * USD_FX.NGN)
-                  : offer.originalPrice)
-              : undefined
-          }
           thisStoreId={offer.storeId}
           thisStoreName={displayStore}
           thisIsCrossBorder={isCrossBorder}

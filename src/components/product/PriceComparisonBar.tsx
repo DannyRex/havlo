@@ -48,11 +48,6 @@ interface Props {
   /** The visiting offer's price in NGN — the marker position
       anchor. */
   thisPriceNgn:        number;
-  /** Original (MSRP) price for the visiting offer in NGN. When
-      present and > thisPriceNgn, the bar renders a vertical tick
-      mark on the spectrum at the MSRP position so the user sees
-      "this is on sale from the merchant's own listed price". */
-  originalPriceNgn?:   number;
   /** Store the visitor is currently looking at. Highlighted on the
       bar with the triangle marker + store-name label. */
   thisStoreId:         string;
@@ -91,7 +86,6 @@ const DOT_PIXEL_SIZE     = 8;       // hit-target size for hover/tap
 
 export default function PriceComparisonBar({
   thisPriceNgn,
-  originalPriceNgn,
   thisStoreId,
   thisStoreName,
   thisIsCrossBorder,
@@ -166,16 +160,14 @@ export default function PriceComparisonBar({
      fully on-bar at extreme positions. */
   const markerLeftPct = Math.max(TRIANGLE_INSET_PCT, Math.min(100 - TRIANGLE_INSET_PCT, offset * 100));
 
-  /* MSRP tick — only renders when original > current. Position on
-     the spectrum is clamped the same way; the line is purely
-     informational ("listed at £X"). */
-  const showMsrp = typeof originalPriceNgn === "number"
-    && originalPriceNgn > thisPriceNgn
-    && originalPriceNgn >= lowestPriceNgn   // doesn't make sense to plot below the floor
-    && originalPriceNgn <= highestPriceNgn * 1.5; // tolerance for above-range MSRP
-  const msrpLeftPct = showMsrp
-    ? Math.max(0, Math.min(100, positionOf(Math.min(originalPriceNgn!, highestPriceNgn)) * 100))
-    : 0;
+  /* MSRP tick removed (May 2026). The ProductHero already shows
+     the strikethrough "£60 £80 You save £20" treatment in the
+     hero price block, which conveys the discount cleanly.
+     Plotting the same number as a tick on the spectrum carried
+     ambiguous labelling ("MSRP" → jargon; "List price" → users
+     read it as "average price across stores"). Dropped the tick
+     entirely; the bar now focuses on per-store CURRENT prices
+     only. */
 
   /* ── Verdict ───────────────────────────────────────────────────
      Headline + color + marker tone. Three-bucket green/amber/red
@@ -321,20 +313,6 @@ export default function PriceComparisonBar({
           </svg>
         </div>
 
-        {/* MSRP tick — vertical line at the merchant's listed
-            price. Sits above the gradient with a small label so
-            the user reads "Listed: £X · You're paying £Y" at a
-            glance. Hidden when MSRP isn't meaningfully higher. */}
-        {showMsrp && (
-          <div
-            className="absolute -top-1 z-10 pointer-events-none"
-            style={{ left: `${msrpLeftPct}%` }}
-            aria-hidden="true"
-          >
-            <div className="w-px h-4 bg-ink-3/60 mx-auto" />
-          </div>
-        )}
-
         {/* Bar itself + dots underneath */}
         <div
           className="relative h-2 rounded-full overflow-visible"
@@ -470,11 +448,6 @@ export default function PriceComparisonBar({
             {formatPriceForUser(lowestPriceNgn, country)}
             <span className="ml-1 opacity-70">cheapest</span>
           </span>
-          {showMsrp && (
-            <span className="opacity-70 text-[10px]">
-              List price {formatPriceForUser(originalPriceNgn!, country)}
-            </span>
-          )}
           <span>
             {formatPriceForUser(highestPriceNgn, country)}
             <span className="ml-1 opacity-70">highest</span>
