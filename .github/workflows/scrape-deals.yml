@@ -202,6 +202,38 @@ jobs:
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
         run: npm run ingest -- --limit=50
 
+  # ── Job 4a: Jumia ingest via SerpAPI's dedicated `engine=jumia`.
+  #           Replaces the Playwright Jumia scraper which Cloudflare
+  #           defeats. Runs in parallel with the other ingest jobs.
+  #           ~17 SerpAPI credits per run (curated NG query list —
+  #           phones, computing, electronics, audio, appliances,
+  #           fashion, beauty, gaming). Twice-weekly cron = ~34/month,
+  #           fits comfortably under the Starter plan budget. ──
+  ingest-jumia:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SERPAPI_KEY:                ${{ secrets.SERPAPI_KEY }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Ingest Jumia deals (SerpAPI engine=jumia) → Supabase
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
+        run: npm run ingest:jumia
+
   # ── Job 4: UK retailer-biased SerpAPI ingest. Standard ingest above
   #          uses category names ("Phones", "Laptops") which Google
   #          Shopping UK ranks Amazon-first for, leaving the UK pool
@@ -249,7 +281,7 @@ jobs:
   #          ingest failed — better to dedup the partial catalog than
   #          skip the merge entirely. ──
   dedup:
-    needs: [scrape, ingest-aliexpress, ingest-serpapi, ingest-uk-retailers]
+    needs: [scrape, ingest-aliexpress, ingest-serpapi, ingest-uk-retailers, ingest-jumia]
     # success() || failure() runs dedup whenever the workflow ran to
     # completion (any combo of pass/fail across upstream jobs), but
     # NOT when the workflow was manually cancelled — that would waste
@@ -285,7 +317,7 @@ jobs:
   #          a digest is preferable to sending one built from
   #          partial / failed data.
   send-newsletter:
-    needs: [scrape, ingest-aliexpress, ingest-serpapi, ingest-uk-retailers, dedup]
+    needs: [scrape, ingest-aliexpress, ingest-serpapi, ingest-uk-retailers, ingest-jumia, dedup]
     if: success()
     runs-on: ubuntu-latest
     timeout-minutes: 15
