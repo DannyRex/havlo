@@ -37,7 +37,8 @@
    country-aware via effectiveLandedPrice. */
 
 import Link from "next/link";
-import { Check, Globe, AlertCircle, TrendingDown, Award, Sparkles, ArrowRight } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Globe, AlertCircle, TrendingDown, Award, Sparkles, ArrowRight, Plane } from "lucide-react";
 import { formatPriceForUser, timeAgo } from "@/lib/utils";
 import { type Country } from "@/lib/country";
 import type { PerStoreOffer } from "@/lib/pdp-stats";
@@ -104,6 +105,26 @@ export default function PriceComparisonBar({
   productId,
   productSearchTitle,
 }: Props) {
+  /* Tap-to-reveal popover for per-store dots. Desktop hovers don't
+     surface store info clearly (the native title= tooltip is
+     unreliable on touch). Now: every dot is a real button; tapping
+     opens a small popover above the spectrum with store name +
+     price + cross-border flag. Tapping another dot moves the
+     popover; tapping outside closes it. Works on both mobile and
+     desktop with a single interaction model. */
+  const [activeDotStoreId, setActiveDotStoreId] = useState<string | null>(null);
+  const barWrapperRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!activeDotStoreId) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!barWrapperRef.current?.contains(e.target as Node)) {
+        setActiveDotStoreId(null);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [activeDotStoreId]);
+
   /* Out-of-stock takes priority over price comparison — there's no
      point ranking the price of an unavailable item. */
   if (outOfStock) {
@@ -282,7 +303,7 @@ export default function PriceComparisonBar({
       </div>
 
       {/* ── The bar ─────────────────────────────────────────────── */}
-      <div className="relative mb-2">
+      <div className="relative mb-2" ref={barWrapperRef}>
         {/* Triangle marker — visiting store, positioned above the bar */}
         <div
           className={`absolute top-0 -translate-x-1/2 -translate-y-[10px] z-20 pointer-events-none ${verdict.markerFill}`}
@@ -334,31 +355,86 @@ export default function PriceComparisonBar({
           {/* Per-store dots — every other store rendered at its
               effective-price position. Visiting store's dot is
               skipped because the triangle marker above represents
-              it. Each dot carries a title attribute so hovering on
-              desktop reveals the store + price. */}
+              it. Each dot is a <button> with a 28×28 hit target so
+              taps register reliably on mobile (Apple HIG: min
+              44px; we get to 28 with the surrounding bar margin
+              extending the practical hit zone). Tapping opens the
+              popover above the bar with store name + price +
+              cross-border flag. */}
           {!isSingleStore && perStoreOffers.map((row) => {
             if (row.storeId === thisStoreId) return null;
             const pos = positionOf(row.effectiveNgn);
             const left = Math.max(DOT_INSET_PCT, Math.min(100 - DOT_INSET_PCT, pos * 100));
             const isCheapestDot = row.storeId === cheapest?.storeId;
+            const isActive      = activeDotStoreId === row.storeId;
             return (
-              <div
+              <button
                 key={row.storeId}
-                className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-auto z-10 transition-transform hover:scale-125 ${
-                  isCheapestDot
-                    ? "bg-emerald-700 ring-2 ring-white/90"
-                    : "bg-ink/70 ring-2 ring-white/70"
-                }`}
-                style={{
-                  left:   `${left}%`,
-                  width:  `${DOT_PIXEL_SIZE}px`,
-                  height: `${DOT_PIXEL_SIZE}px`,
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveDotStoreId(isActive ? null : row.storeId);
                 }}
-                title={`${row.storeName}: ${formatPriceForUser(row.effectiveNgn, country)}${row.isCrossBorder ? " (cross-border)" : ""}`}
+                className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center pointer-events-auto z-10 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                style={{ left: `${left}%` }}
                 aria-label={`${row.storeName} at ${formatPriceForUser(row.effectiveNgn, country)}`}
-              />
+                aria-pressed={isActive}
+              >
+                <span
+                  className={`block rounded-full transition-all ${
+                    isCheapestDot
+                      ? "bg-emerald-700 ring-2 ring-white/90"
+                      : "bg-ink/70 ring-2 ring-white/70"
+                  } ${isActive ? "scale-150" : "hover:scale-125"}`}
+                  style={{
+                    width:  `${DOT_PIXEL_SIZE}px`,
+                    height: `${DOT_PIXEL_SIZE}px`,
+                  }}
+                  aria-hidden="true"
+                />
+              </button>
             );
           })}
+
+          {/* Per-store popover — renders above the active dot with
+              store name + effective price + cross-border flag. The
+              popover position mirrors the active dot's left% so
+              it sits directly above. -top-14 leaves room for the
+              triangle marker that lives at -top-3. The translate-x
+              auto-centers; clamping the position at extremes
+              (3-97%) keeps the popover on-screen even at the
+              ends of the bar. */}
+          {!isSingleStore && activeDotStoreId && (() => {
+            const row = perStoreOffers.find((r) => r.storeId === activeDotStoreId);
+            if (!row || row.storeId === thisStoreId) return null;
+            const pos = positionOf(row.effectiveNgn);
+            const left = Math.max(DOT_INSET_PCT, Math.min(100 - DOT_INSET_PCT, pos * 100));
+            return (
+              <div
+                role="dialog"
+                aria-label={`${row.storeName} details`}
+                className="absolute -top-16 -translate-x-1/2 z-30 rounded-lg bg-ink text-bg px-2.5 py-1.5 shadow-[0_6px_18px_rgba(0,0,0,0.25)] whitespace-nowrap pointer-events-none"
+                style={{ left: `${left}%` }}
+              >
+                <p className="text-[11px] font-semibold leading-tight">
+                  {row.storeName}
+                </p>
+                <p className="text-[12px] tabular-nums font-bold leading-tight">
+                  {formatPriceForUser(row.effectiveNgn, country)}
+                </p>
+                {row.isCrossBorder && (
+                  <p className="text-[10px] text-amber-300 inline-flex items-center gap-1 mt-0.5 leading-tight">
+                    <Plane size={9} aria-hidden="true" /> Cross-border
+                  </p>
+                )}
+                {/* Tail pointing at the dot below */}
+                <span
+                  aria-hidden="true"
+                  className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 rotate-45 bg-ink"
+                />
+              </div>
+            );
+          })()}
         </div>
 
         {/* Visiting-store name label, positioned under the triangle

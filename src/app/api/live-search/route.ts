@@ -189,24 +189,28 @@ export async function GET(req: NextRequest) {
 
   const itemsForResponse = priceFiltered.slice(0, limit);
 
-  /* Write-back to DB — PAUSED May 2026 to relieve Supabase egress
-     pressure (account hit 127% of 5GB free-tier quota the day this
-     code shipped; the per-day egress chart spiked exactly when this
-     write-back went live).
+  /* Write-back to DB — RE-ENABLED May 2026 after user report
+     surfaced the core gap: /compare's "Live results" section was
+     finding similar products at different prices (e.g. multiple
+     Bestier desks across listings) but the PDP's price-spectrum
+     bar said "1 store · watching for more" because none of those
+     live rows were in the offers table.
 
-     What it did when enabled: each unique successful SerpAPI response
-     got persisted to the offers table, so future searches for the
-     same product hit our DB index instead of triggering another paid
-     SerpAPI call. The intent was right (turn one paid call into a
-     forever-cached row) but the cost showed up on the wrong line of
-     the bill: SerpAPI savings, Supabase egress hit. Re-enable only
-     after the egress budget is comfortably under quota AND there's a
-     measurable SerpAPI spend justifying the trade.
+     Persist turns each successful live SerpAPI response into a
+     row in products + offers via ingestDeals. Next PDP visit
+     pools those into the spectrum via pgFtsAnchorOffersByProductId
+     + variant matching. Effectively: one paid SerpAPI call
+     enriches the catalog for every future visitor.
 
-     The edge cache below still gives us the headline cost win for
-     hot queries — repeat searches inside a 1h window cost zero. */
-  void persistLiveResults; // referenced to keep import live; see comment above
-  if (false && priceFiltered.length > 0) {
+     Egress concern from the original pause: at the time, hot
+     queries were re-running every minute. Now the edge cache
+     below sits at 1h s-maxage + 24h SWR, so repeat-same-query
+     traffic doesn't multiply the write-back. ingestDeals'
+     onConflict=(store_id,url) upsert further collapses duplicates.
+
+     Fire-and-forget: not awaited. Failures log but don't block
+     the user response — the live-results UI still renders. */
+  if (priceFiltered.length > 0) {
     void persistLiveResults(q, countryCode, priceFiltered);
   }
 

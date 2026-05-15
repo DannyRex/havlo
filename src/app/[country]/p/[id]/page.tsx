@@ -283,10 +283,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
    has no row for that ID and fetchOffer returns null, which used
    to call notFound() and return a hard 404.
 
-   Live-search synthetic IDs aren't persisted (live-search persist
-   is paused for Supabase egress), so we can't recover the
-   product data without re-running the SerpAPI / AliExpress query.
-   Best-effort UX: redirect to /deals so the visitor sees real
+   Live-search synthetic IDs aren't directly persisted under that
+   id — when persist re-enables (now active per /api/live-search),
+   the underlying offer lands in the offers table with the real
+   storeId + url, but the synthetic `serp-<run>-<i>` id never
+   becomes a stable key. Best-effort UX: redirect to /deals so
+   the visitor sees real
    products instead of a 404 dead end. The route's metadata stays
    noindex so Google doesn't have us indexing dead URLs anyway. */
 const SYNTHETIC_PDP_PREFIXES = ["aliex-", "paapi-", "konga-", "serp-"];
