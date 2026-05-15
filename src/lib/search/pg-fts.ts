@@ -311,7 +311,7 @@ function ftsRowToSingleOffer(r: FtsRow): StoreOffer {
    "iPhone 15 - 128GB" case still merges because both sides parse
    to "apple|iphone15|128". The "Nike Dunk Low" case stops merging
    because its signature is "nike|?" and the helper returns false. */
-function isSignatureTightEnoughForPooling(sig: string | null | undefined): boolean {
+export function isSignatureTightEnoughForPooling(sig: string | null | undefined): boolean {
   if (!sig) return false;
   const parts = sig.split("|");
   if (parts.length < 2) return false;

@@ -22,6 +22,7 @@ import { buildSignature, extractedSignature, type ProductSignature } from "./nor
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { resolveStoreLogoUrl } from "@/lib/store-logo";
 import { isOfferAllowedForCountry, type Country } from "@/lib/country";
+import { isSignatureTightEnoughForPooling } from "./pg-fts";
 
 /* ── Public types ─────────────────────────────────────────────────── */
 
@@ -346,16 +347,24 @@ export async function suggest(
   }
 
   /* Step 2: gather all usable signatures, then fetch every product_id
-     that shares one. Treat "?|?" as solo — that's the placeholder
-     for "couldn't parse brand+model", so pooling those together
-     would mix unrelated products (the same bug fixed in pg-fts.ts
-     commit a34eb9d for the "10 Pcs Handi Set" case). */
-  /* Array.from(Map.values()) instead of for-of so the TS target in
+     that shares one.
+
+     Pool guard MUST match what pgFtsFindByProductId uses
+     (isSignatureTightEnoughForPooling — requires BOTH brand AND
+     model parsed). Earlier this used a looser `sig !== "?|?"` check
+     which accepted "apple|?" as poolable. Result: suggest's storeCount
+     pooled across siblings (e.g. "5 stores"), but clicking through to
+     /compare?pid=X ran tight-only pooling and got 0-1 stores →
+     "Nothing found" page. User saw the autocomplete promise broken
+     after every click. Aligning the guards makes the badge match
+     reality.
+
+     Array.from(Map.values()) instead of for-of so the TS target in
      this repo (downlevelIteration off) accepts it. forEach pattern
      matches what the older offer-count code used. */
   const usableSigs = new Set<string>();
   Array.from(sigByProductId.values()).forEach((sig) => {
-    if (sig && sig !== "?|?") usableSigs.add(sig);
+    if (sig && isSignatureTightEnoughForPooling(sig)) usableSigs.add(sig);
   });
   const siblingsBySig = new Map<string, string[]>();
   if (usableSigs.size > 0) {
@@ -371,11 +380,19 @@ export async function suggest(
     }
   }
 
-  /* Step 3: build the full pool per suggestion. */
+  /* Step 3: build the full pool per suggestion. Uses the same
+     tight-guard as siblingsBySig was built with, so the per-row
+     pool only includes siblings when the SIGNATURE is tight. Loose
+     signatures (apple|?, ?|model) get a solo pool (their offers
+     only) — exactly what /compare's pid path does. */
   const poolByProductId = new Map<string, string[]>();
   for (const r of rows) {
     const sig = sigByProductId.get(r.product_id);
-    if (sig && sig !== "?|?" && siblingsBySig.has(sig)) {
+    /* The guard returns true ONLY when sig is a non-null tight
+       signature — so we can safely treat sig as non-null inside
+       the branch. The explicit `sig &&` keeps TS happy without an
+       assertion. */
+    if (sig && isSignatureTightEnoughForPooling(sig) && siblingsBySig.has(sig)) {
       poolByProductId.set(r.product_id, siblingsBySig.get(sig)!);
     } else {
       poolByProductId.set(r.product_id, [r.product_id]);
@@ -432,26 +449,75 @@ export async function suggest(
     set.add(o.store_id);
   }
 
-  return rows
-    .map((r) => {
-      const pool = poolByProductId.get(r.product_id) ?? [r.product_id];
-      const stores = new Set<string>();
-      pool.forEach((pid) => {
-        const s = storesByProductId.get(pid);
-        if (s) Array.from(s).forEach((sid) => stores.add(sid));
+  /* Title-dedupe — the catalog can carry MULTIPLE products with the
+     same display title because dedup at ingest time keys on
+     signature, not title. Showing "Apple iPhone Air" four times in
+     a row with the same store badge is just visual noise — worse,
+     each row points at a DIFFERENT product_id and some are empty,
+     so the user lands on "Nothing found" half the time.
+
+     Strategy:
+       1. Iterate FTS rows in rank order (preserves Map insertion).
+       2. Group by normalized title (lowercased + punctuation
+          stripped + whitespace collapsed).
+       3. For each group: union the store sets across ALL its
+          product_ids — gives the most accurate "N stores carry
+          this product" badge regardless of catalog dedup state.
+       4. Pick the product_id with the HIGHEST per-product store
+          count as the click target — guarantees the user lands on
+          a /compare page that actually has offers.
+       5. Drop groups with 0 stores after country filter. */
+  const normaliseDisplayTitle = (t: string) =>
+    t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  interface GroupAccumulator {
+    title:        string;
+    bestKey:      string;
+    bestPerKey:   number;
+    mergedStores: Set<string>;
+  }
+  const groups = new Map<string, GroupAccumulator>();
+
+  for (const r of rows) {
+    /* cleanTitle strips HTML tags + collapses dirty separators so
+       autocomplete entries don't render with literal "<strong>"
+       text from DHgate / SerpAPI seller feeds. */
+    const displayTitle = cleanTitle(r.title);
+    const normKey      = normaliseDisplayTitle(displayTitle);
+
+    const pool = poolByProductId.get(r.product_id) ?? [r.product_id];
+    const stores = new Set<string>();
+    pool.forEach((pid) => {
+      const s = storesByProductId.get(pid);
+      if (s) Array.from(s).forEach((sid) => stores.add(sid));
+    });
+
+    const existing = groups.get(normKey);
+    if (!existing) {
+      groups.set(normKey, {
+        title:        displayTitle,
+        bestKey:      r.product_id,
+        bestPerKey:   stores.size,
+        mergedStores: new Set(stores),
       });
-      return {
-        /* cleanTitle strips HTML tags + collapses dirty separators
-           so autocomplete entries don't render with literal
-           "<strong>" text from DHgate / SerpAPI seller feeds. */
-        title: cleanTitle(r.title),
-        key: r.product_id,
-        storeCount: stores.size,
-      };
-    })
-    /* Drop suggestions with NO usable store after country filter.
-       Showing "0 stores" is meaningless and "1 store" lands on a
-       broken /compare. Keep only suggestions the user can actually
-       transact on. */
-    .filter((s) => s.storeCount >= 1);
+    } else {
+      /* Merge this product_id's stores into the group's union. */
+      stores.forEach((s) => existing.mergedStores.add(s));
+      /* Promote this product_id to click target if it has more
+         per-product stores than the current best. Ties keep the
+         FTS-rank-earlier product (first one seen). */
+      if (stores.size > existing.bestPerKey) {
+        existing.bestKey    = r.product_id;
+        existing.bestPerKey = stores.size;
+      }
+    }
+  }
+
+  return Array.from(groups.values())
+    .filter((g) => g.mergedStores.size >= 1)
+    .map((g) => ({
+      title:      g.title,
+      key:        g.bestKey,
+      storeCount: g.mergedStores.size,
+    }));
 }
