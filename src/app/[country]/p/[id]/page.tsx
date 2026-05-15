@@ -305,31 +305,43 @@ export default async function ProductPage({ params }: PageProps) {
   const offer = await fetchOffer(params.id);
   if (!offer) notFound();
 
-  /* Similar products via the dupes engine. anchorPriceNgn=0 means
-     "no price ceiling" — rank by FTS similarity alone. Previously
-     we passed the anchor's NGN price which silently hid every
-     candidate priced at or above the anchor, producing empty
-     alternative rails even when /deals showed multiple matches for
-     the same title (user report May 2026: "filter by iPhone 15 Pro
-     shows multiple products on /deals but PDP shows no cheaper
-     alternatives"). */
-  /* Cached dupes fetch — wraps pgFtsFindDupes in unstable_cache so
-     repeat PDP loads within the 5-minute window don't re-run the
-     FTS + per-product offer hydration. Cache key includes the
-     anchor title (the only thing the FTS query depends on). 5-min
-     TTL is tighter than the page's 1-hour ISR window, so the cache
-     can't drift further than the page itself.
+  /* Two independent Supabase reads — fired in parallel:
+       (a) cached dupes fetch (pgFtsFindDupes over the anchor title)
+       (b) cached anchor-pool fetch (this product + signature
+           siblings → store offers)
 
-     Limit halved from 16 → 8 May 2026 to relieve Supabase egress
-     (pgFtsFindDupes hydrates per-product offer rows). 8 hydrated
-     candidates is enough headroom for the country filter below to
-     drop a couple and still feel populated. */
+     Both are wrapped in unstable_cache so repeat PDP loads within
+     the 5-minute window skip the round-trip entirely. Cache keys
+     are scoped to the input identifiers; the country filter runs
+     AFTER cache lookup so country-specific dropping doesn't shard
+     the cache (one cached value serves all visitors, the filter
+     personalises at render). 5-min TTL is tighter than the page's
+     1-hour ISR so the cache can't drift further than the page.
+
+     anchorPriceNgn=0 in the dupes call means "no price ceiling" —
+     PDP 'You may also like' is a browse rail (broader than
+     /compare's strict cheaper-only rail). User report May 2026:
+     "filter by iPhone 15 Pro shows multiple products on /deals but
+     PDP shows no cheaper alternatives" — anchoring on the price
+     ceiling was hiding same-priced legit alternatives.
+
+     Dupes limit was halved from 16 → 8 (May 2026) to relieve
+     Supabase egress; 8 candidates leaves headroom for the country
+     filter to drop a couple while still feeling populated. */
   const fetchDupesCached = unstable_cache(
     async (title: string) => pgFtsFindDupes(title, 0, { limit: 8 }),
     ["pdp-dupes"],
     { revalidate: 300, tags: ["pdp-dupes"] },
   );
-  const dupes = await fetchDupesCached(offer.title);
+  const fetchAnchorOffersCached = unstable_cache(
+    async (productId: string) => pgFtsAnchorOffersByProductId(productId),
+    ["pdp-anchor-offers"],
+    { revalidate: 300, tags: ["pdp-anchor-offers"] },
+  );
+  const [dupes, anchorOffers] = await Promise.all([
+    fetchDupesCached(offer.title),
+    fetchAnchorOffersCached(offer.product_id),
+  ]);
 
   /* Drop dupe-offers from stores that aren't appropriate for the
      visitor's market (e.g. NG-anchored Konga rows on a UK PDP).
@@ -576,8 +588,11 @@ export default async function ProductPage({ params }: PageProps) {
      DB row) return an empty offer array from the helper. The
      fallback to 1 keeps the CTA copy correct ("Compare prices
      across stores" without a number) since the anchor at least
-     carries the curated offer itself. */
-  const anchorOffers = await pgFtsAnchorOffersByProductId(offer.product_id);
+     carries the curated offer itself.
+
+     anchorOffers is fetched in parallel with dupes above
+     (Promise.all) so the two reads complete in one network
+     round-trip rather than two serial ones. */
   const countryFilteredAnchorOffers = country.code === "ng"
     ? anchorOffers
     : anchorOffers.filter((o) => isOfferAllowedForCountry(o, country));

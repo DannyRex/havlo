@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const country = getServerCountry();
-    let result: SearchOutput;
+
     /* Resolution priority — pid first when present.
 
        When pid is in the URL the user has explicitly clicked a
@@ -92,15 +92,22 @@ export async function GET(req: NextRequest) {
 
        FTS still runs as the fallback for queries that arrive
        WITHOUT a pid (homepage search, paste-a-link results, manual
-       /compare?q= URL entry). */
+       /compare?q= URL entry).
+
+       Control flow simplified May 2026: the prior version mixed
+       `result!` non-null asserts with operator-precedence-dependent
+       conditions that were correct but fragile. Now: explicit null
+       state, two well-named branches, single empty fallback. */
+    let result: SearchOutput | null = null;
     if (pid) {
       result = await pgFtsFindByProductId(pid);
     }
-    if ((!pid || result!.mode === "empty") && q.trim()) {
+    const pidMissedOrAbsent = !result || result.mode === "empty";
+    if (pidMissedOrAbsent && q.trim()) {
       result = await pgFtsFindSimilar(q);
     }
-    if (!result! || result!.mode === "empty" && !q.trim() && !pid) {
-      result = { mode: "empty", query: "", suggestions: [] };
+    if (!result) {
+      result = { mode: "empty", query: q, suggestions: [] };
     }
 
     /* Auto-pivot (May 2026): when FTS returned empty AND a

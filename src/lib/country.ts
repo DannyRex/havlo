@@ -596,7 +596,14 @@ export function inferStoreCountry(storeId: string, storeName: string): string | 
       (Indian Flipkart shouldn't show on a Nigerian homepage)
     - For non-NG: drop NG-only stores; keep country-appropriate
       cross-border, country-tagged matches, and known country-roster
-      stores (Amazon UK / ASOS / Argos for UK, etc.). */
+      stores (Amazon UK / ASOS / Argos for UK, etc.).
+
+    Sibling: isOfferAllowedForCountry (StoreOffer shape, used by the
+    /compare pipeline). The two functions share their rosters and
+    cross-border allowlists but use different cross-border signals —
+    Deal carries `currency` + `tags[]`, OfferLike carries the
+    `isInternational` boolean. See isOfferAllowedForCountry's
+    docstring for the full shape-contract notes. */
 export function filterDealsForCountry<T extends DealLike>(deals: T[], country: Country): T[] {
   const countryFiltered = deals.filter((d) => {
     /* NG path: keep all NG-anchored stores + only country-appropriate
@@ -667,9 +674,34 @@ export function filterDealsForCountry<T extends DealLike>(deals: T[], country: C
   return dedupeCuratedAmazon(countryFiltered, country);
 }
 
-/** Variant for StoreOffer-style rows (compare anchor + dupes pipeline).
-    Same intent as filterDealsForCountry but reads isInternational
-    instead of currency/tags. */
+/** Country relevance check for StoreOffer-style rows (compare anchor +
+    dupes pipeline). Same intent as filterDealsForCountry — "should
+    this row appear in the visitor's market?" — but the input shape
+    is different so the function has to be a sibling rather than a
+    wrapper.
+
+    Shape contract:
+      - filterDealsForCountry  takes Deal     (currency + tags[])
+      - isOfferAllowedForCountry takes OfferLike (isInternational flag)
+
+    The Deal type is /deals' surface object (covers SerpAPI, curated
+    Amazon, native scrapers). It carries `currency` + `tags[]` —
+    SerpAPI rows have explicit `country:xx` tags from the ingest
+    parser. The OfferLike type is the pg-fts compare-pipeline shape:
+    every offer has been normalised to NGN at ingest, the original
+    currency is lost, and the only cross-border signal is the
+    boolean `isInternational` set when the source currency was USD.
+
+    Both functions converge on the same store-roster / cross-border
+    allowlist logic (matchesAny, crossBorderListFor, NG_STORES,
+    isStoreInCountry) so a store that's relevant on /deals stays
+    relevant on /compare. The country tightening that landed in
+    filterDealsForCountry on May 2026 (untagged-USD-from-foreign-
+    retailer drop) has its parallel below — see the "Symmetric
+    tightening" comment at the end of this function.
+
+    If you change one, audit the other. A divergent rule will
+    eventually show as "/deals has Currys but /compare doesn't". */
 export function isOfferAllowedForCountry<T extends OfferLike>(o: T, country: Country): boolean {
   const idLc   = lc(o.storeId);
   const nameLc = lc(o.storeName);
