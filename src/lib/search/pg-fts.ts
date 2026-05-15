@@ -580,6 +580,89 @@ function isSignatureTightEnoughForPooling(sig: string | null | undefined): boole
   return true;
 }
 
+/* Shared anchor-pool fetch. Three call sites used to repeat this
+   logic verbatim with subtle drift:
+     - pgFtsFindSimilar.resolveAnchorFromRow (FTS path)
+     - pgFtsFindByProductId               (pid path, used by /api/compare)
+     - pgFtsAnchorOffersByProductId       (PDP CTA count)
+   Drift bites quietly — a sibling-title field added on one path
+   silently disappears on another, signature-tightness guards
+   change, etc. Centralising the fetch + pool means all three
+   surfaces see the same anchor offer set.
+
+   Returns the AnchorProduct shape ready to feed into
+   buildAnchorGroup. Per-sibling product title is propagated onto
+   each offer via the `productTitle` extension so the compare
+   anchor row can render 'as titled at this store' subtitles for
+   pooled siblings (the base offers fall back to the parent's title
+   via buildAnchorGroup's offerToStoreOffer call).
+
+   Returns null when the product_id doesn't exist. */
+async function fetchAnchorProductWithSiblings(
+  productId: string,
+): Promise<AnchorProduct | null> {
+  const supa = getSupabaseAdmin();
+  if (!supa) return null;
+
+  const { data: product } = await supa
+    .from("products")
+    .select(`
+      id, title, category_slug, brand, image_url, signature,
+      offers (
+        id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
+        stores ( id, name, logo_url, is_international )
+      )
+    `)
+    .eq("id", productId)
+    .maybeSingle();
+
+  if (!product) return null;
+
+  const base = product as unknown as AnchorProduct & { signature: string | null };
+
+  if (!isSignatureTightEnoughForPooling(base.signature)) {
+    /* Tag base offers with productTitle so downstream callers can
+       render consistent subtitles even when no siblings are pooled
+       in. */
+    return {
+      ...base,
+      offers: (base.offers ?? []).map((o) => ({
+        ...o,
+        productTitle: base.title,
+      })) as NestedOffer[],
+    };
+  }
+
+  const { data: siblings } = await supa
+    .from("products")
+    .select(`
+      id, title, category_slug, brand, image_url,
+      offers (
+        id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
+        stores ( id, name, logo_url, is_international )
+      )
+    `)
+    .eq("signature", base.signature)
+    .neq("id", productId);
+
+  const baseOffers = (base.offers ?? []).map((o) => ({
+    ...o,
+    productTitle: base.title,
+  })) as NestedOffer[];
+
+  if (!siblings || siblings.length === 0) {
+    return { ...base, offers: baseOffers };
+  }
+
+  const siblingOffers = (siblings as unknown as Array<{ title: string; offers: NestedOffer[] }>)
+    .flatMap((s) => (s.offers ?? []).map((o) => ({
+      ...o,
+      productTitle: s.title,
+    }))) as NestedOffer[];
+
+  return { ...base, offers: [...baseOffers, ...siblingOffers] };
+}
+
 function buildAnchorGroup(p: AnchorProduct): ProductGroup {
   /* Two filters:
      1. in_stock — drop offers the merchant has sold out of
@@ -877,79 +960,17 @@ export async function pgFtsFindSimilar(
      offers, implausible price). Caller falls through to other
      candidates / fallback queries before giving up. */
   async function resolveAnchorFromRow(row: FtsRow): Promise<ProductGroup | null> {
-    const { data: productData, error: pErr } = await supa!
-      .from("products")
-      .select(`
-        id, title, category_slug, brand, image_url, signature,
-        offers (
-          id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
-          stores ( id, name, logo_url, is_international )
-        )
-      `)
-      .eq("id", row.product_id)
-      .single();
-    if (pErr || !productData) return null;
-
-    /* Default: anchor uses just the chosen product's offers. */
-    let anchorPayload = productData as unknown as AnchorProduct;
-
-    /* Cross-product pool: only when the chosen product has a TIGHT
-       compact signature (brand AND model both parsed). The signature
-       column was rewritten from JSON.stringify(sig) to sig.key by
-       the dedup backfill — it's now either 'brand|model' or '?|?'
-       or 'brand|?' / '?|model' (fallback when one side couldn't
-       be parsed).
-
-       Pool guard history:
-         Round-1: `if (signature)` — too permissive, every "?|?"
-           product pooled with every other "?|?" product. The
-           "Handi Set" anchor pooled with ~800 unrelated generic
-           titles.
-         Round-2 (prior): `signature !== "?|?"` — fixed the both-
-           unknown case but not the half-unknown cases. "nike|?"
-           anchors STILL pooled with every other "nike|?" product
-           (Nike socks, hoodies, joggers, etc.). User report May
-           2026: clicking Compare on a Nike Dunk Low anchor pulled
-           in 251 sibling Nike products' offers.
-         Round-3 (now): isSignatureTightEnoughForPooling requires
-           BOTH brand AND model resolved. Half-unknown signatures
-           skip pooling and the anchor stays clean. */
-    const signature = (productData as { signature: string | null }).signature;
-    if (isSignatureTightEnoughForPooling(signature)) {
-      const { data: siblings } = await supa!
-        .from("products")
-        .select(`
-          id, title, category_slug, brand, image_url,
-          offers (
-            id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
-            stores ( id, name, logo_url, is_international )
-          )
-        `)
-        .eq("signature", signature)
-        .neq("id", row.product_id);
-
-      if (siblings && siblings.length > 0) {
-        const base = productData as unknown as AnchorProduct;
-        /* Tag each base offer with its source product's title so
-           the comparison row subtitle can show 'as titled at this
-           store'. Same for sibling offers — each carries its own
-           parent's title which differs from the chosen anchor's. */
-        const baseOffers = (base.offers ?? []).map((o) => ({
-          ...o,
-          productTitle: base.title,
-        })) as AnchorProduct["offers"];
-        const siblingOffers = (siblings as unknown as AnchorProduct[]).flatMap(
-          (p) => (p.offers ?? []).map((o) => ({
-            ...o,
-            productTitle: p.title,
-          })),
-        ) as AnchorProduct["offers"];
-        anchorPayload = {
-          ...base,
-          offers: [...baseOffers, ...siblingOffers],
-        };
-      }
-    }
+    /* Pooling history (now centralised in fetchAnchorProductWithSiblings):
+       Round-1: `if (signature)` — too permissive, every "?|?"
+         product pooled with every other "?|?" product. The "Handi
+         Set" anchor pooled with ~800 unrelated generic titles.
+       Round-2 (prior): `signature !== "?|?"` — fixed the both-
+         unknown case but not the half-unknown cases. "nike|?"
+         anchors STILL pooled with every other "nike|?" product.
+       Round-3 (now): isSignatureTightEnoughForPooling requires
+         BOTH brand AND model resolved. */
+    const anchorPayload = await fetchAnchorProductWithSiblings(row.product_id);
+    if (!anchorPayload) return null;
 
     const a = buildAnchorGroup(anchorPayload);
     if (a.offers.length === 0) return null;
@@ -1179,71 +1200,75 @@ export async function pgFtsFindByProductId(
   if (!supa) return { mode: "empty", query: productId, suggestions: [] };
   const limit = opts?.limit ?? 16;
 
-  /* Fetch the product + its offers + pool any siblings sharing the
-     same signature (same cross-store-pool behavior as the FTS path). */
-  const { data: product } = await supa
-    .from("products")
-    .select(`
-      id, title, category_slug, brand, image_url, signature,
-      offers (
-        id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
-        stores ( id, name, logo_url, is_international )
-      )
-    `)
-    .eq("id", productId)
-    .maybeSingle();
-
-  if (!product) {
+  /* Anchor pool (this product + signature-tight siblings) via the
+     shared helper. Same pooling logic as pgFtsFindSimilar's FTS
+     path so the two surfaces can never diverge in what they
+     consider 'the anchor'. */
+  const anchorPayload = await fetchAnchorProductWithSiblings(productId);
+  if (!anchorPayload) {
     return { mode: "empty", query: productId, suggestions: [] };
-  }
-
-  const base = product as unknown as AnchorProduct & { signature: string | null };
-  let anchorPayload: AnchorProduct = base;
-
-  /* Pool siblings by signature (best-effort — fall through silently
-     if the join fails). Uses the SAME tightness guard as
-     resolveAnchorFromRow above so the FTS path and the pid-backstop
-     path agree on which signatures are safe to pool by. */
-  if (isSignatureTightEnoughForPooling(base.signature)) {
-    const { data: siblings } = await supa
-      .from("products")
-      .select(`
-        id, title, category_slug, brand, image_url,
-        offers (
-          id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
-          stores ( id, name, logo_url, is_international )
-        )
-      `)
-      .eq("signature", base.signature)
-      .neq("id", productId);
-    if (siblings && siblings.length > 0) {
-      const baseOffers = (base.offers ?? []) as NestedOffer[];
-      const siblingOffers = (siblings as unknown as Array<{ offers: NestedOffer[] }>)
-        .flatMap((s) => s.offers ?? []);
-      anchorPayload = { ...base, offers: [...baseOffers, ...siblingOffers] };
-    }
   }
 
   const anchor = buildAnchorGroup(anchorPayload);
   if (anchor.offers.length === 0) {
-    return { mode: "empty", query: product.title, suggestions: [] };
+    return { mode: "empty", query: anchorPayload.title, suggestions: [] };
   }
 
-  /* Same dupes pipeline as pgFtsFindSimilar — FTS over the anchor's
-     title, then the standard family / variant / price filters. */
+  /* Dupes pipeline. Mirror pgFtsFindSimilar's gates so a pid-anchored
+     search applies the SAME filters as a text-anchored search —
+     audit May 2026 flagged that pid-anchored dupes missed variant /
+     numeric-model / brand gates, which let an iPhone 15 Pro Max
+     PDP-CTA click reveal iPhone 16 alternatives that the same
+     anchor text-search would have filtered out.
+
+     Requirements are extracted from the ANCHOR.TITLE (not a user
+     query — pid resolution has no user-typed string to lean on).
+     That's safe: the anchor's stored title is canonical for the
+     product. */
   const { data: similarMatches } = await supa.rpc("search_products_fts", {
     q: anchor.title,
     max_results: 60,
   });
 
+  const anchorVariants     = extractVariantTokens(anchor.title);
+  const anchorNumbers      = extractRequiredNumbers(anchor.title);
+  const anchorModelTokens  = extractRequiredModelTokens(anchor.title);
+  const anchorBrand        = anchor.brand ?? extractQueryBrand(anchor.title);
+  const anchorFamily       = detectQueryFamily(anchor.title);
+  const anchorIsAccessory  = looksLikeAccessory(anchor.title);
+
   const dupes: DupeResult[] = ((similarMatches as FtsRow[]) ?? [])
     .filter((r) => r.product_id !== productId)
     .filter((r) => !anchor.category || anchor.category === "general" || r.category_slug === anchor.category)
+    /* Strict cheaper-only — pgFtsFindSimilar's contract. /compare's
+       "Cheaper alternatives" rail depends on this. PDP's "You may
+       also like" intentionally uses pgFtsFindDupes(title, 0) which
+       lifts this ceiling (broader browse intent). See PDP page.tsx
+       comment on the fetchDupesCached call. */
     .filter((r) => priceInNgn(r.current_price, r.currency) < anchor.bestPrice * 0.99)
     .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug, r.title))
     .filter((r) => isUsableMerchantUrl(r.url))
-    .filter((r) => !looksLikeAccessory(r.title))
+    /* Accessory match-flip: if the anchor itself is an accessory
+       (a case, cable, stand, etc.) we want other accessories as
+       alternatives, not the parent product. Otherwise drop
+       accessories so a phone anchor doesn't pull in cases. */
+    .filter((r) => anchorIsAccessory ? looksLikeAccessory(r.title) : !looksLikeAccessory(r.title))
     .filter((r) => !looksSuspicious(r.title))
+    /* Family gate. Anchor family inferred from title; candidates
+       must match. Skipped when family is null (allows broad
+       'gift for mum'-style anchors to surface anything). */
+    .filter((r) => !anchorFamily || detectFamily(r.title) === anchorFamily)
+    /* Variant gate: 'pro max' / 'ultra' / 'plus' must be honoured. */
+    .filter((r) => candidateHasAllVariants(r.title, anchorVariants))
+    /* Generation gate: 'iPhone 15' must NOT match 'iPhone 16' rows. */
+    .filter((r) => candidateHasAllNumbers(r.title, anchorNumbers))
+    /* Model-token gate: 'Galaxy S24' must NOT match 'Galaxy S25' rows. */
+    .filter((r) => candidateHasAllModelTokens(r.title, anchorModelTokens))
+    /* Brand gate: a Nike anchor must surface Nike alternatives. */
+    .filter((r) => candidateHasBrand(r.title, anchorBrand))
+    /* Family compatibility — drops cross-family same-brand rows
+       (Nike Dunk → Nike Crew Socks). alternativeFamilyMatches is
+       stricter than familiesIncompatible for the dupes path. */
     .filter((r) => alternativeFamilyMatches(anchor.title, r.title))
     .map((r) => ftsRowToDupe(r, anchor))
     .filter((d) => d.savingsPercent > 0)
@@ -1257,7 +1282,7 @@ export async function pgFtsFindByProductId(
 
   return {
     mode: "similar",
-    query: product.title,
+    query: anchorPayload.title,
     anchor,
     dupes,
   };
@@ -1280,45 +1305,7 @@ export async function pgFtsFindByProductId(
 export async function pgFtsAnchorOffersByProductId(
   productId: string,
 ): Promise<StoreOffer[]> {
-  const supa = getSupabaseAdmin();
-  if (!supa) return [];
-
-  const { data: product } = await supa
-    .from("products")
-    .select(`
-      id, title, category_slug, brand, image_url, signature,
-      offers (
-        id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
-        stores ( id, name, logo_url, is_international )
-      )
-    `)
-    .eq("id", productId)
-    .maybeSingle();
-
-  if (!product) return [];
-
-  const base = product as unknown as AnchorProduct & { signature: string | null };
-  let anchorPayload: AnchorProduct = base;
-
-  if (isSignatureTightEnoughForPooling(base.signature)) {
-    const { data: siblings } = await supa
-      .from("products")
-      .select(`
-        id, title, category_slug, brand, image_url,
-        offers (
-          id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
-          stores ( id, name, logo_url, is_international )
-        )
-      `)
-      .eq("signature", base.signature)
-      .neq("id", productId);
-    if (siblings && siblings.length > 0) {
-      const baseOffers = (base.offers ?? []) as NestedOffer[];
-      const siblingOffers = (siblings as unknown as Array<{ offers: NestedOffer[] }>)
-        .flatMap((s) => s.offers ?? []);
-      anchorPayload = { ...base, offers: [...baseOffers, ...siblingOffers] };
-    }
-  }
-
+  const anchorPayload = await fetchAnchorProductWithSiblings(productId);
+  if (!anchorPayload) return [];
   return buildAnchorGroup(anchorPayload).offers;
 }

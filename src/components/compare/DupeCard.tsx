@@ -222,7 +222,13 @@ export default function DupeCard({
                       />
                     </div>
                     <span className="text-ink-2 truncate flex-1">{displayStoreName(offer.storeName)}</span>
-                    <span className="font-semibold text-ink tabular-nums">{formatPriceForUser(offer.price, country)}</span>
+                    {/* Country-aware price — match the headline above
+                        (line ~135). Was bare `offer.price`, which read
+                        as cross-border merchant-price WITHOUT the
+                        landed-cost estimate the headline already
+                        includes. Same product, two visibly different
+                        prices on the same card. Audit May 2026. */}
+                    <span className="font-semibold text-ink tabular-nums">{formatPriceForUser(effectiveLandedPrice(offer, country), country)}</span>
                   </a>
                 ))}
               </div>

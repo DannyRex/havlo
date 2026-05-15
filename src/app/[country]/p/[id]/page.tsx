@@ -602,36 +602,37 @@ export default async function ProductPage({ params }: PageProps) {
     { name: offer.title,      url: `${SITE_URL}/${country.code}/p/${offer.offer_id}` },
   ]);
 
-  /* Price-vs-market stats. Reads the cheapest landedPrice (which is
-     country-aware after the May 2026 effectiveLandedPrice fix —
-     local stores use base price, cross-border keeps the ~30%
-     landed estimate). Limits to dupes that have at least one offer
-     after country filtering, so the comparison reflects what the
-     user can actually click through to.
+  /* Price-vs-market stats for the PriceComparisonBar.
 
-     Currency contract: dupePricesNgn are NGN (pgFtsFindDupes
-     converts via priceInNgn at query time). offer.current_price is
-     in offer.currency (USD for SerpAPI rows, NGN for native NG
-     scraper rows). We MUST normalise the anchor to NGN before
-     mixing — otherwise Math.min(7.62 USD, 12000 NGN) returns 7.62
-     and the bar's downstream conversion produces "£0 cheapest".
-     User report May 2026: PDP shows "Great price across 4 stores"
-     with £0 cheapest / £0 highest because the USD anchor leaked
-     into an NGN aggregate then got divided by 1600 again at the
-     formatter.
+     Drives "where this offer's price sits among the stores carrying
+     THIS product". Pool = dedupedAnchorOffers (same set the
+     'Compare prices across N stores' CTA counts), so the bar and
+     the CTA describe the exact same scope. Audit May 2026 caught
+     the previous mismatch: bar was fed by filteredDupes — different
+     PRODUCTS — so the 'lowest £X / highest £Y' range described
+     cheaper alternatives rather than other stores carrying the
+     anchor. A £200 iPhone 15 Pro PDP would show 'lowest £40' from
+     a base iPhone 15 dupe, which the user reads as 'iPhone 15 Pro
+     for £40 somewhere' — a broken trust signal.
 
-     anchorPriceNgn is now defined above (near countryFilteredDupes)
-     so the dupe price-band gate can reference it during filtering. */
-  const dupePricesNgn: number[] = filteredDupes.flatMap((d) => {
-    const cheapestOffer = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
-    return cheapestOffer ? [cheapestOffer.landedPrice] : [];
-  });
-  const priceStats = dupePricesNgn.length > 0
+     Currency contract: every effectiveLandedPrice value is NGN
+     (StoreOffer.price/landedPrice are normalised to NGN at ingest /
+     query time). The bar's formatPriceForUser converts to display
+     currency at render time. Passing user-currency values here
+     would round small-amount products to £0 (May 2026 bug).
+
+     `count` is OTHER stores compared (excludes the anchor offer
+     itself), per the bar's prop contract. Subtract 1 from
+     anchorEffectives.length to get OTHER stores, floored at 0. */
+  const anchorEffectives = dedupedAnchorOffers
+    .map((o) => effectiveLandedPrice(o, country))
+    .filter((p) => p > 0);
+  const priceStats = anchorEffectives.length > 1
     ? {
         thisPriceNgn: anchorPriceNgn,
-        lowest:  Math.min(anchorPriceNgn, ...dupePricesNgn),
-        highest: Math.max(anchorPriceNgn, ...dupePricesNgn),
-        count:   dupePricesNgn.length,
+        lowest:  Math.min(...anchorEffectives),
+        highest: Math.max(...anchorEffectives),
+        count:   anchorEffectives.length - 1,
       }
     : undefined;
 
