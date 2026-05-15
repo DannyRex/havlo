@@ -344,9 +344,26 @@ export default function ProductHero({ offer, countryCode, totalStores, priceStat
           })()}
           className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-border-strong text-ink font-medium text-[14px] hover:bg-surface-2 transition-colors mb-4"
         >
+          {/* "Compare prices across N stores" was misleading: the
+              N counted unique stores across THIS product's anchor
+              offers PLUS similar products' best-offer stores. On
+              the /compare landing, the anchor's "Available at"
+              row only shows THIS product's stores (often 1), and
+              the additional stores live in the "You may also
+              like" rail below. Users read the PDP promise as "N
+              stores carry THIS product" and the compare anchor's
+              "Available at 1 store" looked like a broken count.
+
+              Reframed as "Compare similar listings" / "Compare {N}
+              similar listings". "Listings" captures the
+              compare view as a whole (anchor + alternatives),
+              accurately positions N as the breadth of the search
+              rather than a per-product store count, and stops
+              promising something the anchor section can't deliver
+              alone. Audit May 2026 raised this trust gap. */}
           {typeof totalStores === "number" && totalStores > 1
-            ? <>Compare prices across {totalStores} stores</>
-            : <>Compare prices across stores</>}
+            ? <>Compare {totalStores} similar listings</>
+            : <>Compare similar listings</>}
         </Link>
 
         {/* Price-vs-market visual signal. Replaces the previous
