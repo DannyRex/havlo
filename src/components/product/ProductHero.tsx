@@ -342,6 +342,14 @@ export default function ProductHero({ offer, countryCode, totalStores, priceStat
             if (offer.productId) params.set("pid", offer.productId);
             return `/${countryCode}/compare?${params.toString()}`;
           })()}
+          /* prefetch={false}: this is a secondary CTA on a page
+             where the primary action is "View at {Merchant}". Most
+             visitors won't click here, but Next.js's default
+             prefetch=true would fetch the /compare RSC payload on
+             every PDP view — wasted server work + bandwidth.
+             Loading on click is fine; /compare loads in <300ms on
+             a warm cache. */
+          prefetch={false}
           className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-border-strong text-ink font-medium text-[14px] hover:bg-surface-2 transition-colors mb-4"
         >
           {/* Label intentionally says "Compare prices across N stores".

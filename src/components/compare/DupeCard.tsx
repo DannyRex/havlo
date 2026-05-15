@@ -59,23 +59,18 @@ export default function DupeCard({
      React hydration warning).
 
      User report May 2026: "shouldn't the card be clickable and not
-     only the view on merchant button?" */
+     only the view on merchant button?"
+
+     When bestOffer is null (defensive — pgFtsFindDupes shouldn't
+     return offer-less rows, but FTS edge cases occasionally do)
+     we render a non-interactive <div> instead of a `href="#"` Link.
+     `href="#"` is an a11y smell — keyboard / screen-reader users
+     get a focusable element that does nothing, and the URL fragment
+     mutates on click. */
   const cardHref = bestOffer ? pdpUrlForOffer(country.code, { ...bestOffer, title: dupe.title }) : null;
 
-  return (
-    <div className="group relative flex flex-col rounded-2xl border border-border bg-surface overflow-hidden hover:border-border-strong hover:-translate-y-0.5 hover:shadow-card transition-all duration-200">
-
-      {/* Whole upper-card Link target. Wraps image + caption +
-          primary CTA so the card is fully clickable (not just the
-          button). Stops at the "+N more stores" expandable below
-          so those nested links don't violate the no-nested-anchors
-          HTML rule. */}
-      <Link
-        href={cardHref ?? "#"}
-        onClick={() => bestOffer && trackClick(dupe.key, query, rank, mode)}
-        className="block"
-        aria-label={`View ${dupe.title} details`}
-      >
+  const upperContent = (
+    <>
       {/* Savings badge — perfect circle, top-right, on the image */}
       {hasSavings && (
         <div
@@ -178,7 +173,26 @@ export default function DupeCard({
           </span>
         )}
       </div>
-      </Link>
+    </>
+  );
+
+  return (
+    <div className="group relative flex flex-col rounded-2xl border border-border bg-surface overflow-hidden hover:border-border-strong hover:-translate-y-0.5 hover:shadow-card transition-all duration-200">
+
+      {cardHref ? (
+        <Link
+          href={cardHref}
+          onClick={() => trackClick(dupe.key, query, rank, mode)}
+          className="block"
+          aria-label={`View ${dupe.title} details`}
+        >
+          {upperContent}
+        </Link>
+      ) : (
+        <div className="block">
+          {upperContent}
+        </div>
+      )}
       {/* "+N more stores" expandable lives OUTSIDE the upper-card
           Link so each per-store Link below doesn't nest invalidly.
           Wrapper picks up the card's hover styles via the parent
