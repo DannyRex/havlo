@@ -21,6 +21,7 @@ import { usdToNgn, cleanTitle } from "@/lib/utils";
 import { buildSignature, extractedSignature, type ProductSignature } from "./normalize";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { resolveStoreLogoUrl } from "@/lib/store-logo";
+import { isOfferAllowedForCountry, type Country } from "@/lib/country";
 
 /* ── Public types ─────────────────────────────────────────────────── */
 
@@ -290,6 +291,7 @@ export function searchByKey(key: string): SearchOutput {
 export async function suggest(
   rawQuery: string,
   n = 8,
+  country?: Country,
 ): Promise<{ title: string; key: string; storeCount: number }[]> {
   const q = rawQuery.trim();
   if (q.length < 2) return [];
@@ -380,8 +382,14 @@ export async function suggest(
     }
   }
 
-  /* Step 4: fetch (product_id, store_id) for every pooled product and
-     count distinct stores per suggestion. */
+  /* Step 4: fetch (product_id, store_id) PLUS the joined store
+     metadata (name + is_international) so we can country-filter
+     before counting. Without country-filter the badge over-counts
+     and clicking through lands on /compare with "nothing found"
+     because /compare's filterByCountry drops all the irrelevant
+     stores. User report: autocomplete said "1 store" → /compare
+     returned empty — the lone store was a NG-only retailer for a
+     UK visitor. */
   const allPooledIds = new Set<string>();
   Array.from(poolByProductId.values()).forEach((pool) => {
     pool.forEach((id) => allPooledIds.add(id));
@@ -389,31 +397,61 @@ export async function suggest(
 
   const { data: offers } = await supa
     .from("offers")
-    .select("product_id, store_id")
+    .select("product_id, store_id, currency, stores!inner(name, is_international)")
     .in("product_id", Array.from(allPooledIds))
     .eq("in_stock", true);
 
+  /* Build per-product store sets, country-filtered. When `country`
+     is omitted (legacy callers / tests), accept all offers
+     unfiltered — same behaviour as before. */
+  type OfferRow = {
+    product_id: string;
+    store_id:   string;
+    currency:   "NGN" | "USD";
+    stores:     { name: string; is_international: boolean } | null;
+  };
   const storesByProductId = new Map<string, Set<string>>();
-  for (const o of (offers ?? []) as Array<{ product_id: string; store_id: string }>) {
+  for (const o of (offers ?? []) as unknown as OfferRow[]) {
+    if (country) {
+      /* isOfferAllowedForCountry needs OfferLike — stub the
+         price/landed fields with zeros (the function only reads
+         storeId/storeName/isInternational/currency). */
+      const minimal = {
+        storeId:         o.store_id,
+        storeName:       o.stores?.name ?? "",
+        currency:        o.currency,
+        isInternational: o.stores?.is_international ?? false,
+        price:           0,
+        landedCostExtra: 0,
+        landedPrice:     0,
+      };
+      if (!isOfferAllowedForCountry(minimal, country)) continue;
+    }
     let set = storesByProductId.get(o.product_id);
     if (!set) { set = new Set(); storesByProductId.set(o.product_id, set); }
     set.add(o.store_id);
   }
 
-  return rows.map((r) => {
-    const pool = poolByProductId.get(r.product_id) ?? [r.product_id];
-    const stores = new Set<string>();
-    pool.forEach((pid) => {
-      const s = storesByProductId.get(pid);
-      if (s) Array.from(s).forEach((sid) => stores.add(sid));
-    });
-    return {
-      /* cleanTitle strips HTML tags + collapses dirty separators so
-         autocomplete entries don't render with literal "<strong>"
-         text from DHgate / SerpAPI seller feeds. */
-      title: cleanTitle(r.title),
-      key: r.product_id,
-      storeCount: Math.max(1, stores.size),
-    };
-  });
+  return rows
+    .map((r) => {
+      const pool = poolByProductId.get(r.product_id) ?? [r.product_id];
+      const stores = new Set<string>();
+      pool.forEach((pid) => {
+        const s = storesByProductId.get(pid);
+        if (s) Array.from(s).forEach((sid) => stores.add(sid));
+      });
+      return {
+        /* cleanTitle strips HTML tags + collapses dirty separators
+           so autocomplete entries don't render with literal
+           "<strong>" text from DHgate / SerpAPI seller feeds. */
+        title: cleanTitle(r.title),
+        key: r.product_id,
+        storeCount: stores.size,
+      };
+    })
+    /* Drop suggestions with NO usable store after country filter.
+       Showing "0 stores" is meaningless and "1 store" lands on a
+       broken /compare. Keep only suggestions the user can actually
+       transact on. */
+    .filter((s) => s.storeCount >= 1);
 }

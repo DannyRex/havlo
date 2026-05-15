@@ -119,7 +119,11 @@ export default function Navbar() {
               href={countryHref("/", country.code)}
               aria-label="Havlo home"
               aria-current={pathname === "/" ? "page" : undefined}
-              className="px-1 py-1 rounded-lg hover:bg-surface-2 transition-colors"
+              /* No hover/tap background — the logo is unmistakably a
+                 link without one, and the mobile-tap highlight read as
+                 an unwanted visual artefact. Padding kept for tap
+                 target sizing. */
+              className="px-1 py-1 rounded-lg transition-opacity hover:opacity-80 active:opacity-70"
             >
               {/* Smaller wordmark on mobile so the logo doesn't eat ~half
                   the navbar width next to the menu trigger. Switches at the

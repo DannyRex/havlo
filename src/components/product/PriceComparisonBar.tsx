@@ -161,11 +161,21 @@ export default function PriceComparisonBar({
      mapped to the spectrum thirds. Single-store overrides to
      "Best price tracked" — by definition it's the cheapest known.
 
-     History-aware override: when current price matches the
-     all-time low within £1 tolerance, surface "All-time low" with
-     the strongest framing — the most compelling buy signal we can
-     give. */
-  const isAllTimeLow = priceHistory
+     History-aware override: surface "Lowest in 90 days" when the
+     visiting store's current price matches the historical floor.
+     Was previously labelled "All-time low" but the lookback
+     window is 90d (see product_price_history RPC), and we don't
+     have data from before our tracking started — calling it
+     "all-time" overpromises. "Lowest in 90 days" is honest and
+     still a strong buy signal.
+
+     Confidence guard: requires `storeCount >= 2` so we don't
+     trumpet "lowest" for a product that only one store has ever
+     listed (the floor IS trivially that store's price in that
+     case, no real signal). Below that threshold we fall back to
+     the regular spectrum verdict. */
+  const isHistoricalLow = priceHistory
+    && priceHistory.storeCount >= 2
     && Math.abs(thisPriceNgn - priceHistory.allTimeLowNgn) <= 100
     && priceHistory.allTimeLowStoreId === thisStoreId;
 
@@ -174,8 +184,8 @@ export default function PriceComparisonBar({
     colour:     string;
     markerFill: string;
   };
-  if (isAllTimeLow) {
-    verdict = { label: "All-time low",      colour: "text-emerald-600 dark:text-emerald-400", markerFill: "text-emerald-500" };
+  if (isHistoricalLow) {
+    verdict = { label: "Lowest in 90 days",  colour: "text-emerald-600 dark:text-emerald-400", markerFill: "text-emerald-500" };
   } else if (isSingleStore) {
     verdict = { label: "Best price tracked", colour: "text-emerald-600 dark:text-emerald-400", markerFill: "text-emerald-500" };
   } else if (offset === 0) {
@@ -263,7 +273,7 @@ export default function PriceComparisonBar({
           extra "Award" icon as a visual exclamation point. */}
       <div className="flex items-baseline justify-between gap-3 mb-3">
         <h3 className={`text-[15px] font-semibold flex items-center gap-1.5 ${verdict.colour}`}>
-          {isAllTimeLow && <Award size={15} className="shrink-0" aria-hidden="true" />}
+          {isHistoricalLow && <Award size={15} className="shrink-0" aria-hidden="true" />}
           {verdict.label}
         </h3>
         <span className="text-[11px] text-ink-3 tabular-nums">
@@ -425,7 +435,7 @@ export default function PriceComparisonBar({
       )}
 
       {/* ── Historical signal ──────────────────────────────────── */}
-      {priceHistory && !isAllTimeLow && (
+      {priceHistory && !isHistoricalLow && (
         <div className="mb-3 px-3.5 py-2 rounded-xl bg-surface-2 border border-border">
           <p className="text-[11px] text-ink-2 leading-relaxed">
             <Sparkles size={11} className="inline-block mr-1 -mt-0.5 text-ink-3" aria-hidden="true" />

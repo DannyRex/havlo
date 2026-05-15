@@ -68,13 +68,16 @@ export async function fetchProductPriceHistory(
 
 /* Roll up the per-store rows into a single product-level summary. */
 export interface PriceHistorySummary {
-  /** Lowest price ever seen for this product across any store, in
-      NGN (USD rows are converted via usdToNgn before comparison). */
+  /** Lowest price seen for this product within the lookback window
+      (default 90d), across any store. NGN — USD rows converted via
+      usdToNgn before comparison. NB: NOT a true all-time low —
+      capped to the window. The bar's verdict copy says "Lowest in
+      90 days" to be honest about that. */
   allTimeLowNgn:        number;
   /** When that lowest was first recorded. */
   allTimeLowAt:         string;
-  /** Which store hit the all-time low (the cheapest store in the
-      window). The visited offer may or may not be from this store. */
+  /** Which store hit the lowest in the window. The visited offer
+      may or may not be from this store. */
   allTimeLowStoreId:    string;
   /** Lowest price seen at the SAME store as the currently-visited
       offer. Undefined when the visited store has no history rows. */
@@ -82,6 +85,13 @@ export interface PriceHistorySummary {
   /** When THIS store last set its current price. Useful for "Same
       price as <timestamp>" framing. */
   thisStoreLatestAt?:   string;
+  /** Number of distinct stores with history rows in the window.
+      Used by the bar's verdict logic as a confidence signal — the
+      "Lowest in 90 days" badge requires storeCount >= 2 so we
+      don't trumpet "lowest" for a product that only one store has
+      ever listed (where the floor IS that store's price by
+      definition — trivially true, no real signal). */
+  storeCount:           number;
 }
 
 export function rollupPriceHistory(
@@ -114,5 +124,6 @@ export function rollupPriceHistory(
     allTimeLowStoreId: bestRow.storeId,
     thisStoreLowNgn:  thisStore ? inNgn(thisStore, thisStore.lowestSeen) : undefined,
     thisStoreLatestAt: thisStore ? thisStore.latestAt : undefined,
+    storeCount:       history.length,
   };
 }
