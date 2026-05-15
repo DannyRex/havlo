@@ -67,6 +67,17 @@ export default function CountrySelect({ dropUp = false }: Props = {}) {
         aria-expanded={open}
         aria-label={`Country: ${country.name}. Change.`}
         className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-full text-sm font-medium text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors"
+        /* suppressHydrationWarning at the button level covers both
+           the flag <img> src and the country code label. The SSR
+           emits DEFAULT_COUNTRY (NG) because the root layout's
+           CountryProvider has no initialCode and the layout can't
+           read cookies without breaking ISR. On the client, the
+           useState initialiser inside CountryProvider reads
+           window.location.pathname during the first render, so
+           hydration produces the right flag without a post-paint
+           swap. The mismatch warning is the price; the user-
+           visible flash is gone. */
+        suppressHydrationWarning
       >
         {/* SVG flag — renders identically on Windows / Linux /
             macOS / headless. Replaces the regional-indicator emoji
@@ -75,7 +86,6 @@ export default function CountrySelect({ dropUp = false }: Props = {}) {
         <CountryFlag code={country.code} size={20} />
         <span
           className="hidden sm:inline text-[12px] tracking-wider"
-          suppressHydrationWarning
         >
           {country.code.toUpperCase()}
         </span>

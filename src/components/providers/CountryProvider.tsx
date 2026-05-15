@@ -39,40 +39,33 @@ interface Props {
 export function CountryProvider({ initialCode, children }: Props) {
   const router   = useRouter();
   const pathname = usePathname();
-  const [code, setCode] = useState<string>(initialCode ?? DEFAULT_COUNTRY);
 
-  /* Hydration order on mount: URL pathname → cookie → default.
+  /* Resolution order: URL pathname → cookie → default.
 
-     Why URL first: after the May 2026 perf fix the root layout no
-     longer reads cookies() (so the layout stays ISR-able), which
-     means initialCode is undefined for everyone on first render.
-     The HTML emitted by the server uses the default country (NG).
-     If we ONLY hydrated from cookie, a UK visitor on /uk would
-     briefly flash NG in the navbar before the cookie kicked in.
+     CRITICAL: this runs during the useState initialiser, NOT in a
+     post-mount useEffect. The previous useEffect-based approach
+     left the OUTER root-layout CountryProvider rendering NG on
+     first paint (root layout has no initialCode, so initial state
+     was DEFAULT_COUNTRY). Users saw an NG flag briefly flash in
+     the navbar on country-scoped pages until the useEffect tick
+     ran — visible to the user as a wrong-country flash.
 
-     URL-first hydration eliminates that flash for country-scoped
-     pages: a visitor on /uk/... gets the navbar updated to UK
-     synchronously on first useEffect tick. Cookie is the fallback
-     for global pages (/about, /contact) where the URL has no
-     country segment. Default is the safety net.
-
-     `initialCode` (when supplied) still wins so any caller that
-     CAN provide a server-side country code (e.g. a future
-     [country]/layout.tsx) isn't forced through this client path. */
-  useEffect(() => {
-    if (initialCode) return;
-    /* URL pathname check — first segment is the country if it
-       matches our supported set. Same logic the middleware uses. */
+     With the resolution in useState's lazy initialiser, the FIRST
+     client render already has the right country. SSR still emits
+     HTML using DEFAULT_COUNTRY (server has no window/cookie
+     access in this provider; cookies() would break ISR), so the
+     hydration produces a mismatch on country-derived UI — handled
+     by suppressHydrationWarning on the navbar flag wrapper. */
+  const [code, setCode] = useState<string>(() => {
+    if (initialCode) return initialCode;
     if (typeof window !== "undefined") {
       const seg = window.location.pathname.split("/")[1]?.toLowerCase();
-      if (seg && COUNTRY_CODES.has(seg)) {
-        setCode(seg);
-        return;
-      }
+      if (seg && COUNTRY_CODES.has(seg)) return seg;
+      const cookie = readCookie(COUNTRY_COOKIE);
+      if (cookie && COUNTRY_CODES.has(cookie)) return cookie;
     }
-    const c = readCookie(COUNTRY_COOKIE);
-    if (c && COUNTRY_CODES.has(c)) setCode(c);
-  }, [initialCode]);
+    return DEFAULT_COUNTRY;
+  });
 
   const setCountry = useCallback(
     (next: string) => {
