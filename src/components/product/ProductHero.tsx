@@ -191,7 +191,13 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             sizes="(max-width: 768px) 100vw, 50vw"
             priority
             onError={() => setImgFailed(true)}
-            className="object-cover"
+            /* object-contain so small source images (often 300-500px
+               from Jumia / Konga / SerpAPI snippets) display at
+               native size without upscaling blur. The bg-surface-2
+               around small images is intentional — better breathing
+               room than fuzzy pixels. Large images still fill the
+               frame naturally. */
+            className="object-contain p-3 sm:p-4"
           />
         ) : (
           /* Gradient + emoji fallback matches MasonryCard's

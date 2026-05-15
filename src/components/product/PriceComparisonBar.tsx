@@ -140,25 +140,57 @@ export default function PriceComparisonBar({
   }
 
   /* ── Spectrum range ─────────────────────────────────────────────
-     min/max derived from the per-store rows. When there's only one
-     store, both collapse to thisPriceNgn — the bar still renders
-     but in single-store mode with a "watching for more" hint. */
+     min/max derived from the per-store rows. */
   const allEffectives = perStoreOffers.map((r) => r.effectiveNgn).filter((p) => p > 0);
   const lowestPriceNgn = allEffectives.length > 0 ? Math.min(...allEffectives) : thisPriceNgn;
   const highestPriceNgn = allEffectives.length > 0 ? Math.max(...allEffectives) : thisPriceNgn;
-  const isSingleStore = perStoreOffers.length <= 1 || lowestPriceNgn === highestPriceNgn;
+
+  /* Two distinct collapse cases, NOT folded together:
+       isSingleStore — only one store carries the product. The bar
+                       degrades to "watching for more" + a pinned
+                       marker.
+       allTiedPrices — multiple stores but every price is identical.
+                       Was previously bucketed into isSingleStore,
+                       which caused the dots-disappear bug: the CTA
+                       said "Compare across 4 stores" but the bar
+                       hid all dots and read "1 store · watching
+                       for more". Now we keep multi-store mode,
+                       stack dots at the centre, and surface
+                       "Tied at £X" copy. */
+  const isSingleStore = perStoreOffers.length <= 1;
+  const allTiedPrices = !isSingleStore && lowestPriceNgn === highestPriceNgn;
 
   /* Position calculation. Map any NGN price to a 0..1 position along
      the spectrum, clamped. range >= 1 protects against /0 in
-     single-store mode. */
+     single-store mode.
+
+     When every store is tied, the gradient stops being meaningful
+     (there's no "low end" or "high end" to position relative to),
+     so we force every marker — triangle + dots — to the centre
+     of a solid-green bar instead. Keeps the dots visible without
+     stacking them at the left edge. */
   const range = Math.max(highestPriceNgn - lowestPriceNgn, 1);
   const positionOf = (priceNgn: number): number =>
-    Math.max(0, Math.min(1, (priceNgn - lowestPriceNgn) / range));
+    allTiedPrices
+      ? 0.5
+      : Math.max(0, Math.min(1, (priceNgn - lowestPriceNgn) / range));
   const offset = positionOf(thisPriceNgn);
 
   /* Triangle marker — visiting store. Inset so the tip stays
      fully on-bar at extreme positions. */
   const markerLeftPct = Math.max(TRIANGLE_INSET_PCT, Math.min(100 - TRIANGLE_INSET_PCT, offset * 100));
+
+  /* Dynamic label-translate based on marker position so long
+     store names ("John Lewis & Partners", "Currys Business") at
+     the bar's extremes don't get visually clipped off-screen.
+     Aligns the label's start, centre, or end to the marker
+     depending on which edge it's near. Computed as a string
+     instead of a Tailwind class so we can ramp smoothly. */
+  const labelTranslateX = markerLeftPct < 15
+    ? "0%"
+    : markerLeftPct > 85
+      ? "-100%"
+      : "-50%";
 
   /* MSRP tick removed (May 2026). The ProductHero already shows
      the strikethrough "£60 £80 You save £20" treatment in the
@@ -201,6 +233,11 @@ export default function PriceComparisonBar({
     verdict = { label: "Lowest in 90 days",  colour: "text-emerald-600 dark:text-emerald-400", markerFill: "text-emerald-500" };
   } else if (isSingleStore) {
     verdict = { label: "Best price tracked", colour: "text-emerald-600 dark:text-emerald-400", markerFill: "text-emerald-500" };
+  } else if (allTiedPrices) {
+    /* Every store charges the same — useful trust signal: no
+       deal to chase, this is the going rate. Green tone keeps the
+       feel positive (no overcharging anywhere). */
+    verdict = { label: "Same price everywhere", colour: "text-emerald-600 dark:text-emerald-400", markerFill: "text-emerald-500" };
   } else if (offset === 0) {
     verdict = { label: "Lowest price",       colour: "text-emerald-600 dark:text-emerald-400", markerFill: "text-emerald-500" };
   } else if (offset <= 0.33) {
@@ -214,7 +251,9 @@ export default function PriceComparisonBar({
   const otherStoresCount = Math.max(0, perStoreOffers.length - 1);
   const subtitleText = isSingleStore
     ? "1 store · watching for more"
-    : `across ${perStoreOffers.length} stores`;
+    : allTiedPrices
+      ? `across ${perStoreOffers.length} stores · same price`
+      : `across ${perStoreOffers.length} stores`;
 
   /* ── Cheapest-at action ─────────────────────────────────────────
      When the visitor isn't on the cheapest store, surface a
@@ -322,11 +361,18 @@ export default function PriceComparisonBar({
               : `${verdict.label}. ${formatPriceForUser(thisPriceNgn, country)} of a ${formatPriceForUser(lowestPriceNgn, country)} to ${formatPriceForUser(highestPriceNgn, country)} range across ${perStoreOffers.length} stores.`
           }
         >
-          {/* Gradient zones */}
+          {/* Bar background. Gradient (green→amber→red across the
+              price spread) for the normal case. Solid green when
+              every store is tied — the gradient's "low end / high
+              end" framing stops being meaningful when there's no
+              spread, and a solid colour reads as "no overcharging
+              anywhere" without implying a winning store. */}
           <div
             className="absolute inset-0 rounded-full"
             style={{
-              background: "linear-gradient(90deg, rgb(16,185,129) 0%, rgb(16,185,129) 33%, rgb(245,158,11) 50%, rgb(239,68,68) 67%, rgb(239,68,68) 100%)",
+              background: allTiedPrices
+                ? "rgb(16,185,129)"
+                : "linear-gradient(90deg, rgb(16,185,129) 0%, rgb(16,185,129) 33%, rgb(245,158,11) 50%, rgb(239,68,68) 67%, rgb(239,68,68) 100%)",
             }}
           />
 
@@ -419,8 +465,16 @@ export default function PriceComparisonBar({
             so the user sees "You're on [Store]" at a glance. */}
         {!isSingleStore && (
           <div
-            className="absolute -bottom-5 -translate-x-1/2 pointer-events-none"
-            style={{ left: `${markerLeftPct}%` }}
+            className="absolute -bottom-5 pointer-events-none"
+            style={{
+              left: `${markerLeftPct}%`,
+              /* Dynamic translateX so long store names don't clip
+                 off-screen at the bar's extremes. Anchors:
+                   <15%  → label's LEFT edge sits on the marker
+                   >85%  → label's RIGHT edge sits on the marker
+                   else  → centred on the marker (-50%)            */
+              transform: `translateX(${labelTranslateX})`,
+            }}
             aria-hidden="true"
           >
             <p className="text-[10px] font-medium text-ink-2 whitespace-nowrap">
@@ -441,6 +495,16 @@ export default function PriceComparisonBar({
             <span className="ml-1 opacity-70">only listing</span>
           </span>
           <span className="opacity-60">no upper bound yet</span>
+        </div>
+      ) : allTiedPrices ? (
+        /* Tied across all stores — single centred label. The
+           cheapest/highest framing is meaningless when low === high
+           ("£60 cheapest · £60 highest" reads as a typo).  */
+        <div className="flex items-center justify-center text-[11px] text-ink-3 tabular-nums mb-3">
+          <span>
+            {formatPriceForUser(lowestPriceNgn, country)}
+            <span className="ml-1 opacity-70">across {perStoreOffers.length} stores</span>
+          </span>
         </div>
       ) : (
         <div className="flex items-center justify-between text-[11px] text-ink-3 tabular-nums mb-3">
