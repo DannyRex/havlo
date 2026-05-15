@@ -53,38 +53,59 @@ interface JumiaQuery {
 }
 
 const QUERIES: JumiaQuery[] = [
-  // Phones — by far the highest-volume category on Jumia NG
-  { q: "Smartphones",                   categorySlug: "phones"      },
-  { q: "iPhone",                        categorySlug: "phones"      },
-  { q: "Tecno phones",                  categorySlug: "phones"      },
-  { q: "Infinix phones",                categorySlug: "phones"      },
+  /* Phones — brand + model gets product pages; bare "Smartphones"
+     hits Jumia's category landing pages which carry no per-product
+     price markup. Generation tokens (15 / 14 / Camon) keep results
+     specific. */
+  { q: "iPhone 15",                     categorySlug: "phones"      },
+  { q: "iPhone 14",                     categorySlug: "phones"      },
+  { q: "iPhone 13",                     categorySlug: "phones"      },
+  { q: "Samsung Galaxy A",              categorySlug: "phones"      },
+  { q: "Samsung Galaxy S",              categorySlug: "phones"      },
+  { q: "Tecno Camon",                   categorySlug: "phones"      },
+  { q: "Tecno Spark",                   categorySlug: "phones"      },
+  { q: "Infinix Note",                  categorySlug: "phones"      },
+  { q: "Infinix Smart",                 categorySlug: "phones"      },
+  { q: "Itel phone",                    categorySlug: "phones"      },
 
-  // Computing
-  { q: "Laptops",                       categorySlug: "computing"   },
-  { q: "HP laptop",                     categorySlug: "computing"   },
+  /* Computing — same pattern; specific brand+line surfaces product
+     pages. */
+  { q: "MacBook Air",                   categorySlug: "computing"   },
+  { q: "MacBook Pro",                   categorySlug: "computing"   },
+  { q: "HP Pavilion",                   categorySlug: "computing"   },
+  { q: "Dell Inspiron",                 categorySlug: "computing"   },
+  { q: "Lenovo IdeaPad",                categorySlug: "computing"   },
 
-  // Electronics + TV
-  { q: "Smart TV",                      categorySlug: "electronics" },
-  { q: "Power bank",                    categorySlug: "electronics" },
+  /* Electronics — TVs by brand. "Smart TV" alone returns category
+     pages. */
+  { q: "Hisense TV",                    categorySlug: "electronics" },
+  { q: "Samsung TV",                    categorySlug: "electronics" },
+  { q: "LG TV",                         categorySlug: "electronics" },
+  { q: "TCL TV",                        categorySlug: "electronics" },
 
-  // Audio
-  { q: "Bluetooth earbuds",             categorySlug: "audio"       },
-  { q: "Headphones",                    categorySlug: "audio"       },
+  /* Audio — Jumia NG carries Oraimo + JBL + Anker as the top
+     brands; specific brand queries get product pages. */
+  { q: "Oraimo earbuds",                categorySlug: "audio"       },
+  { q: "JBL speaker",                   categorySlug: "audio"       },
+  { q: "Anker speaker",                 categorySlug: "audio"       },
 
-  // Appliances
-  { q: "Washing machine",               categorySlug: "appliances"  },
-  { q: "Refrigerator",                  categorySlug: "appliances"  },
-  { q: "Microwave oven",                categorySlug: "appliances"  },
+  /* Appliances — same pattern. Hisense and Scanfrost dominate NG
+     white-goods listings on Jumia. */
+  { q: "Hisense fridge",                categorySlug: "appliances"  },
+  { q: "Scanfrost washing machine",     categorySlug: "appliances"  },
 
-  // Fashion
-  { q: "Sneakers",                      categorySlug: "fashion"     },
-  { q: "Mens shirts",                   categorySlug: "fashion"     },
+  /* Fashion — branded sneakers / footwear gets product pages.
+     "Sneakers" alone hits Jumia's category landing. */
+  { q: "Nike sneakers",                 categorySlug: "fashion"     },
+  { q: "Adidas sneakers",               categorySlug: "fashion"     },
 
-  // Beauty
-  { q: "Perfume",                       categorySlug: "beauty"      },
+  /* Beauty — Lord's and Nivea + Olay are top-selling Jumia NG
+     beauty brands. */
+  { q: "Nivea body lotion",             categorySlug: "beauty"      },
 
-  // Gaming
-  { q: "PlayStation",                   categorySlug: "gaming"      },
+  /* Gaming — current consoles. */
+  { q: "PlayStation 5",                 categorySlug: "gaming"      },
+  { q: "Xbox Series",                   categorySlug: "gaming"      },
 ];
 
 /* ── CLI args ─────────────────────────────────────────────────── */

@@ -234,7 +234,7 @@ export default function PriceComparisonBar({
     : 0;
   const savingsCopy: string | null = (() => {
     if (isSingleStore) return null;
-    if (offset === 0) return "This IS the cheapest price across the stores we track.";
+    if (offset === 0) return "This is the cheapest price across the stores we track.";
     if (savingsPctVsHighest >= 5) {
       return `You'd save ${formatPriceForUser(savingsVsHighest, country)} vs the highest known price.`;
     }

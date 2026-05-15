@@ -1,40 +1,67 @@
 /* ──────────────────────────────────────────────────────────────────
-   SerpAPI Jumia engine — direct access to Jumia's product listings.
+   Jumia ingest via SerpAPI's Google engine (site-filtered).
 
    STATUS: Active when SERPAPI_KEY is set in env (same key the
    Google Shopping provider uses).
 
-   Why this exists:
+   Why this approach:
      The Playwright Jumia scraper (scripts/scrapers/jumia.ts) was
-     defeated by Cloudflare in early 2026 — both plain fetch and
-     stealth-Playwright now hit the JS challenge page. SerpAPI's
-     dedicated Jumia engine bypasses that entirely by hitting
-     Jumia's own search API server-side.
+     defeated by Cloudflare in early 2026. SerpAPI does NOT offer
+     a dedicated `engine=jumia` (verified by HTTP probe in May
+     2026 — returns "Unsupported `jumia` search engine"). Google
+     Shopping doesn't operate in NG either.
 
-   Engine ref: https://serpapi.com/jumia-search
-     engine=jumia
-     q=<query>
-     jumia_country=<ng|ke|eg|ma|ci|sn|ug|...>
+     The working path: SerpAPI's `engine=google` with a
+     `site:jumia.com.ng` query operator. Google's rich-snippet
+     parser extracts the product price + currency from the
+     structured-data markup Jumia already publishes on every
+     product page, so we get clean (price, currency) pairs without
+     needing to load Jumia's HTML directly.
+
+   API ref: https://serpapi.com/search-api
+     engine=google
+     q=<query> site:jumia.com.ng
+     gl=ng                       (country code biases ranking)
+     hl=en
+     num=<n>                     (results per page; max 100)
      api_key=<key>
 
-     Optional:
-       - page=N              (paginate)
-
    Returns:
-     organic_results: [{ title, price, original_price, link,
-                         thumbnail, rating, reviews, ... }]
+     organic_results: [{
+       title, link, snippet,
+       rich_snippet?: {
+         bottom?: {
+           detected_extensions?: { price?: number, currency?: string },
+           extensions?: ["₦X,XXX.00", "In stock" | ...]
+         }
+       }
+     }]
+
+   We KEEP rows that satisfy ALL of:
+     - link ends with `.html` (direct product page, not a /slp/
+       search-results redirect)
+     - rich_snippet.bottom.detected_extensions.price is a number
+     - currency parses as NGN (₦ sign or "NGN")
+
+   We DROP rows that look like search-results pages (no price in
+   the rich snippet, or URL pattern that says it's a Jumia
+   search-results page).
+
+   Image data: NOT available through this path. The DB stores
+   image_url=null for Jumia rows ingested this way; the UI falls
+   back to gradient + emoji placeholder. A future enhancement
+   could fetch the product page's og:image meta tag at ingest time
+   (Jumia's per-product pages are usually accessible even when the
+   category browse is Cloudflare-walled).
 
    Cost guard: each call is one SerpAPI credit. The orchestrator
    (scripts/ingest-jumia.ts) caps the per-run call count via a
    curated query list — not a wide category sweep — so a typical
-   ingest is ~15 calls, ~$0.075 on a Plus plan. Adjust upward as
+   ingest is ~17 calls, ~$0.085 on a Plus plan. Adjust upward as
    the catalog needs more depth.
 
    Used by:
      - npm run ingest:jumia  (offline ingest into products + offers)
-     - /api/live-search      (when query targets NG and SerpAPI's
-                              Google Shopping returns nothing —
-                              Google Shopping doesn't operate in NG)
    ────────────────────────────────────────────────────────────────── */
 
 import type { SearchProvider, SearchQuery } from "./types";
@@ -42,43 +69,40 @@ import { ProviderError } from "./types";
 import type { Deal } from "@/types";
 
 const SERPAPI_ENDPOINT = "https://serpapi.com/search.json";
+const JUMIA_DOMAIN     = "jumia.com.ng";
 
-/* ── Response shape ─────────────────────────────────────────────── */
+/* ── Google organic-result shape (subset we need) ──────────────── */
 
-interface JumiaResult {
-  position?:        number;
-  title?:           string;
-  link?:            string;
-  product_id?:      string;
-  thumbnail?:       string;
-  /* SerpAPI returns prices as both formatted strings and extracted
-     numeric values. Prefer the extracted form to avoid currency-
-     symbol parsing. */
-  price?:           string;
-  extracted_price?: number;
-  old_price?:       string;
-  extracted_old_price?: number;
-  /* Some listings carry a discount string like "−42%" already
-     computed by Jumia. We compute our own from old_price/price as
-     the source of truth, but use this as a fallback when only
-     one price is present. */
-  discount?:        string;
-  /* Rating is on a 0-5 scale, reviews is the count. Both optional. */
-  rating?:          number;
-  reviews?:         number;
-  /* Some Jumia listings carry an "express" / "free shipping" flag.
-     Useful for trust signals later — captured but not surfaced
-     yet. */
-  express_eligible?: boolean;
-  /* Source string when SerpAPI distinguishes seller from Jumia
-     itself. Most rows are first-party Jumia. */
-  source?:          string;
+interface DetectedExtensions {
+  price?:        number;
+  currency?:     string;
+  /* Other fields Google sometimes detects (rating, reviews,
+     stock, etc.) — captured implicitly via the object spread but
+     not type-narrowed here. */
 }
 
-interface JumiaResponse {
-  organic_results?: JumiaResult[];
+interface RichSnippet {
+  bottom?: {
+    detected_extensions?: DetectedExtensions;
+    extensions?:           string[];
+  };
+}
+
+interface GoogleOrganicResult {
+  position?:      number;
+  title?:         string;
+  link?:          string;
+  snippet?:       string;
+  rich_snippet?:  RichSnippet;
+  /* Some inline image grid results carry a thumbnail. Most product
+     organic results don't. Captured for the rare case it's
+     present. */
+  thumbnail?:     string;
+}
+
+interface GoogleSearchResponse {
+  organic_results?: GoogleOrganicResult[];
   error?:           string;
-  search_metadata?: { id?: string; status?: string };
 }
 
 /* ── Mapping helpers ─────────────────────────────────────────────── */
@@ -122,60 +146,102 @@ function computeDiscount(originalPrice: number, salePrice: number): number {
   return Math.round(((originalPrice - salePrice) / originalPrice) * 100);
 }
 
-function mapToDeal(r: JumiaResult, i: number, country: string): Deal | null {
-  const sale = r.extracted_price;
-  const original = r.extracted_old_price;
-  const url = r.link;
-  const title = r.title;
+/* Strip leftover Google tracking params from Jumia URLs so the
+   stored URL is canonical. `srsltid` is Google's structured-data
+   tracking id; removing it keeps `(store_id, url)` unique-key
+   stable across runs (different srsltid each crawl → would
+   look like a new offer every time). */
+function canonicaliseJumiaUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.delete("srsltid");
+    u.searchParams.delete("gclid");
+    u.searchParams.delete("gad_source");
+    u.searchParams.delete("utm_source");
+    u.searchParams.delete("utm_medium");
+    u.searchParams.delete("utm_campaign");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
 
-  if (!sale || !url || !title) return null;
+/* True when the Google organic-result URL points at a Jumia
+   product DETAIL page (ends with .html and includes a numeric
+   product id pattern), false for category / search-result pages
+   (/slp/, /catalog/, /flash-sales/, etc.) — those don't carry
+   product-level price data. */
+function isJumiaProductUrl(url: string): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    if (!u.hostname.endsWith(JUMIA_DOMAIN)) return false;
+    /* Product pages: /<slug>-<digits>.html.
+       Search pages:  /slp/<slug> or /catalog/?q=...
+       Stay strict — false positives here introduce price-less
+       rows into the catalog. */
+    if (!/\.html(\?|$)/i.test(u.pathname + u.search)) return false;
+    if (u.pathname.startsWith("/slp/") || u.pathname.startsWith("/catalog/")) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-  /* Plausibility floor — drop obvious upstream parse errors before
-     the UI sees them. */
+function isNgnCurrency(currency: string | undefined): boolean {
+  if (!currency) return false;
+  const c = currency.trim();
+  /* ₦ glyph, "NGN" code, or "N" prefix all map to NGN. Google
+     sometimes returns the Naira sign as a single char, sometimes
+     as the ISO code, sometimes as the older N-with-stroke. */
+  return c === "₦" || c.toUpperCase() === "NGN" || c === "N";
+}
+
+function mapToDeal(r: GoogleOrganicResult, i: number, country: string): Deal | null {
+  const url    = r.link;
+  const title  = r.title;
+  if (!url || !title) return null;
+  if (!isJumiaProductUrl(url)) return null;
+
+  const ext = r.rich_snippet?.bottom?.detected_extensions ?? {};
+  const sale = ext.price;
+  if (typeof sale !== "number" || sale <= 0) return null;
+  if (!isNgnCurrency(ext.currency)) return null;
+
+  /* Plausibility floor — same intent as the Google Shopping
+     provider, NGN-denominated. */
   const inferredCat = inferCategoryFromTitle(title);
   const floor = inferredCat ? (CATEGORY_NGN_FLOOR[inferredCat] ?? 500) : 500;
   if (sale < floor) return null;
 
-  /* Skip non-deal rows: Jumia returns BOTH on-sale and full-price
-     listings via the search engine. We want sale rows for the
-     ingest path (otherwise we flood the catalog with full-price
-     entries that don't belong in a "deals" feed).
-
-     Two acceptance signals:
-       1. extracted_old_price > extracted_price → real sale
-       2. discount string present and non-zero → seller marked it down
-
-     Live-search mode (called from /api/live-search) doesn't apply
-     this gate — set `acceptAll=true` via the provider's option to
-     keep full-price rows for the comparison view. */
-  const computedDiscount = original && original > sale
-    ? computeDiscount(original, sale)
-    : 0;
-  /* `discount` field present on Jumia but inconsistently formatted
-     — sometimes "−42%", "-42%", "42%", "42% off". Strip non-digit
-     chars and parse what's left as a fallback when prices alone
-     don't give us a discount. */
-  const discountFromString = r.discount
-    ? parseInt(r.discount.replace(/[^\d]/g, ""), 10) || 0
-    : 0;
-  const discountPercent = computedDiscount > 0 ? computedDiscount : discountFromString;
-
-  if (discountPercent === 0) {
-    /* Skip non-deals from the ingest path. Live-search callers
-       set the provider option `acceptAll` (read by the calling
-       code path) — handled in /api/live-search by relaxing the
-       gate after the fact. We keep the gate strict here because
-       /api/live-search has its own filter logic. */
+  /* Stock signal. Google's rich snippet often carries "In stock"
+     / "Out of stock" / "Sold out" as an extension string. Drop
+     OOS rows from the deals path — the user would land on a Jumia
+     page where they can't buy. */
+  const exts = r.rich_snippet?.bottom?.extensions ?? [];
+  const stockText = exts.join(" ").toLowerCase();
+  if (stockText.includes("out of stock") || stockText.includes("sold out")) {
     return null;
   }
 
+  /* Google doesn't surface an "old price" in the organic-result
+     rich snippet for Jumia. We can't compute a real discount %
+     here. Treat the listing as a current-price snapshot —
+     discountPercent=0 — and let downstream surfaces (price
+     spectrum, history table) handle the "is this a deal?" call
+     when more data arrives.
+
+     This means the FLASH-SALE filter on /deals won't include
+     Jumia rows until we get original-price data. The price-
+     comparison spectrum across stores still works because it
+     ranks by current price relative to other stores. */
+  const discountPercent = 0;
+
+  /* Canonical URL — strip Google tracking params so the
+     (store_id, url) unique key is stable across runs. */
+  const canonicalUrl = canonicaliseJumiaUrl(url);
+
   return {
-    /* Synthetic id — same shape as SerpAPI Google Shopping rows.
-       The PDP routes "serp-" prefixed ids to /p/live so the
-       catalog doesn't need a row-level upsert per live-search hit.
-       Ingest path overwrites this with the offer_id from the DB
-       upsert (ingestDeals handles that), so this is only used
-       for the live-search transient path. */
     id: `serp-jumia-${Date.now().toString(36)}-${i}`,
     title,
     description: title,
@@ -183,24 +249,24 @@ function mapToDeal(r: JumiaResult, i: number, country: string): Deal | null {
     categorySlug: "all",
     storeId: "jumia",
     storeName: "Jumia",
-    originalPrice: original ?? sale,
-    salePrice: sale,
+    originalPrice: sale,    // no MSRP available from this path
+    salePrice:     sale,
     discountPercent,
-    /* Jumia is NGN-priced. The DB schema requires NGN | USD; NGN
-       is correct here so downstream price normalisation
-       (priceInNgn) leaves it untouched. */
     currency: "NGN",
-    imageUrl: r.thumbnail,
+    /* No image from the Google organic path. UI falls back to
+       gradient + emoji placeholder. Future: og:image fetch at
+       ingest time. */
+    imageUrl: undefined,
     imageGradient: "linear-gradient(135deg, #ff6e40 0%, #f4511e 100%)",
     imageEmoji: "🛒",
-    url,
+    url: canonicalUrl,
     expiresAt: null,
-    isHot: discountPercent >= 30,
+    isHot: false,
     isFeatured: false,
-    /* country:ng tag so filterDealsForCountry knows to keep this
-       row for NG visitors. The intl tag is OFF — Jumia is NG-
-       anchored, not a cross-border global. */
-    tags: ["Jumia", "Flash Sale", `country:${country}`],
+    /* country:ng tag so filterDealsForCountry keeps this row for
+       NG visitors. The intl tag stays OFF — Jumia is NG-anchored,
+       not a cross-border global. */
+    tags: ["Jumia", `country:${country}`],
     saves: 0,
     clicks: 0,
     postedAt: new Date().toISOString().slice(0, 10),
@@ -211,7 +277,7 @@ function mapToDeal(r: JumiaResult, i: number, country: string): Deal | null {
 
 export const jumiaSerpapiProvider: SearchProvider = {
   id: "serpapi-jumia",
-  name: "SerpAPI Jumia",
+  name: "SerpAPI Jumia (Google site-filter)",
 
   isActive() {
     /* Same kill-switch + key-required pattern as the Google Shopping
@@ -225,27 +291,48 @@ export const jumiaSerpapiProvider: SearchProvider = {
     const apiKey = process.env.SERPAPI_KEY?.trim();
     if (!apiKey) return [];
 
-    const q = query.q.trim();
-    if (!q) return [];
+    const userQuery = query.q.trim();
+    if (!userQuery) return [];
 
-    /* Country defaults to ng. Jumia operates in NG (primary), KE,
-       EG, MA, CI, SN, UG. The engine's jumia_country param accepts
-       ISO-2 codes. */
+    /* country defaults to ng. The provider also accepts other Jumia
+       markets via the country param — switches the domain used for
+       the site: filter. */
     const country = (query.countryCode ?? "ng").toLowerCase();
+    /* Map ISO-2 to Jumia's market domain. NG primary; KE, EG, MA,
+       CI, SN, UG also covered (Jumia's known markets). When the
+       country doesn't map, fall back to .com.ng — losing some
+       Jumia-XX coverage is better than zero ingest. */
+    const jumiaDomain = (() => {
+      switch (country) {
+        case "ke": return "jumia.co.ke";
+        case "eg": return "jumia.com.eg";
+        case "ma": return "jumia.ma";
+        case "ci": return "jumia.ci";
+        case "sn": return "jumia.sn";
+        case "ug": return "jumia.ug";
+        case "ng":
+        default:   return "jumia.com.ng";
+      }
+    })();
+
+    /* Site-filtered Google search. The site: operator scopes to a
+       single domain; we tag NUM up to 30 results per call to make
+       each SerpAPI credit go further. */
+    const siteFilteredQuery = `${userQuery} site:${jumiaDomain}`;
 
     const url = new URL(SERPAPI_ENDPOINT);
-    url.searchParams.set("engine", "jumia");
-    url.searchParams.set("q", q);
-    url.searchParams.set("jumia_country", country);
+    url.searchParams.set("engine", "google");
+    url.searchParams.set("q", siteFilteredQuery);
+    url.searchParams.set("gl", country);
+    url.searchParams.set("hl", "en");
+    url.searchParams.set("num", "30");
     url.searchParams.set("api_key", apiKey);
 
     let res: Response;
     try {
       res = await fetch(url.toString(), {
         /* 10-min revalidate — same window as the Google Shopping
-           provider. Jumia prices move on hours, not minutes; cache
-           keeps SerpAPI credits in check on repeated identical
-           queries (live-search /compare hits). */
+           provider. Jumia prices move on hours, not minutes. */
         next: { revalidate: 600 },
       });
     } catch (err) {
@@ -260,8 +347,13 @@ export const jumiaSerpapiProvider: SearchProvider = {
       );
     }
 
-    const data = (await res.json()) as JumiaResponse;
+    const data = (await res.json()) as GoogleSearchResponse;
     if (data.error) {
+      /* "Google hasn't returned any results for this query" is a
+         normal empty-result signal, not a fatal error. Return [] so
+         the orchestrator continues to the next query. Other error
+         strings (rate limit, bad params) bubble up via throw. */
+      if (/hasn't returned any results/i.test(data.error)) return [];
       throw new ProviderError(this.id, data.error);
     }
 
