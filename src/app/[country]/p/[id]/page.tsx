@@ -35,8 +35,9 @@ import { unstable_cache } from "next/cache";
 import { COUNTRIES } from "@/lib/country";
 import { SITE_URL, buildBreadcrumbList, buildHreflangAlternates } from "@/lib/seo";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
-import { pgFtsFindDupes } from "@/lib/search/pg-fts";
+import { pgFtsFindDupes, pgFtsAnchorOffersByProductId } from "@/lib/search/pg-fts";
 import { isOfferAllowedForCountry, filterDealsForCountry } from "@/lib/country";
+import { effectiveLandedPrice } from "@/lib/landed-price";
 import { usdToNgn } from "@/lib/utils";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 import { getActiveBrowseProvider } from "@/lib/providers";
@@ -549,40 +550,51 @@ export default async function ProductPage({ params }: PageProps) {
      each maps to a Schema.org Product field. */
   const heroData = offerRowToHero(offer);
 
-  /* Count of unique in-stock stores that carry THIS exact product.
-     Drives the "Compare prices across N stores" CTA so the number
-     matches what the user lands on after clicking — /compare's
-     anchor-card header reads "Across N stores" where N is the
-     anchor product's offer count. Same product_id → same count.
+  /* totalStores drives the "Compare prices across N stores" CTA in
+     the hero. N MUST match what /compare's anchor section shows —
+     "Available at" (single store) or "Across N stores" (multi) —
+     so the click-through promise lines up with the destination
+     view. User report May 2026 audit: "Compare across 3 stores"
+     CTA but compare page showed 1 anchor store + alternatives
+     elsewhere, so users read the CTA as a broken count.
 
-     Previous version counted anchor + similar-products' stores,
-     which double-counted retailers and didn't match /compare's
-     display. User report May 2026: "compare price across x stores
-     doesn't align with the number of stores on the compare page."
+     Mirrors /compare's anchor-section pipeline exactly:
+       1. pgFtsAnchorOffersByProductId pools this product + any
+          signature-tight siblings (brand AND model parsed) — same
+          guard pgFtsFindByProductId uses, so the anchor offer set
+          here equals the anchor offer set the compare page renders.
+       2. isOfferAllowedForCountry drops store/currency-country
+          mismatches for non-NG visitors (same as /api/compare's
+          filterByCountry pass).
+       3. Same-store + same-effective-price dedup (rounded to
+          ₦100 buckets, country-aware via effectiveLandedPrice) —
+          mirrors lines 558-566 of /[country]/compare/page.tsx so a
+          retailer listing the product at two near-identical prices
+          (FX rounding noise) doesn't double-count.
 
-     Curated Amazon PDPs (product_id is the synthetic slug, not a
-     real DB row) have a single anchor store — Amazon — so the
-     fallback to 1 is correct for that path. */
-  /* totalStores aligned with what /compare ACTUALLY shows: this
-     anchor + the country/dedup-filtered alternatives. Was previously
-     a separate offers-table COUNT(distinct store_id) which often
-     OVER-counted versus /compare's display (because /compare uses
-     pgFtsFindSimilar on title which can drop products that
-     product_id-grouping would include, and country-filtering removes
-     more on top). User report May 2026: "Compare across 3 stores"
-     CTA but compare page only shows 1 alternative. New formula: 1
-     anchor + filteredDupes.length distinct store entries. The dupes
-     engine already de-duplicates by store-store-title (see filter
-     above), so no double-counting risk. */
-  const dupeStoreSet = new Set(filteredDupes.map((d) => {
-    const best = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
-    return best?.storeId ?? d.key;
-  }));
-  /* Always include the anchor's own store in the total — even if
-     filteredDupes is empty, the user-facing count is "1 store"
-     (this one), not "0 stores". */
-  if (offer.store_id) dupeStoreSet.add(offer.store_id);
-  const totalStores = Math.max(1, dupeStoreSet.size);
+     Curated Amazon PDPs (product_id is a synthetic slug, not a real
+     DB row) return an empty offer array from the helper. The
+     fallback to 1 keeps the CTA copy correct ("Compare prices
+     across stores" without a number) since the anchor at least
+     carries the curated offer itself. */
+  const anchorOffers = await pgFtsAnchorOffersByProductId(offer.product_id);
+  const countryFilteredAnchorOffers = country.code === "ng"
+    ? anchorOffers
+    : anchorOffers.filter((o) => isOfferAllowedForCountry(o, country));
+  const seenAnchorKeys = new Set<string>();
+  const dedupedAnchorOffers = countryFilteredAnchorOffers
+    .filter((o) => o.landedPrice > 0)
+    .filter((o) => {
+      const eff = effectiveLandedPrice(o, country);
+      const key = `${o.storeId}|${Math.round(eff / 100) * 100}`;
+      if (seenAnchorKeys.has(key)) return false;
+      seenAnchorKeys.add(key);
+      return true;
+    });
+  /* Floor at 1 so curated rows + any edge case where filtering
+     wipes the set still render a sensible CTA label (the anchor
+     offer itself is at minimum 1 store). */
+  const totalStores = Math.max(1, dedupedAnchorOffers.length);
   const breadcrumb = buildBreadcrumbList([
     { name: "Havlo",          url: `${SITE_URL}/${country.code}` },
     { name: country.name,     url: `${SITE_URL}/${country.code}` },

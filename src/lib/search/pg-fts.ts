@@ -1262,3 +1262,63 @@ export async function pgFtsFindByProductId(
     dupes,
   };
 }
+
+/* Lightweight anchor-only fetch by product_id. Same pooling logic as
+   pgFtsFindByProductId (this product + signature-tight siblings → run
+   through buildAnchorGroup's in_stock + usable-URL + plausible-price
+   filters) but SKIPS the dupes FTS pipeline.
+
+   Use case: the PDP's "Compare prices across N stores" CTA. The PDP
+   needs N to equal what /compare's anchor section displays as
+   "Across N stores" / "Available at" so the click-through promise
+   matches the destination view. The full pgFtsFindByProductId would
+   work but burns a search_products_fts RPC + per-product offer
+   hydration the PDP doesn't need (the dupes rail uses
+   pgFtsFindDupes already). Returns the same StoreOffer[] shape so
+   the caller can apply isOfferAllowedForCountry + same-store/
+   same-price dedup before counting. */
+export async function pgFtsAnchorOffersByProductId(
+  productId: string,
+): Promise<StoreOffer[]> {
+  const supa = getSupabaseAdmin();
+  if (!supa) return [];
+
+  const { data: product } = await supa
+    .from("products")
+    .select(`
+      id, title, category_slug, brand, image_url, signature,
+      offers (
+        id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
+        stores ( id, name, logo_url, is_international )
+      )
+    `)
+    .eq("id", productId)
+    .maybeSingle();
+
+  if (!product) return [];
+
+  const base = product as unknown as AnchorProduct & { signature: string | null };
+  let anchorPayload: AnchorProduct = base;
+
+  if (isSignatureTightEnoughForPooling(base.signature)) {
+    const { data: siblings } = await supa
+      .from("products")
+      .select(`
+        id, title, category_slug, brand, image_url,
+        offers (
+          id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
+          stores ( id, name, logo_url, is_international )
+        )
+      `)
+      .eq("signature", base.signature)
+      .neq("id", productId);
+    if (siblings && siblings.length > 0) {
+      const baseOffers = (base.offers ?? []) as NestedOffer[];
+      const siblingOffers = (siblings as unknown as Array<{ offers: NestedOffer[] }>)
+        .flatMap((s) => s.offers ?? []);
+      anchorPayload = { ...base, offers: [...baseOffers, ...siblingOffers] };
+    }
+  }
+
+  return buildAnchorGroup(anchorPayload).offers;
+}

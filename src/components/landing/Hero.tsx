@@ -98,7 +98,18 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
       router.push(`/${country.code}/compare?q=${encodeURIComponent(q)}&mode=similar`);
       return;
     }
-    router.push(`/${country.code}/deals?search=${encodeURIComponent(q)}`);
+    /* origin=all forces /deals to skip its default "local"-tab and
+       open the full cross-border pool. Reason: a typed search like
+       "iPhone 17" or "Adidas Samba" is an intent to FIND THE BEST
+       PRICE, not an intent to browse the visitor's local market.
+       Opening on the local tab hides AliExpress / Amazon / Shein /
+       global retailers on the first paint and the user reads the
+       count as "Havlo doesn't have it" — they shouldn't have to
+       discover the tab switch to see what we already indexed.
+       Category pills (goToCategory below) intentionally OMIT
+       origin so they keep the default local-first tab, since a
+       category click is closer to a browse intent. */
+    router.push(`/${country.code}/deals?search=${encodeURIComponent(q)}&origin=all`);
   };
 
   /* Category pill click routes to /deals with the category SLUG
