@@ -198,12 +198,13 @@ async function main() {
      stale). NOT recommended in production crons. */
   const scrapers = [
     // Nigerian stores (en-NG context)
-    /* Jumia disabled — their Cloudflare bot challenge defeats both
-       plain fetch (403) and Playwright-stealth (challenge page in HTML).
-       Real fix: use Jumia's official Affiliate Programme feed (apply
-       at jumia.com.ng/affiliate-program — fast approval). Keeping the
-       scraper code in scrapers/jumia.ts for if/when we either get a
-       residential-proxy provider OR need it as fallback. */
+    /* Jumia disabled in the Playwright path — Cloudflare bot challenge
+       defeats both plain fetch (403) and Playwright-stealth (challenge
+       page in HTML). Active alternative: SerpAPI's dedicated Jumia
+       engine, run via `npm run ingest:jumia`. That hits Jumia's own
+       search API server-side, no scraping. The Playwright code in
+       scrapers/jumia.ts stays parked for if/when we want a free
+       fallback (residential-proxy provider, affiliate API, etc.). */
     // { name: "Jumia",      probe: "https://www.jumia.com.ng/mlp-flash-sales/",     fn: () => scrapeJumia(page) },
     /* 3C Hub — switched to Shopify JSON ingest in May 2026. Probe
        points at www. host (the bare 3chub.com 404s on /search and

@@ -20,6 +20,7 @@ import type { BrowseProvider, SearchProvider } from "./types";
 import { staticBrowseProvider } from "./browse-static";
 import { dbBrowseProvider, dbHasProducts } from "./browse-db";
 import { serpapiSearchProvider } from "./search-serpapi";
+import { jumiaSerpapiProvider } from "./search-jumia-serpapi";
 import { pgFtsSearchProvider } from "./search-pgfts";
 import { kongaSearchProvider } from "./search-konga";
 import { aliexpressSearchProvider } from "./search-aliexpress";
@@ -44,6 +45,11 @@ const SEARCH_PROVIDERS: SearchProvider[] = [
   kongaSearchProvider,
   aliexpressSearchProvider,
   amazonSearchProvider,    // Free; covers .com / .co.uk / .de / .ae / .in
+  /* Jumia via SerpAPI's dedicated jumia engine — fills the NG-local
+     gap that SerpAPI's google_shopping engine can't (Google Shopping
+     doesn't operate in NG). The Playwright Jumia scraper was
+     defeated by Cloudflare in early 2026; this is the active path. */
+  jumiaSerpapiProvider,
   serpapiSearchProvider,
 ];
 
