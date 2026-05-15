@@ -37,7 +37,7 @@ import { SITE_URL, buildBreadcrumbList, buildHreflangAlternates } from "@/lib/se
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { pgFtsFindDupes, pgFtsAnchorOffersByProductId } from "@/lib/search/pg-fts";
 import { isOfferAllowedForCountry, filterDealsForCountry } from "@/lib/country";
-import { effectiveLandedPrice } from "@/lib/landed-price";
+import { computeAnchorStats } from "@/lib/pdp-stats";
 import { usdToNgn } from "@/lib/utils";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 import { getActiveBrowseProvider } from "@/lib/providers";
@@ -447,7 +447,20 @@ export default async function ProductPage({ params }: PageProps) {
        same product (Fashion Nova SKU variants, AliExpress
        multi-seller listings). Different store + same title is a
        legit cross-store alternative and falls through this check
-       because storeTitleKey differs. */
+       because storeTitleKey differs.
+
+       Why TITLE-based (not price-based) dedup here, while the
+       compare anchor section uses PRICE-based dedup:
+         - This list (`filteredDupes`) is DIFFERENT PRODUCTS
+           ranked as alternatives. Same store + same title = same
+           offering presented twice, so collapse to cheapest.
+         - The compare anchor section is THE SAME PRODUCT across
+           stores. Two different effective prices at the same store
+           = two real SKU variants (256GB vs 512GB iPhone, S vs L
+           apparel) so PRICE-based dedup is right there — drop
+           identical-price duplicates, keep different-price ones.
+       Intentional split. If you unify, you change the trust
+       contract on one of the two surfaces. */
     const titleKey = normaliseTitle(d.title);
     const storeTitleKey = `${best?.storeId ?? ""}|${titleKey}`;
     if (seenStoreTitle.has(storeTitleKey)) return false;
@@ -562,94 +575,41 @@ export default async function ProductPage({ params }: PageProps) {
      each maps to a Schema.org Product field. */
   const heroData = offerRowToHero(offer);
 
-  /* totalStores drives the "Compare prices across N stores" CTA in
-     the hero. N MUST match what /compare's anchor section shows —
-     "Available at" (single store) or "Across N stores" (multi) —
-     so the click-through promise lines up with the destination
-     view. User report May 2026 audit: "Compare across 3 stores"
-     CTA but compare page showed 1 anchor store + alternatives
-     elsewhere, so users read the CTA as a broken count.
+  /* Anchor pool stats — drives both the "Compare prices across N
+     stores" CTA in ProductHero AND the PriceComparisonBar's range
+     numbers. Same pool, same dedup, same country filter — the CTA
+     and the bar describe the same scope so they can never disagree.
 
-     Mirrors /compare's anchor-section pipeline exactly:
-       1. pgFtsAnchorOffersByProductId pools this product + any
-          signature-tight siblings (brand AND model parsed) — same
-          guard pgFtsFindByProductId uses, so the anchor offer set
-          here equals the anchor offer set the compare page renders.
-       2. isOfferAllowedForCountry drops store/currency-country
-          mismatches for non-NG visitors (same as /api/compare's
-          filterByCountry pass).
-       3. Same-store + same-effective-price dedup (rounded to
-          ₦100 buckets, country-aware via effectiveLandedPrice) —
-          mirrors lines 558-566 of /[country]/compare/page.tsx so a
-          retailer listing the product at two near-identical prices
-          (FX rounding noise) doesn't double-count.
+     Pipeline (in src/lib/pdp-stats.ts):
+       1. Country filter (NG keeps everything; non-NG drops NG-anchored
+          + foreign-roster rows via isOfferAllowedForCountry).
+       2. Same-store + same-effective-price dedup (₦100 buckets,
+          country-aware via effectiveLandedPrice) — mirrors lines
+          558-566 of /[country]/compare/page.tsx.
+       3. totalStores = max(1, deduped.length); priceStats from
+          min/max of effective prices when ≥ 2 stores remain.
 
      Curated Amazon PDPs (product_id is a synthetic slug, not a real
-     DB row) return an empty offer array from the helper. The
-     fallback to 1 keeps the CTA copy correct ("Compare prices
-     across stores" without a number) since the anchor at least
-     carries the curated offer itself.
+     DB row) return an empty offer array from
+     pgFtsAnchorOffersByProductId. The floor-at-1 inside the helper
+     keeps the CTA copy correct ("Compare prices across stores"
+     without a number) since the anchor at least carries the
+     curated offer itself.
 
      anchorOffers is fetched in parallel with dupes above
      (Promise.all) so the two reads complete in one network
      round-trip rather than two serial ones. */
-  const countryFilteredAnchorOffers = country.code === "ng"
-    ? anchorOffers
-    : anchorOffers.filter((o) => isOfferAllowedForCountry(o, country));
-  const seenAnchorKeys = new Set<string>();
-  const dedupedAnchorOffers = countryFilteredAnchorOffers
-    .filter((o) => o.landedPrice > 0)
-    .filter((o) => {
-      const eff = effectiveLandedPrice(o, country);
-      const key = `${o.storeId}|${Math.round(eff / 100) * 100}`;
-      if (seenAnchorKeys.has(key)) return false;
-      seenAnchorKeys.add(key);
-      return true;
-    });
-  /* Floor at 1 so curated rows + any edge case where filtering
-     wipes the set still render a sensible CTA label (the anchor
-     offer itself is at minimum 1 store). */
-  const totalStores = Math.max(1, dedupedAnchorOffers.length);
+  const { totalStores, priceStats } = computeAnchorStats(
+    anchorOffers,
+    anchorPriceNgn,
+    country,
+  );
   const breadcrumb = buildBreadcrumbList([
     { name: "Havlo",          url: `${SITE_URL}/${country.code}` },
     { name: country.name,     url: `${SITE_URL}/${country.code}` },
     { name: "Products",       url: `${SITE_URL}/${country.code}/deals` },
     { name: offer.title,      url: `${SITE_URL}/${country.code}/p/${offer.offer_id}` },
   ]);
-
-  /* Price-vs-market stats for the PriceComparisonBar.
-
-     Drives "where this offer's price sits among the stores carrying
-     THIS product". Pool = dedupedAnchorOffers (same set the
-     'Compare prices across N stores' CTA counts), so the bar and
-     the CTA describe the exact same scope. Audit May 2026 caught
-     the previous mismatch: bar was fed by filteredDupes — different
-     PRODUCTS — so the 'lowest £X / highest £Y' range described
-     cheaper alternatives rather than other stores carrying the
-     anchor. A £200 iPhone 15 Pro PDP would show 'lowest £40' from
-     a base iPhone 15 dupe, which the user reads as 'iPhone 15 Pro
-     for £40 somewhere' — a broken trust signal.
-
-     Currency contract: every effectiveLandedPrice value is NGN
-     (StoreOffer.price/landedPrice are normalised to NGN at ingest /
-     query time). The bar's formatPriceForUser converts to display
-     currency at render time. Passing user-currency values here
-     would round small-amount products to £0 (May 2026 bug).
-
-     `count` is OTHER stores compared (excludes the anchor offer
-     itself), per the bar's prop contract. Subtract 1 from
-     anchorEffectives.length to get OTHER stores, floored at 0. */
-  const anchorEffectives = dedupedAnchorOffers
-    .map((o) => effectiveLandedPrice(o, country))
-    .filter((p) => p > 0);
-  const priceStats = anchorEffectives.length > 1
-    ? {
-        thisPriceNgn: anchorPriceNgn,
-        lowest:  Math.min(...anchorEffectives),
-        highest: Math.max(...anchorEffectives),
-        count:   anchorEffectives.length - 1,
-      }
-    : undefined;
 
   const productSchema = {
     "@context": "https://schema.org",

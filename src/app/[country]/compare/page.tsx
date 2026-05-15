@@ -2,25 +2,17 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { SearchX, Sparkles, ArrowDown, ExternalLink, Plane, CheckCircle, AlertCircle, Coins, ChevronRight, Star } from "lucide-react";
+import { SearchX, CheckCircle, AlertCircle, Coins } from "lucide-react";
 import Link from "next/link";
 import SearchBar from "@/components/compare/SearchBar";
-import Image from "next/image";
 import PriceResults from "@/components/compare/PriceResults";
-import DupeCard from "@/components/compare/DupeCard";
-import StoreLogo from "@/components/compare/StoreLogo";
+import CompareAnchorCard from "@/components/compare/CompareAnchorCard";
+import DupeMasonry from "@/components/compare/DupeMasonry";
 import LiveResults from "@/components/compare/LiveResults";
 import EmptySearchState from "@/components/empty/EmptySearchState";
 import TrendingChipRail from "@/components/compare/TrendingChipRail";
-import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
-import AnimateIn from "@/components/ui/AnimateIn";
 import DealUnavailableBanner from "@/components/feedback/DealUnavailableBanner";
-import { formatNaira, formatPriceForUser } from "@/lib/utils";
-import { pdpUrlForOffer } from "@/lib/pdp-url";
-import {
-  effectiveLandedPrice, effectiveDeliveryDays, anyCrossBorderForUser, isCrossBorderForUser,
-} from "@/lib/landed-price";
-import { trackClick } from "@/lib/trackClick";
+import { formatNaira } from "@/lib/utils";
 import { sniffToAnchor } from "@/lib/sniff-to-anchor";
 import { getCashbackForUrl } from "@/lib/cashback";
 import { useCountry } from "@/components/providers/CountryProvider";
@@ -447,312 +439,21 @@ function CompareContent() {
       {/* ── SIMILAR — anchor product + cheaper alternatives ── */}
       {!loading && result?.mode === "similar" && (
         <div className="mt-8 sm:mt-10">
-          {/* Anchor hero card */}
-          <div className="relative max-w-3xl mx-auto mb-8 sm:mb-10">
-            <div className="relative rounded-2xl border border-border bg-surface p-4 sm:p-6 overflow-hidden">
-
-              <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
-                {/* Image — full-width on mobile, square on sm+ */}
-                {result.anchor.imageUrl ? (
-                  <div className="w-full sm:w-28 h-40 sm:h-28 rounded-xl overflow-hidden flex-shrink-0 bg-white">
-                    <img
-                      src={result.anchor.imageUrl}
-                      alt={result.anchor.title}
-                      className="w-full h-full object-contain p-2"
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="w-full sm:w-28 h-40 sm:h-28 rounded-xl flex items-center justify-center text-3xl flex-shrink-0"
-                    style={{ background: result.anchor.imageGradient }}
-                  >
-                    {result.anchor.imageEmoji}
-                  </div>
-                )}
-
-                <div className="flex-1 min-w-0 w-full">
-                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-ink-2 bg-surface-2 px-2 py-0.5 rounded">
-                      Your pick
-                    </span>
-                    {result.anchor.brand && (
-                      <span className="text-[10px] uppercase tracking-wider text-ink-3">
-                        {result.anchor.brand}
-                      </span>
-                    )}
-                  </div>
-                  <h2 className="text-[15px] sm:text-lg font-semibold text-ink leading-snug line-clamp-2">
-                    {result.anchor.title}
-                  </h2>
-                  {/* Show price summary line: cheapest store's price as
-                      headline, savings span vs the most expensive store
-                      across the offer set. Both numbers are real to the
-                      user since they come from real offers below. */}
-                  {result.anchor.offers.length > 0 && result.anchor.bestPrice > 0 && (() => {
-                    /* Sort + spread by EFFECTIVE landed price (country-
-                       aware) so a UK shopper looking at a UK retailer
-                       doesn't see a 30% landed estimate baked into the
-                       headline price. effectiveLandedPrice returns
-                       offer.price for stores local-to-user, and
-                       offer.landedPrice only for true cross-border. */
-                    const withEff = result.anchor.offers
-                      .filter((o) => o.landedPrice > 0)
-                      .map((o) => ({ o, eff: effectiveLandedPrice(o, country) }))
-                      .sort((a, b) => a.eff - b.eff);
-                    const cheapest = withEff[0];
-                    const dearest  = withEff[withEff.length - 1];
-                    const spread   = dearest && cheapest && dearest.eff > cheapest.eff
-                      ? dearest.eff - cheapest.eff
-                      : 0;
-                    return (
-                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
-                        <span className="text-lg sm:text-xl font-bold text-ink">
-                          {formatPriceForUser(cheapest?.eff ?? result.anchor.bestPrice, country)}
-                        </span>
-                        {spread > 0 && (
-                          <span className="text-xs text-ink-3">
-                            Save up to <span className="text-success font-semibold">{formatPriceForUser(spread, country)}</span> across stores
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  {result.dupes.length > 0 && result.dupes[0].savingsPercent > 0 && (
-                    <p className="mt-2 text-xs text-success font-medium">
-                      Alternatives from {formatPriceForUser(result.dupes.reduce((min, d) => Math.min(min, d.bestPrice), Infinity), country)}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* ── Store row(s) ───────────────────────────────────
-                  Always render at least one row so the user can
-                  click through to the merchant. When there are 2+
-                  offers, render the full comparison; when there's
-                  exactly one store, render a single clean "go to
-                  store" row (no 'Best price' framing, since there's
-                  nothing to compare it against).
-
-                  Deduped by (storeId, landedPrice rounded to nearest
-                  ₦100): when the query-time signature pool gathers
-                  the same listing from multiple ingest cycles, six
-                  identical AliExpress rows at ₦1,078,896 quietly
-                  surface — visible noise that isn't a comparison.
-                  Same-store + same-price = same listing for UX
-                  purposes; keep the first, drop the rest. Different
-                  prices from the same store DO stay (a retailer
-                  often lists multiple variants — 256GB vs 512GB —
-                  at different prices, and those are real choices).
-
-                  Sorted by landedPrice ascending (cheapest first);
-                  in multi-store mode the top row gets a 'Best price'
-                  badge. */}
-              {result.anchor.offers.length >= 1 && (() => {
-                /* Dedup pass first: collapse same-store + same-price
-                   rows. Round to nearest ₦100 so trivial FX-rounding
-                   differences don't leak through as separate rows.
-                   Keys + sort key now use the COUNTRY-AWARE effective
-                   landed price (no 30% adder for local stores). */
-                const seen = new Set<string>();
-                const deduped = result.anchor.offers
-                  .filter((o) => o.landedPrice > 0)
-                  .filter((o) => {
-                    const eff = effectiveLandedPrice(o, country);
-                    const key = `${o.storeId}|${Math.round(eff / 100) * 100}`;
-                    if (seen.has(key)) return false;
-                    seen.add(key);
-                    return true;
-                  });
-                const sorted = deduped.sort(
-                  (a, b) => effectiveLandedPrice(a, country) - effectiveLandedPrice(b, country),
-                );
-                if (sorted.length === 0) return null;
-                const cheapest = effectiveLandedPrice(sorted[0], country);
-                /* Single-store mode: render a clean go-to-store row.
-                   Drop the green 'Best price' treatment + the star
-                   + the right-side 'Sorted cheapest first' caption
-                   so the row reads as a CTA, not a comparison
-                   winner. User feedback: "if there's only one store,
-                   then show the store". */
-                const isSingleStore = sorted.length === 1;
-                return (
-                  <div className="mt-5 pt-5 border-t border-border">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-3">
-                        {isSingleStore
-                          ? "Available at"
-                          : `Across ${sorted.length.toLocaleString()} stores`}
-                      </p>
-                      {!isSingleStore && (
-                        <p className="text-[11px] text-ink-3">
-                          Sorted cheapest first
-                        </p>
-                      )}
-                    </div>
-                    <ul className="space-y-1.5">
-                      {sorted.map((offer, i) => {
-                        const isBest   = !isSingleStore && i === 0;
-                        const eff      = effectiveLandedPrice(offer, country);
-                        const savings  = eff - cheapest;
-                        const subtitle = (offer.productTitle && offer.productTitle !== result.anchor.title)
-                          ? offer.productTitle
-                          : null;
-                        const offerDeliveryDays = effectiveDeliveryDays(offer, country);
-                        const showCrossBorderTag = isCrossBorderForUser(offer, country);
-                        return (
-                          <li key={`${offer.storeId}-${offer.price}-${i}`}>
-                            {/* Whole row is the click target — Spoken pattern.
-                                Visual chevron at the end implies 'go to this
-                                store'. Less chrome than a separate button,
-                                bigger tap area on mobile.
-
-                                Click model (May 2026 user request): route
-                                to the PDP for this offer instead of
-                                jumping straight outbound. Matches the
-                                site-wide "PDP before merchant" pattern
-                                used on /deals, TrendingDeals, and the
-                                PDP "You may also like" rail. The PDP
-                                reveals the price-bar, cashback rate at
-                                this specific store, delivery estimate,
-                                and a clear "View at {Merchant}" CTA
-                                that fires the same /api/go affiliate
-                                wrap — so revenue is unchanged, just
-                                one extra fast internal page view per
-                                click. pdpUrlForOffer falls back to
-                                /p/live for synthetic offers (no
-                                offerId), so live SerpAPI rows still
-                                land on a meaningful page. */}
-                            <a
-                              href={pdpUrlForOffer(country.code, offer)}
-                              onClick={() => trackClick(result.anchor.key, query, i, "anchor-comparison")}
-                              className={`group flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                                isBest
-                                  ? "border-success/40 bg-success/5 hover:bg-success/10"
-                                  : "border-border bg-bg/50 hover:border-border-strong hover:bg-surface-2/50"
-                              }`}
-                            >
-                              {/* Shared <StoreLogo> handles bg + border
-                                  + letter fallback when the logo file
-                                  404s (long-tail SerpAPI seller
-                                  storeIds like walmart-techmate-intl,
-                                  93mobiles, etc.). */}
-                              <StoreLogo
-                                storeId={offer.storeId}
-                                storeName={offer.storeName}
-                                storeLogoUrl={offer.storeLogoUrl}
-                                size={40}
-                              />
-
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {/* Star icon for best price — Spoken pattern.
-                                      Inline with the store name rather than a
-                                      separate badge, less visual noise. */}
-                                  {isBest && (
-                                    <Star
-                                      size={13}
-                                      strokeWidth={2}
-                                      className="text-success fill-success shrink-0"
-                                      aria-label="Best price"
-                                    />
-                                  )}
-                                  <span className="text-sm font-semibold text-ink truncate">
-                                    {offer.storeName}
-                                  </span>
-                                  {offer.isInternational && (
-                                    <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-500 shrink-0">
-                                      <Plane size={10} /> Cross-border
-                                    </span>
-                                  )}
-                                </div>
-                                {/* Subtitle: how the product is titled at this
-                                    store. Surfaces the proof that pooled
-                                    offers really are the same item. Falls
-                                    back to delivery info when the per-store
-                                    title matches the anchor. */}
-                                {subtitle ? (
-                                  <p className="text-[11px] text-ink-3 mt-0.5 truncate">
-                                    {subtitle}
-                                  </p>
-                                ) : (
-                                  <p className="text-[11px] text-ink-3 mt-0.5">
-                                    {offerDeliveryDays
-                                      ? `${offerDeliveryDays} ${offerDeliveryDays === 1 ? "day" : "days"} delivery`
-                                      : "Delivery varies"}
-                                  </p>
-                                )}
-                              </div>
-
-                              <div className="text-right shrink-0">
-                                <p className={`text-base font-bold tabular-nums ${isBest ? "text-success" : "text-ink"}`}>
-                                  {formatPriceForUser(eff, country)}
-                                </p>
-                                {savings > 0 && (
-                                  <p className="text-[11px] text-ink-3 tabular-nums">
-                                    +{formatPriceForUser(savings, country)}
-                                  </p>
-                                )}
-                              </div>
-
-                              <ChevronRight
-                                size={16}
-                                strokeWidth={2}
-                                className="shrink-0 text-ink-3 group-hover:text-ink-2 transition-colors"
-                                aria-hidden="true"
-                              />
-                            </a>
-                          </li>
-                        );
-                      })}
-                    </ul>
-
-                    {/* Always-visible landed-cost disclosure. Gated on
-                        anyCrossBorderForUser — i.e. ONLY when at least
-                        one row in the displayed table is cross-border
-                        FOR THIS VISITOR. Previous gate used the raw
-                        `o.isInternational` DB flag, so the disclaimer
-                        appeared even on UK retailer rows for UK users
-                        (Currys / Argos / John Lewis all carry the flag
-                        because SerpAPI normalises them to USD). */}
-                    {anyCrossBorderForUser(sorted, country) && (
-                      <p className="mt-3 text-[11px] text-ink-3 leading-relaxed">
-                        <span className="text-amber-500">⚑</span>{" "}
-                        Cross-border prices include a ~30% landed estimate (shipping + customs).
-                        Final total varies by carrier and customs assessment.
-                      </p>
-                    )}
-                    {/* Affiliate disclosure — inline at the click-out
-                        point, the moment the FTC's clear-and-conspicuous
-                        standard most cares about. Tiny visual weight so
-                        it doesn't compete with prices, but always present
-                        on every comparison surface. Mirrors the
-                        Wirecutter / NYT pattern of putting the
-                        disclosure right where commercial action happens. */}
-                    <p className="mt-2 text-[10px] text-ink-3/85 leading-relaxed">
-                      The price you pay doesn&apos;t change, and we never adjust ranking based on who pays us.{" "}
-                      <Link href={`/how-we-make-money`} className="underline underline-offset-2 hover:text-ink-2 transition-colors">
-                        How this works
-                      </Link>
-                    </p>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Connector */}
-            {result.dupes.length > 0 && (
-              <div className="flex flex-col items-center mt-5 mb-2">
-                <div className="w-px h-6 bg-border" />
-                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-success/10 border border-success/20">
-                  <ArrowDown size={12} className="text-success" />
-                  <span className="text-xs font-semibold text-success">
-                    {result.dupes.length.toLocaleString()} alternative{result.dupes.length > 1 ? "s" : ""} found
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Anchor hero card (extracted May 2026, phase 3 refactor).
+              Owns the image + title + price-summary + store-rows
+              + cross-border / affiliate disclosures + the connector
+              chip that bridges into the dupes grid. ~290 LoC of JSX
+              + two IIFEs pulled out of this file. See
+              components/compare/CompareAnchorCard.tsx for the
+              dedup pipeline (mirrors lib/pdp-stats.computeAnchorStats
+              so the PDP's "Compare prices across N stores" CTA
+              count equals what shows here). */}
+          <CompareAnchorCard
+            anchor={result.anchor}
+            dupes={result.dupes}
+            country={country}
+            query={query}
+          />
 
           {/* Dupes grid */}
           {result.dupes.length > 0 ? (
@@ -901,54 +602,6 @@ function CompareContent() {
         );
       })()}
     </div>
-  );
-}
-
-/* ── Masonry layout for dupes ─────────────────────────────────────
-   Renders three column-distributed layouts (mobile/tablet/desktop)
-   so cards flow left-to-right with varied heights from cycled aspects. */
-function DupeColumn({
-  items, gapClass, startIndex, query,
-}: { items: DupeResult[]; gapClass: string; startIndex: number; query: string }) {
-  return (
-    <div className={`flex-1 flex flex-col ${gapClass} min-w-0`}>
-      {items.map((dupe, i) => (
-        <AnimateIn key={dupe.key} delay={Math.min(i, 6) * 60}>
-          <DupeCard
-            dupe={dupe}
-            rank={startIndex + i}
-            query={query}
-            mode="similar"
-            aspect={MASONRY_ASPECTS[(startIndex + i) % MASONRY_ASPECTS.length]}
-          />
-        </AnimateIn>
-      ))}
-    </div>
-  );
-}
-
-function DupeMasonry({ dupes, query }: { dupes: DupeResult[]; query: string }) {
-  const mobileCols  = chunkLeftToRight(dupes, 2);
-  const tabletCols  = chunkLeftToRight(dupes, 3);
-  const desktopCols = chunkLeftToRight(dupes, 4);
-  return (
-    <>
-      <div className="flex gap-3 sm:hidden">
-        {mobileCols.map((col, i) => (
-          <DupeColumn key={i} items={col} gapClass="gap-3" startIndex={i * 100} query={query} />
-        ))}
-      </div>
-      <div className="hidden sm:flex lg:hidden gap-3">
-        {tabletCols.map((col, i) => (
-          <DupeColumn key={i} items={col} gapClass="gap-3" startIndex={i * 100} query={query} />
-        ))}
-      </div>
-      <div className="hidden lg:flex gap-4">
-        {desktopCols.map((col, i) => (
-          <DupeColumn key={i} items={col} gapClass="gap-4" startIndex={i * 100} query={query} />
-        ))}
-      </div>
-    </>
   );
 }
 

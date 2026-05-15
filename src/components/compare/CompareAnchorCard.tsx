@@ -1,0 +1,300 @@
+"use client";
+
+/* Anchor hero card for the /compare page.
+
+   Extracted from the compare/page.tsx top-level CompareContent
+   component (May 2026 audit, phase 3 decomposition). The inline
+   anchor card was ~290 lines of JSX + two IIFEs inside the parent
+   page. As a separate component it's easier to reason about, can
+   memoize render work, and keeps compare/page.tsx focused on the
+   data-fetching state machine.
+
+   Rendered when SearchOutput.mode === "similar". Three nested
+   visual blocks:
+     1. Product info (image + brand + title + price summary + alts hint)
+     2. Store rows (deduped anchor offers, sorted by effective price)
+     3. Disclosures (cross-border landed estimate + affiliate)
+     4. Connector chip (only when dupes.length > 0)
+
+   Compare-pool dedup matches the PDP's totalStores / priceStats
+   pipeline (src/lib/pdp-stats.ts) so the count rendered here equals
+   the "Compare prices across N stores" CTA on the originating PDP.
+   Audit May 2026 caught that mismatch. */
+
+import Image from "next/image";
+import Link from "next/link";
+import { Star, Plane, ChevronRight, ArrowDown } from "lucide-react";
+import { formatPriceForUser } from "@/lib/utils";
+import { pdpUrlForOffer } from "@/lib/pdp-url";
+import {
+  effectiveLandedPrice,
+  effectiveDeliveryDays,
+  anyCrossBorderForUser,
+  isCrossBorderForUser,
+} from "@/lib/landed-price";
+import { trackClick } from "@/lib/trackClick";
+import StoreLogo from "@/components/compare/StoreLogo";
+import type { Country } from "@/lib/country";
+import type { ProductGroup, DupeResult } from "@/lib/search";
+
+interface Props {
+  anchor: ProductGroup;
+  dupes:  DupeResult[];
+  country: Country;
+  query:  string;
+}
+
+export default function CompareAnchorCard({ anchor, dupes, country, query }: Props) {
+  /* Price summary line — cheapest store's price as headline,
+     spread vs the most-expensive store ("save up to X across
+     stores"). Sort by EFFECTIVE landed price (country-aware) so
+     UK shoppers looking at a UK retailer don't see a 30% landed
+     adder baked into the headline. */
+  const withEff = anchor.offers
+    .filter((o) => o.landedPrice > 0)
+    .map((o) => ({ o, eff: effectiveLandedPrice(o, country) }))
+    .sort((a, b) => a.eff - b.eff);
+  const cheapest = withEff[0];
+  const dearest  = withEff[withEff.length - 1];
+  const spread   = dearest && cheapest && dearest.eff > cheapest.eff
+    ? dearest.eff - cheapest.eff
+    : 0;
+
+  /* Deduped store rows — same-store + same-effective-price (rounded
+     to ₦100 buckets) collapses identical AliExpress listings from
+     multiple ingest cycles into a single row. Different prices
+     from the same store stay (256GB vs 512GB SKU variants are
+     real choices). Mirrors lines 558-566 of the pre-refactor
+     compare/page.tsx exactly. */
+  const seenRowKeys = new Set<string>();
+  const sortedRows = anchor.offers
+    .filter((o) => o.landedPrice > 0)
+    .filter((o) => {
+      const eff = effectiveLandedPrice(o, country);
+      const key = `${o.storeId}|${Math.round(eff / 100) * 100}`;
+      if (seenRowKeys.has(key)) return false;
+      seenRowKeys.add(key);
+      return true;
+    })
+    .sort((a, b) => effectiveLandedPrice(a, country) - effectiveLandedPrice(b, country));
+
+  const rowsCheapest    = sortedRows.length > 0 ? effectiveLandedPrice(sortedRows[0], country) : 0;
+  const isSingleStore   = sortedRows.length === 1;
+  const hasDupes        = dupes.length > 0;
+  const cheapestDupeBest = hasDupes ? dupes.reduce((min, d) => Math.min(min, d.bestPrice), Infinity) : 0;
+
+  return (
+    <div className="relative max-w-3xl mx-auto mb-8 sm:mb-10">
+      <div className="relative rounded-2xl border border-border bg-surface p-4 sm:p-6 overflow-hidden">
+
+        <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
+          {/* Image — LCP candidate on /compare for clicks landing
+              via PDP CTAs, so next/image with priority cuts a
+              ~200ms decode + paint. width/height match the
+              sm:w-28 / sm:h-28 cell (112px CSS, 224 for retina). */}
+          {anchor.imageUrl ? (
+            <div className="relative w-full sm:w-28 h-40 sm:h-28 rounded-xl overflow-hidden flex-shrink-0 bg-white">
+              <Image
+                src={anchor.imageUrl}
+                alt={anchor.title}
+                fill
+                sizes="(max-width: 640px) 100vw, 112px"
+                priority
+                className="object-contain p-2"
+              />
+            </div>
+          ) : (
+            <div
+              className="w-full sm:w-28 h-40 sm:h-28 rounded-xl flex items-center justify-center text-3xl flex-shrink-0"
+              style={{ background: anchor.imageGradient }}
+            >
+              {anchor.imageEmoji}
+            </div>
+          )}
+
+          <div className="flex-1 min-w-0 w-full">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-ink-2 bg-surface-2 px-2 py-0.5 rounded">
+                Your pick
+              </span>
+              {anchor.brand && (
+                <span className="text-[10px] uppercase tracking-wider text-ink-3">
+                  {anchor.brand}
+                </span>
+              )}
+            </div>
+            <h2 className="text-[15px] sm:text-lg font-semibold text-ink leading-snug line-clamp-2">
+              {anchor.title}
+            </h2>
+
+            {anchor.offers.length > 0 && anchor.bestPrice > 0 && (
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
+                <span className="text-lg sm:text-xl font-bold text-ink">
+                  {formatPriceForUser(cheapest?.eff ?? anchor.bestPrice, country)}
+                </span>
+                {spread > 0 && (
+                  <span className="text-xs text-ink-3">
+                    Save up to <span className="text-success font-semibold">{formatPriceForUser(spread, country)}</span> across stores
+                  </span>
+                )}
+              </div>
+            )}
+
+            {hasDupes && dupes[0].savingsPercent > 0 && (
+              <p className="mt-2 text-xs text-success font-medium">
+                Alternatives from {formatPriceForUser(cheapestDupeBest, country)}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {sortedRows.length >= 1 && (
+          <div className="mt-5 pt-5 border-t border-border">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-3">
+                {isSingleStore
+                  ? "Available at"
+                  : `Across ${sortedRows.length.toLocaleString()} stores`}
+              </p>
+              {!isSingleStore && (
+                <p className="text-[11px] text-ink-3">
+                  Sorted cheapest first
+                </p>
+              )}
+            </div>
+            <ul className="space-y-1.5">
+              {sortedRows.map((offer, i) => {
+                const isBest   = !isSingleStore && i === 0;
+                const eff      = effectiveLandedPrice(offer, country);
+                const savings  = eff - rowsCheapest;
+                const subtitle = (offer.productTitle && offer.productTitle !== anchor.title)
+                  ? offer.productTitle
+                  : null;
+                const deliveryDays = effectiveDeliveryDays(offer, country);
+                const isXBorder    = isCrossBorderForUser(offer, country);
+                return (
+                  <li key={`${offer.storeId}-${offer.price}-${i}`}>
+                    {/* Whole row is the click target — Spoken pattern.
+                        Routes to the PDP for this offer, not directly
+                        outbound. PDP-first click model is consistent
+                        across /deals, TrendingDeals, the PDP "You may
+                        also like" rail, and this anchor row.
+                        pdpUrlForOffer falls back to /p/live for
+                        synthetic offers. */}
+                    <a
+                      href={pdpUrlForOffer(country.code, offer)}
+                      onClick={() => trackClick(anchor.key, query, i, "anchor-comparison")}
+                      className={`group flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                        isBest
+                          ? "border-success/40 bg-success/5 hover:bg-success/10"
+                          : "border-border bg-bg/50 hover:border-border-strong hover:bg-surface-2/50"
+                      }`}
+                    >
+                      <StoreLogo
+                        storeId={offer.storeId}
+                        storeName={offer.storeName}
+                        storeLogoUrl={offer.storeLogoUrl}
+                        size={40}
+                      />
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {isBest && (
+                            <Star
+                              size={13}
+                              strokeWidth={2}
+                              className="text-success fill-success shrink-0"
+                              aria-label="Best price"
+                            />
+                          )}
+                          <span className="text-sm font-semibold text-ink truncate">
+                            {offer.storeName}
+                          </span>
+                          {/* Cross-border tag — uses isCrossBorderForUser
+                              (visitor-aware) rather than the raw
+                              isInternational DB flag, so a UK retailer
+                              doesn't carry the tag for a UK user even
+                              though the row was ingested USD-normalised.
+                              Same fix shape as DupeCard / MasonryCard. */}
+                          {isXBorder && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-500 shrink-0">
+                              <Plane size={10} /> Cross-border
+                            </span>
+                          )}
+                        </div>
+                        {subtitle ? (
+                          <p className="text-[11px] text-ink-3 mt-0.5 truncate">
+                            {subtitle}
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-ink-3 mt-0.5">
+                            {deliveryDays
+                              ? `${deliveryDays} ${deliveryDays === 1 ? "day" : "days"} delivery`
+                              : "Delivery varies"}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <p className={`text-base font-bold tabular-nums ${isBest ? "text-success" : "text-ink"}`}>
+                          {formatPriceForUser(eff, country)}
+                        </p>
+                        {savings > 0 && (
+                          <p className="text-[11px] text-ink-3 tabular-nums">
+                            +{formatPriceForUser(savings, country)}
+                          </p>
+                        )}
+                      </div>
+
+                      <ChevronRight
+                        size={16}
+                        strokeWidth={2}
+                        className="shrink-0 text-ink-3 group-hover:text-ink-2 transition-colors"
+                        aria-hidden="true"
+                      />
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Cross-border landed-cost disclosure — gated on
+                anyCrossBorderForUser (visitor-aware) so it doesn't
+                surface for UK-shopper-looking-at-UK-retailer rows. */}
+            {anyCrossBorderForUser(sortedRows, country) && (
+              <p className="mt-3 text-[11px] text-ink-3 leading-relaxed">
+                <span className="text-amber-500">⚑</span>{" "}
+                Cross-border prices include a ~30% landed estimate (shipping + customs).
+                Final total varies by carrier and customs assessment.
+              </p>
+            )}
+            {/* Affiliate disclosure — inline at the click-out point,
+                FTC clear-and-conspicuous standard. Tiny visual weight
+                but always present on every comparison surface. */}
+            <p className="mt-2 text-[10px] text-ink-3/85 leading-relaxed">
+              The price you pay doesn&apos;t change, and we never adjust ranking based on who pays us.{" "}
+              <Link href={`/how-we-make-money`} className="underline underline-offset-2 hover:text-ink-2 transition-colors">
+                How this works
+              </Link>
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Connector chip — only shows when there are dupes below.
+          Visually links the anchor card to the cheaper-alternatives
+          grid that follows. */}
+      {hasDupes && (
+        <div className="flex flex-col items-center mt-5 mb-2">
+          <div className="w-px h-6 bg-border" />
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-success/10 border border-success/20">
+            <ArrowDown size={12} className="text-success" />
+            <span className="text-xs font-semibold text-success">
+              {dupes.length.toLocaleString()} alternative{dupes.length > 1 ? "s" : ""} found
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
