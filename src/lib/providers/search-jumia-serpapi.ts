@@ -105,6 +105,24 @@ interface GoogleSearchResponse {
   error?:           string;
 }
 
+/* google_images sub-engine result shape — used to enrich the
+   organic-result rows with product images. The `engine=google`
+   response doesn't carry images; google_images does, with a
+   direct CDN URL under `original`. We do TWO parallel SerpAPI
+   calls per ingest query (google + google_images), match by
+   canonical Jumia URL, and attach the image. */
+interface GoogleImagesResult {
+  link?:     string;     // the destination URL (Jumia product page)
+  thumbnail?: string;    // SerpAPI proxy (expires; not used)
+  original?: string;     // direct image CDN URL (Jumia: ng.jumia.is/...)
+  in_stock?: boolean;
+}
+
+interface GoogleImagesResponse {
+  images_results?: GoogleImagesResult[];
+  error?:          string;
+}
+
 /* ── Mapping helpers ─────────────────────────────────────────────── */
 
 /* USD-equivalent floor (re-using SerpAPI Google Shopping's table
@@ -197,7 +215,12 @@ function isNgnCurrency(currency: string | undefined): boolean {
   return c === "₦" || c.toUpperCase() === "NGN" || c === "N";
 }
 
-function mapToDeal(r: GoogleOrganicResult, i: number, country: string): Deal | null {
+function mapToDeal(
+  r: GoogleOrganicResult,
+  i: number,
+  country: string,
+  imageByUrl: Map<string, string>,
+): Deal | null {
   const url    = r.link;
   const title  = r.title;
   if (!url || !title) return null;
@@ -238,8 +261,16 @@ function mapToDeal(r: GoogleOrganicResult, i: number, country: string): Deal | n
   const discountPercent = 0;
 
   /* Canonical URL — strip Google tracking params so the
-     (store_id, url) unique key is stable across runs. */
+     (store_id, url) unique key is stable across runs. Same
+     canonicalisation runs on the google_images side, so URL
+     keys match between the two responses. */
   const canonicalUrl = canonicaliseJumiaUrl(url);
+
+  /* Image from the parallel google_images call. Key match is
+     canonical URL after srsltid + tracking strip. Falls back to
+     undefined (gradient + emoji placeholder) when the images
+     call returned nothing or failed. */
+  const imageUrl = imageByUrl.get(canonicalUrl);
 
   return {
     id: `serp-jumia-${Date.now().toString(36)}-${i}`,
@@ -253,10 +284,7 @@ function mapToDeal(r: GoogleOrganicResult, i: number, country: string): Deal | n
     salePrice:     sale,
     discountPercent,
     currency: "NGN",
-    /* No image from the Google organic path. UI falls back to
-       gradient + emoji placeholder. Future: og:image fetch at
-       ingest time. */
-    imageUrl: undefined,
+    imageUrl,
     imageGradient: "linear-gradient(135deg, #ff6e40 0%, #f4511e 100%)",
     imageEmoji: "🛒",
     url: canonicalUrl,
@@ -315,30 +343,46 @@ export const jumiaSerpapiProvider: SearchProvider = {
       }
     })();
 
-    /* Site-filtered Google search. The site: operator scopes to a
-       single domain; we tag NUM up to 30 results per call to make
-       each SerpAPI credit go further. */
+    /* Site-filtered query string — reused for both the organic
+       (price-bearing) Google call AND the parallel google_images
+       call (image-bearing). The site: operator scopes both to
+       the same Jumia domain so the image results are matched to
+       the same product set. */
     const siteFilteredQuery = `${userQuery} site:${jumiaDomain}`;
 
-    const url = new URL(SERPAPI_ENDPOINT);
-    url.searchParams.set("engine", "google");
-    url.searchParams.set("q", siteFilteredQuery);
-    url.searchParams.set("gl", country);
-    url.searchParams.set("hl", "en");
-    url.searchParams.set("num", "30");
-    url.searchParams.set("api_key", apiKey);
+    const googleUrl = new URL(SERPAPI_ENDPOINT);
+    googleUrl.searchParams.set("engine", "google");
+    googleUrl.searchParams.set("q", siteFilteredQuery);
+    googleUrl.searchParams.set("gl", country);
+    googleUrl.searchParams.set("hl", "en");
+    googleUrl.searchParams.set("num", "30");
+    googleUrl.searchParams.set("api_key", apiKey);
 
-    let res: Response;
-    try {
-      res = await fetch(url.toString(), {
-        /* 10-min revalidate — same window as the Google Shopping
-           provider. Jumia prices move on hours, not minutes. */
-        next: { revalidate: 600 },
-      });
-    } catch (err) {
-      throw new ProviderError(this.id, "Network error contacting SerpAPI", err);
+    const imagesUrl = new URL(SERPAPI_ENDPOINT);
+    imagesUrl.searchParams.set("engine", "google_images");
+    imagesUrl.searchParams.set("q", siteFilteredQuery);
+    imagesUrl.searchParams.set("gl", country);
+    imagesUrl.searchParams.set("hl", "en");
+    imagesUrl.searchParams.set("api_key", apiKey);
+
+    /* Two SerpAPI calls per query, run in parallel:
+         google → prices (rich_snippet.detected_extensions)
+         google_images → image URLs (results[].original)
+       Merge by canonical Jumia URL. The images call adds one
+       SerpAPI credit per query, doubling per-query cost (~$0.005)
+       — net ingest cost still well within plan budget given the
+       29-query curated list. Images call wrapped in Promise.all
+       Settled so a failed images request doesn't kill the run;
+       we degrade to imageless rows when that branch fails. */
+    const [googleSettled, imagesSettled] = await Promise.allSettled([
+      fetch(googleUrl.toString(), { next: { revalidate: 600 } }),
+      fetch(imagesUrl.toString(), { next: { revalidate: 600 } }),
+    ]);
+
+    if (googleSettled.status === "rejected") {
+      throw new ProviderError(this.id, "Network error contacting SerpAPI", googleSettled.reason);
     }
-
+    const res = googleSettled.value;
     if (!res.ok) {
       const body = await res.text().catch(() => "<no body>");
       throw new ProviderError(
@@ -346,22 +390,38 @@ export const jumiaSerpapiProvider: SearchProvider = {
         `SerpAPI HTTP ${res.status}: ${body.slice(0, 300)}`,
       );
     }
-
     const data = (await res.json()) as GoogleSearchResponse;
     if (data.error) {
-      /* "Google hasn't returned any results for this query" is a
-         normal empty-result signal, not a fatal error. Return [] so
-         the orchestrator continues to the next query. Other error
-         strings (rate limit, bad params) bubble up via throw. */
       if (/hasn't returned any results/i.test(data.error)) return [];
       throw new ProviderError(this.id, data.error);
+    }
+
+    /* Build URL → image map from google_images results. We strip
+       Google's `srsltid` + tracking params via canonicaliseJumiaUrl
+       so the URL keys agree across the google and google_images
+       responses (Google generates different srsltid tokens per
+       engine + per request). Failures here non-fatal — degrade
+       to imageless rows. */
+    const imageByUrl = new Map<string, string>();
+    if (imagesSettled.status === "fulfilled" && imagesSettled.value.ok) {
+      try {
+        const imagesJson = await imagesSettled.value.json() as GoogleImagesResponse;
+        for (const img of imagesJson.images_results ?? []) {
+          if (!img.link || !img.original) continue;
+          const canon = canonicaliseJumiaUrl(img.link);
+          /* First image wins. Google often returns multiple variant
+             images for the same product page; the first is usually
+             the primary listing photo. */
+          if (!imageByUrl.has(canon)) imageByUrl.set(canon, img.original);
+        }
+      } catch { /* silent — imageless fallback */ }
     }
 
     const results = data.organic_results ?? [];
     const limit = query.limit ?? 24;
 
     const mapped = results
-      .map((r, i) => mapToDeal(r, i, country))
+      .map((r, i) => mapToDeal(r, i, country, imageByUrl))
       .filter((d): d is Deal => d !== null);
 
     return mapped.slice(0, limit);

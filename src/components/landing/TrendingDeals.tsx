@@ -104,7 +104,18 @@ export default async function TrendingDeals({ country }: { country: Country }) {
   const rng = makeRng(freshnessSeed());
 
   /* Build the candidate pool. NG users get both local NGN + intl USD
-     pools merged; non-NG users only see intl filtered to their country. */
+     pools merged; non-NG users only see intl filtered to their country.
+
+     NG-only third pool — `localFresh` — fetches 0%-discount local
+     inventory sorted by newest. This is the bridge for retailers
+     whose ingest path doesn't carry original_price metadata
+     (Jumia via SerpAPI Google site-filter, Bitmarte, HealthPlus,
+     etc). Without this pool they're invisible on the homepage
+     because the discount>=15 floor on the other two pools
+     excludes every row with discountPercent=0. Per-store cap in
+     the bucket fill still prevents any single fresh-only store
+     from dominating; the freshness sort keeps the rotation
+     pointing at the most recently scraped inventory. */
   let pool: Deal[];
   if (!isNG) {
     const raw = await provider.fetchDeals({
@@ -112,13 +123,15 @@ export default async function TrendingDeals({ country }: { country: Country }) {
     });
     pool = filterDealsForCountry(raw.filter(qualityFilter), country);
   } else {
-    const [localPool, intlPool] = await Promise.all([
+    const [localPool, intlPool, localFreshPool] = await Promise.all([
       provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "local" }),
       provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "intl" }),
+      provider.fetchDeals({ sort: "newest",   minDiscount: 0,  origin: "local" }),
     ]);
     pool = [
       ...localPool.filter(qualityFilter),
       ...intlPool.filter(qualityFilter),
+      ...localFreshPool.filter(qualityFilter),
     ];
   }
 
