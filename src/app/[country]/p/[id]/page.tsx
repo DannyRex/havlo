@@ -40,8 +40,8 @@ import { isOfferAllowedForCountry, filterDealsForCountry } from "@/lib/country";
 import { computeAnchorStats } from "@/lib/pdp-stats";
 import { fetchProductPriceHistory, rollupPriceHistory } from "@/lib/search/price-history";
 import { partitionDupesByVariantMatch, variantOffers } from "@/lib/search/variant-pooling";
+import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
 import { usdToNgn } from "@/lib/utils";
-import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getCategory } from "@/lib/data/categories";
 import JsonLd from "@/components/seo/JsonLd";
@@ -63,130 +63,11 @@ interface PageProps {
 }
 
 /* ── Data fetch ──────────────────────────────────────────────────── */
-
-interface OfferRow {
-  offer_id: string;
-  product_id: string;
-  store_id: string;
-  url: string;
-  current_price: number;
-  original_price: number | null;
-  discount_percent: number | null;
-  currency: "NGN" | "USD";
-  scraped_at: string;
-  /** Undefined when sourced from product_best_offers (the view
-      filters for in_stock=true by construction and the column
-      doesn't propagate). Treated as "in stock" downstream. */
-  in_stock: boolean | undefined;
-  title: string;
-  category_slug: string | null;
-  brand: string | null;
-  image_url: string | null;
-  store_name: string;
-  store_logo_url: string | null;
-}
-
-/* Fetch a single offer by its ID. Three sources, tried in order:
-     1. product_best_offers view (fast, ~50% of /deals clicks).
-     2. offers + products + stores manual join (every DB-backed offer).
-     3. curated-amazon static catalogue (the in-memory baseline for
-        Amazon's 5 marketplaces, IDs like `amazon-us-iphone-15-pro-max`
-        that aren't in the DB at all).
-   Returns null on miss → page falls through to notFound(). */
-async function fetchOffer(offerId: string): Promise<OfferRow | null> {
-  const supa = getSupabaseAdmin();
-
-  /* Try the joined view first. */
-  if (supa) {
-    const { data: viewRow } = await supa
-      .from("product_best_offers")
-      .select("*")
-      .eq("offer_id", offerId)
-      .maybeSingle();
-
-    if (viewRow) {
-      /* The product_best_offers view filters for in_stock=true via a
-         lateral join and drops the column from its projection. Default
-         to true so the out-of-stock badge doesn't misfire across every
-         PDP (the bug user reported May 2026: "all products say Last
-         seen unavailable"). */
-      return {
-        ...(viewRow as Omit<OfferRow, "in_stock">),
-        in_stock: true,
-      };
-    }
-
-    /* Fall back to the offers + products + stores join. Slower (two
-       more network hops) but covers every offer in the catalog. */
-    const { data: offer } = await supa
-      .from("offers")
-      .select("id, product_id, store_id, url, current_price, original_price, discount_percent, currency, in_stock, scraped_at")
-      .eq("id", offerId)
-      .maybeSingle();
-
-    if (offer) {
-      const [{ data: product }, { data: store }] = await Promise.all([
-        supa.from("products").select("title, category_slug, brand, image_url").eq("id", offer.product_id).maybeSingle(),
-        supa.from("stores").select("name, logo_url").eq("id", offer.store_id).maybeSingle(),
-      ]);
-      if (product && store) {
-        return {
-          offer_id: offer.id,
-          product_id: offer.product_id,
-          store_id: offer.store_id,
-          url: offer.url,
-          current_price: offer.current_price,
-          original_price: offer.original_price,
-          discount_percent: offer.discount_percent,
-          currency: offer.currency as "NGN" | "USD",
-          scraped_at: offer.scraped_at,
-          /* offers.in_stock has a `default true` in the schema so a
-             missing/null value is treated as in-stock. Only explicit
-             false renders the out-of-stock tile in ProductHero. */
-          in_stock: offer.in_stock ?? true,
-          title: product.title,
-          category_slug: product.category_slug,
-          brand: product.brand,
-          image_url: product.image_url,
-          store_name: store.name,
-          store_logo_url: store.logo_url,
-        };
-      }
-    }
-  }
-
-  /* Curated Amazon fallback — handles IDs like
-     `amazon-us-iphone-15-pro-max` (5 marketplaces x ~15 products =
-     ~75 stable URLs that aren't in the offers table). Without this,
-     clicking a curated card on /deals 404s the PDP. */
-  const curated = curatedAmazonDeals.find((d) => d.id === offerId);
-  if (curated) {
-    return {
-      offer_id: curated.id,
-      /* Curated rows have no product_id (they're not in the products
-         table). Use the id as a synthetic key — the PDP only reads
-         this for the dupes anchor, and pgFtsFindDupes ranks by title
-         similarity regardless of key value. */
-      product_id: curated.id,
-      store_id: curated.storeId,
-      url: curated.url,
-      current_price: curated.salePrice,
-      original_price: curated.originalPrice ?? curated.salePrice,
-      discount_percent: curated.discountPercent ?? 0,
-      currency: curated.currency,
-      scraped_at: curated.postedAt + "T00:00:00Z",
-      in_stock: true,
-      title: curated.title,
-      category_slug: curated.categorySlug,
-      brand: null,
-      image_url: curated.imageUrl ?? null,
-      store_name: curated.storeName,
-      store_logo_url: `/logos/${curated.storeId}.png`,
-    };
-  }
-
-  return null;
-}
+/* fetchOfferById + OfferRow live in lib/offers/fetch-offer-by-id.ts
+   so /api/compare's oid-fallback path can reuse the same 3-source
+   resolution (view / manual join / curated catalogue) — guarantees
+   that anything visible on this PDP is also resolvable from the
+   compare flow. */
 
 function offerRowToHero(row: OfferRow): OfferData {
   return {
@@ -228,7 +109,7 @@ function offerRowToHero(row: OfferRow): OfferData {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const country = getCountry(params.country);
-  const offer = await fetchOffer(params.id);
+  const offer = await fetchOfferById(params.id);
   if (!offer) {
     return {
       title: "Product not found",
@@ -306,7 +187,7 @@ export default async function ProductPage({ params }: PageProps) {
     redirect(`/${country.code}/deals`);
   }
 
-  const offer = await fetchOffer(params.id);
+  const offer = await fetchOfferById(params.id);
   if (!offer) notFound();
 
   /* Two independent Supabase reads — fired in parallel:

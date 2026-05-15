@@ -337,7 +337,25 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
         <Link
           href={(() => {
             const params = new URLSearchParams({ q: offer.title, mode: "similar" });
-            if (offer.productId) params.set("pid", offer.productId);
+            /* Pass pid only when it's a real product_id (UUID
+               shape). Curated Amazon rows carry a synthetic slug
+               like 'amazon-us-iphone-15-pro-max' as their pseudo-
+               product_id; sending that through `?pid=` causes the
+               compare RPC to fail (products.id is uuid-typed) and
+               the user lands on "Nothing found" even though the
+               PDP can render the product fine. */
+            const looksLikeUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (offer.productId && looksLikeUuid.test(offer.productId)) {
+              params.set("pid", offer.productId);
+            }
+            /* `oid` is the ultimate fallback. /api/compare uses it
+               to fetch the offer + product + store from the same
+               sources the PDP uses (product_best_offers view,
+               offers+products+stores join, curated Amazon catalog)
+               and synthesises a single-offer anchor when pid + FTS
+               both miss. Guarantees: if the user can see this PDP,
+               the compare click ALWAYS shows at least this offer. */
+            if (offer.offerId) params.set("oid", offer.offerId);
             return `/${countryCode}/compare?${params.toString()}`;
           })()}
           /* prefetch={false}: this is a secondary CTA on a page

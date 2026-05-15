@@ -38,6 +38,11 @@ function CompareContent() {
      pid= (the product_id direct-lookup fallback). Forwarded to
      /api/compare so the API can short-circuit empty FTS results. */
   const initialPid   = searchParams.get("pid") ?? "";
+  /* oid= — offer-id backstop. PDP "Compare prices" CTA passes this
+     so /api/compare can synthesise an anchor from the offer when
+     pid + FTS both miss (synthetic-id products, unusual titles,
+     etc.). See /api/compare/route.ts oid-fallback for details. */
+  const initialOid   = searchParams.get("oid") ?? "";
 
   const [query, setQuery]             = useState(initialQuery);
   const [result, setResult]           = useState<SearchOutput | null>(null);
@@ -164,13 +169,14 @@ function CompareContent() {
   }, [router, fetchLive]);
 
   /* ── Text search ────────────────────────────────────────────────────── */
-  const handleSearch = useCallback(async (q: string, pid?: string) => {
+  const handleSearch = useCallback(async (q: string, pid?: string, oid?: string) => {
     if (looksLikeUrl(q)) { handleUrlSearch(q); return; }
 
     setQuery(q);
     setSniffResult(null);
     const params = new URLSearchParams({ q, mode: "similar" });
     if (pid) params.set("pid", pid);
+    if (oid) params.set("oid", oid);
     /* Country-prefixed — see comment on line 104. */
     router.replace(`/${country.code}/compare?${params.toString()}`, { scroll: false });
     setLoading(true);
@@ -180,14 +186,15 @@ function CompareContent() {
     fetchLive(q);
 
     try {
-      /* Forward pid to the API so it can fall back to direct
-         product lookup when FTS misses. Round-4 QA: chip clicks
-         were getting "Nothing in our local index" because of
-         catalog timing — pid backstop fixes that. */
-      const apiUrl = pid
-        ? `/api/compare?q=${encodeURIComponent(q)}&pid=${encodeURIComponent(pid)}&mode=similar`
-        : `/api/compare?q=${encodeURIComponent(q)}&mode=similar`;
-      const res = await fetch(apiUrl);
+      /* Forward pid + oid to the API. pid is the primary backstop
+         (chip clicks, PDP CTA). oid is the ultimate fallback for
+         when pid + FTS both miss — /api/compare synthesises an
+         anchor from the offer-row directly so the user always
+         sees their product, never "Nothing found" from a PDP. */
+      const apiParams = new URLSearchParams({ q, mode: "similar" });
+      if (pid) apiParams.set("pid", pid);
+      if (oid) apiParams.set("oid", oid);
+      const res = await fetch(`/api/compare?${apiParams.toString()}`);
       const data = await res.json() as SearchOutput;
       setResult(data);
       /* Log to search_query_log. resultCount is approximate — we
@@ -211,12 +218,15 @@ function CompareContent() {
   /* ── React to URL changes (initial load, back/forward) ─────────────── */
   useEffect(() => {
     if (initialKey) fetchByKey(initialKey, initialQuery);
-    else if (initialQuery) {
-      if (looksLikeUrl(initialQuery)) handleUrlSearch(initialQuery);
-      else handleSearch(initialQuery, initialPid || undefined);
+    else if (initialQuery || initialOid) {
+      if (initialQuery && looksLikeUrl(initialQuery)) {
+        handleUrlSearch(initialQuery);
+      } else {
+        handleSearch(initialQuery, initialPid || undefined, initialOid || undefined);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialKey, initialQuery, initialPid]);
+  }, [initialKey, initialQuery, initialPid, initialOid]);
 
   /* PDP back-link breadcrumb. PdpBackLink reads sessionStorage to
      route "Back to results" → the originating compare URL when the
