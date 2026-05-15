@@ -19,6 +19,7 @@ import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { usdToNgn } from "@/lib/utils";
 import { isUsableMerchantUrl } from "@/lib/url-helpers";
 import { resolveStoreLogoUrl } from "@/lib/store-logo";
+import { partitionDupesByVariantMatch, variantOffers } from "./variant-pooling";
 import type {
   SearchOutput, ProductGroup, StoreOffer, DupeResult, SearchSuggestion,
 } from "./index";
@@ -1022,11 +1023,47 @@ export async function pgFtsFindByProductId(
     })
     .slice(0, limit);
 
+  /* Variant-aware augmentation. The strict signature pool above
+     misses real same-product matches whenever the brand/model
+     parser fails at ingest time (Stanley Quencher tumblers,
+     non-canonical Apple-line titles, fashion items, etc.). The
+     dupes engine DID find the matching listings via FTS — promote
+     the ones that pass isLikelySameProduct (brand + family +
+     variant + size + model + price band) into the anchor pool, so
+     /compare's "Across N stores" section reflects the true
+     comparison breadth.
+
+     The same partition runs PDP-side in /[country]/p/[id]/page.tsx
+     against fetchDupesCached. Doing it here too keeps /compare's
+     anchor section consistent with the PDP CTA's count promise. */
+  const partition = partitionDupesByVariantMatch(
+    { title: anchor.title, brand: anchor.brand, priceNgn: anchor.bestPrice },
+    dupes,
+  );
+  const augmentedOffers = [
+    ...anchor.offers,
+    ...variantOffers(partition.likelyVariants),
+  ];
+  const augmentedAnchor: ProductGroup = {
+    ...anchor,
+    offers:    augmentedOffers,
+    /* Recompute bestPrice/worstPrice from the augmented set —
+       variant offers can shift either extreme. storeCount stays
+       informational; the compare anchor card derives its display
+       count from offers.length directly. */
+    bestPrice:  augmentedOffers.length > 0 ? Math.min(...augmentedOffers.map((o) => o.landedPrice)) : anchor.bestPrice,
+    worstPrice: augmentedOffers.length > 0 ? Math.max(...augmentedOffers.map((o) => o.landedPrice)) : anchor.worstPrice,
+    storeCount: augmentedOffers.length,
+  };
+
   return {
     mode: "similar",
     query: anchorPayload.title,
-    anchor,
-    dupes,
+    anchor: augmentedAnchor,
+    /* Dupes rail loses variants — they're now on the anchor card
+       directly. Genuinely different products (different size,
+       different generation) stay. */
+    dupes: partition.otherProducts,
   };
 }
 

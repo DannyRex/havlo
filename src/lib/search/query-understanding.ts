@@ -256,3 +256,137 @@ export function candidateHasBrand(title: string, brand: string | null): boolean 
 export function detectQueryFamily(query: string): string | null {
   return detectFamily(query);
 }
+
+/* ── Size token extraction ──────────────────────────────────────
+   Pulls out numeric-with-unit tokens that distinguish SKU size
+   variants of the same product line:
+     "Stanley Quencher 40oz"     → ["40oz"]
+     "Stanley Quencher 0.88l"    → ["0.88l"]   (different size)
+     "MacBook Pro 13-inch 256GB" → ["13inch", "256gb"]
+     "iPhone 15 Pro 512GB"       → ["512gb"]
+     "Samsung 55-inch 4K TV"     → ["55inch"]
+
+   Why a separate extractor: extractRequiredNumbers + extractRequired
+   ModelTokens both miss numeric-glued-to-unit tokens that ARE
+   discriminators between same-product-line variants. The MODEL_TOKEN_
+   STOPLIST explicitly excludes sizes like 40oz / 256gb because they
+   carry meaningful information that we WANT to compare on for the
+   spectrum's variant-pooling logic, but DIDN'T want enforced as a
+   hard FTS gate. Now the spectrum uses this extractor as the
+   variant discriminator.
+
+   Units recognised: oz, ml, l, gb, tb, mm, cm, inch (with " or
+   "in" aliases). Decimal values supported (0.88l, 1.5oz). Hyphen
+   between number and unit handled (13-inch). Trailing trim of
+   .0 (13.0 → 13). */
+export function extractSizeTokens(title: string): string[] {
+  const lc = title.toLowerCase();
+  const matches = Array.from(
+    lc.matchAll(/(\d+(?:\.\d+)?)\s*(?:-)?(oz|ml|l|gb|tb|mm|cm|inch|"|in)(?=[^a-z]|$)/g),
+  );
+  return matches.map((m) => {
+    const num  = m[1].replace(/\.0+$/, "");
+    let unit = m[2];
+    if (unit === '"' || unit === "in") unit = "inch";
+    return `${num}${unit}`;
+  });
+}
+
+/* True when two titles share the SAME SET of size tokens (or both
+   have none). Used by the variant-pooling check — pooling a
+   "Stanley 40oz" anchor with a "Stanley 0.88l" candidate would
+   compare prices across different sizes (probably misleading: a
+   30oz being cheaper isn't a deal vs a 40oz). When neither title
+   has a size marker, we allow pooling — that's the case for many
+   apparel / generic products without explicit size in the title. */
+export function shareAllSizeTokens(a: string, b: string): boolean {
+  const sa = extractSizeTokens(a);
+  const sb = extractSizeTokens(b);
+  if (sa.length === 0 && sb.length === 0) return true;
+  if (sa.length !== sb.length) return false;
+  const setB = new Set(sb);
+  for (const s of sa) if (!setB.has(s)) return false;
+  return true;
+}
+
+/* ── Variant-aware same-product detection ──────────────────────
+   Decides whether a search-result candidate is likely the SAME
+   product as the anchor, not just a similar one. Used by the
+   PDP's spectrum-augmenting code to merge variant offers into
+   the anchor pool — so a "Stanley Quencher 40oz Frost Polka Dot"
+   PDP can show price comparisons against a "Stanley Quencher
+   40oz Holiday Botanical" listing at another store, but NOT
+   pool with the 0.88L size variant or the IceFlow product.
+
+   Bidirectional gates — anchor's variant tokens must appear in
+   the candidate AND vice versa, so 'MacBook' doesn't pool with
+   'MacBook Pro' (different SKUs), and 'iPhone 15 Pro Max'
+   doesn't pool with bare 'iPhone 15 Pro'.
+
+   Brand handling: when both sides have an explicit brand, they
+   must match. When only one side has a brand (catalog
+   imperfection), allow — the other gates (model, family, size)
+   carry the burden of preventing false matches.
+
+   Price band 0.5x-2.0x: catches obvious mismatches (a "tumbler"
+   priced 5x the anchor is probably not the same product) without
+   excluding legitimate cross-store price spread.
+
+   Returns true ONLY when the candidate passes EVERY gate. False
+   on any single failure — strict by design, since the spectrum's
+   trust contract depends on showing genuinely-comparable prices. */
+export function isLikelySameProduct(
+  anchor: { title: string; brand?: string | null; priceNgn?: number },
+  candidate: { title: string; brand?: string | null; priceNgn?: number },
+): boolean {
+  /* Brand: when both sides have explicit brand info, they must
+     match. When either side is missing (parser miss / unbranded
+     listing), defer to the other gates. */
+  const aBrand = (anchor.brand?.toLowerCase().trim() || null) ?? extractQueryBrand(anchor.title);
+  const cBrand = (candidate.brand?.toLowerCase().trim() || null) ?? extractQueryBrand(candidate.title);
+  if (aBrand && cBrand && aBrand !== cBrand) return false;
+
+  /* Family: both classified, must match. Either side null → fall
+     through (the anchor-removal in pgFtsFindDupes already gates
+     family permissively for the dupes pool). */
+  const aFamily = detectFamily(anchor.title);
+  const cFamily = detectFamily(candidate.title);
+  if (aFamily && cFamily && aFamily !== cFamily) return false;
+
+  /* Variant tokens (Pro / Max / Ultra / Plus / Mini / SE / M1-M5).
+     Bidirectional — both sides must agree on the variant set so
+     base-model and pro-model don't accidentally pool. */
+  const aVariants = extractVariantTokens(anchor.title);
+  const cVariants = extractVariantTokens(candidate.title);
+  if (!candidateHasAllVariants(candidate.title, aVariants)) return false;
+  if (!candidateHasAllVariants(anchor.title, cVariants)) return false;
+
+  /* Numeric model markers (15 in iPhone 15, 24 in Galaxy S24).
+     Bidirectional — same generation requirement. */
+  const aNumbers = extractRequiredNumbers(anchor.title);
+  const cNumbers = extractRequiredNumbers(candidate.title);
+  if (!candidateHasAllNumbers(candidate.title, aNumbers)) return false;
+  if (!candidateHasAllNumbers(anchor.title, cNumbers)) return false;
+
+  /* Letter-glued model tokens (s24, 1000xm5, h2). Bidirectional
+     so the candidate must share every model identifier the anchor
+     uses AND vice versa. */
+  const aModel = extractRequiredModelTokens(anchor.title);
+  const cModel = extractRequiredModelTokens(candidate.title);
+  if (!candidateHasAllModelTokens(candidate.title, aModel)) return false;
+  if (!candidateHasAllModelTokens(anchor.title, cModel)) return false;
+
+  /* Size match — exact same size set on both sides. Catches
+     'Stanley 40oz' vs 'Stanley 0.88l' as different SKUs. */
+  if (!shareAllSizeTokens(anchor.title, candidate.title)) return false;
+
+  /* Price band 0.5x-2.0x. Skipped when either side has no
+     usable price. Catches obvious mismatches (a "tumbler" listing
+     priced 5x the anchor probably isn't the same product). */
+  if (anchor.priceNgn && candidate.priceNgn && anchor.priceNgn > 0) {
+    const ratio = candidate.priceNgn / anchor.priceNgn;
+    if (ratio < 0.5 || ratio > 2.0) return false;
+  }
+
+  return true;
+}

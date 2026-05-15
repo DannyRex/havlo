@@ -39,6 +39,7 @@ import { pgFtsFindDupes, pgFtsAnchorOffersByProductId } from "@/lib/search/pg-ft
 import { isOfferAllowedForCountry, filterDealsForCountry } from "@/lib/country";
 import { computeAnchorStats } from "@/lib/pdp-stats";
 import { fetchProductPriceHistory, rollupPriceHistory } from "@/lib/search/price-history";
+import { partitionDupesByVariantMatch, variantOffers } from "@/lib/search/variant-pooling";
 import { usdToNgn } from "@/lib/utils";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 import { getActiveBrowseProvider } from "@/lib/providers";
@@ -600,11 +601,65 @@ export default async function ProductPage({ params }: PageProps) {
      anchorOffers is fetched in parallel with dupes above
      (Promise.all) so the two reads complete in one network
      round-trip rather than two serial ones. */
+  /* Variant-aware spectrum pooling.
+
+     The strict signature pool (pgFtsAnchorOffersByProductId) only
+     finds same-product offers when the brand+model parser hit at
+     ingest time. For Stanley Quencher tumblers, MacBook Pros,
+     AirPods, and many other catalog rows whose titles defeat the
+     parser, the strict pool collapses to "1 store · watching for
+     more" — even when the dupes engine clearly found the same
+     product at other stores via FTS title overlap.
+
+     Fix: partition the country-filtered dupes into:
+       likelyVariants — pass isLikelySameProduct (brand + family +
+                        variant + size + model + price band).
+                        Their offers merge into the spectrum pool
+                        so the bar plots them as dots and the CTA
+                        counts them as stores.
+       otherProducts  — different size / generation / sub-model /
+                        broader similarity. Stay in the "You may
+                        also like" rail as cheaper alternatives.
+
+     Variants are matched against the COUNTRY-FILTERED dupes
+     directly (not filteredDupes which has additional dedup +
+     anchor-removal) so we don't lose candidates that the rail's
+     filters drop. Anchor-removal isn't needed here because the
+     anchor's own product_id was already excluded by pgFtsFindDupes
+     pre-filter. */
+  const partition = partitionDupesByVariantMatch(
+    { title: offer.title, brand: offer.brand, priceNgn: anchorPriceNgn },
+    countryFilteredDupes,
+  );
+  const augmentedAnchorOffers = [
+    ...anchorOffers,
+    ...variantOffers(partition.likelyVariants),
+  ];
+
   const { totalStores, perStoreOffers } = computeAnchorStats(
-    anchorOffers,
+    augmentedAnchorOffers,
     anchorPriceNgn,
     country,
   );
+
+  /* Strip variants from the "You may also like" rail. They're now
+     plotted on the spectrum as same-product price points; rendering
+     them again as cheaper-alternative cards would duplicate the
+     same offers across two places on the same page. The rail keeps
+     genuinely different products (size variants, alternative
+     models, lookalikes) — exactly its intended role. */
+  const variantProductIds = new Set(partition.likelyVariants.map((v) => v.key));
+  const variantOfferIds   = new Set(
+    partition.likelyVariants.flatMap((v) => v.offers.map((o) => o.offerId)),
+  );
+  const dupesForRail = filteredDupes.filter((d) => {
+    if (variantProductIds.has(d.key)) return false;
+    /* Defensive: if any of the dupe's offers got merged into the
+       spectrum (FTS sometimes splits same-product into two
+       group rows), drop the rail entry too. */
+    if (d.offers.some((o) => variantOfferIds.has(o.offerId))) return false;
+    return true;
+  });
 
   /* Price-history rollup for the new bar's "lowest tracked / at
      this store: £X" callouts. Cached at 5min — same window as the
@@ -682,17 +737,17 @@ export default async function ProductPage({ params }: PageProps) {
           priceHistory={priceHistorySummary}
         />
 
-        {filteredDupes.length > 0 ? (
+        {dupesForRail.length > 0 ? (
           <section className="mt-12 sm:mt-16">
             <header className="mb-6 sm:mb-8">
               <h2 className="text-[22px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
                 You may also like
               </h2>
               <p className="text-sm sm:text-base text-ink-2 mt-1.5">
-                {filteredDupes.length} {filteredDupes.length === 1 ? "pick" : "picks"} from other stores. Sorted cheapest first.
+                {dupesForRail.length} {dupesForRail.length === 1 ? "pick" : "picks"} from other stores. Sorted cheapest first.
               </p>
             </header>
-            <SimilarProducts dupes={filteredDupes} countryCode={country.code} />
+            <SimilarProducts dupes={dupesForRail} countryCode={country.code} />
           </section>
         ) : fallbackDeals.length > 0 ? (
           /* Fallback rail — no direct dupes for this product, so we
