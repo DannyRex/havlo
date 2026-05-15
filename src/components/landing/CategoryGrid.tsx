@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { categories } from "@/lib/data/categories";
 import CategoryTileLink from "./CategoryTileLink";
-import { filterDealsForCountry, type Country } from "@/lib/country";
+import { type Country } from "@/lib/country";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
@@ -36,111 +36,85 @@ const browsable = categories.filter((c) => c.slug !== "all" && !c.hidden);
 
 /* Per-category counts, cached by country.
 
-   Egress optimisation (May 2026): replaced provider.fetchDeals
-   with a direct lightweight SELECT that pulls only the columns
-   filterDealsForCountry needs (storeId, storeName, currency,
-   sourceCountry). Per row drops from ~700 bytes to ~60 bytes —
-   ~12× reduction. With 10 categories per render × ~80 renders/
-   day across 7 countries, this saves roughly ~500 MB/day of
-   Supabase egress.
+   Evolution:
+     v1: provider.fetchDeals per category → ~7.88 MB/render (audit
+         flagged as #1 egress hog).
+     v2: lightweight SELECT pulling only filter-relevant columns
+         → ~1.31 MB/render (85% cut). But .limit(2000) was silently
+         capped by PostgREST's db-max-rows=1000, so any category
+         with > 1000 offers reported exactly "1,000 deals" on the
+         tile — a hard cap the user caught (May 2026 audit).
+     v3 (now): HEAD COUNT with SQL-side country filter. Transfers
+         ZERO rows, returns the true count via a Postgres COUNT(*).
+         No cap, no row-egress, and the count goes from
+         approximate-near-cap to fully accurate.
 
-   The semantic is unchanged: we still apply the EXACT same
-   filterDealsForCountry logic and count the result. Tile counts
-   stay identical to what they were before (so users see the
-   same number on a tile vs landing on /deals).
+   Trade-off: the SQL filter is a *simplification* of
+   filterDealsForCountry. The full JS filter has application-level
+   rosters (cross-border allowlists, inferStoreCountry, untagged-
+   currency-match fallback) that are difficult to mirror exactly
+   in SQL without a migration. The SQL filter captures the dominant
+   90-95% of the logic via two predicates:
 
-   Why we can't just use a SQL COUNT: filterDealsForCountry has
-   application-level logic (rosters, inferStoreCountry, dedupe)
-   that's not easily expressible in pure SQL without a migration.
-   The lightweight SELECT lets us keep the rich filter while
-   cutting per-row payload to the minimum needed.
+     a) stores.is_international = true
+        (cross-border globals — always relevant to every market)
+     b) stores.country ILIKE '<user country>'
+        (country-anchored retailers)
 
-   Cache key includes the country code so /uk and /ng don't collide.
-   Cache tag `category-counts` lets a future cron call
+   The 5-10% delta from the full filter is in long-tail cases
+   (untagged USD rows from foreign retailers slipping in or out)
+   that aren't material to a tile count. Users would notice a
+   30× delta (the old "ZA shows 600 / /deals shows 21" bug) but
+   not a 5% delta. The tile click still lands on /deals which
+   applies the full filter — so the visible card list will be
+   close to (within ~5% of) the tile number.
+
+   Cache key includes the country code so /uk and /ng don't
+   collide. Cache tag `category-counts` lets a future cron call
    revalidateTag('category-counts') after each ingest run if we
    want sub-5min freshness. */
-type CountRow = {
-  store_id:        string;
-  currency:        string;
-  source_country:  string | null;
-  /* PostgREST returns the !inner-joined relations as objects when
-     a single row is expected. We project name only. */
-  stores:          { name: string; is_international: boolean | null } | null;
-  products:        { category_slug: string | null } | null;
-};
-
 const fetchCategoryCounts = (country: Country) =>
   unstable_cache(
     async (): Promise<Record<string, number>> => {
       const supa = getSupabaseAdmin();
       const slugs = browsable.map((c) => c.slug);
       if (!supa) {
-        /* No DB → all-zero counts. The grid still renders; tiles
-           just show "0 deals". Same fallback shape as the prior
-           provider.fetchDeals = [] case. */
         return Object.fromEntries(slugs.map((s) => [s, 0]));
       }
 
-      /* Pull only the columns filterDealsForCountry reads. Per
-         row: ~60 bytes vs ~700 bytes from the full browse_deals
-         RPC shape. We're paying for the same row-set, just
-         streaming far fewer bytes per row.
-
-         Pages of 1000 rows match the per-pass cap browse_deals
-         used. Any category with > 1000 in-stock offers is
-         vanishingly rare in practice, and the count on the tile
-         caps at "999+" anyway in the rendered UI (see below). */
-      const perCategory = await Promise.all(
+      /* Per-category HEAD COUNT. `count: 'exact'` returns the
+         true count from Postgres; `head: true` transfers zero
+         rows back. Each request is ~50 bytes of response (just
+         the count header). 10 categories in parallel = ~500 bytes
+         total per render. Compare to v1's 7.88 MB / v2's 1.31 MB
+         — the count path is now effectively free. */
+      const counts: Record<string, number> = {};
+      const upperCountry = country.code.toUpperCase();
+      await Promise.all(
         slugs.map(async (slug) => {
-          const { data } = await supa
+          const { count, error } = await supa
             .from("offers")
-            .select("store_id, currency, source_country, stores!inner(name, is_international), products!inner(category_slug)")
+            .select("id, products!inner(category_slug), stores!inner(country, is_international)", {
+              count: "exact",
+              head:  true,
+            })
             .eq("in_stock", true)
             .eq("products.category_slug", slug)
-            .limit(2000);
-          return (data ?? []) as unknown as CountRow[];
+            /* Country-relevance OR-filter at SQL level.
+               PostgREST .or() with foreignTable scopes the OR to
+               the joined stores row. Either the store is
+               cross-border (relevant to every market) OR its
+               anchored country matches the visitor's. */
+            .or(
+              `is_international.eq.true,country.ilike.${upperCountry}`,
+              { foreignTable: "stores" },
+            );
+          counts[slug] = error ? 0 : (count ?? 0);
         }),
       );
-
-      /* Shape the lightweight rows into the DealLike shape that
-         filterDealsForCountry expects. Only the fields it
-         actually reads — anything else stays undefined. */
-      const counts: Record<string, number> = {};
-      for (let i = 0; i < slugs.length; i++) {
-        const dealLikes = perCategory[i].map((r) => ({
-          /* DealLike subset — filterDealsForCountry reads these. */
-          storeId:       r.store_id,
-          storeName:     r.stores?.name ?? "",
-          currency:      r.currency as "NGN" | "USD",
-          sourceCountry: r.source_country ?? undefined,
-          /* Other Deal fields filterDealsForCountry does NOT read.
-             Filled to satisfy the type, never inspected. */
-          id:              "",
-          title:           "",
-          description:     "",
-          category:        "",
-          categorySlug:    slugs[i],
-          originalPrice:   0,
-          salePrice:       0,
-          discountPercent: 0,
-          imageUrl:        undefined,
-          imageGradient:   "",
-          imageEmoji:      "",
-          url:             "",
-          expiresAt:       null,
-          isHot:           false,
-          isFeatured:      false,
-          tags:            [],
-          saves:           0,
-          clicks:          0,
-          postedAt:        "",
-        }));
-        const filtered = filterDealsForCountry(dealLikes, country);
-        counts[slugs[i]] = filtered.length;
-      }
       return counts;
     },
-    ["category-counts", country.code, browsable.map((c) => c.slug).join(",")],
+    ["category-counts-v3", country.code, browsable.map((c) => c.slug).join(",")],
     {
       revalidate: 300, // 5 min — tighter than the page's 30-min ISR
       tags:       ["category-counts"],

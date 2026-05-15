@@ -851,16 +851,24 @@ function CompareContent() {
                       : []
                   }
                 />
-                <div className="max-w-3xl mx-auto mb-5 px-1 mt-8 text-center sm:text-left">
-                  <p className="text-[13px] text-ink-3 uppercase tracking-[0.08em] font-semibold">
-                    Or browse what&apos;s live online for &ldquo;{displayQuery}&rdquo;
-                  </p>
+                {/* Drop the wrapping "Or browse what's live online
+                    for {query}" header — EmptySearchState above
+                    already renders a "Or browse trending deals"
+                    CTA, and the two adjacent "Or browse…" labels
+                    read as duplicated cruft (audit May 2026
+                    flagged the duplication).
+
+                    LiveResults below has its OWN heading internal
+                    to the component, which keeps the section
+                    boundary clear without the extra wrapping
+                    label. */}
+                <div className="mt-8">
+                  <LiveResults
+                    items={liveResults}
+                    loading={liveLoading}
+                    providers={liveProviders}
+                  />
                 </div>
-                <LiveResults
-                  items={liveResults}
-                  loading={liveLoading}
-                  providers={liveProviders}
-                />
               </>
             ) : liveMisconfigured ? (
               <div className="max-w-md mx-auto text-center py-12">
