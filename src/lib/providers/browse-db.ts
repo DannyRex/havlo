@@ -9,6 +9,7 @@ import { getCuratedDeals, sortDeals } from "./curated-helper";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 import { isUsableMerchantUrl } from "@/lib/url-helpers";
 import { getPopularityRecord, type PopularityRecord } from "@/lib/popularity";
+import { searchCandidates } from "@/lib/search/query-expand";
 
 interface BestOfferRow {
   product_id: string;
@@ -76,6 +77,127 @@ function rowToDeal(r: BestOfferRow, popularity?: PopularityRecord): Deal {
    helpers have no remaining call sites. The RPC's CASE branches
    match the old sortToOrder mapping exactly: see browse_deals.sql. */
 
+/* ── Search via FTS ────────────────────────────────────────────────
+   Routes /deals search queries through search_deals_fts (migration
+   0025) with multi-strategy candidate fallback + popularity-aware
+   re-ranking. Used by fetchDeals when q.search is non-empty.
+
+   Strategy:
+     1. searchCandidates(rawQuery) produces an ordered candidate
+        list: [original, expanded, stripped]. Each runs through
+        search_deals_fts independently.
+     2. The first candidate that returns ≥ MIN_USABLE rows wins.
+        If all candidates underflow we union them so the user gets
+        SOMETHING rather than an empty page.
+     3. Popularity from outbound_clicks (last 30 days) re-ranks the
+        top-N rows: relevance_score * (1 + log(1 + clicks) / 5). Caps
+        the boost so a moderately-popular product doesn't beat a
+        much-better text match — popularity is a tie-breaker, not a
+        ranking primary.
+     4. JS-side country filter still runs in /deals' route handler
+        (same as the browse path), so anything search_deals_fts'
+        country-priority sort leaks gets trimmed there.
+
+   Limit: PostgREST caps RPC responses at 1000 rows. For search,
+   1000 relevance-ranked rows is plenty — most queries return <100
+   meaningful matches anyway. */
+const SEARCH_MAX_ROWS = 1000;
+const MIN_USABLE_ROWS = 6;
+/* Popularity boost cap. Empirical: a product with 200 clicks in 30
+   days gets ~1.06 multiplier, 2000 clicks → ~1.13. Higher caps let
+   a popular-but-loosely-matching row outrank a precise text match,
+   which we don't want — search ranking primary should be relevance,
+   popularity is a soft secondary. */
+const POPULARITY_BOOST_DIVISOR = 5;
+
+async function searchDealsViaFts(
+  supa: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  q: BrowseQuery,
+): Promise<Deal[]> {
+  /* Expand the raw query into FTS candidates. searchCandidates
+     handles synonyms (earbuds → earphones), brand aliases (rayban
+     → ray-ban), split forms (play station → playstation), and
+     trailing-modifier stripping (iphone 15 pro max → iphone 15). */
+  const rawSearch = q.search!.trim().replace(/[(),]/g, " ");
+  const candidates = searchCandidates(rawSearch);
+  if (candidates.length === 0) return [];
+
+  const rpcBase = {
+    p_category:     q.categorySlug && q.categorySlug !== "all" ? q.categorySlug : null,
+    p_min_discount: typeof q.minDiscount === "number" && q.minDiscount > 0 ? q.minDiscount : 0,
+    p_origin:       "all" as const,
+    p_store_ids:    q.stores && q.stores.length > 0 ? q.stores : null,
+    p_max_rows:     SEARCH_MAX_ROWS,
+    p_country:      q.country ? q.country.toUpperCase() : null,
+  };
+
+  /* Walk candidates in order. First candidate that yields enough
+     usable rows wins. Otherwise union everything we collected. */
+  const seenOfferIds = new Set<string>();
+  const merged: BestOfferRow[] = [];
+
+  for (let i = 0; i < candidates.length; i++) {
+    const queryStr = candidates[i];
+    const { data, error } = await supa.rpc("search_deals_fts", {
+      q: queryStr,
+      ...rpcBase,
+    });
+    if (error) {
+      console.warn(`[browse-db] search_deals_fts error on candidate "${queryStr}":`, error.message);
+      continue;
+    }
+    const rows = (data as unknown as BestOfferRow[] | null) ?? [];
+    for (const row of rows) {
+      if (seenOfferIds.has(row.offer_id)) continue;
+      seenOfferIds.add(row.offer_id);
+      merged.push(row);
+    }
+    // Stop early when the literal query gave us plenty of matches.
+    if (i === 0 && rows.length >= MIN_USABLE_ROWS * 4) break;
+  }
+
+  if (merged.length === 0) {
+    /* Multi-strategy fallback exhausted. Caller's empty-state
+       handler surfaces did-you-mean pills via suggest_titles.
+       We don't degrade to browse_deals ILIKE — that path is
+       strictly weaker than FTS + trigram + exact-phrase + token-
+       coverage blend, so if FTS returned zero across every
+       candidate, ILIKE would too. */
+    return [];
+  }
+
+  /* Pull popularity once for the re-rank. unstable_cache keeps the
+     RPC cost cheap even at high traffic. */
+  const popularity = await getPopularityRecord().catch(() => ({} as PopularityRecord));
+
+  /* Drop Google-relay URLs (legacy SerpAPI residue) — same gate
+     the browse path applies. */
+  const fromDb = merged
+    .filter((r) => isUsableMerchantUrl(r.url))
+    .map((r) => rowToDeal(r, popularity));
+
+  /* Popularity-aware re-rank. RPC already returned rows in relevance
+     order (rank DESC). We multiply a position-derived relevance score
+     by a log-scaled popularity factor to push well-clicked products
+     up — but bounded so a much-better text match always wins. */
+  const reranked = fromDb
+    .map((deal, idx) => {
+      const relevanceScore = 1 / (1 + idx);
+      const clicks = deal.clicks ?? 0;
+      const popFactor = 1 + Math.log(1 + clicks) / POPULARITY_BOOST_DIVISOR;
+      return { deal, blended: relevanceScore * popFactor };
+    })
+    .sort((a, b) => b.blended - a.blended)
+    .map((x) => x.deal);
+
+  /* Merge curated Amazon catalog with the FTS results. Curated
+     entries don't have FTS scores so they're appended after the
+     re-ranked DB rows. sortDeals respects the user's sort field
+     when it isn't "relevance" — for relevance it preserves order. */
+  const curated = getCuratedDeals(q);
+  return sortDeals([...reranked, ...curated], q.sort);
+}
+
 export const dbBrowseProvider: BrowseProvider = {
   id: "db-products",
   name: "DB (live ingested products)",
@@ -90,6 +212,32 @@ export const dbBrowseProvider: BrowseProvider = {
   async fetchDeals(q: BrowseQuery): Promise<Deal[]> {
     const supa = getSupabaseAdmin();
     if (!supa) return [];
+
+    /* ── SEARCH PATH ──────────────────────────────────────────────
+       When the user has typed a query, route through search_deals_fts
+       (migration 0025) instead of browse_deals. The two RPCs share a
+       return shape but search_deals_fts adds:
+         • ts_rank on the products.search_doc tsvector
+         • trigram fuzzy match for typo tolerance
+         • exact-phrase boost (+2.0 when query appears verbatim)
+         • per-token coverage boost (+0.8 when every word present)
+
+       Multi-strategy fallback: query-expand produces an ordered list
+       of candidates [original, synonym-expanded, token-stripped] —
+       try each until we get usable results. Most queries hit the
+       first candidate; expansion + strip cover the long tail.
+
+       Why we don't keep browse_deals' three-pass shape for search:
+         Search results are RELEVANCE-ranked. The local/intl/zero-
+         discount three-pass exists to guarantee browse-time pool
+         diversity (cross-border + 0%-discount slots get reserved
+         even when discount-desc would otherwise crowd them out).
+         For search those guarantees actively hurt — they push
+         lower-relevance rows above higher-relevance ones. One pass,
+         relevance-sorted, with country-priority as the tie-breaker. */
+    if (q.search?.trim()) {
+      return await searchDealsViaFts(supa, q);
+    }
 
     /* Single-RPC fetch (May 2026 perf refactor).
 
@@ -281,16 +429,43 @@ export const dbBrowseProvider: BrowseProvider = {
     const supa = getSupabaseAdmin();
     if (!supa) return { all: 0, local: 0, intl: 0 };
 
+    /* SEARCH PATH: when a query is present, the displayed list comes
+       from search_deals_fts (relevance-ranked). To keep the origin
+       counts in agreement with what the user sees, we run the SAME
+       FTS pipeline (one call, origin=all) and bucket the rows by
+       is_international. Three separate head-counts with the old
+       title ILIKE would diverge from the displayed list because
+       FTS / trigram / synonym expansion finds matches ILIKE can't. */
+    if (q.search?.trim()) {
+      const rawSearch = q.search.trim().replace(/[(),]/g, " ");
+      const candidates = searchCandidates(rawSearch);
+      if (candidates.length === 0) return { all: 0, local: 0, intl: 0 };
+      /* One FTS call (the literal-query candidate, which is the
+         primary). Counts based on the first non-empty result —
+         secondary candidates would inflate the count vs the
+         displayed list which also stops on the first match. */
+      const { data, error } = await supa.rpc("search_deals_fts", {
+        q:              candidates[0],
+        p_category:     q.categorySlug && q.categorySlug !== "all" ? q.categorySlug : null,
+        p_min_discount: typeof q.minDiscount === "number" && q.minDiscount > 0 ? q.minDiscount : 0,
+        p_origin:       "all",
+        p_store_ids:    q.stores && q.stores.length > 0 ? q.stores : null,
+        p_max_rows:     SEARCH_MAX_ROWS,
+        p_country:      q.country ? q.country.toUpperCase() : null,
+      });
+      if (error || !data) return { all: 0, local: 0, intl: 0 };
+      const rows = (data as unknown as BestOfferRow[]) ?? [];
+      let local = 0; let intl = 0;
+      for (const r of rows) (r.is_international ? intl++ : local++);
+      return { all: rows.length, local, intl };
+    }
+
+    /* BROWSE PATH: no search query. Three head-count queries —
+       cheap, exact, no row payload transferred. */
     const baseFilter = (qb: ReturnType<typeof supa.from>) => {
       let chain = qb.select("*", { count: "exact", head: true });
       if (q.categorySlug && q.categorySlug !== "all") chain = chain.eq("category_slug", q.categorySlug);
       if (typeof q.minDiscount === "number") chain = chain.gte("discount_percent", q.minDiscount);
-      if (q.search?.trim()) {
-        /* Same dual title/store_name filter as fetchDeals so origin
-           counts agree with the displayed list. */
-        const escaped = q.search.trim().replace(/[(),]/g, " ");
-        chain = chain.or(`title.ilike.%${escaped}%,store_name.ilike.%${escaped}%`);
-      }
       return chain;
     };
 

@@ -193,298 +193,40 @@ function priceLooksPlausible(priceNgn: number, categorySlug: string | null, titl
 export { PRODUCT_FAMILIES, detectFamily, familiesIncompatible, alternativeFamilyMatches } from "./families";
 import { PRODUCT_FAMILIES, detectFamily, familiesIncompatible, alternativeFamilyMatches } from "./families";
 
-/* Category-class queries — bare nouns / plurals that name a product class
-   rather than a specific product. When the user's literal query matches
-   one of these, the anchor + dupes MUST be in that family (otherwise FTS
-   trigram overlap surfaces "headphones" for the bare query "phones").
+/* Query-understanding gates moved to ./query-understanding (shared
+   with /deals search). Re-imported here so pg-fts's existing
+   references stay valid. If you're looking for these definitions,
+   they live at one canonical location now:
 
-   Map any category-class word → the canonical PRODUCT_FAMILIES key. */
-const CATEGORY_CLASS_QUERIES: Record<string, keyof typeof PRODUCT_FAMILIES> = {
-  phone: "phone", phones: "phone", smartphone: "phone", smartphones: "phone",
-  tablet: "tablet", tablets: "tablet", ipad: "tablet",
-  laptop: "laptop", laptops: "laptop", notebook: "laptop", notebooks: "laptop",
-  headphone: "headphones", headphones: "headphones", headset: "headphones",
-  earbud: "earbuds", earbuds: "earbuds",
-  speaker: "speaker", speakers: "speaker", soundbar: "speaker",
-  tv: "tv", tvs: "tv", television: "tv", televisions: "tv",
-  console: "console", consoles: "console",
-  smartwatch: "watch", watch: "watch", watches: "watch",
-  camera: "camera", cameras: "camera",
-};
+     extractVariantTokens, candidateHasAllVariants
+     extractRequiredNumbers, candidateHasAllNumbers
+     extractRequiredModelTokens, candidateHasAllModelTokens
+     extractQueryBrand, candidateHasBrand
+     detectQueryFamily, queryFamily
+     looksLikeAccessory, looksSuspicious
+     scoreCandidate, stripTrailingModifiers
 
-function queryFamily(rawQuery: string): keyof typeof PRODUCT_FAMILIES | null {
-  const tokens = rawQuery.toLowerCase().split(/\s+/).filter(Boolean);
-  // Only treat as a category-class query if EVERY meaningful token is a
-  // class noun (so "iphone 15" isn't reduced to "phone"). Skip very short
-  // articles that don't carry meaning.
-  const meaningful = tokens.filter((t) => !/^(the|a|an|for|to|of)$/.test(t));
-  if (meaningful.length === 0 || meaningful.length > 2) return null;
-  const fams = meaningful.map((t) => CATEGORY_CLASS_QUERIES[t]);
-  if (fams.every((f) => f && f === fams[0])) return fams[0] ?? null;
-  return null;
-}
+   Single source of truth — when a gate gets tightened or relaxed,
+   both /compare's anchor-FTS and /deals' search inherit the same
+   behaviour automatically.
 
-/* Accessory / parts noise — when these tokens appear in a candidate title
-   for a product-name query, we drop the candidate. A query for "iPhone 15
-   Pro Max" should never anchor on a phone case, screen protector, or
-   replacement LCD. Whole-word boundaries to avoid false positives like
-   "case" inside "casework" (not a real concern but good hygiene). */
-const ACCESSORY_NOISE = [
-  "case", "cover", "skin", "holder", "stand", "tripod", "selfie stick",
-  "screen protector", "tempered glass", "replacement", "repair", "lcd screen",
-  "battery replacement", "charger only", "cable only", "adapter only",
-  "lens kit", "gimbal",
-];
-
-function looksLikeAccessory(title: string): boolean {
-  const t = title.toLowerCase();
-  return ACCESSORY_NOISE.some((kw) => {
-    // simple word-boundary check — kw can be multi-word so we use \b at
-    // either end where alphabetic
-    const pattern = new RegExp(`(^|[^a-z])${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z]|$)`);
-    return pattern.test(t);
-  });
-}
-
-/* Suspicious / counterfeit-looking titles. These slip past family +
-   accessory + price filters because they LOOK like the real product
-   ("Apple MacBook Neo A18 Pro 13-inch") but combine known-Apple naming
-   with a non-Apple chipset (A18 is Mediatek/Infinix; Apple uses M1–M5).
-   Hard to detect generically — we maintain a small denylist of known
-   bad patterns. Easy to extend as new fake listings surface. */
-const SUSPICIOUS_PATTERNS: RegExp[] = [
-  // "Apple MacBook ... <non-Apple chip>" — Apple ships M1–M5 only.
-  /macbook[^a-z0-9]+.*\b(a1[0-9]|a2[0-9]|helio|snapdragon|exynos|kirin|dimensity|tensor)\b/i,
-  // "Apple MacBook Neo" — Apple has never made a "Neo" line.
-  // Allow any non-letter separator so "MacBook-Neo", "MacBook  Neo" all match.
-  /macbook[^a-z]+neo/i,
-  // "Apple iPhone ... <Android marker>" — fake iPhone clones.
-  /iphone[^a-z]+.*\b(android|harmonyos|miui|oneui)\b/i,
-  // Generic: a title that names two competing chip ecosystems is bogus.
-  // Apple Silicon (M1–M5) AND a competing chip in the same title.
-  /\bm[1-5]\b.*(snapdragon|mediatek|helio|a1[0-9]|a2[0-9])/i,
-];
-
-function looksSuspicious(title: string): boolean {
-  return SUSPICIOUS_PATTERNS.some((re) => re.test(title));
-}
-
-/* Score a candidate title against the user's query.
-   Token-overlap with a 3× boost for numeric tokens (model numbers like
-   "15" in "iphone 15 pro max" are the strongest disambiguator). Returns
-   a number — higher is better. */
-function scoreCandidate(query: string, candidateTitle: string): number {
-  const qTokens = query.toLowerCase().split(/\s+/).filter((t) => t.length >= 2);
-  const t = candidateTitle.toLowerCase();
-  let score = 0;
-  for (const tok of qTokens) {
-    const isNumeric = /^\d+/.test(tok);
-    if (t.includes(tok)) score += isNumeric ? 3 : 1;
-  }
-  return score;
-}
-
-/* Strip trailing modifier tokens for fallback queries.
-   "iphone 15 pro max" → "iphone 15", "macbook pro 16" → "macbook pro".
-   Rules: drop trailing color words, sizes, storage, generic modifiers. */
-const TRAILING_MODIFIERS = new Set([
-  "pro", "max", "ultra", "plus", "mini", "lite", "se", "air",
-  "blue", "red", "black", "white", "silver", "gold", "titanium",
-  "graphite", "gray", "grey", "purple", "pink", "green", "starlight",
-  "256gb", "512gb", "128gb", "64gb", "1tb", "2tb",
-  "5g", "4g", "lte", "wifi",
-]);
-
-function stripTrailingModifiers(query: string): string | null {
-  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
-  let i = tokens.length;
-  while (i > 1 && TRAILING_MODIFIERS.has(tokens[i - 1])) i--;
-  if (i === tokens.length) return null;     // nothing stripped
-  if (i < 2) return null;                   // would over-strip
-  return tokens.slice(0, i).join(" ");
-}
-
-/* Variant tokens that distinguish a higher-end SKU from its base
-   model. When the query contains one of these, the anchor MUST also
-   contain it — otherwise we'd surface 'iPhone 15' as the answer to
-   'iPhone 15 Pro Max' (Bucket 3#3 from QA audit, where the user
-   pays 50% more for the Pro Max but Havlo recommended the cheaper
-   base model and three even-cheaper older iPhones).
-
-   Multi-word variants ('pro max') checked as substrings; single
-   words checked with word-boundary regex so 'pro' inside 'product'
-   doesn't false-match. Order: longest first so 'pro max' matches
-   before falling through to 'pro' alone. */
-const VARIANT_TOKENS = [
-  "pro max", "ultra", "plus", "max", "pro", "mini", "lite", "se",
-  "m4", "m5", "m3", "m2", "m1",
-];
-
-function extractVariantTokens(query: string): string[] {
-  const lc = query.toLowerCase();
-  const found: string[] = [];
-  for (const v of VARIANT_TOKENS) {
-    if (v.includes(" ")) {
-      if (lc.includes(v)) found.push(v);
-    } else {
-      const re = new RegExp(`(^|[^a-z0-9])${v}([^a-z0-9]|$)`);
-      if (re.test(lc)) found.push(v);
-    }
-  }
-  /* Dedupe: if 'pro max' matched, drop 'pro' and 'max' so we don't
-     require a candidate to triple-match an inclusion that's already
-     covered by the multi-word match. */
-  if (found.includes("pro max")) {
-    return found.filter((t) => t !== "pro" && t !== "max");
-  }
-  return found;
-}
-
-function candidateHasAllVariants(title: string, variants: string[]): boolean {
-  if (variants.length === 0) return true;
-  const lc = title.toLowerCase();
-  return variants.every((v) => {
-    if (v.includes(" ")) return lc.includes(v);
-    const re = new RegExp(`(^|[^a-z0-9])${v}([^a-z0-9]|$)`);
-    return re.test(lc);
-  });
-}
-
-/* Extract whole-number model markers from the query (e.g. '15' from
-   'iPhone 15 Pro Max', '24' from 'Galaxy S24 Ultra'). When present,
-   every candidate must contain each one as a whole token; otherwise
-   'iPhone 15 Pro Max' silently anchored to 'iPhone 16 Pro Max' (the
-   variant gate alone passed both). Numeric-only tokens, 1-4 digits,
-   excluding tokens like 'M4' where the digit is glued to letters. */
-function extractRequiredNumbers(query: string): string[] {
-  const matches = Array.from(query.toLowerCase().matchAll(/(?<![a-z0-9])(\d{1,4})(?![a-z0-9])/g));
-  return matches.map((m) => m[1]);
-}
-
-function candidateHasAllNumbers(title: string, numbers: string[]): boolean {
-  if (numbers.length === 0) return true;
-  const lc = title.toLowerCase();
-  return numbers.every((n) => {
-    const re = new RegExp(`(^|[^a-z0-9])${n}([^a-z0-9]|$)`);
-    return re.test(lc);
-  });
-}
-
-/* Extract letter-glued model tokens from the query — these are the
-   identifiers extractRequiredNumbers misses because the digit is
-   glued to a letter:
-     'Galaxy S24 Ultra'      → ['s24']
-     'Logitech MX Master 3S' → ['3s']
-     'Galaxy A55'            → ['a55']
-     'iPhone 16 Plus'        → []     (16 is bare, caught by extractRequiredNumbers)
-     'MacBook Pro M4'        → ['m4'] (also covered by extractVariantTokens)
-
-   QA agent flagged 'Galaxy S24 Ultra → Galaxy S25 Ultra' (same
-   family + same variants slipped past). The S24/S25 distinction
-   only lives in this letter-glued form, so we need a dedicated
-   gate.
-
-   Stop-list excludes connectivity flags (5G/4G/LTE), storage sizes
-   (256GB), watch sizes (44mm/45mm), display tech (OLED/QLED), and
-   chip names already enforced by the variant gate (M1–M5). Without
-   this list, requiring '5g' to appear in every candidate would drop
-   legitimate non-5G variants of the same SKU. */
-const MODEL_TOKEN_STOPLIST = new Set([
-  "5g", "4g", "3g", "2g", "lte", "wifi", "wlan", "nfc",
-  "256gb", "512gb", "128gb", "64gb", "32gb", "16gb", "8gb",
-  "1tb", "2tb", "4tb",
-  "44mm", "45mm", "46mm", "49mm", "40mm", "42mm", "41mm", "38mm",
-  "9oz", "10oz", "12oz", "14oz", "16oz", "20oz", "32oz", "40oz",
-  "oled", "qled", "uhd", "fhd", "hdr",
-  "m1", "m2", "m3", "m4", "m5",
-  "h1", "h2", "h3",
-  "4k", "8k",
-]);
-
-/* Brand gate (added May 2026 after QA report flagged an LG OLED 55
-   query anchoring on a Samsung TV).
-
-   When the query contains a recognisable manufacturer brand name,
-   every candidate must contain the same brand. Stops cross-brand
-   matches inside the same family (LG → Samsung TV, Sony → Bose
-   headphones, etc.). Brands that share family but compete head-to-
-   head shouldn't substitute for each other.
-
-   Conservative list — only major brands where users genuinely
-   shop by brand identity. Non-brand queries (e.g. "55 inch TV"
-   without a brand name) bypass this gate. */
-const KNOWN_BRANDS = new Set([
-  // Phones / electronics — typed by users when they want THAT brand
-  "samsung", "lg", "sony", "hisense", "tcl", "philips", "panasonic",
-  "apple", "google", "xiaomi", "oneplus", "motorola", "nokia", "huawei",
-  "tecno", "infinix", "itel", "oppo", "realme", "vivo", "honor",
-  // Audio
-  "bose", "jbl", "marshall", "sonos", "sennheiser", "beats", "anker",
-  // Computing
-  "dell", "hp", "lenovo", "asus", "acer", "msi", "razer",
-  // Cameras / smart
-  "gopro", "fitbit", "garmin", "nest", "ring",
-  // Appliances
-  "dyson", "shark", "ninja", "kitchenaid", "bosch", "miele", "lg", "samsung",
-  // Footwear / fashion
-  "nike", "adidas", "puma", "reebok", "vans", "converse", "newbalance",
-  // Beauty / fragrance
-  "fenty", "rimmel", "maybelline", "loreal", "estee", "clinique",
-]);
-
-function extractQueryBrand(query: string): string | null {
-  const tokens = query.toLowerCase().split(/\s+/);
-  for (const tok of tokens) {
-    if (KNOWN_BRANDS.has(tok)) return tok;
-  }
-  return null;
-}
-
-function candidateHasBrand(title: string, brand: string | null): boolean {
-  if (!brand) return true;
-  return title.toLowerCase().includes(brand);
-}
-
-function extractRequiredModelTokens(query: string): string[] {
-  /* Pattern: token of length 2-8 that contains BOTH at least one
-     letter and at least one digit. Lookaheads enforce the
-     letter+digit requirement; \b anchors avoid mid-word matches.
-
-     Length cap of 8 (was 5) catches longer compound IDs like
-     '1000XM5' from 'Sony WH-1000XM5' — without this the matcher
-     anchored XM5 queries on XM6 because nothing forced the
-     specific generation marker (QA agent's 25-query script). */
-  const matches = Array.from(query.toLowerCase().matchAll(
-    /\b(?=[a-z0-9]*\d)(?=[a-z0-9]*[a-z])[a-z0-9]{2,8}\b/g,
-  ));
-  const tokens = matches.map((m) => m[0]);
-  return tokens.filter((t) => !MODEL_TOKEN_STOPLIST.has(t));
-}
-
-function candidateHasAllModelTokens(title: string, tokens: string[]): boolean {
-  if (tokens.length === 0) return true;
-  const lc = title.toLowerCase();
-  return tokens.every((tok) => {
-    const re = new RegExp(`(^|[^a-z0-9])${tok}([^a-z0-9]|$)`);
-    return re.test(lc);
-  });
-}
-
-/* Detect product family from the user's query directly (not just
-   from category-class queries like 'phones'). Reuses the same
-   PRODUCT_FAMILIES mapping as detectFamily(title). When the query
-   names a specific product (iPhone, MacBook, Galaxy), we know the
-   family and can require candidates to match it.
-
-   Closes the cross-category bleed in the variant gate from the QA
-   re-test: 'iPhone 16 Plus' was matching 'Dell 16 Plus DB16250'
-   (laptop), 'MacBook Pro M4' was matching 'iPad Pro M4' (tablet).
-   Token overlap alone wasn't enough; we need a category guard. */
-function detectQueryFamily(query: string): string | null {
-  return detectFamily(query);
-}
-
-/* familiesIncompatible is now imported from ./families. */
+   familiesIncompatible is still imported from ./families. */
+import {
+  queryFamily,
+  looksLikeAccessory,
+  looksSuspicious,
+  scoreCandidate,
+  stripTrailingModifiers,
+  extractVariantTokens,
+  candidateHasAllVariants,
+  extractRequiredNumbers,
+  candidateHasAllNumbers,
+  extractRequiredModelTokens,
+  candidateHasAllModelTokens,
+  extractQueryBrand,
+  candidateHasBrand,
+  detectQueryFamily,
+} from "./query-understanding";
 
 function offerToStoreOffer(o: NestedOffer, productTitle?: string): StoreOffer {
   const store = o.stores;
