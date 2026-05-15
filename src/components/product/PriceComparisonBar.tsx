@@ -396,7 +396,7 @@ export default function PriceComparisonBar({
           </span>
           {showMsrp && (
             <span className="opacity-70 text-[10px]">
-              MSRP {formatPriceForUser(originalPriceNgn!, country)}
+              List price {formatPriceForUser(originalPriceNgn!, country)}
             </span>
           )}
           <span>
@@ -512,8 +512,8 @@ export default function PriceComparisonBar({
       {!anyXBorder && thisIsCrossBorder && (
         <p className="mt-2.5 text-[11px] text-ink-3 leading-relaxed">
           <span className="text-amber-500">⚑</span>{" "}
-          This offer ships across borders — the price includes a ~30% landed
-          estimate (shipping + customs).
+          This offer ships across borders. The price includes a ~30% landed
+          estimate for shipping and customs.
         </p>
       )}
     </div>

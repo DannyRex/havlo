@@ -423,7 +423,6 @@ Use a real iPhone or Android (or Chrome devtools at 390×844).
 ### K2. Affiliate disclosure
 - [ ] Bottom of `/ng/compare?q=X` results shows the affiliate
       disclosure line ("Some links earn Havlo a commission…")
-- [ ] Click "How this works" → lands on `/how-we-make-money`
 
 ### K3. Cookie banner (UK / EU)
 - [ ] On a first visit to `/uk`, a cookie banner appears

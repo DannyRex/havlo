@@ -273,9 +273,6 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                 but always present on every comparison surface. */}
             <p className="mt-2 text-[10px] text-ink-3/85 leading-relaxed">
               The price you pay doesn&apos;t change, and we never adjust ranking based on who pays us.{" "}
-              <Link href={`/how-we-make-money`} className="underline underline-offset-2 hover:text-ink-2 transition-colors">
-                How this works
-              </Link>
             </p>
           </div>
         )}

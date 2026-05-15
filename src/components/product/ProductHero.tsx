@@ -191,7 +191,7 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             sizes="(max-width: 768px) 100vw, 50vw"
             priority
             onError={() => setImgFailed(true)}
-            className="object-contain p-6 sm:p-10"
+            className="object-cover"
           />
         ) : (
           /* Gradient + emoji fallback matches MasonryCard's

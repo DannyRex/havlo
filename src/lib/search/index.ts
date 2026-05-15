@@ -513,11 +513,27 @@ export async function suggest(
     }
   }
 
+  /* Badge = bestPerKey, NOT mergedStores.size. The click target is
+     `bestKey` (one specific product_id). /compare's pid path pools
+     ONLY that product's tight-signature siblings — so if the title
+     group spans products with DIFFERENT signatures (catalog dedup
+     gap), the merged total over-promises what compare can actually
+     show.
+
+     Concrete: AirPods Pro Apple exists as product A (sig
+     apple|airpods-pro) AND product B (sig apple|?). Both have 1
+     store each. mergedStores = 2; bestPerKey = 1. Badge said "2
+     stores" but /compare?pid=A returned 1 store and read as broken.
+
+     Trade-off accepted: when catalog dedup is imperfect we
+     under-report stores in the badge, but the click-through
+     promise always matches reality. Catalog dedup is a separate
+     fix on its own track (scripts/dedup-products.ts). */
   return Array.from(groups.values())
-    .filter((g) => g.mergedStores.size >= 1)
+    .filter((g) => g.bestPerKey >= 1)
     .map((g) => ({
       title:      g.title,
       key:        g.bestKey,
-      storeCount: g.mergedStores.size,
+      storeCount: g.bestPerKey,
     }));
 }

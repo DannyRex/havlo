@@ -242,8 +242,8 @@ export default function LiveResults({ items, loading, providers }: Props) {
      a secondary "≈ $X in USD" hint per card — but the headline is
      local. */
   const caption = country.code === "ng"
-    ? "Live picks from global stores — prices in ₦, ships to Nigeria."
-    : `Live picks from global stores — prices in ${country.currency}.`;
+    ? "Live picks from global stores. Prices in ₦, ships to Nigeria."
+    : `Live picks from global stores. Prices in ${country.currency}.`;
 
   return (
     <section className="mt-12 sm:mt-16">
