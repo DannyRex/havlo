@@ -378,9 +378,17 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
           Paste a link or search any product. Havlo finds it cheaper in {countryPhrase(countryCode, countryName)}.
         </p>
 
-        {/* Composer — mobile-optimised */}
+        {/* Composer — mobile-optimised.
+
+            z-30 elevates the entire composer subtree (including the
+            absolute-positioned autocomplete dropdown below) above
+            the category chip rail that follows in DOM order. The
+            dropdown's own z-20 is LOCAL to this composer's stacking
+            context — without an explicit z-index here, the composer
+            sits at z-auto and the later-sibling chip rail (also
+            z-auto) wins by document order. */}
         <div
-          className="relative animate-fade-up text-left"
+          className="relative z-30 animate-fade-up text-left"
           style={{ animationDelay: "160ms" }}
         >
           <div
