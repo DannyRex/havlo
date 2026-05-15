@@ -278,12 +278,17 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
   return (
     <section
       aria-label="Search for products"
-      className="relative bg-bg pt-12 pb-10 sm:pt-24 sm:pb-16 overflow-hidden"
+      className="relative bg-bg pt-12 pb-10 sm:pt-24 sm:pb-16"
     >
-      {/* Subtle radial wash — light enough to read non-AI */}
+      {/* Subtle radial wash — light enough to read non-AI.
+          NOTE: dropped section-level `overflow-hidden` — was clipping
+          the autocomplete dropdown when it extended past the
+          section's bottom padding. The wash itself is already
+          bounded by `absolute inset-0` (same box as the section), so
+          the clip wasn't load-bearing for the background. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-60 dark:opacity-40"
+        className="pointer-events-none absolute inset-0 opacity-60 dark:opacity-40 overflow-hidden"
         style={{
           backgroundImage:
             "radial-gradient(60% 50% at 50% 0%, rgba(0,87,255,0.05) 0%, transparent 70%)",
