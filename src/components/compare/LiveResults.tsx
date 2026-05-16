@@ -11,6 +11,7 @@ import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-la
 import { useCountry } from "@/components/providers/CountryProvider";
 import { USD_FX, formatLocal, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { displayStoreName } from "@/lib/store-display";
+import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import type { Deal } from "@/types";
 
 interface Props {
@@ -124,12 +125,7 @@ function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
             className="absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-[1.04] transition-transform duration-500 motion-reduce:group-hover:scale-100"
           />
         ) : (
-          <div
-            className="absolute inset-0 flex items-center justify-center text-4xl"
-            aria-hidden="true"
-          >
-            {deal.imageEmoji}
-          </div>
+          <HavloLogoFallback size="md" />
         )}
 
         {/* Discount badge — perfect circle, top-right */}

@@ -34,6 +34,7 @@ import {
 } from "@/lib/landed-price";
 import { trackClick } from "@/lib/trackClick";
 import StoreLogo from "@/components/compare/StoreLogo";
+import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import type { Country } from "@/lib/country";
 import type { ProductGroup, DupeResult } from "@/lib/search";
 
@@ -104,11 +105,8 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
               />
             </div>
           ) : (
-            <div
-              className="w-full sm:w-28 h-40 sm:h-28 rounded-xl flex items-center justify-center text-3xl flex-shrink-0"
-              style={{ background: anchor.imageGradient }}
-            >
-              {anchor.imageEmoji}
+            <div className="relative w-full sm:w-28 h-40 sm:h-28 rounded-xl overflow-hidden flex-shrink-0">
+              <HavloLogoFallback size="md" />
             </div>
           )}
 

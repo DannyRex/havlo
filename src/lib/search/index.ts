@@ -61,8 +61,6 @@ export interface ProductGroup {
   title: string;       // representative title
   category: string;
   imageUrl?: string;
-  imageEmoji: string;
-  imageGradient: string;
   brand: string | null;
   model: string | null;
   storageGb: number | null;
@@ -232,8 +230,6 @@ function getGroups(): ProductGroup[] {
       title: rep.deal.title,
       category: rep.deal.category,
       imageUrl: items.find((i) => i.deal.imageUrl)?.deal.imageUrl,
-      imageEmoji: rep.deal.imageEmoji,
-      imageGradient: rep.deal.imageGradient,
       brand: rep.sig.brand,
       model: rep.sig.model,
       storageGb: rep.sig.storageGb,

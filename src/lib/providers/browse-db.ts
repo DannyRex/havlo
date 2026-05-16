@@ -45,8 +45,6 @@ function rowToDeal(r: BestOfferRow, popularity?: PopularityRecord): Deal {
     discountPercent: r.discount_percent ?? 0,
     currency: r.currency,
     imageUrl: r.image_url ?? undefined,
-    imageGradient: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
-    imageEmoji: "🛍️",
     url: r.url,
     expiresAt: null,
     isHot: (r.discount_percent ?? 0) >= 30,

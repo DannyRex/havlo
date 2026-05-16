@@ -207,8 +207,6 @@ export function searchProducts(query: string): SearchResult | null {
       brand: cheapest.storeName,
       priceRange: { min: minPrice, max: maxPrice },
       currency: "NGN",
-      imageGradient: cheapest.imageGradient,
-      imageEmoji: cheapest.imageEmoji,
       imageUrl: cheapest.imageUrl,
       category: cheapest.category,
       similarity: Math.max(similarity, 40),
@@ -225,8 +223,6 @@ export function searchProducts(query: string): SearchResult | null {
     product: {
       title: primary.title,
       category: primary.category,
-      imageEmoji: primary.imageEmoji,
-      imageGradient: primary.imageGradient,
       imageUrl: primary.imageUrl,
     },
     prices,

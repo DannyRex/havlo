@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, TrendingDown, Store } from "lucide-react";
 import { formatNaira, proxiedImageUrl, cleanTitle } from "@/lib/utils";
 import type { Alternative } from "@/types";
+import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 
 interface Props {
   alt: Alternative;
@@ -15,8 +16,7 @@ export default function AlternativeCard({ alt }: Props) {
                     hover:border-border-strong transition-all duration-300 hover:-translate-y-1 group">
 
       {/* Image */}
-      <div className="h-28 sm:h-32 flex items-center justify-center relative border-b border-border overflow-hidden"
-           style={{ background: alt.imageGradient }}>
+      <div className="relative h-28 sm:h-32 flex items-center justify-center border-b border-border overflow-hidden">
         {alt.imageUrl ? (
           /* Below-the-anchor → lazy + low priority. proxiedImageUrl
              handles Amazon / ASOS / AliExpress hotlink blocks. */
@@ -29,7 +29,7 @@ export default function AlternativeCard({ alt }: Props) {
             className="w-full h-full object-contain p-3 bg-white"
           />
         ) : (
-          <span className="text-4xl sm:text-5xl">{alt.imageEmoji}</span>
+          <HavloLogoFallback size="md" />
         )}
 
         {/* Similarity badge */}

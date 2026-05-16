@@ -116,8 +116,6 @@ export function sniffToAnchor(sniff: SniffResult): ProductGroup | null {
     title:         sniff.title,
     category:      "general",
     imageUrl:      sniff.imageUrl ?? undefined,
-    imageEmoji:    "🛒",
-    imageGradient: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
     brand:         sniff.brand,
     model:         null,
     storageGb:     null,

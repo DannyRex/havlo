@@ -91,8 +91,6 @@ async function synthesizeAnchorFromOfferRow(row: OfferRow): Promise<SearchOutput
     title:         row.title,
     category:      row.category_slug ?? "general",
     imageUrl:      row.image_url ?? undefined,
-    imageEmoji:    "🛍️",
-    imageGradient: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
     brand:         row.brand,
     model:         null,
     storageGb:     null,

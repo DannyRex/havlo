@@ -285,8 +285,6 @@ function mapToDeal(
     discountPercent,
     currency: "NGN",
     imageUrl,
-    imageGradient: "linear-gradient(135deg, #ff6e40 0%, #f4511e 100%)",
-    imageEmoji: "🛒",
     url: canonicalUrl,
     expiresAt: null,
     isHot: false,

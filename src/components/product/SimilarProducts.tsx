@@ -58,8 +58,6 @@ function dupeToDeal(d: DupeResult): Deal {
     discountPercent: best.discountPercent || 0,
     currency:        best.currency,
     imageUrl:        d.imageUrl ?? best.imageUrl,
-    imageGradient:   d.imageGradient ?? "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
-    imageEmoji:      d.imageEmoji ?? "🛍️",
     url:             best.url,
     expiresAt:       null,
     isHot:           (best.discountPercent ?? 0) >= 30,

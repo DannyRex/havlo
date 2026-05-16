@@ -281,8 +281,6 @@ function mapToDeal(
     discountPercent,
     currency:        "USD",
     imageUrl:        item.Images?.Primary?.Large?.URL,
-    imageGradient:   "linear-gradient(135deg, #FF9900 0%, #232F3E 100%)",
-    imageEmoji:      "🛍️",
     url,
     expiresAt:       null,
     isHot:           discountPercent >= 30,

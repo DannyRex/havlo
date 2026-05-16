@@ -212,8 +212,6 @@ function mapToDeal(p: AliexProduct, i: number, country: string): Deal | null {
     discountPercent,
     currency:       "USD",
     imageUrl:       p.product_main_image_url,
-    imageGradient:  "linear-gradient(135deg, #ff4747 0%, #c91111 100%)",
-    imageEmoji:     "🛍️",
     url,
     expiresAt:      null,
     isHot:          discountPercent >= 30,

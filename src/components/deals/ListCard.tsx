@@ -15,6 +15,7 @@ import {
 } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import InfoTip from "@/components/ui/InfoTip";
+import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { USD_FX, formatLocal, inferStoreCountry, isGlobalIntlStore, type Country } from "@/lib/country";
 import { pdpUrlForDeal } from "@/lib/pdp-url";
@@ -31,24 +32,14 @@ function convertToUserCurrency(amount: number, dealCurrency: string, country: Co
 }
 
 /* Same onError fallback pattern as MasonryCard's ResilientImage —
-   when the image fails to load, swap to the gradient + emoji
-   fallback so users never see a broken image icon. */
+   when the image fails to load OR is missing entirely, swap to the
+   Havlo logo mark so users never see a broken image icon. */
 function ResilientThumb({ deal }: { deal: Deal }) {
   const [failed, setFailed] = useState(false);
   const showFallback = !deal.imageUrl || failed;
 
   if (showFallback) {
-    return (
-      <div
-        className="absolute inset-0 flex items-center justify-center text-3xl"
-        style={{ background: deal.imageGradient }}
-        aria-hidden="true"
-      >
-        <span className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.25)]">
-          {deal.imageEmoji}
-        </span>
-      </div>
-    );
+    return <HavloLogoFallback size="sm" />;
   }
 
   /* Proxy external images so Amazon / ASOS / AliExpress hotlink-block

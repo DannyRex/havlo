@@ -49,13 +49,10 @@ interface CuratedProduct {
   salePriceUsd:     number;
   /** Approx. USD original price (pre-discount). */
   originalPriceUsd: number;
-  /** Visual treatment fallback when there's no imageUrl. */
-  imageGradient: string;
-  imageEmoji:    string;
   /** Optional: real product photo URL. We use Wikipedia / Wikimedia
       Commons URLs since they're stable, accessible, no bot detection,
       and the images are CC-licensed. When omitted, the card renders
-      the gradient + emoji fallback instead. */
+      the Havlo logo fallback (see components/ui/HavloLogoFallback). */
   imageUrl?:    string;
   /** Mark a few flagship items as featured / hot to surface them
       prominently in TrendingDeals + the "hot" view filters. */
@@ -74,8 +71,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "iPhone 15 Pro Max 256GB",
     salePriceUsd: 1099,
     originalPriceUsd: 1199,
-    imageGradient: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
-    imageEmoji: "📱",
     imageUrl: "https://m.media-amazon.com/images/I/81UKVHM77GL._AC_SL1500_.jpg",
     isFeatured: true,
   },
@@ -88,8 +83,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "Samsung Galaxy S24 Ultra 256GB",
     salePriceUsd: 1099,
     originalPriceUsd: 1299,
-    imageGradient: "linear-gradient(135deg, #6b7280 0%, #1f2937 100%)",
-    imageEmoji: "📱",
     imageUrl: "https://m.media-amazon.com/images/I/51A-Q4eMBxL._AC_SL1000_.jpg",
   },
 
@@ -103,8 +96,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "MacBook Air M3 13 inch 256GB",
     salePriceUsd: 999,
     originalPriceUsd: 1099,
-    imageGradient: "linear-gradient(135deg, #cbd5e1 0%, #64748b 100%)",
-    imageEmoji: "💻",
     imageUrl: "https://m.media-amazon.com/images/I/71-D1xCuVwL._AC_SL1500_.jpg",
     isFeatured: true,
   },
@@ -117,8 +108,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "iPad Air M2 11 inch 128GB",
     salePriceUsd: 549,
     originalPriceUsd: 599,
-    imageGradient: "linear-gradient(135deg, #94a3b8 0%, #475569 100%)",
-    imageEmoji: "💻",
     imageUrl: "https://m.media-amazon.com/images/I/41meTpiX+8L._AC_.jpg",
   },
   {
@@ -130,8 +119,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "Dell XPS 13 Core Ultra 7 16GB 512GB",
     salePriceUsd: 1099,
     originalPriceUsd: 1399,
-    imageGradient: "linear-gradient(135deg, #475569 0%, #1e293b 100%)",
-    imageEmoji: "💻",
     imageUrl: "https://m.media-amazon.com/images/I/71ZktZ8Wn8L._AC_SL1500_.jpg",
   },
 
@@ -145,8 +132,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "AirPods Pro 2 USB-C",
     salePriceUsd: 199,
     originalPriceUsd: 249,
-    imageGradient: "linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%)",
-    imageEmoji: "🎧",
     imageUrl: "https://m.media-amazon.com/images/I/51NRGHU2NoL._AC_SL1500_.jpg",
     isFeatured: true,
   },
@@ -159,8 +144,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "AirPods Max",
     salePriceUsd: 449,
     originalPriceUsd: 549,
-    imageGradient: "linear-gradient(135deg, #475569 0%, #1e293b 100%)",
-    imageEmoji: "🎧",
     imageUrl: "https://m.media-amazon.com/images/I/71umw2cCkOL._AC_SL1500_.jpg",
   },
   {
@@ -172,8 +155,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "Sony WH-1000XM5",
     salePriceUsd: 329,
     originalPriceUsd: 399,
-    imageGradient: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-    imageEmoji: "🎧",
     imageUrl: "https://m.media-amazon.com/images/I/61vJtKbAssL._AC_SL1500_.jpg",
   },
   {
@@ -185,8 +166,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "Bose QuietComfort Ultra Headphones",
     salePriceUsd: 379,
     originalPriceUsd: 429,
-    imageGradient: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
-    imageEmoji: "🎧",
     imageUrl: "https://m.media-amazon.com/images/I/61z+9dMt9vL._AC_SL1500_.jpg",
   },
 
@@ -200,8 +179,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "PlayStation 5 Slim Console",
     salePriceUsd: 449,
     originalPriceUsd: 499,
-    imageGradient: "linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%)",
-    imageEmoji: "🎮",
     imageUrl: "https://m.media-amazon.com/images/I/51tSjJJl82L._SL1500_.jpg",
     isFeatured: true,
   },
@@ -214,8 +191,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "Nintendo Switch OLED Model",
     salePriceUsd: 309,
     originalPriceUsd: 349,
-    imageGradient: "linear-gradient(135deg, #ef4444 0%, #1e3a8a 100%)",
-    imageEmoji: "🎮",
     imageUrl: "https://m.media-amazon.com/images/I/61nqNujSF2L._SL1330_.jpg",
   },
 
@@ -229,8 +204,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "Apple Watch Series 10 GPS 42mm",
     salePriceUsd: 379,
     originalPriceUsd: 399,
-    imageGradient: "linear-gradient(135deg, #94a3b8 0%, #1e293b 100%)",
-    imageEmoji: "⌚",
     imageUrl: "https://m.media-amazon.com/images/I/6105jZyXyPL._AC_SL1500_.jpg",
   },
   {
@@ -242,8 +215,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "Kindle Paperwhite 12th Generation 16GB",
     salePriceUsd: 159,
     originalPriceUsd: 199,
-    imageGradient: "linear-gradient(135deg, #475569 0%, #1e293b 100%)",
-    imageEmoji: "📚",
     imageUrl: "https://m.media-amazon.com/images/I/61lwtlaSiNL._AC_SL1000_.jpg",
   },
 
@@ -257,8 +228,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "Dyson V15 Detect Cordless Vacuum",
     salePriceUsd: 649,
     originalPriceUsd: 749,
-    imageGradient: "linear-gradient(135deg, #fbbf24 0%, #b45309 100%)",
-    imageEmoji: "🧹",
     imageUrl: "https://m.media-amazon.com/images/I/51d7OAeDG9L._SL1000_.jpg",
   },
   {
@@ -270,8 +239,6 @@ const PRODUCTS: CuratedProduct[] = [
     searchQuery: "Ninja Foodi DualZone 8 Quart Air Fryer",
     salePriceUsd: 159,
     originalPriceUsd: 199,
-    imageGradient: "linear-gradient(135deg, #1f2937 0%, #475569 100%)",
-    imageEmoji: "🍳",
     imageUrl: "https://m.media-amazon.com/images/I/61xMRA3NY4L._AC_SL1500_.jpg",
   },
 ];
@@ -319,10 +286,9 @@ function expandProduct(product: CuratedProduct): Deal[] {
       discountPercent,
       currency: "USD",
       /* Real product photo when available; cards fall through to the
-         imageGradient + imageEmoji combination otherwise. */
+         Havlo logo fallback (components/ui/HavloLogoFallback) when
+         imageUrl is null. */
       imageUrl: product.imageUrl,
-      imageGradient: product.imageGradient,
-      imageEmoji: product.imageEmoji,
       url,
       expiresAt: null,
       isHot: discountPercent >= 20,

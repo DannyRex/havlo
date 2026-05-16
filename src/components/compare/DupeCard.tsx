@@ -8,6 +8,7 @@ import { formatPriceForUser } from "@/lib/utils";
 import { pdpUrlForOffer } from "@/lib/pdp-url";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
+import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import { effectiveLandedPrice } from "@/lib/landed-price";
 import { displayStoreName } from "@/lib/store-display";
 import { storeLogoInvertClass } from "@/lib/store-logo-invert";
@@ -99,12 +100,7 @@ export default function DupeCard({
             className="w-full h-full object-contain p-3 group-hover:scale-[1.04] transition-transform duration-500"
           />
         ) : (
-          <div
-            className="flex h-full w-full items-center justify-center text-4xl"
-            style={{ background: dupe.imageGradient }}
-          >
-            {dupe.imageEmoji}
-          </div>
+          <HavloLogoFallback size="md" />
         )}
       </div>
 

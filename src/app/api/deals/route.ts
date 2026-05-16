@@ -557,8 +557,6 @@ export async function GET(req: NextRequest) {
       discountPercent: d.discountPercent,
       currency:        d.currency,
       imageUrl:        d.imageUrl,
-      imageGradient:   d.imageGradient,
-      imageEmoji:      d.imageEmoji,
       /* `url` intentionally empty — Google Shopping URLs are 1KB+
          each and the cards link to PDP first (`/p/{id}`), not
          directly to the merchant. The full URL lives on the

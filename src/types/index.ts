@@ -38,8 +38,6 @@ export interface Deal {
   discountPercent: number;
   currency: "NGN" | "USD";
   imageUrl?: string;
-  imageGradient: string;
-  imageEmoji: string;
   url: string;
   expiresAt: string | null;
   isHot: boolean;
@@ -72,8 +70,6 @@ export interface Alternative {
   brand: string;
   priceRange: { min: number; max: number };
   currency: "NGN";
-  imageGradient: string;
-  imageEmoji: string;
   imageUrl?: string;
   category: string;
   similarity: number;
@@ -89,8 +85,6 @@ export interface SearchResult {
   product: {
     title: string;
     category: string;
-    imageEmoji: string;
-    imageGradient: string;
     imageUrl?: string;
   };
   prices: PriceResult[];

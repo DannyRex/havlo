@@ -6,6 +6,7 @@ import { formatPriceForUser, proxiedImageUrl, cleanTitle } from "@/lib/utils";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { displayStoreName } from "@/lib/store-display";
+import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import { storeLogoInvertClass } from "@/lib/store-logo-invert";
 import { trackClick } from "@/lib/trackClick";
 import type { ProductGroup, StoreOffer } from "@/lib/search";
@@ -20,7 +21,7 @@ export default function PriceResults({
   mode?: string;
 }) {
   const { country } = useCountry();
-  const { offers, bestPrice, maxSavings, title, imageUrl, imageEmoji, imageGradient, category, storeCount } = group;
+  const { offers, bestPrice, maxSavings, title, imageUrl, category, storeCount } = group;
 
   /* Compute "INTL for this visitor" at the UI layer rather than
      trusting the StoreOffer.isInternational flag from pg-fts.ts.
@@ -72,9 +73,8 @@ export default function PriceResults({
             />
           </div>
         ) : (
-          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl flex items-center justify-center text-3xl flex-shrink-0"
-               style={{ background: imageGradient }}>
-            {imageEmoji}
+          <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden flex-shrink-0">
+            <HavloLogoFallback size="sm" />
           </div>
         )}
         <div className="min-w-0 flex-1">

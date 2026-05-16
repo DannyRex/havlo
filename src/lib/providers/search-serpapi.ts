@@ -277,8 +277,6 @@ function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | nu
     discountPercent,
     currency: "USD",
     imageUrl: r.thumbnail,
-    imageGradient: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
-    imageEmoji: "🛍️",
     url: finalUrl,
     expiresAt: null,
     isHot: discountPercent >= 30,

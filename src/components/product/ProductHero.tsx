@@ -25,6 +25,7 @@ import {
 } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import PriceComparisonBar from "@/components/product/PriceComparisonBar";
+import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import type { PerStoreOffer } from "@/lib/pdp-stats";
 import type { PriceHistorySummary } from "@/lib/search/price-history";
 import {
@@ -200,16 +201,9 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             className="object-contain p-3 sm:p-4"
           />
         ) : (
-          /* Gradient + emoji fallback matches MasonryCard's
-             ResilientImage so the empty state reads consistent
-             across surfaces. */
-          <div
-            className="absolute inset-0 flex items-center justify-center text-7xl sm:text-8xl"
-            style={{ background: "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)" }}
-            aria-hidden="true"
-          >
-            <span className="drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]">🛍️</span>
-          </div>
+          /* Havlo logo fallback matches MasonryCard's ResilientImage
+             so the empty state reads consistent across surfaces. */
+          <HavloLogoFallback size="lg" />
         )}
 
         {/* Discount badge — top-right, same circular treatment as

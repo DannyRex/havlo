@@ -28,6 +28,7 @@ import {
 } from "@/lib/country";
 import { getCashbackForStore } from "@/lib/cashback";
 import InfoTip from "@/components/ui/InfoTip";
+import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import { track } from "@/lib/analytics";
 import { pdpUrlForDeal } from "@/lib/pdp-url";
 import type { Deal } from "@/types";
@@ -69,24 +70,17 @@ function convertToUserCurrency(amount: number, dealCurrency: string, country: Co
 }
 
 /* Resilient image renderer. Tries the deal's imageUrl; on load
-   failure (DNS, 404, CORS, deleted file), swaps to the gradient +
-   emoji fallback so users never see a broken image icon. */
+   failure (DNS, 404, CORS, deleted file) OR when the deal has no
+   imageUrl at all, swaps to the Havlo logo fallback so users never
+   see a broken image icon. May 2026: replaced the emoji+gradient
+   placeholder (decorative but inconsistent) with the brand logo
+   mark — reads as intentional and keeps the surface on-brand. */
 function ResilientImage({ deal, priority }: { deal: Deal; priority: boolean }) {
   const [failed, setFailed] = useState(false);
   const showFallback = !deal.imageUrl || failed;
 
   if (showFallback) {
-    return (
-      <div
-        className="absolute inset-0 flex items-center justify-center text-5xl sm:text-6xl"
-        style={{ background: deal.imageGradient }}
-        aria-hidden="true"
-      >
-        <span className="drop-shadow-[0_2px_8px_rgba(0,0,0,0.25)]">
-          {deal.imageEmoji}
-        </span>
-      </div>
-    );
+    return <HavloLogoFallback size="md" />;
   }
 
   /* alt = product title (truncated). Empty alt was an a11y miss
@@ -189,18 +183,32 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
 
   /* Cross-border classification — three-step decision:
        1. If inferStoreCountry returns a country, store is local
-          IFF it matches the user's country.
+          IFF it matches the user's country. If it's anchored to a
+          DIFFERENT country, the visitor will pay cross-border
+          shipping regardless of whether currencies happen to match.
        2. If store has no country anchor BUT is in GLOBAL_INTL_STORES
           (AliExpress, Shein, Temu, DHgate…), it's ALWAYS cross-
           border, regardless of currency match.
-       3. Otherwise fall back to currency-mismatch.
+       3. Untagged store with no global-intl flag — fall back to
+          currency-mismatch as a last-resort hint.
      Hoisted ABOVE landedFmt + secondaryStr (May 2026) so both gate
      on the corrected check, not the raw `!sameCcy` which fires for
-     UK Currys (stored as USD but local for UK users). */
+     UK Currys (stored as USD but local for UK users).
+     Bug fix May 2026: previously the anchored-elsewhere case (UK
+     Currys viewed by a US user) didn't trigger cross-border because
+     both deal currency and user currency normalised to USD — so
+     `sameCcy` was true and the OR shortcut returned false. The
+     extra `dealStoreCountry !== null` clause closes that hole so
+     every cross-country browse on the deals page now shows the
+     landed total. */
   const dealStoreCountry = inferStoreCountry(deal.storeId, deal.storeName);
   const storeIsLocalToUser = dealStoreCountry !== null && dealStoreCountry.toLowerCase() === country.code.toLowerCase();
   const storeIsGlobalIntl  = dealStoreCountry === null && isGlobalIntlStore(deal.storeId, deal.storeName);
-  const isCrossBorderForUser = !storeIsLocalToUser && (storeIsGlobalIntl || !sameCcy);
+  const isCrossBorderForUser = !storeIsLocalToUser && (
+    dealStoreCountry !== null ||  // anchored to a different country
+    storeIsGlobalIntl ||          // global intl roster
+    !sameCcy                       // last-resort currency hint
+  );
   const showIntl = showOriginBadge && isCrossBorderForUser;
 
   /* Landed-cost estimate for cross-border purchases. Uses the same

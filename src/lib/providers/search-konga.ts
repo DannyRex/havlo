@@ -132,8 +132,6 @@ function mapToDeal(p: KongaProduct, i: number): Deal | null {
     discountPercent,
     currency:       "NGN",
     imageUrl:       p.image,
-    imageGradient:  "linear-gradient(135deg, #1f2937 0%, #4b5563 100%)",
-    imageEmoji:     "🛍️",
     url:            withAffiliateId(url, process.env.KONGA_AFFILIATE_KEY ?? ""),
     expiresAt:      null,
     isHot:          discountPercent >= 30,
