@@ -26,7 +26,12 @@
    FTS work; this just classifies the results. */
 
 import type { DupeResult, StoreOffer } from "@/lib/search";
-import { isLikelySameProduct } from "./query-understanding";
+import {
+  isLikelySameProduct,
+  extractRequiredNumbers,
+  extractRequiredModelTokens,
+  extractVariantTokens,
+} from "./query-understanding";
 
 export interface PartitionResult {
   /** Dupes that look like genuine same-product variants — their
@@ -52,43 +57,65 @@ export function partitionDupesByVariantMatch(
   const siblingVariants: DupeResult[] = [];
   const otherProducts: DupeResult[] = [];
 
-  /* Anchor's identity tokens — used to detect siblings. A sibling
-     shares the brand AND a meaningful piece of the model identifier
-     (the leading model token like "iphone 15", "galaxy s24") but
-     fails the strict same-product gate because it carries different
-     variant/number/model tokens (Plus, Ultra, Max, M4 vs M3, etc.).
+  /* Sibling detection — narrowly scoped to the EXACT case the QA
+     report caught: iPhone 15 anchor showing iPhone 15 Plus as a
+     "cheaper alternative". A sibling is the SAME generation/model
+     number with a DIFFERENT sub-tier suffix (Plus, Pro, Max, Ultra,
+     Mini, SE, FE, etc.).
 
-     We compute these from the anchor's title once and reuse per dupe. */
+     First implementation was way too broad — any 2-word slice match
+     on brand+model-prefix flagged every iPhone as a sibling of every
+     other iPhone, every Nike Air as a sibling of every other Nike
+     Air. Result: the "You may also like" rail went near-empty
+     because legit alternatives (iPhone 14, Galaxy S23, etc.) got
+     swept up.
+
+     Tightened rule (May 2026 v2): a dupe is a sibling iff
+       (a) brand matches exactly
+       (b) shares ALL numeric model markers with the anchor
+           (iPhone 15 vs iPhone 15 Plus share "15"; iPhone 14 vs
+           iPhone 15 do NOT share — 14 is in one, 15 in the other)
+       (c) shares ALL letter-glued model tokens (s24 + s24 ultra
+           share "s24"; xm4 vs xm5 do NOT)
+       (d) ONE side has additional sub-tier variant tokens (plus,
+           pro, max, ultra, mini, se, fe, etc.) that the other
+           lacks — this is what makes them siblings rather than
+           the exact same SKU
+     Without (d) it would just be a same-product match and the
+     variant gate would have already pooled them into the spectrum. */
   const anchorBrand = (anchor.brand ?? "").toLowerCase().trim();
-  /* Model prefix: first 2-3 alphanumeric tokens of the anchor title,
-     lowercased and stripped of punctuation. Matches "iphone 15",
-     "galaxy s24", "macbook pro", "ps5" etc. Good enough for sibling
-     detection — full model parsing lives in normalize.ts. */
-  const anchorModelPrefix = anchor.title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 3)
-    .join(" ");
+  const anchorNumbers = extractRequiredNumbers(anchor.title);
+  const anchorModels  = extractRequiredModelTokens(anchor.title);
+  const anchorVariants = extractVariantTokens(anchor.title);
 
   function looksLikeSibling(d: DupeResult): boolean {
-    /* Sibling requires (at least) brand match AND model-prefix overlap.
-       Without brand match, we can't be confident it's the same product
-       line — better to leave it in cross-brand alternatives. */
     const dBrand = (d.brand ?? "").toLowerCase().trim();
     if (!anchorBrand || !dBrand || anchorBrand !== dBrand) return false;
-    if (!anchorModelPrefix) return false;
-    /* Check if any 2-word slice of the anchor's model prefix appears
-       in the dupe's title — catches "iphone 15" within "iPhone 15
-       Plus" or "galaxy s24" within "Galaxy S24 Ultra". */
-    const dTitleLc = d.title.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
-    const tokens = anchorModelPrefix.split(" ");
-    for (let i = 0; i <= tokens.length - 2; i++) {
-      const slice = tokens.slice(i, i + 2).join(" ");
-      if (dTitleLc.includes(slice)) return true;
+
+    const dTitleLc = d.title.toLowerCase();
+    /* (b) all anchor numeric model markers must appear in dupe.
+       Catches iPhone 15 / 15 Plus (both have "15") but rejects
+       iPhone 14 vs iPhone 15. */
+    for (const n of anchorNumbers) {
+      if (!dTitleLc.includes(n)) return false;
     }
-    return false;
+    /* (c) all anchor letter-glued model tokens must appear.
+       Catches s24 / s24 Ultra (both share "s24") but rejects
+       WH-1000XM4 vs WH-1000XM5. */
+    for (const m of anchorModels) {
+      if (!dTitleLc.includes(m)) return false;
+    }
+    /* (d) variant token asymmetry — one side has a sub-tier
+       suffix the other doesn't. If both sides have identical
+       variant tokens (or both have none) it's not a sibling —
+       it would be the same SKU (caught by the variant gate)
+       or a same-tier different-product (cross-brand-ish). */
+    const dVariants = extractVariantTokens(d.title);
+    const anchorSet = new Set(anchorVariants);
+    const dSet = new Set(dVariants);
+    const anchorHasUnique = anchorVariants.some((v) => !dSet.has(v));
+    const dHasUnique      = dVariants.some((v) => !anchorSet.has(v));
+    return anchorHasUnique || dHasUnique;
   }
 
   for (const d of dupes) {
