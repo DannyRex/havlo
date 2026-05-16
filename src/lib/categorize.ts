@@ -325,7 +325,25 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
      Spray' (hair treatment) in retag dry-run. Disambiguated by
      pairing 'coat' with weather/winter context, and dropping 'coat'
      from the bare list. */
-  { pattern: /\b(jeans|denim|t-shirt|hoodie|jacket|skirt|trousers|chinos|polo|blouse|cardigan)\b/i, slug: "fashion", reason: "clothing" },
+  /* T-shirt phrasing varies wildly across NG marketplaces:
+     "T-shirt", "T shirt", "Tshirt", "Tee shirt", "Tee", "T-Shirts".
+     The original `t-shirt` regex required a literal hyphen, which
+     missed Konga / Jumia titles like "GG Stripped Men's Black T shirt"
+     and routed them into electronics (the source-query default).
+     Broader pattern below covers the common variants without
+     false-matching unrelated titles. `\btee\b` is gated to require an
+     adjacent fashion qualifier so it doesn't match "Tee Time Golf",
+     "Tee Off Tournament", etc. */
+  { pattern: /\b(jeans|denim|hoodie|jacket|skirt|trousers|chinos|polo|blouse|cardigan|sweatshirt|sweatpants|joggers|leggings|shorts|swimwear|swimsuit|bikini|underwear|boxers|briefs|lingerie|nightwear|pajamas|pyjamas|onesie|bodysuit|jumpsuit|romper|kaftan|kimono|robe|abaya|saree|kurta|ankara|agbada|dashiki)\b/i, slug: "fashion", reason: "clothing" },
+  /* T-shirt + tee variants. Listed separately so the regex stays
+     readable. `t[-\s]?shirts?` matches "T-shirt", "T shirt", "Tshirt",
+     "T-Shirts", "T shirts". `tee\s*(shirt|top|dress)` matches "Tee
+     shirt", "Tee top", "Tee dress" without false-matching golf "tee". */
+  { pattern: /\b(t[-\s]?shirts?|tee[-\s]?shirts?|tee\s+(top|dress|shirt))\b/i, slug: "fashion", reason: "tee shirt" },
+  /* Generic "shirt" — only when paired with a clothing qualifier
+     so it doesn't catch "shirt-pocket", "shirt cable" (a real
+     AliExpress phone-cable listing), etc. */
+  { pattern: /\b(dress|button[-\s]?down|button[-\s]?up|polo|oxford|flannel|denim|linen|cotton|silk|formal|casual|men'?s|women'?s|kids?'?|boys?'?|girls?'?|long[-\s]?sleeve|short[-\s]?sleeve|striped|stripped|plain|graphic|printed|embroidered)\s+shirts?\b|\bshirts?\s+(for\s+(men|women|kids|boys|girls)|with\s+(stripes|print))\b/i, slug: "fashion", reason: "shirt with clothing qualifier" },
   { pattern: /\b(winter\s*coat|trench\s*coat|raincoat|peacoat)\b/i, slug: "fashion", reason: "outerwear" },
   /* 'dress' alone is greedy ('dress shoes', 'dressing' table, 'dressing
      gown' is fine but 'salad dressing' isn't). Constrain to garment
