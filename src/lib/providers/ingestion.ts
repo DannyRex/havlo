@@ -14,6 +14,17 @@ import { inferStoreCountry } from "@/lib/country";
 import { categoryDisagreesWithTitle } from "@/lib/categorize";
 import { categories } from "@/lib/data/categories";
 
+/* Secret-scrubber leakage guard. The upstream provider chain has a
+   middleware that replaces detected secrets (JWTs, API keys, OAuth
+   tokens) with the literal string '[BLOCKED: <type>]'. When that
+   middleware mis-fires on a store record the placeholder lands in
+   storeId / storeName and the row becomes catalog junk. QA report
+   May 2026 found '[BLOCKED: JWT token]' surfacing as a storeId in
+   3 NG and 2 US rows. This guard drops affected deals at the door. */
+function isBlockedSentinel(s: string | null | undefined): boolean {
+  return !!s && /\[BLOCKED:\s*[^\]]+\]/i.test(s);
+}
+
 export interface IngestResult {
   fetched: number;
   upserted: number;
@@ -77,13 +88,20 @@ function dealToProductRow(d: Deal, signature: string) {
     ? (categories.find((c) => c.slug === inferred)?.name ?? d.category)
     : d.category;
 
+  /* Populate brand + model from the signature parser. Was previously
+     hardcoded null even though buildSignature(title) had already
+     extracted them — an old TODO that nullified the variant-gate's
+     brand-equality guard (both sides null → no-op check). May 2026
+     fix: persist what the parser found. */
+  const parsed = buildSignature(d.title);
+
   return {
     title: d.title,
     description: d.description ?? null,
     category: correctedCategory,
     category_slug: correctedSlug,
-    brand: null,
-    model: null,
+    brand: parsed.brand,
+    model: parsed.model,
     image_url: d.imageUrl ?? null,
     signature,
   };
@@ -189,6 +207,22 @@ export async function ingestDeals(
     result.errors.push("Supabase client not configured (need SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)");
     return result;
   }
+
+  /* Pre-filter: drop deals whose storeId / storeName / title contains
+     a secret-scrubber sentinel like '[BLOCKED: JWT token]'. Those rows
+     were leaking from an upstream middleware mis-fire and surfacing as
+     catalog junk (3 NG + 2 US rows in QA report May 2026). Rejecting
+     at the door beats trying to clean up downstream. */
+  const blockedRejects = deals.filter((d) =>
+    isBlockedSentinel(d.storeId) ||
+    isBlockedSentinel(d.storeName) ||
+    isBlockedSentinel(d.title),
+  );
+  if (blockedRejects.length > 0) {
+    result.errors.push(`Rejected ${blockedRejects.length} deals containing [BLOCKED: …] sentinel`);
+  }
+  deals = deals.filter((d) => !blockedRejects.includes(d));
+
   if (deals.length === 0) return result;
 
   /* Pinned at the start of the run. Every offer upserted below

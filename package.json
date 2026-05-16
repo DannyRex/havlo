@@ -27,7 +27,8 @@
     "newsletter:dry-run": "tsx --tsconfig tsconfig.scripts.json scripts/cron/send-newsletter.ts --dry-run",
     "test:matcher": "tsx --tsconfig tsconfig.scripts.json scripts/test-matcher.ts",
     "retag": "tsx --tsconfig tsconfig.scripts.json scripts/retag-categories.ts",
-    "resignature": "tsx --tsconfig tsconfig.scripts.json scripts/resignature-products.ts"
+    "resignature": "tsx --tsconfig tsconfig.scripts.json scripts/resignature-products.ts",
+    "backfill:brand": "tsx --tsconfig tsconfig.scripts.json scripts/backfill-brand.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.0",
