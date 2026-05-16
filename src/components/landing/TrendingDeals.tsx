@@ -213,6 +213,62 @@ export default async function TrendingDeals({ country }: { country: Country }) {
   fill(bucketed.aliexpress,    Q_ALIEXPRESS,  capAliExpress);
   fill(bucketed["intl-other"], Q_INTL_OTHER,  capIntlOther);
 
+  /* NG-only: guarantee at least 2 Jumia cards in the rotation. Jumia's
+     ingest path pulls a high-volume catalogue but their offers tend to
+     have small or zero discounts (SerpAPI google rich-snippets often
+     skip the strikethrough), so they get crowded out by higher-discount
+     Konga / MedPlus rows in the local quota. Without this floor, Jumia
+     can rotate to zero cards on a given 5-min window even though the
+     pool has hundreds of fresh Jumia rows.
+
+     Strategy: count current Jumia picks; if <2, pull more from any
+     bucket that contains Jumia rows (mostly localFresh) and displace
+     the lowest-priority current picks until we hit 2. Only kicks in
+     when pool actually has Jumia rows so it's a no-op on cold ingests. */
+  if (isNG) {
+    const JUMIA_FLOOR = 2;
+    const jumiaInPool = pool.filter((d) => d.storeId === "jumia");
+    const currentJumia = picks.filter((d) => d.storeId === "jumia").length;
+    if (jumiaInPool.length > 0 && currentJumia < JUMIA_FLOOR) {
+      const need = Math.min(JUMIA_FLOOR - currentJumia, jumiaInPool.length);
+      const jumiaShuffled = seededShuffle(jumiaInPool, rng);
+      let added = 0;
+      for (const d of jumiaShuffled) {
+        if (added >= need) break;
+        const key = d.storeId + d.title.slice(0, 20);
+        if (seen.has(key)) continue;
+        /* Displace the last non-Jumia pick from the lowest-priority
+           bucket (intl-other → aliexpress → amazon → local last) so
+           we don't push out a Konga/3C Hub local card when we can
+           drop an intl-other instead. */
+        const displaceOrder: Array<(p: Deal) => boolean> = [
+          (p) => bucketed["intl-other"].some((x) => x.id === p.id),
+          (p) => p.storeId === "aliexpress",
+          (p) => bucketed.amazon.some((x) => x.id === p.id),
+          (p) => p.storeId !== "jumia",
+        ];
+        let displaced = false;
+        for (const matches of displaceOrder) {
+          for (let i = picks.length - 1; i >= 0; i--) {
+            if (matches(picks[i])) {
+              const removed = picks.splice(i, 1)[0];
+              storeCount[removed.storeId] = (storeCount[removed.storeId] ?? 1) - 1;
+              displaced = true;
+              break;
+            }
+          }
+          if (displaced) break;
+        }
+        if (displaced || picks.length < TARGET_TOTAL) {
+          seen.add(key);
+          storeCount[d.storeId] = (storeCount[d.storeId] ?? 0) + 1;
+          picks.push(d);
+          added++;
+        }
+      }
+    }
+  }
+
   /* Backfill cascade — ordered by what we'd rather show if a bucket
      under-filled. Local first (trust + same-day delivery), then Amazon
      (highest commission), then AliExpress, then intl-other (NG only,
