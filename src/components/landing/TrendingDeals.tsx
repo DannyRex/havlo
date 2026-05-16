@@ -123,15 +123,25 @@ export default async function TrendingDeals({ country }: { country: Country }) {
     });
     pool = filterDealsForCountry(raw.filter(qualityFilter), country);
   } else {
-    const [localPool, intlPool, localFreshPool] = await Promise.all([
+    /* NG fetches 4 pools in parallel. The 4th is a Jumia-only direct
+       pull as a backstop: the localFresh pool depends on Pass A+B+C
+       merge order putting Jumia rows ahead of other stores in the
+       sort=newest result. If the localFresh's first 1000 rows happen
+       to skew Konga/Ajebomarket-heavy, Jumia drops below the merge
+       cap and the floor logic later can't find any Jumia in `pool`.
+       The dedicated Jumia fetch guarantees there's always Jumia
+       inventory available to displace into the rotation. */
+    const [localPool, intlPool, localFreshPool, jumiaOnlyPool] = await Promise.all([
       provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "local" }),
       provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "intl" }),
       provider.fetchDeals({ sort: "newest",   minDiscount: 0,  origin: "local" }),
+      provider.fetchDeals({ sort: "newest",   minDiscount: 0,  origin: "local", stores: ["jumia"] }),
     ]);
     pool = [
       ...localPool.filter(qualityFilter),
       ...intlPool.filter(qualityFilter),
       ...localFreshPool.filter(qualityFilter),
+      ...jumiaOnlyPool.filter(qualityFilter),
     ];
   }
 
