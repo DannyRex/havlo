@@ -6,23 +6,22 @@
    Havlo "h" logo mark on a neutral surface instead of the previous
    emoji-on-gradient pattern.
 
-   Why: the emoji-on-gradient looked decorative but inconsistent
-   across cards (each Deal got a different gradient + emoji at
-   ingest, so a row of fallbacks looked like 5 unrelated coloured
-   tiles). The logo mark keeps the surface feeling like Havlo —
-   reinforces brand recognition on the small fraction of products
-   without imagery, and reads as intentional rather than
-   "missing image."
+   Why inline the SVG rather than <Image src="/logo-mark.svg">:
+   next/image rejects SVG sources by default (it's a known security
+   posture — SVG can carry scripts). Enabling `dangerouslyAllowSVG`
+   in next.config would unlock it but opens the door to user-supplied
+   SVGs in product imagery being executed. The brand mark is fixed,
+   tiny (~250 bytes), and renders faster as inline JSX than as a
+   separate optimizer round-trip — so we inline it.
 
    Drop-in replacement: render inside an absolute-positioned parent
    (cards) or a relatively-sized parent — the wrapper takes the
    parent's full width/height.
    ────────────────────────────────────────────────────────────────── */
-import Image from "next/image";
 
 interface Props {
-  /** Inner mark size. `sm` for list thumbs, `md` for grid cards,
-      `lg` for hero / detail-page renders. */
+  /** Inner mark size in pixels. `sm` for list thumbs, `md` for grid
+      cards, `lg` for hero / detail-page renders. */
   size?: "sm" | "md" | "lg";
   /** Append to wrapper className for sizing / positioning overrides. */
   className?: string;
@@ -45,14 +44,29 @@ export default function HavloLogoFallback({ size = "md", className = "" }: Props
       className={`absolute inset-0 flex items-center justify-center bg-surface-2 ${className}`}
       aria-hidden="true"
     >
-      <Image
-        src="/logo-mark.svg"
-        alt=""
+      {/* Inline Havlo "h" mark — matches /public/logo-mark.svg.
+          Brand-blue rounded square + lowercase 'h' construction. */}
+      <svg
         width={px}
         height={px}
-        priority={false}
+        viewBox="0 0 64 64"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        role="img"
+        aria-label="Havlo"
         className="opacity-90"
-      />
+      >
+        <title>Havlo</title>
+        <rect width="64" height="64" rx="14" fill="#0057FF" />
+        <g fill="#FFFFFF">
+          {/* Left vertical stem (full height) */}
+          <rect x="18" y="15" width="7" height="34" rx="1.5" />
+          {/* Mid horizontal connector */}
+          <rect x="18" y="26" width="27" height="7" rx="1.5" />
+          {/* Right vertical (from mid to baseline) */}
+          <rect x="38" y="26" width="7" height="23" rx="1.5" />
+        </g>
+      </svg>
     </div>
   );
 }
