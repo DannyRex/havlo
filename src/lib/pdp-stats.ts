@@ -102,13 +102,43 @@ export function computeAnchorStats(
 
   const deduped = dedupAnchorOffers(countryFiltered, country);
 
+  /* Outlier filter — defense against over-merged products in the DB.
+     QA report May 2026 found a PDP whose product_id contained a £14
+     accessory listing alongside the real £400+ Dyson V11 offers (the
+     accessory was mis-signed at ingest and merged by the resignature
+     script before the price-spread guard was added). At render time
+     we don't have access to re-validate the merge, but we can refuse
+     to plot an offer whose effective price is more than 4× off the
+     anchor or more than 4× off the median offer.
+
+     Median chosen over mean because a single £14 outlier wrecks the
+     mean for a 5-offer spectrum. 4× chosen to match the resignature
+     guard's MAX_GROUP_RATIO. Cross-border landed prices are used so
+     the comparison apples-to-apples in the user's currency. */
+  const ANCHOR_OUTLIER_RATIO = 4;
+  const offerPrices = deduped.map((o) => effectiveLandedPrice(o, country)).filter((p) => p > 0);
+  let medianPrice = 0;
+  if (offerPrices.length > 0) {
+    const sorted = [...offerPrices].sort((a, b) => a - b);
+    medianPrice = sorted[Math.floor(sorted.length / 2)];
+  }
+  const referencePrice = anchorPriceNgn > 0 ? anchorPriceNgn : medianPrice;
+  const dedupedFiltered = referencePrice > 0
+    ? deduped.filter((o) => {
+        const p = effectiveLandedPrice(o, country);
+        if (p <= 0) return false;
+        const ratio = p / referencePrice;
+        return ratio >= 1 / ANCHOR_OUTLIER_RATIO && ratio <= ANCHOR_OUTLIER_RATIO;
+      })
+    : deduped;
+
   /* Per-store rows for the new PriceComparisonBar. Sorted cheapest
      first so the bar can plot dots in display order and the
      'cheapest at [Store]' lookup is perStoreOffers[0].
      effectiveNgn is country-aware via effectiveLandedPrice — local
      stores show base price, cross-border show landed (+ ~30%
      shipping/customs estimate). */
-  const perStoreOffers: PerStoreOffer[] = deduped
+  const perStoreOffers: PerStoreOffer[] = dedupedFiltered
     .map((o) => ({
       storeId:       o.storeId,
       storeName:     o.storeName,
@@ -123,7 +153,7 @@ export function computeAnchorStats(
   const effectives = perStoreOffers.map((r) => r.effectiveNgn);
 
   return {
-    totalStores: Math.max(1, deduped.length),
+    totalStores: Math.max(1, dedupedFiltered.length),
     priceStats: effectives.length > 1
       ? {
           thisPriceNgn: anchorPriceNgn,

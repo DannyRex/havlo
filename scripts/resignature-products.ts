@@ -170,7 +170,63 @@ async function main(): Promise<void> {
       if (sub.length > 1) subGroups.push({ key, sizeKey: sk, products: sub });
     }
   }
-  const collisionGroups = subGroups; // alias for downstream loop
+
+  /* PRICE-SPREAD GUARD (added after QA report May 2026 caught a £14
+     bartyspares Dyson accessory merged into the Dyson V11 vacuum
+     product_id, producing a 1:66 price spread on a single PDP).
+     For each candidate merge sub-group, fetch the price range of each
+     product's in-stock offers. If the cheapest-of-cheap vs
+     most-expensive-of-expensive ratio exceeds MAX_GROUP_RATIO, the
+     group is one or more of:
+       (a) an accessory was mis-signed as the parent
+       (b) a SKU-level variant got pooled (different storage tier,
+           different chip generation, different size we didn't capture
+           in extractSizeTokens)
+     Either way, refuse to merge — keep them as separate products and
+     let the variant gate sort them out at compare time. */
+  const MAX_GROUP_RATIO = 4;
+  type GroupPriceRange = { min: number; max: number; productMins: Map<string, number>; productMaxs: Map<string, number>; };
+  async function fetchGroupRange(productIds: string[]): Promise<GroupPriceRange> {
+    const { data } = await supa
+      .from("offers")
+      .select("product_id, current_price, currency")
+      .in("product_id", productIds)
+      .eq("in_stock", true);
+    const USD_TO_NGN = 1500; // rough normalisation; only used for ratio comparison
+    let min = Infinity, max = 0;
+    const productMins = new Map<string, number>();
+    const productMaxs = new Map<string, number>();
+    for (const o of (data ?? []) as Array<{ product_id: string; current_price: number; currency: string }>) {
+      const price = o.currency === "NGN" ? o.current_price : o.current_price * USD_TO_NGN;
+      if (price <= 0) continue;
+      if (price < min) min = price;
+      if (price > max) max = price;
+      const pMin = productMins.get(o.product_id) ?? Infinity;
+      const pMax = productMaxs.get(o.product_id) ?? 0;
+      if (price < pMin) productMins.set(o.product_id, price);
+      if (price > pMax) productMaxs.set(o.product_id, price);
+    }
+    return { min, max, productMins, productMaxs };
+  }
+
+  const blockedByPriceGuard: SubGroup[] = [];
+  const safeSubGroups: SubGroup[] = [];
+  for (const g of subGroups) {
+    const range = await fetchGroupRange(g.products.map((p) => p.id));
+    if (range.max === 0 || range.min === Infinity) {
+      /* No in-stock offers — keep the merge; the worst case is that
+         we collapse two empty products. Safe. */
+      safeSubGroups.push(g);
+      continue;
+    }
+    const ratio = range.max / range.min;
+    if (ratio > MAX_GROUP_RATIO) {
+      blockedByPriceGuard.push(g);
+      continue;
+    }
+    safeSubGroups.push(g);
+  }
+  const collisionGroups = safeSubGroups;
   const unsafeProductsTouched = unsafeMergeGroupsRaw.reduce((a, [, ps]) => a + ps.length, 0);
   const merging = collisionGroups.reduce((acc, g) => acc + g.products.length, 0);
   const collapseTo = collisionGroups.length;
@@ -181,7 +237,17 @@ async function main(): Promise<void> {
   console.log(`  Safe merge sub-groups (brand+model+size match): ${collisionGroups.length}`);
   console.log(`  Products being merged into canonical:  ${merging - collapseTo}`);
   console.log(`  Unsafe collisions (skipped, drift only): ${unsafeMergeGroupsRaw.length} groups, ${unsafeProductsTouched} products`);
+  console.log(`  Blocked by price-spread guard (>${MAX_GROUP_RATIO}x): ${blockedByPriceGuard.length} groups`);
   console.log(`──────────────────────────────────────────────────────────────\n`);
+
+  if (blockedByPriceGuard.length > 0) {
+    console.log(`SAMPLE — blocked by price-spread (first 5):`);
+    for (const g of blockedByPriceGuard.slice(0, 5)) {
+      console.log(`  → ${g.key}  (${g.products.length} products, ratio guard tripped)`);
+      for (const p of g.products.slice(0, 4)) console.log(`        "${p.title.slice(0, 60)}"  [${p.id.slice(0, 8)}]`);
+    }
+    console.log("");
+  }
 
   /* Show sample of each change type. */
   const driftSamples = drifts.filter((d) => (collisionMap.get(d.newSig)?.length ?? 0) === 1).slice(0, 8);
