@@ -187,6 +187,22 @@ export default async function ProductPage({ params }: PageProps) {
     redirect(`/${country.code}/deals`);
   }
 
+  /* Colon-prefixed anchor keys ('oid:<uuid>', 'live:<slug>') come
+     from /api/compare when the underlying product_id is missing
+     (orphaned by the resignature migration, or live-search result).
+     Strip the prefix and try the UUID lookup; if that still misses,
+     soft-redirect to /deals rather than hard-404. */
+  if (params.id.includes(":")) {
+    const stripped = params.id.split(":").slice(1).join(":");
+    /* Try the stripped id as an offer_id lookup. fetchOfferById
+       already tries product_id → offer_id → curated, so we just
+       hand it the bare id. */
+    const fallbackOffer = await fetchOfferById(stripped);
+    if (!fallbackOffer) redirect(`/${country.code}/deals`);
+    /* Replace params for the rest of the function. */
+    params.id = stripped;
+  }
+
   const offer = await fetchOfferById(params.id);
   if (!offer) notFound();
 
@@ -533,13 +549,23 @@ export default async function ProductPage({ params }: PageProps) {
   /* Strip variants from the "You may also like" rail. They're now
      plotted on the spectrum as same-product price points; rendering
      them again as cheaper-alternative cards would duplicate the
-     same offers across two places on the same page. The rail keeps
-     genuinely different products (size variants, alternative
-     models, lookalikes) — exactly its intended role. */
-  const variantProductIds = new Set(partition.likelyVariants.map((v) => v.key));
-  const variantOfferIds   = new Set(
-    partition.likelyVariants.flatMap((v) => v.offers.map((o) => o.offerId)),
-  );
+     same offers across two places on the same page.
+
+     Also strip siblingVariants (same brand + same model line, but
+     different sub-tier — iPhone 15 ↔ iPhone 15 Plus, Galaxy S24 ↔
+     S24 Ultra, MacBook Pro M3 ↔ M4). QA report May 2026 flagged
+     these as misleading "cheaper alternatives" — a user looking
+     at iPhone 15 doesn't want iPhone 15 Plus suggested as a cheaper
+     swap because they're different products at different price
+     tiers. Sibling SKUs get their own dedicated rail downstream. */
+  const variantProductIds = new Set([
+    ...partition.likelyVariants.map((v) => v.key),
+    ...partition.siblingVariants.map((v) => v.key),
+  ]);
+  const variantOfferIds   = new Set([
+    ...partition.likelyVariants.flatMap((v) => v.offers.map((o) => o.offerId)),
+    ...partition.siblingVariants.flatMap((v) => v.offers.map((o) => o.offerId)),
+  ]);
   const dupesForRail = filteredDupes.filter((d) => {
     if (variantProductIds.has(d.key)) return false;
     /* Defensive: if any of the dupe's offers got merged into the
@@ -548,6 +574,13 @@ export default async function ProductPage({ params }: PageProps) {
     if (d.offers.some((o) => variantOfferIds.has(o.offerId))) return false;
     return true;
   });
+
+  /* Sibling rail data — same model line, different sub-tier.
+     Computed but not rendered yet — UI section is a follow-up.
+     The user-visible win today is that siblings are EXCLUDED from
+     the alternatives rail above so they no longer mislead users
+     into thinking they're cheaper swaps. */
+  void partition.siblingVariants; // intentional: tracked for future "Other models" rail
 
   /* Price-history rollup for the new bar's "lowest tracked / at
      this store: £X" callouts. Cached at 5min — same window as the

@@ -3,7 +3,7 @@ import { searchByKey } from "@/lib/search";
 import { pgFtsFindSimilar, pgFtsFindByProductId, pgFtsFindDupes } from "@/lib/search/pg-fts";
 import { partitionDupesByVariantMatch, variantOffers } from "@/lib/search/variant-pooling";
 import { getServerCountry } from "@/lib/country-server";
-import { isOfferAllowedForCountry } from "@/lib/country";
+import { getCountry, isOfferAllowedForCountry, COUNTRIES } from "@/lib/country";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
 import { usdToNgn } from "@/lib/utils";
 import type { SearchOutput, ProductGroup, DupeResult, StoreOffer } from "@/lib/search";
@@ -86,8 +86,21 @@ async function synthesizeAnchorFromOfferRow(row: OfferRow): Promise<SearchOutput
   );
   const augmentedOffers = [visitingOffer, ...variantOffers(partition.likelyVariants)];
 
+  /* anchor.key — when product_id is available, this is the canonical
+     PDP-routable id. When only offer_id exists (synthesised anchor
+     paths), we prefix with `oid:` so downstream consumers can tell
+     it's NOT a /p/[id] route and should use /p/live with the
+     offer's full payload instead. The May 2026 resignature merges
+     dropped some product_id references; without the prefix, a
+     consumer constructing /p/{key} would 404. */
+  const anchorKey = row.product_id
+    ? row.product_id
+    : row.offer_id
+      ? `oid:${row.offer_id}`
+      : `live:${row.title.slice(0, 60).replace(/[^a-z0-9]+/gi, "-")}`;
+
   const anchor: ProductGroup = {
-    key:           row.product_id || row.offer_id,
+    key:           anchorKey,
     title:         row.title,
     category:      row.category_slug ?? "general",
     imageUrl:      row.image_url ?? undefined,
@@ -174,7 +187,17 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const country = getServerCountry();
+    /* Country resolution order: explicit ?country query param > cookie
+       set by middleware > geo-IP > default. The query param was added
+       May 2026 after the QA agent's curl-based testing flagged that
+       the API silently defaulted to NG for all uncookied requests —
+       which made the endpoint untestable in isolation. Honor the
+       param only when it's a supported country code; otherwise fall
+       through to the cookie/geo chain. */
+    const countryParam = req.nextUrl.searchParams.get("country")?.toLowerCase().trim();
+    const country = countryParam && COUNTRIES.some((c) => c.code === countryParam)
+      ? getCountry(countryParam)
+      : getServerCountry();
 
     /* Resolution priority — pid first when present.
 

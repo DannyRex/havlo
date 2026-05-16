@@ -141,28 +141,44 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
      guarantee for the specific item the user lands on. */
   const isPriceFromOnly = isStoreSearchUrl(offer.url);
 
-  /* Cross-border signal — same three-step logic as MasonryCard:
-     store-country roster first, then global-intl short-circuit
-     (catches AliExpress/Shein/Temu/etc.), then currency-mismatch
-     fallback. */
+  /* Cross-border signal — matches MasonryCard's three-step logic
+     plus the May 2026 fix that triggers cross-border when the
+     store is anchored to ANY country other than the user's
+     (not just on currency mismatch). UK Currys viewed by a US
+     user with both prices normalised to USD still gets the
+     cross-border treatment. */
   const dealStoreCountry = inferStoreCountry(offer.storeId, offer.storeName);
   const storeIsLocalToUser = dealStoreCountry !== null && dealStoreCountry.toLowerCase() === country.code.toLowerCase();
   const storeIsGlobalIntl  = dealStoreCountry === null && isGlobalIntlStore(offer.storeId, offer.storeName);
-  const isCrossBorder      = !storeIsLocalToUser && (storeIsGlobalIntl || !sameCcy);
+  const isCrossBorder      = !storeIsLocalToUser && (
+    dealStoreCountry !== null ||
+    storeIsGlobalIntl ||
+    !sameCcy
+  );
 
-  /* Secondary price — only show the original-currency hint when the
-     store is genuinely cross-border for this visitor. For local
-     stores the stored "USD" is a SerpAPI normalisation artifact
-     (every UK / US / DE retailer is normalised to USD at ingest);
-     surfacing "≈ $1,141.73 in USD" on a Currys card to a UK shopper
-     reads as if Currys prices in USD, which they don't. User report
-     May 2026: "Currys is UK, not intl. Why does the price show
-     USD?" — gated behind isCrossBorder so the secondary only
-     renders when the foreign-currency context is real. */
+  /* Secondary price line — completely rewritten May 2026 after QA
+     report. Old behaviour: showed `≈ $12.02 in USD` as a spot FX
+     conversion on every cross-border PDP. That's both jargon-heavy
+     AND mis-described (the user doesn't pay $12.02 — they pay the
+     local store's price plus shipping + customs).
+
+     New behaviour: always shows the LANDED TOTAL in the user's own
+     currency for cross-border purchases — same +30% formula
+     MasonryCard already uses. Matches the rest of the surface so
+     a card → PDP transition doesn't change what "total" means.
+     For genuine currency hints (e.g. AliExpress NGN price on a US
+     PDP), we fall through to a small parenthetical original-
+     currency note BELOW the landed total. */
   let secondaryStr: string | null = null;
-  if (!sameCcy && isCrossBorder) {
-    if (offer.currency === "NGN") secondaryStr = `≈ ${formatCompact(offer.currentPrice)}`;
-    else if (offer.currency === "USD") secondaryStr = `≈ ${formatUSDPrice(offer.currentPrice)}`;
+  if (isCrossBorder) {
+    /* Primary line: landed total in user's currency. */
+    const landedAmount = Math.round(primaryAmount * 1.30);
+    const landedFmt = country.currency === "NGN"
+      ? formatCompact(landedAmount)
+      : country.currency === "USD"
+        ? formatUSDPrice(landedAmount)
+        : formatLocal(landedAmount, country);
+    secondaryStr = `≈ ${landedFmt} total`;
   }
 
   /* Resolved /api/go URL for the View-at-merchant CTA. The wrapper
