@@ -321,22 +321,36 @@ export function shareAllSizeTokens(a: string, b: string): boolean {
    Bidirectional gates — anchor's variant tokens must appear in
    the candidate AND vice versa, so 'MacBook' doesn't pool with
    'MacBook Pro' (different SKUs), and 'iPhone 15 Pro Max'
-   doesn't pool with bare 'iPhone 15 Pro'.
+   doesn't pool with bare 'iPhone 15 Pro'. Variant/number/model
+   bidirectionality is NEVER loosened — the impact-probe analysis
+   (May 2026) showed one-way matching pools an iPhone 15 with the
+   iPhone 15 Plus, which is wrong.
 
    Brand handling: when both sides have an explicit brand, they
    must match. When only one side has a brand (catalog
    imperfection), allow — the other gates (model, family, size)
    carry the burden of preventing false matches.
 
-   Price band 0.5x-2.0x: catches obvious mismatches (a "tumbler"
-   priced 5x the anchor is probably not the same product) without
-   excluding legitimate cross-store price spread.
+   Family-conditional loosening (May 2026):
+     • fashion / beauty: skip size-token equality entirely (fashion
+       sizing is M/L/XL/EU 42/UK 8 — almost never matches the
+       numeric+unit regex anyway, and when it does it's noise).
+       Wider price band 0.33x-3.0x because fashion has higher
+       intra-SKU price spread (sale vs full-price, region markup).
+     • home / appliances: skip size-token equality WHEN ONE SIDE
+       HAS NO TOKENS (cookware/drinkware sizing is sometimes in
+       the description, not the title). When both sides DO have
+       tokens, equality still required (40oz vs 30oz remain
+       different SKUs). Price band 0.4x-2.5x.
+     • everything else (electronics, computing, audio, gaming,
+       phones): strict. Size equality required, price band
+       0.5x-2.0x. Pooling a 256GB phone with 512GB across stores
+       would mislead — they're different SKUs.
 
-   Returns true ONLY when the candidate passes EVERY gate. False
-   on any single failure — strict by design, since the spectrum's
-   trust contract depends on showing genuinely-comparable prices. */
+   Returns true ONLY when the candidate passes EVERY gate (with
+   loosening conditions noted above). */
 export function isLikelySameProduct(
-  anchor: { title: string; brand?: string | null; priceNgn?: number },
+  anchor: { title: string; brand?: string | null; priceNgn?: number; family?: string | null },
   candidate: { title: string; brand?: string | null; priceNgn?: number },
 ): boolean {
   /* Brand: when both sides have explicit brand info, they must
@@ -376,16 +390,62 @@ export function isLikelySameProduct(
   if (!candidateHasAllModelTokens(candidate.title, aModel)) return false;
   if (!candidateHasAllModelTokens(anchor.title, cModel)) return false;
 
-  /* Size match — exact same size set on both sides. Catches
-     'Stanley 40oz' vs 'Stanley 0.88l' as different SKUs. */
-  if (!shareAllSizeTokens(anchor.title, candidate.title)) return false;
+  /* Family-conditional size + price band. Family is detected from
+     the anchor title (or passed in by the caller for cases where
+     the category is already known).
 
-  /* Price band 0.5x-2.0x. Skipped when either side has no
-     usable price. Catches obvious mismatches (a "tumbler" listing
-     priced 5x the anchor probably isn't the same product). */
+     Lenient bucket — fashion, beauty, sports:
+       Cross-store price spread is genuinely high (sales, regional
+       markup, direct-to-consumer vs marketplace). Size tokens are
+       either irrelevant (clothing S/M/L not captured by regex) or
+       inconsistently tagged (sports footwear sometimes lists size,
+       sometimes doesn't).
+
+     Medium bucket — home, appliances, health:
+       Cookware + drinkware + supplement pack-counts DO matter when
+       both sides have them, but titles often drop the size on one
+       side. Pharmacies + supermarkets have 1.5–2.5x spread.
+
+     Strict bucket — everything else (phones, electronics,
+     computing, audio, gaming):
+       Storage tier / chip generation / model year / console SKU
+       are real product identity. Loosening pools different SKUs. */
+  const fam = anchor.family ?? detectQueryFamily(anchor.title);
+  const isLenientFam = fam === "fashion" || fam === "beauty" || fam === "sports";
+  const isMediumFam  = fam === "home"    || fam === "appliances" || fam === "health";
+
+  /* Size match — strict by default. For fashion/beauty: skip
+     entirely (size regex doesn't match S/M/L/XL anyway). For
+     home/appliances: skip when ONE side has tokens and the other
+     doesn't (drinkware sizing inconsistently surfaced in titles).
+     When both sides have tokens, equality required regardless of
+     family — a 30oz tumbler and a 40oz tumbler at different prices
+     should never share a spectrum. */
+  if (!isLenientFam) {
+    const aS = extractSizeTokens(anchor.title);
+    const cS = extractSizeTokens(candidate.title);
+    const bothHaveTokens = aS.length > 0 && cS.length > 0;
+    const oneHasTokens   = aS.length > 0 || cS.length > 0;
+    if (oneHasTokens) {
+      if (isMediumFam && !bothHaveTokens) {
+        /* skip: home/appliances tolerate one-sided missing size */
+      } else if (!shareAllSizeTokens(anchor.title, candidate.title)) {
+        return false;
+      }
+    }
+  }
+
+  /* Price band — wider for non-electronics families because
+     real-world price spread is genuinely larger there.
+       fashion/beauty: 0.33x – 3.0x   (sale + regional markup)
+       home/appliances: 0.4x – 2.5x   (cookware + drinkware spread)
+       everything else: 0.5x – 2.0x   (strict, current behaviour)
+     Skipped entirely when either side has no usable price. */
   if (anchor.priceNgn && candidate.priceNgn && anchor.priceNgn > 0) {
     const ratio = candidate.priceNgn / anchor.priceNgn;
-    if (ratio < 0.5 || ratio > 2.0) return false;
+    const lo = isLenientFam ? 0.33 : isMediumFam ? 0.4 : 0.5;
+    const hi = isLenientFam ? 3.0  : isMediumFam ? 2.5 : 2.0;
+    if (ratio < lo || ratio > hi) return false;
   }
 
   return true;

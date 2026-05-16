@@ -511,7 +511,12 @@ export default async function ProductPage({ params }: PageProps) {
      anchor's own product_id was already excluded by pgFtsFindDupes
      pre-filter. */
   const partition = partitionDupesByVariantMatch(
-    { title: offer.title, brand: offer.brand, priceNgn: anchorPriceNgn },
+    /* family threads through to the gate so fashion / beauty / home
+       get their family-conditional loosenings (wider price band,
+       lenient size matching). category_slug from the products row
+       is the authoritative source — falls back to title-detection
+       inside the gate when null. */
+    { title: offer.title, brand: offer.brand, priceNgn: anchorPriceNgn, family: offer.category_slug ?? null },
     countryFilteredDupes,
   );
   const augmentedAnchorOffers = [

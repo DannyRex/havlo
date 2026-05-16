@@ -47,6 +47,28 @@ const BRANDS = [
   "fenty", "maybelline", "loreal", "lancome", "mac",
   // Watches
   "rolex", "casio", "seiko", "fossil", "garmin", "fitbit",
+  /* Drinkware — May 2026: variant-pooling probe showed Stanley
+     Quencher tumblers collapsed to brand=null, model=null because
+     none of these were in the list. Same for Yeti / Hydro Flask /
+     Owala — high-volume cross-store inventory we were missing. */
+  "stanley", "yeti", "hydroflask", "owala", "contigo", "thermos",
+  "klean", "kanteen", "swell", "rtic", "corkcicle",
+  /* Home appliances + small kitchen — same probe surfaced many
+     brand=null hits on these because the parser bailed at brand
+     detection. Adding them lets the model-extractor follow up. */
+  "dyson", "roomba", "irobot", "shark", "bissell", "hoover",
+  "ninja", "vitamix", "kitchenaid", "cuisinart", "instant", "instantpot",
+  "hamilton", "westinghouse", "blackdecker", "kenwood", "moulinex",
+  "delonghi", "smeg", "nespresso", "keurig", "breville",
+  /* Audio (additional) — Bose QC variants, Sonos lines, Marshall
+     speakers and Sennheiser were missing or under-covered. */
+  "sennheiser", "audiotechnica", "shure", "akg", "sonos", "marshall",
+  "harmankardon", "bang", "olufsen", "klipsch", "polk", "yamaha",
+  /* Gaming peripherals + brand-monitors — Logitech mice/keyboards
+     and SteelSeries / Corsair headsets surface often in compare
+     queries but didn't have brand→model extraction. */
+  "logitech", "steelseries", "corsair", "hyperx", "alienware",
+  "benq", "viewsonic", "asus", "gigabyte",
 ];
 
 // Aliases / canonicalization
@@ -63,6 +85,17 @@ const BRAND_ALIAS: Record<string, string> = {
   ps4:       "sony",
   ps5:       "sony",
   surface:   "microsoft",
+  /* Drinkware sub-brand aliases — `kanteen` is Klean Kanteen's
+     model word but also appears as the standalone brand in many
+     listings. Same for `instantpot` (the model line is so iconic
+     it's used in place of the parent brand). */
+  kanteen:   "kleankanteen",
+  instantpot: "instant",
+  /* Audio sub-brand aliases */
+  olufsen:   "bang",
+  harmankardon: "harman",
+  /* iRobot's Roomba is the household name */
+  roomba:    "irobot",
 };
 
 export interface ProductSignature {
@@ -106,11 +139,24 @@ function findBrand(norm: string): string | null {
 // Common model-line keywords per brand — used to extract a tight model name
 const MODEL_HINTS: Record<string, RegExp[]> = {
   apple: [
-    /\biphone\s*(\d{1,2}(?:\s*(?:pro|plus|mini|max|pro\s*max))?)\b/i,
+    /* `pro\s*max` listed BEFORE bare `pro` so the alternation
+       greedy-matches the longer suffix first. Probe May 2026:
+       "iPhone 15 Pro Max" was matching only "iPhone 15 Pro"
+       because bare `pro` won the alternation race, which then
+       collapsed Pro and Pro Max into the same signature key. */
+    /\biphone\s*(\d{1,2}(?:\s*(?:pro\s*max|plus|mini|max|pro))?)\b/i,
     /\bipad\s*(?:(pro|air|mini)\s*)?(\d{1,2})?\b/i,
+    /* MacBook now captures the chip generation (M1-M5 + optional
+       Pro/Max suffix) so a "MacBook Pro 16 M4" and "MacBook Pro 16
+       M3" land on DIFFERENT keys instead of collapsing to bare
+       "macbook pro". Without this, every MacBook Pro 16" at every
+       store pooled into one product_id regardless of chip year,
+       which surfaced wildly different prices in the same spectrum. */
+    /\bmacbook\s*(?:pro|air)\s*(?:\d{1,2}\s*(?:inch|"|in)?\s*)?m[1-5](?:\s*(?:pro|max|ultra))?\b/i,
     /\bmacbook\s*(?:(pro|air)\s*)?(\d{1,2})?\b/i,
-    /\bairpods?\s*(?:(pro|max)\s*(\d)?)?\b/i,
-    /\bwatch\s*(?:series\s*)?(\d{1,2})\b/i,
+    /\bairpods?\s*(?:max|pro\s*\d?|\d)\b/i,   /* "AirPods 4", "AirPods Pro 2", "AirPods Max" */
+    /\bairpods?\b/i,                            /* bare "AirPods" */
+    /\bwatch\s*(?:series\s*)?(?:se|ultra\s*\d?|\d{1,2})\b/i,  /* Watch SE / Ultra / Series N */
   ],
   samsung: [
     /\bgalaxy\s*([a-z]\d{1,3}[a-z]?(?:\s*(?:plus|ultra))?)\b/i,
@@ -154,8 +200,70 @@ const MODEL_HINTS: Record<string, RegExp[]> = {
   ],
   sony: [
     /\b(playstation\s*\d|ps\d)\b/i,
-    /\b(wh-\d+[a-z]*)\b/i,
+    /\b(wh[-\s]?\d+xm\d|wh[-\s]?\d+[a-z]*)\b/i,  /* WH-1000XM5, WH-CH720 */
+    /\b(wf[-\s]?\d+xm\d|wf[-\s]?\d+[a-z]*)\b/i,  /* WF-1000XM5 */
+    /\b(linkbuds\s*[a-z]*)\b/i,
     /\b(bravia\s*\w+)\b/i,
+    /\b(srs[-\s]?[a-z0-9]+)\b/i,                 /* SRS-XB100 portable speaker */
+  ],
+  bose: [
+    /\b(quietcomfort(?:\s*(?:ultra|earbuds|se))?(?:\s*\d+)?)\b/i,
+    /\b(qc(?:\s*(?:ultra|se))?\s*\d{0,2})\b/i,   /* QC45, QC SE, QC Ultra */
+    /\b(soundlink\s*(?:flex|mini|micro|revolve|max)?(?:\s*\d)?)\b/i,
+    /\b(sport\s*earbuds)\b/i,
+  ],
+  /* Drinkware product lines — Stanley Quencher / IceFlow,
+     Yeti Rambler / Hopper, Hydro Flask Standard / Wide Mouth,
+     Owala FreeSip. Capturing the line + the size (oz/L) lets
+     the spectrum pool same-line/same-size across stores while
+     keeping different lines separate. */
+  stanley: [
+    /\b(quencher(?:\s*(?:h2\.?0|h20|flowstate|adventure|luxe))?)\b/i,
+    /\b(iceflow(?:\s*flip\s*straw)?)\b/i,
+    /\b(adventure\s*(?:to[-\s]?go|big\s*grip|stein))\b/i,
+    /\b(classic\s*(?:trigger[-\s]?action|legendary)?)\b/i,
+  ],
+  yeti: [
+    /\b(rambler(?:\s*(?:tumbler|mug|bottle|jr))?)\b/i,
+    /\b(hopper(?:\s*(?:flip|m\d+|backflip))?)\b/i,
+    /\b(roadie\s*\d+)\b/i,
+    /\b(tundra\s*\d+)\b/i,
+  ],
+  hydroflask: [
+    /\b(standard\s*mouth)\b/i,
+    /\b(wide\s*mouth)\b/i,
+    /\b(trail\s*series)\b/i,
+  ],
+  owala: [
+    /\b(freesip)\b/i,
+    /\b(flip)\b/i,
+  ],
+  /* Dyson — vacuum + hair appliance lines that span multiple
+     generations. Without these, every "Dyson V-series" pooled
+     into one bucket. */
+  dyson: [
+    /\b(v\d{1,2}(?:\s*(?:detect|absolute|animal|motorhead|fluffy|origin|cordless))?)\b/i,
+    /\b(airwrap(?:\s*(?:complete|multi|long))?)\b/i,
+    /\b(supersonic)\b/i,
+    /\b(corrale)\b/i,
+    /\b(pure\s*(?:cool|hot)(?:\s*link)?)\b/i,
+  ],
+  /* Ninja — blenders + kitchen appliances. Many SKUs share a
+     family word (Foodi, Creami) with a numeric/letter suffix
+     identifying the actual model. */
+  ninja: [
+    /\b(foodi(?:\s*\d+[a-z]*)?(?:\s*(?:max|pro|deluxe))?)\b/i,
+    /\b(creami(?:\s*deluxe)?)\b/i,
+    /\b(blast(?:\s*max)?)\b/i,
+    /\b(speedi)\b/i,
+  ],
+  microsoft: [
+    /\b(surface\s*(?:pro|laptop|book|studio|go)(?:\s*\d+)?)\b/i,
+    /\b(xbox\s*(?:series\s*[sx]|one(?:\s*[sx])?))\b/i,
+  ],
+  logitech: [
+    /\b(mx\s*(?:master|keys|anywhere|ergo|mechanical)(?:\s*[0-9s]+)?)\b/i,
+    /\b(g\s*(?:pro|hub|cloud|703|915|x))\b/i,
   ],
 };
 

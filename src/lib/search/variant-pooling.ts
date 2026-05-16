@@ -39,15 +39,19 @@ export interface PartitionResult {
 }
 
 export function partitionDupesByVariantMatch(
-  anchor: { title: string; brand: string | null; priceNgn: number },
+  anchor: { title: string; brand: string | null; priceNgn: number; family?: string | null },
   dupes: DupeResult[],
 ): PartitionResult {
   const likelyVariants: DupeResult[] = [];
   const otherProducts: DupeResult[] = [];
 
   for (const d of dupes) {
+    /* anchor.family lets the caller pass an authoritative product
+       family (from category_slug) so detection inside the gate
+       isn't repeated for every dupe. When omitted, the gate
+       falls back to detecting family from the anchor title. */
     const match = isLikelySameProduct(
-      { title: anchor.title, brand: anchor.brand, priceNgn: anchor.priceNgn },
+      { title: anchor.title, brand: anchor.brand, priceNgn: anchor.priceNgn, family: anchor.family ?? null },
       { title: d.title,      brand: d.brand,      priceNgn: d.bestPrice },
     );
     (match ? likelyVariants : otherProducts).push(d);
