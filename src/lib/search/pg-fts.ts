@@ -510,7 +510,17 @@ interface FakeAnchor {
 export async function pgFtsFindDupes(
   query: string,
   anchorPriceNgn: number,
-  opts?: { limit?: number },
+  /* `strict` (default true) controls the variant/number/model gates
+     and is the knob that toggles between "spectrum candidate" mode
+     (strict: every gate fires, used when callers will run their own
+     same-product partitioning afterward) and "alternatives" mode
+     (lenient: family + price + accessory + url, but variant tokens
+     and generation numbers are allowed to differ). Lenient mode is
+     what the /compare 'Cheaper alternatives' rail wants — a user
+     looking at iPhone 15 SHOULD see iPhone 14 / Galaxy S23 as
+     legitimate cheaper alternatives, not just same-generation
+     siblings. */
+  opts?: { limit?: number; strict?: boolean },
 ): Promise<DupeResult[]> {
   const supa = getSupabaseAdmin();
   if (!supa || !query.trim()) return [];
@@ -521,6 +531,7 @@ export async function pgFtsFindDupes(
      filter; UI then ranks by FTS similarity alone. */
   const noCeiling = anchorPriceNgn <= 0;
   const limit = opts?.limit ?? 16;
+  const strict = opts?.strict ?? true;
   const qFamily = queryFamily(query);
 
   /* Same gate set as the main entrypoint, applied to the externally-
@@ -590,12 +601,16 @@ export async function pgFtsFindDupes(
        cross-fit between phones and tablets — matching by accessory
        semantics is what we want there. */
     .filter((r) => queryIsAccessory || !familyConstraint || detectFamily(r.title) === familyConstraint)
-    // Variant gate: 'pro max' / 'ultra' / 'plus' must be honoured.
-    .filter((r) => candidateHasAllVariants(r.title, variants))
-    // Generation gate: 'iPhone 15' must NOT match 'iPhone 16' rows.
-    .filter((r) => candidateHasAllNumbers(r.title, requiredNumbers))
-    // Model-token gate: 'Galaxy S24' must NOT match 'Galaxy S25' rows.
-    .filter((r) => candidateHasAllModelTokens(r.title, requiredModelTokens))
+    /* Strict-only gates. In lenient mode the alternatives rail
+       wants iPhone 14 / Galaxy S23 to surface for iPhone 15 /
+       S24 anchors — these are legit cheaper alternatives, not
+       false matches. Callers that DO need same-product enforcement
+       (PDP spectrum candidates) keep strict=true and run their
+       own partition (partitionDupesByVariantMatch) afterward to
+       split same-product from sibling-tier from other-brand. */
+    .filter((r) => !strict || candidateHasAllVariants(r.title, variants))
+    .filter((r) => !strict || candidateHasAllNumbers(r.title, requiredNumbers))
+    .filter((r) => !strict || candidateHasAllModelTokens(r.title, requiredModelTokens))
     .map((r) => ftsRowToDupe(r, fakeAnchor))
     /* No savings floor — was '>= 5%' but the user's UX guidance is
        'show everything, let me decide'. Even 1-2% off the anchor is

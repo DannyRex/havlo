@@ -237,7 +237,14 @@ export default async function ProductPage({ params }: PageProps) {
      unstable_cache TTL plus the 1-hour ISR — a single cached value
      serves every visitor for the cache window. */
   const fetchDupesCached = unstable_cache(
-    async (title: string) => pgFtsFindDupes(title, 0, { limit: 20 }),
+    /* lenient + 20 — same reasoning as /api/compare. The partition
+       below (partitionDupesByVariantMatch) correctly splits same-
+       product candidates into the spectrum, sibling SKUs out of the
+       rail, and cross-tier alternatives into 'You may also like'.
+       Feeding strict candidates starves the rail without benefit
+       since the partition already enforces strictness for the
+       spectrum-bound subset. */
+    async (title: string) => pgFtsFindDupes(title, 0, { limit: 20, strict: false }),
     ["pdp-dupes"],
     { revalidate: 300, tags: ["pdp-dupes"] },
   );

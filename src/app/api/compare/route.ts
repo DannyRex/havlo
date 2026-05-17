@@ -73,8 +73,30 @@ function offerRowToStoreOffer(row: OfferRow): StoreOffer {
 async function synthesizeAnchorFromOfferRow(row: OfferRow): Promise<SearchOutput> {
   const visitingOffer = offerRowToStoreOffer(row);
 
-  /* Find similar products via FTS — same pipeline the PDP uses. */
-  const dupes = await pgFtsFindDupes(row.title, 0, { limit: 16 });
+  /* Find similar products via FTS. Lenient mode here (strict: false)
+     so the alternatives rail can surface iPhone 14 / Galaxy S23 /
+     refurbs / cross-brand competitors for an iPhone 15 / S24 anchor.
+     The partitionDupesByVariantMatch call below then splits the
+     looser candidate set into likelyVariants (spectrum pool),
+     siblingVariants (excluded from rail), and otherProducts (true
+     cross-tier alternatives the user wants to discover). */
+  const rawDupes = await pgFtsFindDupes(row.title, 0, { limit: 24, strict: false });
+
+  /* Drop the anchor itself from the candidate pool. pgFtsFindDupes
+     returns every product matching the title — including the anchor
+     product (same title scores high). Without this exclusion, the
+     'Cheaper alternatives' rail surfaced the anchor product as the
+     first alternative. Three signals identify it: product_id key
+     match, offer_id present in dupe's offers, or exact normalised
+     title match (last-resort for cross-source ID drift). */
+  const normaliseTitle = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const anchorNormTitle = normaliseTitle(row.title);
+  const dupes = rawDupes.filter((d) => {
+    if (row.product_id && d.key === row.product_id) return false;
+    if (row.offer_id && d.offers.some((o) => o.offerId === row.offer_id)) return false;
+    if (normaliseTitle(d.title) === anchorNormTitle) return false;
+    return true;
+  });
 
   /* Partition: same-product variants fold into the anchor's
      offers; truly different products stay in the rail. Mirrors
