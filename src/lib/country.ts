@@ -429,25 +429,32 @@ interface DealLike {
   tags:       string[];
 }
 
-/* Per-country preferred Amazon marketplace. Drives the dedupe step in
-   filterDealsForCountry: the curated Amazon catalog generates one
+/* Per-country preferred Amazon marketplace(s). Drives the dedupe step
+   in filterDealsForCountry: the curated Amazon catalog generates one
    entry per marketplace (5 per product), and without dedupe a NG user
    sees the same iPhone listed 5x at the same USD price across US, UK,
-   DE, AE, IN. We pick ONE marketplace per user country and drop the
-   rest.
+   DE, AE, IN. We pick which marketplaces survive per user country
+   and drop the rest.
 
-   Mapping logic:
-     - NG / ZA: prefer US (most cross-border traffic from these markets
-       routes to amazon.com per the affiliate.ts marketplace data)
-     - All others: prefer their own marketplace */
-const PREFERRED_AMAZON_MARKETPLACE: Record<string, string> = {
-  ng: "us",
-  us: "us",
-  uk: "uk",
-  de: "de",
-  ae: "ae",
-  in: "in",
-  za: "us",
+   Values are an ORDERED ARRAY — first entry is canonical, additional
+   entries also pass through. For most markets we keep ONE
+   (the local one — UK shoppers don't need to see the same iPhone at
+   amazon.com when amazon.co.uk has it locally). For markets with
+   active cross-border behaviour (NG, ZA), we keep MULTIPLE so the
+   user can compare freight-route options:
+     - NG: US + UK. Both have established NG freight-forwarder
+       workflows. Same product priced differently across the two
+       gives the buyer a real choice (often UK wins for non-bulky
+       items, US for electronics).
+     - ZA: US + UK. Same dynamic. */
+const PREFERRED_AMAZON_MARKETPLACE: Record<string, string[]> = {
+  ng: ["us", "uk"],
+  us: ["us"],
+  uk: ["uk"],
+  de: ["de"],
+  ae: ["ae"],
+  in: ["in"],
+  za: ["us", "uk"],
 };
 
 /* Collapse curated-Amazon duplicates to one entry per product.
@@ -459,28 +466,37 @@ function dedupeCuratedAmazon<T extends DealLike>(
   deals: T[],
   country: Country,
 ): T[] {
-  const preferred = PREFERRED_AMAZON_MARKETPLACE[country.code] ?? "us";
+  const preferredList = PREFERRED_AMAZON_MARKETPLACE[country.code] ?? ["us"];
+  const preferredSet = new Set(preferredList);
   const result: T[] = [];
-  const seenSlugs = new Set<string>();
+  /* Track which (marketplace, slug) pairs we've kept so the defensive
+     pass-2 fallback doesn't re-emit the same row. Slug-only tracking
+     would block legit per-marketplace duplicates for multi-preferred
+     countries (NG/ZA see both US + UK for the same iPhone — that's
+     the whole point). */
+  const seenPairs = new Set<string>();
 
-  /* Pass 1: emit non-curated-Amazon as-is, plus curated entries at the
-     preferred marketplace. Tracks slugs we've already kept. */
+  /* Pass 1: emit non-curated-Amazon as-is, plus curated entries whose
+     marketplace is in the preferred set. */
   for (const d of deals) {
     const m = d.id?.match(/^amazon-(us|uk|de|ae|in)-(.+)$/);
     if (!m) {
       result.push(d);
       continue;
     }
-    if (m[1] === preferred) {
+    if (preferredSet.has(m[1])) {
       result.push(d);
-      seenSlugs.add(m[2]);
+      seenPairs.add(`${m[1]}|${m[2]}`);
     }
   }
 
-  /* Pass 2: defensive fallback. If for any reason a product wasn't
-     emitted in the preferred marketplace (shouldn't happen since the
-     curated catalog has all 5), grab the first available marketplace
-     so the product still appears once. */
+  /* Pass 2: defensive fallback. If a product has NO preferred-
+     marketplace entry (curated catalog usually has all 5, but if a
+     SKU goes missing from one marketplace), grab the first available
+     fallback so the product still appears at least once. Track by
+     slug only here — we just want one copy. */
+  const seenSlugs = new Set<string>();
+  seenPairs.forEach((pair) => { seenSlugs.add(pair.split("|")[1]); });
   for (const d of deals) {
     const m = d.id?.match(/^amazon-(us|uk|de|ae|in)-(.+)$/);
     if (!m) continue;
