@@ -74,9 +74,26 @@ function parseArgs(): CliArgs {
 
 async function main() {
   const args = parseArgs();
-  const providers = getActiveSearchProviders().filter(
+  let providers = getActiveSearchProviders().filter(
     (p) => !args.providerId || p.id === args.providerId,
   );
+
+  /* Market mode runs ONLY against serpapi-shopping (google_shopping).
+     The other providers serve distinct purposes:
+       serpapi-jumia: site-filtered google search, NG-only, has its
+         own dedicated ingest path + cron
+       amazon-paapi:  Amazon PA-API, separate credit pool
+       aliexpress-affiliate: free affiliate API, irrelevant to
+         market visibility on flagship products
+     Routing market mode through all of them was burning 4× the
+     credits with no quality benefit. */
+  if (args.mode === "market") {
+    providers = providers.filter((p) => p.id === "serpapi-shopping");
+    if (providers.length === 0) {
+      console.error("✗ Market mode requires serpapi-shopping provider. Set SERPAPI_KEY and try again.");
+      process.exit(1);
+    }
+  }
 
   if (providers.length === 0) {
     console.error("✗ No active search providers. Set SERPAPI_KEY (or other) in .env.local");
