@@ -221,10 +221,20 @@ const DIRECT_LOAD_IMAGE_HOSTS = new Set([
      covers all of them via the bare parent. Open CDN, no Referer
      enforcement. */
   "dhresource.com",
-  /* Google Shopping thumbnail CDN — shows up in SerpAPI ingest
-     where Google's own search-results thumbnails come back as the
-     product image. Open CDN, served fast from Google's edge. */
-  "gstatic.com",
+  /* Google Shopping thumbnail CDN (encrypted-tbn*.gstatic.com) —
+     REMOVED from direct-load May 2026 v3. Adblockers (uBlock,
+     Brave strict, Firefox tracking protection) routinely block
+     gstatic.com because it's Google's tracking-adjacent CDN. With
+     direct-load, ~74% of NG /deals images served from gstatic →
+     blocked by extensions → onError → Havlo H fallback. With
+     next/image previously, the user-visible URL was
+     havlo.io/_next/image?url=... and adblockers didn't touch it.
+     Routing through /api/img-proxy restores that property: the
+     image URL is now havlo.io/api/img-proxy?url=... which
+     adblockers don't block. Edge-cached 30 days so function-
+     execution cost stays bounded.
+     (Entry intentionally NOT re-added — leaving the comment as
+     a tombstone for future maintainers tempted to whitelist it.) */
   /* AWS S3 — Bitmarte hosts product images at
      bitmarte-bucket.s3.eu-north-1.amazonaws.com. Open S3 bucket, no
      Referer enforcement. The subdomain-suffix matcher catches every
