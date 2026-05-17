@@ -98,32 +98,40 @@ async function main() {
 
   const totalCalls = targetCategories.length * args.countries.length * providers.length;
 
-  /* SerpAPI credit guard — gated to market mode by design.
+  /* SerpAPI credit guard — different policy per mode.
 
-     The deal cron (Mon+Thu) is the primary user-facing data refresh:
-     we want it to run even when credits are tight, because broken
-     `/deals` freshness hurts the product more than spending the last
-     plan credits. Add the guard there too if you want, but the
-     fail-mode of "deal cron skipped" is worse than "deal cron drains
-     credits and we top up sooner".
+     Both modes check credits before starting. The difference is the
+     BUFFER:
 
-     Market mode is OPPOSITE: it's a nice-to-have monthly enrichment.
-     If credits are low, we'd rather preserve them for user-facing
-     live-search (which fires on every paste-a-link / unusual query).
-     So market mode SKIPS gracefully when credits + 50% buffer
-     wouldn't survive the planned calls.
+       deals mode (Mon+Thu cron, primary user-facing data):
+         Buffer = 0%. If we have enough credits for the full run, go.
+         If not, SKIP CLEANLY rather than start and fail halfway —
+         a partial run burns credits without filling the catalog, AND
+         leaves /deals stale anyway. Skip + visible CI log so the
+         operator knows to top up.
+
+       market mode (monthly nice-to-have enrichment):
+         Buffer = 50%. Preserves headroom for user-facing live-search
+         (paste-a-link, unusual queries) during the rest of the
+         period. Market enrichment is optional; live-search isn't.
 
      Exit code 0 on skip is intentional — GitHub Actions treats
      non-zero as failure and would email/alert. A skip-due-to-budget
-     isn't a failure, it's expected steady-state behaviour. */
+     isn't a failure, it's expected steady-state behaviour. The log
+     line distinguishes the two skip reasons. */
   const serpapiKey = process.env.SERPAPI_KEY?.trim();
   const usesSerpapi = providers.some((p) => p.id.includes("serpapi"));
-  if (args.mode === "market" && serpapiKey && usesSerpapi) {
+  if (serpapiKey && usesSerpapi) {
     try {
       const acct = await fetchSerpapiAccount(serpapiKey);
       console.log(`▶ SerpAPI credits — plan=${acct.planLeft}, extra=${acct.extraLeft}, total=${acct.totalLeft} (${acct.planName})`);
-      if (!hasBudget(acct, totalCalls)) {
-        console.log(`▷ SKIP: market run needs ${totalCalls} + ${Math.ceil(totalCalls * 0.5)} buffer = ${Math.ceil(totalCalls * 1.5)} credits. Have ${acct.totalLeft}. Reserving budget for user-facing live-search; exiting cleanly.`);
+      const bufferFraction = args.mode === "market" ? 0.5 : 0;
+      if (!hasBudget(acct, totalCalls, bufferFraction)) {
+        const needed = Math.ceil(totalCalls * (1 + bufferFraction));
+        const reason = args.mode === "market"
+          ? `Reserving budget for user-facing live-search`
+          : `Avoiding partial-run that would leave catalog half-stale`;
+        console.log(`▷ SKIP: ${args.mode} run needs ${needed} credits (${totalCalls} calls${bufferFraction > 0 ? ` + ${Math.ceil(totalCalls * bufferFraction)} buffer` : ""}). Have ${acct.totalLeft}. ${reason}; exiting cleanly. TOP UP at serpapi.com to resume.`);
         process.exit(0);
       }
     } catch (err) {
