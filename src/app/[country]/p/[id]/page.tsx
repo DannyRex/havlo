@@ -226,11 +226,18 @@ export default async function ProductPage({ params }: PageProps) {
      PDP shows no cheaper alternatives" — anchoring on the price
      ceiling was hiding same-priced legit alternatives.
 
-     Dupes limit was halved from 16 → 8 (May 2026) to relieve
-     Supabase egress; 8 candidates leaves headroom for the country
-     filter to drop a couple while still feeling populated. */
+     Dupes limit history:
+       16 (initial) → 8 (May 2026, Supabase egress) → 20 (May 2026
+       v2, user report 'You may also like is too sparse')
+     The 8-row cap was over-aggressive for the rail. By the time
+     country filter + price-band gate + dedup + sibling exclusion
+     ran, the rail was down to 1-3 cards. Pushing back to 20 gives
+     each downstream filter headroom to drop without emptying the
+     rail. Supabase egress impact is bounded by the 5-min
+     unstable_cache TTL plus the 1-hour ISR — a single cached value
+     serves every visitor for the cache window. */
   const fetchDupesCached = unstable_cache(
-    async (title: string) => pgFtsFindDupes(title, 0, { limit: 8 }),
+    async (title: string) => pgFtsFindDupes(title, 0, { limit: 20 }),
     ["pdp-dupes"],
     { revalidate: 300, tags: ["pdp-dupes"] },
   );
@@ -305,8 +312,17 @@ export default async function ProductPage({ params }: PageProps) {
      band shrinks naturally for cheap anchors (£5 anchor → £1.25–£15
      band, which is fine since most products in our catalogue are
      above £10 anyway). */
-  const FLOOR_RATIO   = 0.25;  // alt ≥ 25% of anchor (drops "£5 vs £100" cases)
-  const CEILING_RATIO = 3.00;  // alt ≤ 3x anchor   (drops "£100 vs £300+ bundle" cases)
+  /* Price band for the "You may also like" rail. Loosened May 2026 v2
+     (0.25-3.0 → 0.15-5.0) after user feedback that the rail was too
+     sparse. The rail is a BROWSE surface — it's meant to show related
+     products, not just same-price-tier alternatives. The narrower
+     0.25-3.0 band was over-correcting for the "£5 vs £100" trust
+     concern; widening to 0.15-5.0 still catches the obvious
+     accessory-vs-parent mismatches but lets legitimate
+     cross-tier alternatives (premium variants, deeply-discounted
+     basics) surface in the rail. */
+  const FLOOR_RATIO   = 0.15;  // alt ≥ 15% of anchor (still drops "£1 sticker for £50 product")
+  const CEILING_RATIO = 5.00;  // alt ≤ 5x anchor   (still drops "£50 vs £500 bundle")
   const filteredDupes = countryFilteredDupes.filter((d) => {
     /* Drop the ANCHOR product itself. Two signals:
          1. d.key === anchor.product_id — exact same product row.
