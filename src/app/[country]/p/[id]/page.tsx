@@ -49,6 +49,7 @@ import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import SimilarProducts from "@/components/product/SimilarProducts";
 import FallbackCategoryRail from "@/components/product/FallbackCategoryRail";
 import PdpBackLink from "@/components/product/PdpBackLink";
+import { ArrowDown } from "lucide-react";
 import type { Deal } from "@/types";
 
 /* Offers churn frequently (every ingest cycle adds + retires rows).
@@ -686,34 +687,29 @@ export default async function ProductPage({ params }: PageProps) {
           priceHistory={priceHistorySummary}
         />
 
-        {siblingsForRail.length > 0 && (
-          /* Sibling rail — same brand + same model line, different
-             sub-tier (iPhone 15 ↔ Plus/Pro/Max, Galaxy S24 ↔ Ultra/FE).
-             Surfaces ABOVE the cross-brand alternatives so users
-             can shop the model line vertically (cheaper/pricier
-             configurations of what they're already looking at)
-             before browsing cross-brand swaps below. */
-          <section className="mt-12 sm:mt-16">
-            <header className="mb-6 sm:mb-8">
-              <h2 className="text-[22px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
-                Other models in this line
-              </h2>
-              <p className="text-sm sm:text-base text-ink-2 mt-1.5">
-                {siblingsForRail.length} {siblingsForRail.length === 1 ? "configuration" : "configurations"} of the same model line.
-              </p>
-            </header>
-            <SimilarProducts dupes={siblingsForRail} countryCode={country.code} />
-          </section>
-        )}
-
         {dupesForRail.length > 0 ? (
+          /* Cheaper alternatives section — moved ABOVE the sibling
+             rail per user preference (May 2026 v3). Cross-brand /
+             cross-tier cheaper picks are the higher-intent surface
+             ("can I get this product cheaper / different brand?"),
+             siblings ("other configurations in this line") are the
+             secondary browse. */
           <section className="mt-12 sm:mt-16">
             <header className="mb-6 sm:mb-8">
               <h2 className="text-[22px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
                 {siblingsForRail.length > 0 ? "Cheaper alternatives" : "You may also like"}
               </h2>
-              <p className="text-sm sm:text-base text-ink-2 mt-1.5">
-                {dupesForRail.length} {dupesForRail.length === 1 ? "pick" : "picks"} from other stores. Sorted cheapest first.
+              {/* Green "N alternatives found" pill — mirrors the
+                  CompareAnchorCard connector chip so the design
+                  language stays consistent across compare + PDP. */}
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-success/10 border border-success/20 mt-2">
+                <ArrowDown size={12} className="text-success" />
+                <span className="text-xs font-semibold text-success">
+                  {dupesForRail.length} {dupesForRail.length === 1 ? "alternative" : "alternatives"} found
+                </span>
+              </div>
+              <p className="text-sm sm:text-base text-ink-2 mt-3">
+                Sorted by best value, cheapest first.
               </p>
             </header>
             <SimilarProducts dupes={dupesForRail} countryCode={country.code} />
@@ -737,6 +733,26 @@ export default async function ProductPage({ params }: PageProps) {
             <FallbackCategoryRail deals={fallbackDeals} />
           </section>
         ) : null}
+
+        {siblingsForRail.length > 0 && (
+          /* Sibling rail — same brand + same model line, different
+             sub-tier (iPhone 15 ↔ Plus/Pro/Max, Galaxy S24 ↔ Ultra/FE).
+             Surfaces BELOW the cross-brand cheaper alternatives per
+             user preference (May 2026 v3) — cheaper-different-product
+             is the higher-intent surface; same-line different-config
+             is a secondary browse aid. */
+          <section className="mt-12 sm:mt-16">
+            <header className="mb-6 sm:mb-8">
+              <h2 className="text-[22px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
+                Other models in this line
+              </h2>
+              <p className="text-sm sm:text-base text-ink-2 mt-1.5">
+                {siblingsForRail.length} {siblingsForRail.length === 1 ? "configuration" : "configurations"} of the same model line.
+              </p>
+            </header>
+            <SimilarProducts dupes={siblingsForRail} countryCode={country.code} />
+          </section>
+        )}
 
         {/* Live deals rail removed (May 2026).
             Earlier this surface fetched /api/live-search on mount,
