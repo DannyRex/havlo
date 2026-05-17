@@ -22,6 +22,16 @@ try {
 import { categories } from "../src/lib/data/categories";
 import { getActiveSearchProviders } from "../src/lib/providers";
 import { ingestDeals } from "../src/lib/providers/ingestion";
+import { fetchSerpapiAccount, hasBudget } from "../src/lib/providers/serpapi-credits";
+
+/* High-value categories that benefit from market-mode ingest. These
+   have stable MSRPs where the honest spectrum value matters more
+   than promo density. Other categories (fashion / beauty / home /
+   sports / gaming / health) stick with deals-mode because users
+   come there for promotional inventory. */
+const MARKET_MODE_CATEGORIES = new Set([
+  "phones", "computing", "audio", "electronics", "appliances",
+]);
 
 /* The international markets Nigerian shoppers most commonly import from.
    - us:  Amazon.com, eBay, Walmart, Best Buy
@@ -39,10 +49,11 @@ interface CliArgs {
   providerId?: string;
   countries: string[];
   perCategoryLimit: number;
+  mode: "deals" | "market";
 }
 
 function parseArgs(): CliArgs {
-  const args: CliArgs = { countries: DEFAULT_COUNTRIES, perCategoryLimit: 20 };
+  const args: CliArgs = { countries: DEFAULT_COUNTRIES, perCategoryLimit: 20, mode: "deals" };
   for (const arg of process.argv.slice(2)) {
     if (arg.startsWith("--category=")) {
       args.categorySlugs = arg.slice("--category=".length).split(",").map((s) => s.trim());
@@ -52,6 +63,10 @@ function parseArgs(): CliArgs {
       args.countries = arg.split("=")[1].split(",").map((s) => s.trim().toLowerCase());
     } else if (arg.startsWith("--limit=")) {
       args.perCategoryLimit = parseInt(arg.slice("--limit=".length), 10) || 20;
+    } else if (arg === "--mode=market") {
+      args.mode = "market";
+    } else if (arg === "--mode=deals") {
+      args.mode = "deals";
     }
   }
   return args;
@@ -68,13 +83,56 @@ async function main() {
     process.exit(1);
   }
 
-  const targetCategories = args.categorySlugs
+  let targetCategories = args.categorySlugs
     ? categories.filter((c) => args.categorySlugs!.includes(c.slug))
     : categories.filter((c) => c.slug !== "all");
 
+  /* Market mode runs ONLY on the high-value category whitelist. The
+     rest stay in deals mode (handled by the regular Mon+Thu cron).
+     This keeps the monthly market cron tiny (~30 calls vs 132 for a
+     deal run) and focused on the categories where MSRP visibility
+     actually moves the trust dial. */
+  if (args.mode === "market" && !args.categorySlugs) {
+    targetCategories = targetCategories.filter((c) => MARKET_MODE_CATEGORIES.has(c.slug));
+  }
+
   const totalCalls = targetCategories.length * args.countries.length * providers.length;
 
-  console.log(`▶ Ingesting deals — ${totalCalls} total searches`);
+  /* SerpAPI credit guard — gated to market mode by design.
+
+     The deal cron (Mon+Thu) is the primary user-facing data refresh:
+     we want it to run even when credits are tight, because broken
+     `/deals` freshness hurts the product more than spending the last
+     plan credits. Add the guard there too if you want, but the
+     fail-mode of "deal cron skipped" is worse than "deal cron drains
+     credits and we top up sooner".
+
+     Market mode is OPPOSITE: it's a nice-to-have monthly enrichment.
+     If credits are low, we'd rather preserve them for user-facing
+     live-search (which fires on every paste-a-link / unusual query).
+     So market mode SKIPS gracefully when credits + 50% buffer
+     wouldn't survive the planned calls.
+
+     Exit code 0 on skip is intentional — GitHub Actions treats
+     non-zero as failure and would email/alert. A skip-due-to-budget
+     isn't a failure, it's expected steady-state behaviour. */
+  const serpapiKey = process.env.SERPAPI_KEY?.trim();
+  const usesSerpapi = providers.some((p) => p.id.includes("serpapi"));
+  if (args.mode === "market" && serpapiKey && usesSerpapi) {
+    try {
+      const acct = await fetchSerpapiAccount(serpapiKey);
+      console.log(`▶ SerpAPI credits — plan=${acct.planLeft}, extra=${acct.extraLeft}, total=${acct.totalLeft} (${acct.planName})`);
+      if (!hasBudget(acct, totalCalls)) {
+        console.log(`▷ SKIP: market run needs ${totalCalls} + ${Math.ceil(totalCalls * 0.5)} buffer = ${Math.ceil(totalCalls * 1.5)} credits. Have ${acct.totalLeft}. Reserving budget for user-facing live-search; exiting cleanly.`);
+        process.exit(0);
+      }
+    } catch (err) {
+      console.warn(`⚠ SerpAPI credit check failed: ${(err as Error).message}. Proceeding anyway.`);
+    }
+  }
+
+  console.log(`▶ Ingesting ${args.mode} — ${totalCalls} total searches`);
+  console.log(`  Mode:       ${args.mode}${args.mode === "market" ? " (market lane — drops 'deals' query suffix)" : ""}`);
   console.log(`  Providers:  ${providers.map((p) => p.id).join(", ")}`);
   console.log(`  Countries:  ${args.countries.join(", ")}`);
   console.log(`  Categories: ${targetCategories.map((c) => c.slug).join(", ")}`);
@@ -95,6 +153,7 @@ async function main() {
             q: category.name,
             countryCode: country,
             limit: args.perCategoryLimit,
+            mode: args.mode,
           });
 
           // Tag every deal with the source category so /api/deals

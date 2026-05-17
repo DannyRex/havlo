@@ -41,6 +41,15 @@ export interface SearchQuery {
   countryCode?: string;
   /** Cap on how many results to return */
   limit?: number;
+  /** Ingest mode toggle:
+        - "deals" (default): appends 'deals' suffix to generic queries
+          to bias Google Shopping toward sale-tagged results. Used by
+          the Mon+Thu deal cron.
+        - "market": drops the suffix to return a broader catalogue mix
+          (deals + full-price + sponsored). Used by the monthly market
+          cron to populate the spectrum + 'cheaper alternatives' rail
+          with honest market data, not just promo data. */
+  mode?: "deals" | "market";
 }
 
 export interface OriginCounts {

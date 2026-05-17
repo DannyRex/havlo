@@ -1,0 +1,72 @@
+name: Refresh market data (monthly)
+
+# ── Why this exists ───────────────────────────────────────────────────
+# The Mon+Thu cron in scrape-deals.yml runs the "deals lane" — it
+# appends "deals" to generic Google Shopping queries to bias the
+# results toward sale-tagged listings. That powers /deals page
+# freshness perfectly.
+#
+# But it leaves a blind spot on /compare and the PDP spectrum: those
+# surfaces show only stores that happen to have a deal RIGHT NOW.
+# A user looking at iPhone 15 sees the cheapest discounted offer
+# rather than the real market range (MSRP at Apple direct, full-price
+# at Best Buy, etc.).
+#
+# This workflow runs the SAME ingest script in --mode=market which
+# DROPS the "deals" suffix on high-value categories only (phones,
+# computing, audio, electronics, appliances). Result: ~30 SerpAPI
+# calls per month surface MSRP + full-price listings for the categories
+# where market visibility actually moves user trust.
+#
+# Cadence — first day of each month at 6:00 AM WAT (5:00 AM UTC).
+# MSRP for flagship products is stable for 6-12 months; monthly
+# refresh is plenty. If you ship a tighter cadence later (e.g.
+# bi-monthly), adjust the cron + the credit guard's planned-call
+# estimate together.
+#
+# Credit guard — ingest-providers.ts queries SerpAPI's account API
+# before running and ABORTS GRACEFULLY (exit 0, no CI alert) if
+# there aren't enough credits for the planned calls + a 50% buffer
+# for user-facing live-search. Prevents the cron from silently
+# consuming all remaining credits on day 1 and leaving the rest of
+# the month with no live-search budget.
+
+on:
+  schedule:
+    # 0 5 1 * *  →  05:00 UTC on day-of-month 1, every month
+    - cron: "0 5 1 * *"
+  workflow_dispatch:
+    # Manual trigger lets us refresh market data on demand
+    # (e.g. just after a major product launch announcement)
+
+permissions:
+  contents: read
+
+jobs:
+  market-ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20  # ~30 calls × ~10s each + DB writes; 20m has comfortable headroom
+
+    env:
+      SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SERPAPI_KEY:               ${{ secrets.SERPAPI_KEY }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run market-mode ingest
+        # The script handles the credit check internally and exits 0
+        # if there's not enough budget. No need for a separate guard
+        # step here — keeps the workflow simple.
+        run: npm run ingest -- --mode=market

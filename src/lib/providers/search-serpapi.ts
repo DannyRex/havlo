@@ -318,22 +318,36 @@ export const serpapiSearchProvider: SearchProvider = {
 
     const { country } = resolveCountry(query.countryCode);
 
-    /* Append "deals" to bias Google Shopping toward sale-tagged results,
-       BUT skip the suffix for highly-branded queries where Google's
-       relevance is already strong (e.g. "airpods max", "iphone 15 pro").
-       Adding "deals" to those dilutes the brand signal. */
+    /* Query strategy depends on mode:
+         - "deals" (default): append "deals" suffix to bias Google Shopping
+           toward sale-tagged results. Skip suffix for branded queries
+           where Google's relevance is already strong (adding "deals" to
+           "iphone 15 pro" dilutes the brand signal).
+         - "market": drop the suffix entirely. We want broader catalogue
+           coverage including full-price listings, so the spectrum on
+           PDPs and the alternatives rail reflect honest market range,
+           not just whatever's on promo right now.
+
+       tbs=mr:1 (sort by recency) is kept for deals mode but DROPPED
+       for market mode — recency biases toward fresh promos, which is
+       the opposite of what market mode wants. */
+    const mode = query.mode ?? "deals";
     const isBrandedQuery = /\b(airpods?|iphone|ipad|macbook|galaxy|playstation|ps[45]|xbox|airmax|jordan|yeezy|samba|dunk)\b/i.test(q);
     const alreadyHasDealKeyword = /deal|sale|discount|offer/i.test(q);
-    const dealsQuery = isBrandedQuery || alreadyHasDealKeyword ? q : `${q} deals`;
+    const effectiveQuery = mode === "market"
+      ? q
+      : (isBrandedQuery || alreadyHasDealKeyword ? q : `${q} deals`);
 
     const url = new URL(SERPAPI_ENDPOINT);
     url.searchParams.set("engine", "google_shopping");
-    url.searchParams.set("q", dealsQuery);
+    url.searchParams.set("q", effectiveQuery);
     url.searchParams.set("gl", country);
     url.searchParams.set("hl", "en");
     url.searchParams.set("api_key", apiKey);
-    /* tbs=mr:1 sorts by recency; helps surface fresher promotions */
-    url.searchParams.set("tbs", "mr:1");
+    if (mode === "deals") {
+      /* recency sort — helps surface fresher promotions */
+      url.searchParams.set("tbs", "mr:1");
+    }
 
     let res: Response;
     try {
