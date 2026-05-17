@@ -559,7 +559,7 @@ export async function pgFtsFindDupes(
 
   const { data: matches, error } = await supa.rpc("search_products_fts", {
     q: query,
-    max_results: 60,
+    max_results: 30,  /* halved May 2026 v3 for Supabase egress relief */
   });
   if (error || !matches) return [];
 
@@ -879,7 +879,7 @@ export async function pgFtsFindSimilar(
   /* 3. Find similar products via FTS using the anchor's title (richer query than user's) */
   const { data: similarMatches } = await supa.rpc("search_products_fts", {
     q: anchor.title,
-    max_results: 60,
+    max_results: 30,  /* halved May 2026 v3 for Supabase egress relief */
   });
 
   const dupes: DupeResult[] = ((similarMatches as FtsRow[]) ?? [])
@@ -979,7 +979,7 @@ export async function pgFtsFindByProductId(
      product. */
   const { data: similarMatches } = await supa.rpc("search_products_fts", {
     q: anchor.title,
-    max_results: 60,
+    max_results: 30,  /* halved May 2026 v3 for Supabase egress relief */
   });
 
   const anchorBrand        = anchor.brand ?? extractQueryBrand(anchor.title);

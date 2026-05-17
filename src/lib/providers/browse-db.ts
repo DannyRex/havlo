@@ -99,7 +99,11 @@ function rowToDeal(r: BestOfferRow, popularity?: PopularityRecord): Deal {
    Limit: PostgREST caps RPC responses at 1000 rows. For search,
    1000 relevance-ranked rows is plenty — most queries return <100
    meaningful matches anyway. */
-const SEARCH_MAX_ROWS = 1000;
+/* Bumped DOWN May 2026 v3 from 1000 → 500 for Supabase egress
+   relief. Search-path queries rarely surface >50 meaningful
+   results to a user; the extra 500 rows were egress-burning
+   tail with near-zero render impact. */
+const SEARCH_MAX_ROWS = 500;
 const MIN_USABLE_ROWS = 6;
 /* Popularity boost cap. Empirical: a product with 200 clicks in 30
    days gets ~1.06 multiplier, 2000 clicks → ~1.13. Higher caps let
@@ -306,9 +310,17 @@ export const dbBrowseProvider: BrowseProvider = {
     /* Cache-bust marker — bump this any time the multi-pass shape
        changes so old function instances with stale POOL_CACHE
        entries get recycled by Vercel. */
-    const PASS_VERSION = "v2-cross-border-guaranteed";
+    const PASS_VERSION = "v3-egress-halved";
     void PASS_VERSION;
-    const PASS_MAX = 1000;
+    /* Halved May 2026 v3 (1000 → 500) for Supabase egress relief.
+       The 3-pass fan-out previously pulled up to 3×1000 = 3000
+       rows per /api/deals call (~2.25 MB). /deals page renders
+       at most ~100 cards initially + lazy-loads on scroll; the
+       extra 2900 rows were egress-burning tail. Halved each pass
+       to ~1.1 MB per call total. Combined with the recent ISR +
+       unstable_cache TTL bumps (commit 16a99f1), egress per
+       unique URL drops ~75-90%. */
+    const PASS_MAX = 500;
 
     const passABase = {
       p_category:       q.categorySlug && q.categorySlug !== "all" ? q.categorySlug : null,
