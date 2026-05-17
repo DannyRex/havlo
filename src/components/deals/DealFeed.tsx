@@ -587,13 +587,15 @@ export default function DealFeed({
           Browse deals + new arrivals
         </h1>
         <p className="text-sm sm:text-base text-ink-2 mt-2 max-w-2xl">
-          Fresh deals first, then everything else worth seeing from the stores {country.name === "Nigeria" ? "Nigerians" : `${country.name} shoppers`} already shop.{" "}
-          {originCounts?.allDeals !== undefined && originCounts.all > 0 && (
-            <span className="text-ink-3">
-              {originCounts.allDeals.toLocaleString()} on sale of {originCounts.all.toLocaleString()} total.
-            </span>
-          )}
+          Fresh deals first, then everything else worth seeing from the stores {country.name === "Nigeria" ? "Nigerians" : `${country.name} shoppers`} already shop.
         </p>
+        {originCounts?.allDeals !== undefined && originCounts.all > 0 && (
+          /* Deal-count summary on its own line — separate paragraph
+             so the metric breathes instead of crowding the subhead. */
+          <p className="text-xs sm:text-sm text-ink-3 mt-2 tabular-nums">
+            {originCounts.allDeals.toLocaleString()} on sale of {originCounts.all.toLocaleString()} total.
+          </p>
+        )}
       </div>
 
       {/* Search input + subtitle. Subtitle addresses Bucket 2#25 from
