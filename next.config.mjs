@@ -28,10 +28,23 @@ const nextConfig = {
     /* Modern formats — Next negotiates the best one per browser.
        AVIF first (smaller), WebP fallback. Saves ~25–50% over JPEG. */
     formats: ["image/avif", "image/webp"],
-    /* Match the most common cell sizes we render so generated thumbnails
-       hit the cache cleanly instead of producing one-off variants. */
-    deviceSizes: [320, 420, 640, 768, 1024, 1280, 1536],
-    imageSizes: [80, 96, 128, 160, 256, 384],
+    /* Tightened May 2026 v2 after Vercel hit the 5,000-transformation
+       free-tier ceiling. Each (deviceSize, imageSize) cell × format
+       × image creates a transformation. The old matrix had 7×6×2 = 84
+       transformations per unique image, multiplied across thousands of
+       products = catastrophic blow-through of the free tier.
+
+       New matrix: 3 device sizes (mobile, tablet, desktop) + 3 image
+       sizes (sm thumb, md card, lg hero) = 6×2 = 12 transforms per
+       image instead of 84. Still covers every render bucket the UI
+       actually uses without over-generating variants. */
+    deviceSizes: [640, 1024, 1536],
+    imageSizes: [96, 256, 384],
+    /* Cache transformations for 60 days minimum. Vercel's edge cache
+       respects this — a transformed image stays in cache up to 60d
+       even if the underlying source doesn't change. Cuts repeat
+       transforms massively. */
+    minimumCacheTTL: 60 * 60 * 24 * 60,
     remotePatterns: [
       // Allow all HTTPS images (store CDNs vary widely)
       { protocol: "https", hostname: "**" },

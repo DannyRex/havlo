@@ -6,16 +6,16 @@
    Havlo "h" logo mark on a neutral surface instead of the previous
    emoji-on-gradient pattern.
 
-   Uses /icon.png — the 512×512 brand mark (copy of src/app/icon.png
-   placed in public/ so it's reachable from a component via next/image).
-   PNG passes next/image's default security policy (no scripts), so
-   no dangerouslyAllowSVG flag required.
-
-   Drop-in replacement: render inside an absolute-positioned parent
-   (cards) or a relatively-sized parent — the wrapper takes the
-   parent's full width/height.
+   Uses a plain <img> (not next/image) deliberately. The fallback
+   renders on EVERY image-less card surface — masonry grid, list
+   view, compare cards, PDP. With next/image, each render hit
+   Vercel's image optimizer and counted against the 5,000/mo free-
+   tier transformation budget. Going through next/image to serve a
+   static 512×512 PNG saved nothing (PNG was already optimized at
+   build time) and burnt transformations needlessly. Plain <img>
+   skips the optimizer, gets served from Vercel's CDN edge cache,
+   and never charges a transformation.
    ────────────────────────────────────────────────────────────────── */
-import Image from "next/image";
 
 interface Props {
   /** Inner mark size in pixels. `sm` for list thumbs, `md` for grid
@@ -42,12 +42,18 @@ export default function HavloLogoFallback({ size = "md", className = "" }: Props
       className={`absolute inset-0 flex items-center justify-center bg-surface-2 ${className}`}
       aria-hidden="true"
     >
-      <Image
+      {/* Plain <img> — skips next/image optimizer to preserve free-tier
+          transformation budget. /icon.png is a static 512×512 brand
+          mark served from Vercel's CDN; no need to re-transform per
+          device size. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
         src="/icon.png"
         alt=""
         width={px}
         height={px}
-        priority={false}
+        loading="lazy"
+        decoding="async"
         className="rounded-lg opacity-95"
       />
     </div>

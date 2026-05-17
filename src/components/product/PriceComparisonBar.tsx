@@ -395,6 +395,19 @@ export default function PriceComparisonBar({
               <button
                 key={row.storeId}
                 type="button"
+                /* Desktop: hover reveals the popover (mouse-driven
+                   discovery, no click needed). Mobile / touch: tap
+                   toggles since hover doesn't exist on touch devices.
+                   Both paths converge on setActiveDotStoreId — the
+                   popover state machine is identical, only the
+                   trigger event differs.
+
+                   onMouseEnter/Leave is desktop-only (no-op on touch);
+                   onClick stays as the mobile fallback. onTouchStart
+                   on touch devices fires BEFORE onMouseEnter so the
+                   activation order is deterministic. */
+                onMouseEnter={() => setActiveDotStoreId(row.storeId)}
+                onMouseLeave={() => setActiveDotStoreId((current) => (current === row.storeId ? null : current))}
                 onClick={(e) => {
                   e.stopPropagation();
                   setActiveDotStoreId(isActive ? null : row.storeId);
@@ -433,12 +446,31 @@ export default function PriceComparisonBar({
             if (!row || row.storeId === thisStoreId) return null;
             const pos = positionOf(row.effectiveNgn);
             const left = Math.max(DOT_INSET_PCT, Math.min(100 - DOT_INSET_PCT, pos * 100));
+            /* Edge-aware horizontal anchor — was always -translate-x-1/2
+               (center on dot), which clipped on small viewports when
+               the dot sat at the bar's extreme left/right. User
+               report May 2026: popover gets cut off on mobile at the
+               edges.
+
+               New behaviour:
+                 left < 20%    → anchor popover to LEFT (no translate)
+                 left > 80%    → anchor popover to RIGHT (-100% translate)
+                 otherwise     → center (-50% translate, current)
+
+               The arrow tail position adjusts to match (see below). */
+            const anchor: "left" | "right" | "center" =
+              left < 20 ? "left" : left > 80 ? "right" : "center";
+            const translateClass =
+              anchor === "left"  ? "translate-x-0" :
+              anchor === "right" ? "-translate-x-full" :
+                                   "-translate-x-1/2";
             return (
               <div
                 role="dialog"
                 aria-label={`${row.storeName} details`}
-                className="absolute -top-16 -translate-x-1/2 z-30 rounded-lg bg-ink text-bg px-2.5 py-1.5 shadow-[0_6px_18px_rgba(0,0,0,0.25)] whitespace-nowrap pointer-events-none"
+                className={`absolute -top-16 ${translateClass} z-30 rounded-lg bg-ink text-bg px-2.5 py-1.5 shadow-[0_6px_18px_rgba(0,0,0,0.25)] whitespace-nowrap pointer-events-none max-w-[calc(100vw-2rem)]`}
                 style={{ left: `${left}%` }}
+                data-anchor={anchor}
               >
                 <p className="text-[11px] font-semibold leading-tight">
                   {row.storeName}
@@ -451,10 +483,20 @@ export default function PriceComparisonBar({
                     <Plane size={9} aria-hidden="true" /> Cross-border
                   </p>
                 )}
-                {/* Tail pointing at the dot below */}
+                {/* Tail pointing at the dot below — position adjusts
+                    to match the popover's edge-aware anchor so the
+                    triangle still points AT the dot, not into empty
+                    space.
+                      center: triangle in the middle of popover
+                      left-anchored: triangle near popover's left edge
+                      right-anchored: triangle near popover's right edge */}
                 <span
                   aria-hidden="true"
-                  className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 rotate-45 bg-ink"
+                  className={`absolute -bottom-1 w-2 h-2 rotate-45 bg-ink ${
+                    anchor === "left"  ? "left-3" :
+                    anchor === "right" ? "right-3" :
+                                          "left-1/2 -translate-x-1/2"
+                  }`}
                 />
               </div>
             );
