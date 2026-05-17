@@ -126,8 +126,19 @@ const DEFAULT_CROSS_BORDER = [
    'argos-uk', 'argos-ae', etc. without needing every variant. */
 const COUNTRY_CROSS_BORDER: Record<string, string[]> = {
   ng: [
-    /* Globals that already shipped to NG long before this commit. */
-    "amazon", "amazon.com", "amazon.co.uk", "aliexpress", "asos",
+    /* Globals that already shipped to NG long before this commit.
+       Amazon marketplaces are listed EXPLICITLY (not the broad
+       "amazon" substring) so we drop amazon-de and amazon-india —
+       Nigerians don't realistically cross-border ship from those:
+         - Amazon DE: language barrier + EU-focused logistics
+         - Amazon IN: no direct shipping to NG, GST + customs
+           friction at value thresholds NG buyers care about
+       Kept: US (.com), UK (.co.uk), AE (Lagos↔Dubai freight route).
+       May 2026 v3 fix per user observation. */
+    "amazon.com", "amazon-com", "amazon-us",
+    "amazon.co.uk", "amazon-co-uk", "amazon-uk",
+    "amazon.ae", "amazon-ae",
+    "aliexpress", "asos",
     "shein", "temu", "dhgate", "ebay", "apple.com", "banggood",
     /* US retailers commonly used by NG cross-border shoppers — most
        are already in the DB via SerpAPI ingest (see
@@ -613,8 +624,20 @@ export function filterDealsForCountry<T extends DealLike>(deals: T[], country: C
       if (isNigerianStore(d)) return true;
       if (isCrossBorderStore(d, "ng")) return true;
       const tag = dealCountryTag(d);
-      // Untagged rows from the legacy intl pool — keep, broadly relevant
-      if (tag === null) return true;
+      /* Untagged rows — was unconditional pass-through. Tightened
+         May 2026 v3 to mirror the non-NG path: only keep if the
+         store either (a) can't be inferred to a specific country
+         (truly global like AliExpress/Shein/Temu) OR (b) is in a
+         country on NG's cross-border allowlist (US/UK/AE).
+         Without this, Amazon DE and Amazon IN slipped through
+         even after removing the broad "amazon" substring from
+         NG's cross-border list. */
+      if (tag === null) {
+        const inferred = inferStoreCountry(d.storeId, d.storeName);
+        if (inferred === null) return true;
+        const ic = inferred.toLowerCase();
+        return ic === "ng" || ic === "us" || ic === "uk" || ic === "ae";
+      }
       // Tagged country:ng → keep (SerpAPI ingest)
       if (tag === "ng") return true;
       // Tagged for a foreign market — only keep if the store is known
