@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { ExternalLink, Trophy, Truck, Globe, Star } from "lucide-react";
 import { formatPriceForUser, proxiedImageUrl, cleanTitle } from "@/lib/utils";
 import { useCountry } from "@/components/providers/CountryProvider";

@@ -20,7 +20,6 @@
    StoreEntry.logo with a Clearbit / icon.horse / static-asset
    URL at the call site instead of changing the global default. */
 
-import Image from "next/image";
 import { useState } from "react";
 
 export interface StoreEntry {
@@ -80,15 +79,20 @@ export function StoreLogoChip({
     <div className="flex items-center gap-2.5 shrink-0 group cursor-default">
       <div className={`${chipSize} rounded-md overflow-hidden flex items-center justify-center bg-bg border border-border shrink-0`}>
         {!showLetter && src ? (
-          <Image
+          /* Plain <img> May 2026 v3 — was next/image with
+             unoptimized={isRemote}. Even for local /public/logos
+             assets, the optimizer transform burned ~80 transforms
+             per /ng page load (one per store chip × srcset variants).
+             Local PNGs are tiny + pre-optimized; the AVIF/WebP saving
+             didn't justify the transformation cost. */
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={src}
             alt={ariaHidden ? "" : store.name}
             width={store.wideLogo ? 80 : 32}
             height={32}
-            /* Skip optimizer for any remote URL so we don't have to
-               whitelist hosts in next.config. Local /public/logos
-               assets keep optimization. */
-            unoptimized={isRemote}
+            loading="lazy"
+            decoding="async"
             onError={() => setImgFailed(true)}
             className={`${imgSize} object-contain grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300 ${
               store.whiteLogo ? "invert dark:invert-0"

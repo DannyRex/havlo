@@ -21,7 +21,6 @@
    the "Compare prices across N stores" CTA on the originating PDP.
    Audit May 2026 caught that mismatch. */
 
-import Image from "next/image";
 import Link from "next/link";
 import { Star, Plane, ChevronRight, ArrowDown } from "lucide-react";
 import { formatPriceForUser } from "@/lib/utils";

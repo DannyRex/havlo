@@ -11,7 +11,6 @@
    useful supplementary info (last seen, store badge, savings %)
    without crowding. */
 
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { ExternalLink, Tag, Store as StoreIcon, Globe } from "lucide-react";

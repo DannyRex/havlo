@@ -22,7 +22,6 @@
    component at different scales without re-implementing the
    shell+letter pattern. */
 
-import Image from "next/image";
 import { useState } from "react";
 import { storeLogoInvertClass } from "@/lib/store-logo-invert";
 
