@@ -137,7 +137,9 @@ const COUNTRY_CROSS_BORDER: Record<string, string[]> = {
        May 2026 v3 fix per user observation. */
     "amazon.com", "amazon-com", "amazon-us",
     "amazon.co.uk", "amazon-co-uk", "amazon-uk",
-    "amazon.ae", "amazon-ae",
+    /* Amazon AE removed May 2026 v3 per user direction —
+       Nigerians realistically buy from US + UK only. AE adds
+       noise without a real freight-route. */
     "aliexpress", "asos",
     "shein", "temu", "dhgate", "ebay", "apple.com", "banggood",
     /* US retailers commonly used by NG cross-border shoppers — most
@@ -659,7 +661,9 @@ export function filterDealsForCountry<T extends DealLike>(deals: T[], country: C
         const inferred = inferStoreCountry(d.storeId, d.storeName);
         if (inferred === null) return true;
         const ic = inferred.toLowerCase();
-        return ic === "ng" || ic === "us" || ic === "uk" || ic === "ae";
+        /* AE removed May 2026 v3 — user wants only NG/US/UK
+           shoppable retailers in the NG pool. */
+        return ic === "ng" || ic === "us" || ic === "uk";
       }
       // Tagged country:ng → keep (SerpAPI ingest)
       if (tag === "ng") return true;
