@@ -25,6 +25,7 @@ import {
 import { displayStoreName } from "@/lib/store-display";
 import PriceComparisonBar from "@/components/product/PriceComparisonBar";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
+import InfoTip from "@/components/ui/InfoTip";
 import type { PerStoreOffer } from "@/lib/pdp-stats";
 import type { PriceHistorySummary } from "@/lib/search/price-history";
 import {
@@ -294,8 +295,18 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             )}
           </div>
           {secondaryStr && (
-            <p className="text-sm text-ink-3 mt-1 tabular-nums">
+            /* Cross-border landed total — mirrors the card treatment
+               from MasonryCard so the PDP transition stays visually
+               consistent. InfoTip explains the +30% shipping/customs
+               assumption so users know what's actually in the
+               number. */
+            <p className="text-sm text-ink-3 mt-1 flex items-center gap-1 tabular-nums">
               {secondaryStr}
+              <InfoTip
+                label="What's included in the total"
+                text="Estimated total: product price + ~30% for cross-border shipping and customs. Actual cost varies by carrier, weight, and customs assessment."
+                size={13}
+              />
             </p>
           )}
           {hasDiscount && savingsAbs > 0 && (
