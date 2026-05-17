@@ -584,7 +584,7 @@ export default function DealFeed({
           subhead localises automatically. */}
       <div className="mb-6 sm:mb-8 px-1 sm:px-0">
         <h1 className="text-[28px] sm:text-4xl font-bold text-ink tracking-[-0.03em] leading-tight">
-          Browse deals + new arrivals
+          Browse deals & new arrivals
         </h1>
         <p className="text-sm sm:text-base text-ink-2 mt-2 max-w-2xl">
           Fresh deals first, then everything else worth seeing from the stores {country.name === "Nigeria" ? "Nigerians" : `${country.name} shoppers`} already shop.

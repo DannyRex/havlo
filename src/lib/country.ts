@@ -182,10 +182,17 @@ const COUNTRY_CROSS_BORDER: Record<string, string[]> = {
   de: ["aliexpress", "shein", "temu", "dhgate", "banggood", "wish.com", "alibaba.com", "lightinthebox", "geekbuying", "trendyol"],
   ae: ["aliexpress", "shein", "temu", "amazon.com", "amazon.co.uk", "dhgate", "banggood", "wish.com", "alibaba.com", "trendyol"],
   // Shein officially banned in India since 2020. Import duties make
-  // most Western cross-border purchases impractical except Amazon Global.
-  // The expanded global tail (Wish / AliExpress) still passes Indian
-  // customs at low value thresholds.
-  in: ["aliexpress", "amazon.com", "wish.com", "alibaba.com"],
+  // most Western cross-border purchases impractical.
+  //
+  // Tightened May 2026 v3 — removed amazon.com. Indian shoppers
+  // access US Amazon inventory via Amazon India's 'Global Store'
+  // feature (which surfaces in our catalog as amazon.in offers
+  // anyway, since the storefront is amazon.in). Direct cross-border
+  // to amazon.com isn't realistic: 18% GST + 30%+ customs + slow
+  // shipping vs domestic Amazon Global Store at fraction of the
+  // friction. So the cross-border list keeps only the truly global
+  // marketplaces that DO clear Indian customs at low thresholds.
+  in: ["aliexpress", "wish.com", "alibaba.com"],
   za: ["aliexpress", "shein", "temu", "amazon.com", "amazon.co.uk", "dhgate", "banggood", "wish.com", "alibaba.com", "trendyol"],
 };
 
