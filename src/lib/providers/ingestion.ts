@@ -137,6 +137,12 @@ function dealToOfferRow(
     original_price: d.originalPrice ?? null,
     discount_percent: d.discountPercent ?? null,
     currency: d.currency,
+    /* is_deal — explicit boolean derived from discount_percent.
+       Pairs with migration 0028-offers-is-deal.sql which adds the
+       column and backfills existing rows. Future brand DTC scrapes
+       will deliberately set discountPercent=0 (selling at MSRP),
+       which naturally lands them as is_deal=false. */
+    is_deal: (d.discountPercent ?? 0) > 0,
     /* Always (re)mark as in_stock on a successful upsert. The
        staleness sweep below flips offers that DIDN'T get touched
        this run, so re-stamping here is the "I saw this URL this

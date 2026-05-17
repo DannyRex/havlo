@@ -106,7 +106,21 @@ async function synthesizeAnchorFromOfferRow(row: OfferRow): Promise<SearchOutput
     { title: row.title, brand: row.brand, priceNgn: visitingOffer.landedPrice },
     dupes,
   );
-  const augmentedOffers = [visitingOffer, ...variantOffers(partition.likelyVariants)];
+  const rawAugmented = [visitingOffer, ...variantOffers(partition.likelyVariants)];
+
+  /* Dedupe by (storeId, rounded landed price) — same logic as the
+     PDP's dedupAnchorOffers. QA report May 2026 found 4 identical
+     93mobiles offers inflating storeCount to 4 when only 1 unique
+     store-price existed. Round to nearest 100 NGN to collapse
+     trivial FX-rounding differences. */
+  const dedupSeen = new Set<string>();
+  const augmentedOffers = rawAugmented.filter((o) => {
+    if (o.landedPrice <= 0) return false;
+    const key = `${o.storeId}|${Math.round(o.landedPrice / 100) * 100}`;
+    if (dedupSeen.has(key)) return false;
+    dedupSeen.add(key);
+    return true;
+  });
 
   /* anchor.key — when product_id is available, this is the canonical
      PDP-routable id. When only offer_id exists (synthesised anchor

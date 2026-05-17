@@ -599,12 +599,16 @@ export default async function ProductPage({ params }: PageProps) {
     return true;
   });
 
-  /* Sibling rail data — same model line, different sub-tier.
-     Computed but not rendered yet — UI section is a follow-up.
-     The user-visible win today is that siblings are EXCLUDED from
-     the alternatives rail above so they no longer mislead users
-     into thinking they're cheaper swaps. */
-  void partition.siblingVariants; // intentional: tracked for future "Other models" rail
+  /* Sibling rail — same brand + same model line + different sub-tier.
+     Surfaces iPhone 15 Plus / Pro / Pro Max when viewing iPhone 15,
+     Galaxy S24 Ultra / FE when viewing Galaxy S24, etc. Excluded
+     from the cross-brand 'Cheaper alternatives' rail above so the
+     two surfaces are semantically distinct:
+       Other models in this line  → siblingsForRail (same product family)
+       Cheaper alternatives       → dupesForRail (different products) */
+  const siblingsForRail = filteredDupes.filter((d) =>
+    partition.siblingVariants.some((s) => s.key === d.key),
+  );
 
   /* Price-history rollup for the new bar's "lowest tracked / at
      this store: £X" callouts. Cached at 5min — same window as the
@@ -682,11 +686,31 @@ export default async function ProductPage({ params }: PageProps) {
           priceHistory={priceHistorySummary}
         />
 
+        {siblingsForRail.length > 0 && (
+          /* Sibling rail — same brand + same model line, different
+             sub-tier (iPhone 15 ↔ Plus/Pro/Max, Galaxy S24 ↔ Ultra/FE).
+             Surfaces ABOVE the cross-brand alternatives so users
+             can shop the model line vertically (cheaper/pricier
+             configurations of what they're already looking at)
+             before browsing cross-brand swaps below. */
+          <section className="mt-12 sm:mt-16">
+            <header className="mb-6 sm:mb-8">
+              <h2 className="text-[22px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
+                Other models in this line
+              </h2>
+              <p className="text-sm sm:text-base text-ink-2 mt-1.5">
+                {siblingsForRail.length} {siblingsForRail.length === 1 ? "configuration" : "configurations"} of the same model line.
+              </p>
+            </header>
+            <SimilarProducts dupes={siblingsForRail} countryCode={country.code} />
+          </section>
+        )}
+
         {dupesForRail.length > 0 ? (
           <section className="mt-12 sm:mt-16">
             <header className="mb-6 sm:mb-8">
               <h2 className="text-[22px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
-                You may also like
+                {siblingsForRail.length > 0 ? "Cheaper alternatives" : "You may also like"}
               </h2>
               <p className="text-sm sm:text-base text-ink-2 mt-1.5">
                 {dupesForRail.length} {dupesForRail.length === 1 ? "pick" : "picks"} from other stores. Sorted cheapest first.

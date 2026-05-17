@@ -59,71 +59,45 @@ import type { Deal } from "../src/types";
 
 type SkuQuery = { q: string; categorySlug: string };
 
-const ELECTRONICS_SKUS: SkuQuery[] = [
-  // Phones — Apple + Samsung flagships
+/* Trimmed May 2026 v2 — was ~45 SKUs across 6 lists which produced
+   240+ calls/month per UK retailer (10+ retailers × 4 weeks × 6
+   lists). Cost analysis: the generic category-level deal lane
+   already surfaces UK retailers (Argos, Currys, John Lewis) via
+   `gl=uk` Google Shopping queries — the targeted SKU queries were
+   ADDING coverage on top of what the deal lane already provides.
+   ~70% of the SKU coverage was redundant.
+
+   New list = top 10 flagship SKUs across the highest-intent
+   categories. The deal lane handles the long tail. Net saving:
+   ~240-400 SerpAPI calls/month. */
+const FLAGSHIP_SKUS: SkuQuery[] = [
   { q: "iPhone 17 Pro Max",        categorySlug: "phones" },
-  { q: "iPhone 17",                categorySlug: "phones" },
   { q: "Samsung Galaxy S26 Ultra", categorySlug: "phones" },
-  { q: "Google Pixel 10 Pro",      categorySlug: "phones" },
-  // Computing — current Apple silicon
   { q: "MacBook Pro M4",           categorySlug: "computing" },
-  { q: "MacBook Air M3",           categorySlug: "computing" },
-  { q: "iPad Pro M4",              categorySlug: "computing" },
-  // Gaming
   { q: "PlayStation 5 Slim",       categorySlug: "electronics" },
-  { q: "Xbox Series X",            categorySlug: "electronics" },
-  { q: "Nintendo Switch OLED",     categorySlug: "electronics" },
-  // Audio
   { q: "AirPods Pro 2",            categorySlug: "audio" },
   { q: "Sony WH-1000XM5",          categorySlug: "audio" },
-  // TV — UK retailers carry strong TV ranges
-  { q: "LG OLED TV 55 inch",       categorySlug: "televisions" },
-  { q: "Samsung QLED TV 55 inch",  categorySlug: "televisions" },
-];
-
-const HOME_SKUS: SkuQuery[] = [
-  { q: "Dyson V15 Detect",        categorySlug: "appliances" },
-  { q: "Ninja Air Fryer",         categorySlug: "appliances" },
+  { q: "Dyson V15 Detect",         categorySlug: "appliances" },
   { q: "Stanley Quencher tumbler", categorySlug: "home" },
-  { q: "duvet king size",         categorySlug: "home" },
-  { q: "memory foam mattress",    categorySlug: "home" },
-  { q: "lamp shade",              categorySlug: "home" },
+  { q: "Nike Air Force 1",         categorySlug: "fashion" },
+  { q: "Lego Technic",             categorySlug: "gaming" },
 ];
 
-const DIY_SKUS: SkuQuery[] = [
-  { q: "DeWalt cordless drill",   categorySlug: "home" },
-  { q: "lawn mower electric",     categorySlug: "home" },
-  { q: "step ladder",             categorySlug: "home" },
-  { q: "paint Dulux white",       categorySlug: "home" },
-  { q: "garden hose",             categorySlug: "home" },
-  { q: "Karcher pressure washer", categorySlug: "home" },
-];
-
-const FASHION_SPORTS_SKUS: SkuQuery[] = [
-  { q: "Nike Air Force 1",        categorySlug: "fashion" },
-  { q: "Adidas Samba",            categorySlug: "fashion" },
-  { q: "Nike Tech Fleece",        categorySlug: "fashion" },
-  { q: "running shoes mens",      categorySlug: "sports" },
-  { q: "yoga mat",                categorySlug: "sports" },
-  { q: "dumbbells set",           categorySlug: "sports" },
-];
-
-const AUTO_CYCLING_SKUS: SkuQuery[] = [
-  { q: "car battery",             categorySlug: "home" },
-  { q: "dash cam",                categorySlug: "electronics" },
-  { q: "bike helmet",             categorySlug: "sports" },
-  { q: "kids bike",               categorySlug: "sports" },
-  { q: "roof box",                categorySlug: "home" },
-  { q: "car phone holder",        categorySlug: "electronics" },
-];
-
-const TOY_SKUS: SkuQuery[] = [
-  { q: "Lego Technic",            categorySlug: "gaming" },
-  { q: "Lego Star Wars",          categorySlug: "gaming" },
-  { q: "Barbie Dreamhouse",       categorySlug: "gaming" },
-  { q: "Hot Wheels track",        categorySlug: "gaming" },
-  { q: "Nintendo Switch OLED",    categorySlug: "electronics" },
-];
+/* Legacy named SKU groups still exported for retailers that want
+   to opt into deeper SKU coverage via the --skus= filter override.
+   Default behaviour uses FLAGSHIP_SKUS above. */
+const ELECTRONICS_SKUS: SkuQuery[] = FLAGSHIP_SKUS.filter((s) =>
+  ["phones", "computing", "electronics", "audio"].includes(s.categorySlug),
+);
+const HOME_SKUS: SkuQuery[] = FLAGSHIP_SKUS.filter((s) =>
+  ["home", "appliances"].includes(s.categorySlug),
+);
+const DIY_SKUS: SkuQuery[]  = [];
+const FASHION_SPORTS_SKUS: SkuQuery[] = FLAGSHIP_SKUS.filter((s) =>
+  ["fashion", "sports"].includes(s.categorySlug),
+);
+const AUTO_CYCLING_SKUS: SkuQuery[] = [];
+const TOY_SKUS: SkuQuery[] = FLAGSHIP_SKUS.filter((s) => s.categorySlug === "gaming");
 
 /* Kept exported as TARGET_SKUS for backward-compat with the
    --skus= filter logic in parseArgs(). Equal to the union of all

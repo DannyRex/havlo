@@ -392,9 +392,33 @@ export const dbBrowseProvider: BrowseProvider = {
         allRows.push(row);
       }
     };
-    merge(passAResult.data as unknown as BestOfferRow[] | null);
+    /* Interleaved merge — Pass A (discounted local) and Pass C
+       (0%-only local) ROUND-ROBIN into the pool instead of
+       concatenating in order. Without this, Pass A's 1000 rows
+       always pre-empt Pass C entirely (Pass C only surfaces when
+       Pass A is thin). Result: stores whose offers are mostly
+       0%-discount (Jumia, pharmacy feeds) get drowned out — QA
+       report May 2026 found 0 Jumia in /api/deals top 400 despite
+       63 Jumia products in catalog.
+
+       After interleave: take the first row from A, then from C, then
+       A, then C... so every 2 rows in the final pool contains 1
+       Pass-A and 1 Pass-C entry. Stores like Jumia get fair surfacing
+       in the deal feed alongside discounted Konga/3C Hub inventory.
+
+       Pass B (intl) stays separate — it serves a different bucket
+       (cross-border) and the country-filter at the API layer keeps
+       intl from polluting local-only views regardless. */
+    const passARows = (passAResult.data as unknown as BestOfferRow[] | null) ?? [];
+    const passCRows = (passCResult.data as unknown as BestOfferRow[] | null) ?? [];
+    const interleaved: BestOfferRow[] = [];
+    const maxLen = Math.max(passARows.length, passCRows.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (i < passARows.length) interleaved.push(passARows[i]);
+      if (i < passCRows.length) interleaved.push(passCRows[i]);
+    }
+    merge(interleaved);
     merge(passBResult.data as unknown as BestOfferRow[] | null);
-    merge(passCResult.data as unknown as BestOfferRow[] | null);
 
     /* Drop offers whose URL points at Google Shopping (legacy SerpAPI
        ingest residue). Without SerpAPI to resolve, those clicks land
@@ -507,29 +531,44 @@ export const dbBrowseProvider: BrowseProvider = {
 
     const userCountry = q.country?.toUpperCase();
     if (userCountry) {
-      const [localRes, intlRes] = await Promise.all([
+      const [localRes, intlRes, localDealsRes, intlDealsRes] = await Promise.all([
         baseFilter(supa.from("product_best_offers")).eq("store_country", userCountry),
         /* True cross-border globals only: is_international=true
            with no anchored country. Excludes foreign-country-
            anchored retailers that don't realistically ship to
            the visitor's market. */
         baseFilter(supa.from("product_best_offers")).eq("is_international", true).is("store_country", null),
+        /* Deal-only sub-counts via the new is_deal column. When the
+           migration hasn't been applied yet, PostgREST returns an
+           error which we coerce to null below; the UI then skips
+           the parenthetical and shows only the totals. */
+        baseFilter(supa.from("product_best_offers")).eq("store_country", userCountry).eq("is_deal", true),
+        baseFilter(supa.from("product_best_offers")).eq("is_international", true).is("store_country", null).eq("is_deal", true),
       ]);
       const local = localRes.count ?? 0;
       const intl  = intlRes.count  ?? 0;
-      return { all: local + intl, local, intl };
+      const localDeals = localDealsRes.error ? undefined : (localDealsRes.count ?? 0);
+      const intlDeals  = intlDealsRes.error  ? undefined : (intlDealsRes.count  ?? 0);
+      const allDeals   = (localDeals !== undefined && intlDeals !== undefined) ? localDeals + intlDeals : undefined;
+      return { all: local + intl, local, intl, allDeals, localDeals, intlDeals };
     }
 
-    const [allRes, localRes, intlRes] = await Promise.all([
+    const [allRes, localRes, intlRes, allDealsRes, localDealsRes, intlDealsRes] = await Promise.all([
       baseFilter(supa.from("product_best_offers")),
       baseFilter(supa.from("product_best_offers")).eq("is_international", false),
       baseFilter(supa.from("product_best_offers")).eq("is_international", true),
+      baseFilter(supa.from("product_best_offers")).eq("is_deal", true),
+      baseFilter(supa.from("product_best_offers")).eq("is_international", false).eq("is_deal", true),
+      baseFilter(supa.from("product_best_offers")).eq("is_international", true).eq("is_deal", true),
     ]);
 
     return {
-      all:   allRes.count   ?? 0,
-      local: localRes.count ?? 0,
-      intl:  intlRes.count  ?? 0,
+      all:        allRes.count        ?? 0,
+      local:      localRes.count      ?? 0,
+      intl:       intlRes.count       ?? 0,
+      allDeals:   allDealsRes.error   ? undefined : (allDealsRes.count   ?? 0),
+      localDeals: localDealsRes.error ? undefined : (localDealsRes.count ?? 0),
+      intlDeals:  intlDealsRes.error  ? undefined : (intlDealsRes.count  ?? 0),
     };
   },
 };

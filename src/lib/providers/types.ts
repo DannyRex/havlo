@@ -56,6 +56,15 @@ export interface OriginCounts {
   all: number;
   local: number;
   intl: number;
+  /* Deal-only counts — added May 2026 with offers.is_deal column.
+     Lets the /deals UI show 'Local 2,526 (1,800 on sale)' pills
+     without a second round-trip. Zero when the underlying DB
+     migration (0028-offers-is-deal.sql) hasn't been applied yet —
+     UI gracefully renders without the deal-count parenthetical
+     in that case. */
+  allDeals?:   number;
+  localDeals?: number;
+  intlDeals?:  number;
 }
 
 /* ── Provider interfaces ──────────────────────────────────────────── */

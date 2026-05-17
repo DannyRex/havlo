@@ -28,7 +28,10 @@
     "test:matcher": "tsx --tsconfig tsconfig.scripts.json scripts/test-matcher.ts",
     "retag": "tsx --tsconfig tsconfig.scripts.json scripts/retag-categories.ts",
     "resignature": "tsx --tsconfig tsconfig.scripts.json scripts/resignature-products.ts",
-    "backfill:brand": "tsx --tsconfig tsconfig.scripts.json scripts/backfill-brand.ts"
+    "backfill:brand": "tsx --tsconfig tsconfig.scripts.json scripts/backfill-brand.ts",
+    "prune:price-history": "tsx --tsconfig tsconfig.scripts.json scripts/prune-price-history.ts",
+    "scrape:brand-dtc": "tsx --tsconfig tsconfig.scripts.json scripts/scrape-brand-dtc.ts",
+    "backfill:images": "tsx --tsconfig tsconfig.scripts.json scripts/backfill-product-images.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.0",

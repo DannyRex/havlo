@@ -1,0 +1,86 @@
+name: Maintenance (resignature + price prune)
+
+# ── Why this exists ──────────────────────────────────────────────────
+# Two cheap, idempotent maintenance jobs that keep the DB bounded as
+# the catalog grows from the deal + market ingests.
+#
+#   resignature: walks products that have drifted from their current
+#     buildSignature(title) output (after parser improvements or new
+#     brand additions) and updates the signature column. Idempotent
+#     re-runs produce zero changes once the catalog is clean.
+#
+#   price-prune: deletes price_history rows older than 90 days so
+#     the table doesn't grow unboundedly. The spectrum/PDP "lowest
+#     tracked" feature only reads from the last 90 days anyway, so
+#     older rows are dead storage. Modest cost: ~75% of current
+#     ~450K price-history rows get deleted on first run, then ~5K/week
+#     thereafter as new rows roll out the back.
+#
+# Cadence — every Sunday at 04:00 UTC. Sunday is the quietest day
+# of the week for shopper traffic, so any modest read-path impact
+# from the prune (autovacuum etc.) lands when nobody's looking.
+
+on:
+  schedule:
+    # Sunday at 04:00 UTC
+    - cron: "0 4 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  resignature:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: "npm" }
+      - run: npm ci
+      - name: Re-signature products with drifted keys
+        # --apply makes the script commit changes; without it, dry-run only.
+        # Safe even on the first run: the merge-safety guard rejects
+        # unsafe collisions (brand|? or ?|model) and the price-spread
+        # guard rejects accessory-into-product over-merges.
+        run: npm run resignature -- --apply
+
+  price-prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: "npm" }
+      - run: npm ci
+      - name: Prune price_history older than 90 days
+        run: npm run prune:price-history -- --apply
+
+  brand-dtc-scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: "npm" }
+      - run: npm ci
+      - name: Scrape brand DTC sites (Apple / Sony / Dyson / Bose / Samsung)
+        # Free — no SerpAPI calls. Hits brand sites directly with a
+        # real-browser User-Agent. Anchors the upper end of the
+        # spectrum with real MSRPs that Google Shopping won't surface.
+        run: npm run scrape:brand-dtc

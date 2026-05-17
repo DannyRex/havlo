@@ -7,7 +7,10 @@ import type { OriginFilter } from "@/types";
 interface Props {
   active: OriginFilter;
   onChange: (origin: OriginFilter) => void;
-  counts?: { all: number; local: number; intl: number };
+  counts?: {
+    all: number; local: number; intl: number;
+    allDeals?: number; localDeals?: number; intlDeals?: number;
+  };
 }
 
 const OPTIONS: { value: OriginFilter; label: string; short: string; icon: typeof Globe }[] = [
@@ -27,6 +30,11 @@ export default function OriginToggle({ active, onChange, counts }: Props) {
         const isActive = active === value;
         const count =
           counts?.[value === "all" ? "all" : value === "local" ? "local" : "intl"];
+        /* Deal-only sub-count for the parenthetical. Undefined when
+           the is_deal migration hasn't been applied — the UI then
+           just shows the total. */
+        const dealCount =
+          counts?.[value === "all" ? "allDeals" : value === "local" ? "localDeals" : "intlDeals"];
         const isIntl = value === "intl";
         return (
           <button
@@ -54,12 +62,16 @@ export default function OriginToggle({ active, onChange, counts }: Props) {
                     ? "bg-bg/20 text-bg"
                     : "bg-surface-2 text-ink-2",
                 )}
+                /* Title shows the deal sub-count on hover/tap. The
+                   pill stays compact (showing only the total) but
+                   the secondary signal is discoverable without
+                   crowding the layout. */
+                title={
+                  typeof dealCount === "number"
+                    ? `${count.toLocaleString()} products · ${dealCount.toLocaleString()} on sale`
+                    : `${count.toLocaleString()} products`
+                }
               >
-                {/* toLocaleString adds locale-appropriate thousands
-                    separators ("3,193" vs "3193"). The badges sit
-                    next to "All / Local / Intl" labels and frequently
-                    show 4-digit deal counts; without commas the
-                    number reads as a code, not a quantity. */}
                 {count.toLocaleString()}
               </span>
             )}

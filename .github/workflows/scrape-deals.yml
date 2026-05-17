@@ -230,8 +230,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Cost trim May 2026 v2 — Jumia ingest now runs ONLY on Thursdays
+      # (formerly Mon + Thu). Jumia inventory turnover is slow enough
+      # that weekly refresh keeps the catalog acceptably fresh, and
+      # the saving is ~17 calls × 4 weeks = ~68 SerpAPI calls/month.
+      # If Jumia inventory ever becomes time-sensitive (flash sales),
+      # widen back to Mon + Thu by removing the day-gate.
       - name: Ingest Jumia deals (SerpAPI engine=jumia) → Supabase
-        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true && (github.event.schedule == null || contains(github.event.schedule, '4'))
         run: npm run ingest:jumia
 
   # ── Job 4: UK retailer-biased SerpAPI ingest. Standard ingest above

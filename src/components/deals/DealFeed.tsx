@@ -24,8 +24,8 @@ const VIEW_STORAGE_KEY = "havlo:deals:viewMode";
 const PAGE_SIZE = 24;
 
 const TIERS: { value: DiscountTier; label: string }[] = [
-  { value: "all", label: "Any" },
-  { value: "10",  label: "10%+" },
+  { value: "all", label: "All" },
+  { value: "10",  label: "On sale" },
   { value: "20",  label: "20%+" },
   { value: "50",  label: "50%+" },
 ];
@@ -206,7 +206,10 @@ export default function DealFeed({
   const [searchDebounced, setSearchDebounced] = useState(initialSearch);
   const [origin, setOrigin]     = useState<OriginFilter>(initialOrigin);
   const [originCounts, setOriginCounts] =
-    useState<{ all: number; local: number; intl: number } | undefined>(initialOriginCounts);
+    useState<{
+      all: number; local: number; intl: number;
+      allDeals?: number; localDeals?: number; intlDeals?: number;
+    } | undefined>(initialOriginCounts);
   /* Did-you-mean suggestions returned by /api/deals when the result
      list is empty AND a search query is present. Populates the
      pills on EmptySearchState. Empty array = no pills, falls back
@@ -581,10 +584,15 @@ export default function DealFeed({
           subhead localises automatically. */}
       <div className="mb-6 sm:mb-8 px-1 sm:px-0">
         <h1 className="text-[28px] sm:text-4xl font-bold text-ink tracking-[-0.03em] leading-tight">
-          Deals worth checking today
+          Browse deals + new arrivals
         </h1>
         <p className="text-sm sm:text-base text-ink-2 mt-2 max-w-2xl">
-          Fresh price drops and standout offers from the stores {country.name === "Nigeria" ? "Nigerians" : `${country.name} shoppers`} already shop. Filter fast, find the deals worth opening.
+          Fresh deals first, then everything else worth seeing from the stores {country.name === "Nigeria" ? "Nigerians" : `${country.name} shoppers`} already shop.{" "}
+          {originCounts?.allDeals !== undefined && originCounts.all > 0 && (
+            <span className="text-ink-3">
+              {originCounts.allDeals.toLocaleString()} on sale of {originCounts.all.toLocaleString()} total.
+            </span>
+          )}
         </p>
       </div>
 

@@ -24,14 +24,26 @@ import { getActiveSearchProviders } from "../src/lib/providers";
 import { ingestDeals } from "../src/lib/providers/ingestion";
 import { fetchSerpapiAccount, hasBudget } from "../src/lib/providers/serpapi-credits";
 
-/* High-value categories that benefit from market-mode ingest. These
-   have stable MSRPs where the honest spectrum value matters more
-   than promo density. Other categories (fashion / beauty / home /
-   sports / gaming / health) stick with deals-mode because users
-   come there for promotional inventory. */
+/* High-value categories that benefit from market-mode query
+   strategy (drops "deals" suffix to get a broader catalogue mix
+   including fuller-price + MSRP-anchor listings). These have stable
+   MSRPs where the honest spectrum value matters more than promo
+   density. Other categories (fashion / beauty / home / sports /
+   gaming / health) stick with deals-mode because users come there
+   for promotional inventory.
+
+   Per-category mode inference is the DEFAULT behaviour as of May 2026
+   v2 (consolidated market lane). The dedicated --mode=market flag
+   still exists for manual focused enrichment runs, and --mode=deals
+   exists as a fallback override. */
 const MARKET_MODE_CATEGORIES = new Set([
   "phones", "computing", "audio", "electronics", "appliances",
 ]);
+
+function inferModeForCategory(slug: string, forceMode?: "deals" | "market"): "deals" | "market" {
+  if (forceMode) return forceMode;
+  return MARKET_MODE_CATEGORIES.has(slug) ? "market" : "deals";
+}
 
 /* The international markets Nigerian shoppers most commonly import from.
    - us:  Amazon.com, eBay, Walmart, Best Buy
@@ -49,11 +61,16 @@ interface CliArgs {
   providerId?: string;
   countries: string[];
   perCategoryLimit: number;
-  mode: "deals" | "market";
+  /* Optional force override. Default (undefined) uses per-category
+     inference — high-value cats run in market mode, others in deals
+     mode. --mode=market forces all queries to market mode AND
+     filters to high-value cats. --mode=deals forces all to deals
+     mode (legacy / emergency fallback). */
+  forceMode?: "deals" | "market";
 }
 
 function parseArgs(): CliArgs {
-  const args: CliArgs = { countries: DEFAULT_COUNTRIES, perCategoryLimit: 20, mode: "deals" };
+  const args: CliArgs = { countries: DEFAULT_COUNTRIES, perCategoryLimit: 20 };
   for (const arg of process.argv.slice(2)) {
     if (arg.startsWith("--category=")) {
       args.categorySlugs = arg.slice("--category=".length).split(",").map((s) => s.trim());
@@ -64,9 +81,9 @@ function parseArgs(): CliArgs {
     } else if (arg.startsWith("--limit=")) {
       args.perCategoryLimit = parseInt(arg.slice("--limit=".length), 10) || 20;
     } else if (arg === "--mode=market") {
-      args.mode = "market";
+      args.forceMode = "market";
     } else if (arg === "--mode=deals") {
-      args.mode = "deals";
+      args.forceMode = "deals";
     }
   }
   return args;
@@ -78,16 +95,11 @@ async function main() {
     (p) => !args.providerId || p.id === args.providerId,
   );
 
-  /* Market mode runs ONLY against serpapi-shopping (google_shopping).
-     The other providers serve distinct purposes:
-       serpapi-jumia: site-filtered google search, NG-only, has its
-         own dedicated ingest path + cron
-       amazon-paapi:  Amazon PA-API, separate credit pool
-       aliexpress-affiliate: free affiliate API, irrelevant to
-         market visibility on flagship products
-     Routing market mode through all of them was burning 4× the
-     credits with no quality benefit. */
-  if (args.mode === "market") {
+  /* --mode=market overrides: filter providers + categories to the
+     focused-enrichment shape. Used by manual `npm run ingest --
+     --mode=market` runs (rarely needed now that the default cron
+     already handles per-category mode inference). */
+  if (args.forceMode === "market") {
     providers = providers.filter((p) => p.id === "serpapi-shopping");
     if (providers.length === 0) {
       console.error("✗ Market mode requires serpapi-shopping provider. Set SERPAPI_KEY and try again.");
@@ -104,12 +116,7 @@ async function main() {
     ? categories.filter((c) => args.categorySlugs!.includes(c.slug))
     : categories.filter((c) => c.slug !== "all");
 
-  /* Market mode runs ONLY on the high-value category whitelist. The
-     rest stay in deals mode (handled by the regular Mon+Thu cron).
-     This keeps the monthly market cron tiny (~30 calls vs 132 for a
-     deal run) and focused on the categories where MSRP visibility
-     actually moves the trust dial. */
-  if (args.mode === "market" && !args.categorySlugs) {
+  if (args.forceMode === "market" && !args.categorySlugs) {
     targetCategories = targetCategories.filter((c) => MARKET_MODE_CATEGORIES.has(c.slug));
   }
 
@@ -142,13 +149,14 @@ async function main() {
     try {
       const acct = await fetchSerpapiAccount(serpapiKey);
       console.log(`▶ SerpAPI credits — plan=${acct.planLeft}, extra=${acct.extraLeft}, total=${acct.totalLeft} (${acct.planName})`);
-      const bufferFraction = args.mode === "market" ? 0.5 : 0;
+      const bufferFraction = args.forceMode === "market" ? 0.5 : 0;
       if (!hasBudget(acct, totalCalls, bufferFraction)) {
         const needed = Math.ceil(totalCalls * (1 + bufferFraction));
-        const reason = args.mode === "market"
+        const reason = args.forceMode === "market"
           ? `Reserving budget for user-facing live-search`
           : `Avoiding partial-run that would leave catalog half-stale`;
-        console.log(`▷ SKIP: ${args.mode} run needs ${needed} credits (${totalCalls} calls${bufferFraction > 0 ? ` + ${Math.ceil(totalCalls * bufferFraction)} buffer` : ""}). Have ${acct.totalLeft}. ${reason}; exiting cleanly. TOP UP at serpapi.com to resume.`);
+        const runLabel = args.forceMode ?? "default";
+        console.log(`▷ SKIP: ${runLabel} run needs ${needed} credits (${totalCalls} calls${bufferFraction > 0 ? ` + ${Math.ceil(totalCalls * bufferFraction)} buffer` : ""}). Have ${acct.totalLeft}. ${reason}; exiting cleanly. TOP UP at serpapi.com to resume.`);
         process.exit(0);
       }
     } catch (err) {
@@ -156,8 +164,9 @@ async function main() {
     }
   }
 
-  console.log(`▶ Ingesting ${args.mode} — ${totalCalls} total searches`);
-  console.log(`  Mode:       ${args.mode}${args.mode === "market" ? " (market lane — drops 'deals' query suffix)" : ""}`);
+  const runLabel = args.forceMode ?? "per-category inference";
+  console.log(`▶ Ingesting (${runLabel}) — ${totalCalls} total searches`);
+  console.log(`  Mode:       ${runLabel}${args.forceMode === "market" ? " (forced market — drops 'deals' suffix)" : !args.forceMode ? ` (high-value cats use market query, others use deals)` : ""}`);
   console.log(`  Providers:  ${providers.map((p) => p.id).join(", ")}`);
   console.log(`  Countries:  ${args.countries.join(", ")}`);
   console.log(`  Categories: ${targetCategories.map((c) => c.slug).join(", ")}`);
@@ -174,11 +183,16 @@ async function main() {
       for (const provider of providers) {
         const label = `[${provider.id}] ${country.padEnd(2)} ${category.name.padEnd(18)}`;
         try {
+          /* Per-category mode — high-value cats query without
+             "deals" suffix to surface full market mix. Other cats
+             keep the suffix for promo density. --mode= override
+             forces all categories to the same mode. */
+          const categoryMode = inferModeForCategory(category.slug, args.forceMode);
           const deals = await provider.searchDeals({
             q: category.name,
             countryCode: country,
             limit: args.perCategoryLimit,
-            mode: args.mode,
+            mode: categoryMode,
           });
 
           // Tag every deal with the source category so /api/deals
