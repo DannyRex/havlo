@@ -66,10 +66,27 @@ const ACCESSORY_NOISE = [
   "screen protector", "tempered glass", "replacement", "repair", "lcd screen",
   "battery replacement", "charger only", "cable only", "adapter only",
   "lens kit", "gimbal",
+  /* Drinkware accessories — added May 2026 v3 after QA report that
+     Stanley searches were anchoring on "Water Bottle Pouch Paint
+     Series for Stanley Quencher" (an accessory) instead of the
+     Stanley Quencher tumbler itself. */
+  "water bottle pouch", "tumbler pouch", "tumbler sleeve", "tumbler boot",
+  "silicone boot", "silicone sleeve", "straw cover", "straw replacement",
+  "lid replacement", "spare part", "spare parts", "replacement straw",
+  "replacement lid",
 ];
+
+/* Pattern: "for {brand}" — flags accessories whose title doesn't
+   include an obvious accessory keyword but explicitly markets itself
+   AS for a major brand (e.g. "Carry Bag for Yeti Rambler",
+   "Anti-slip Grip for AirPods Max"). Tight on the brand list — only
+   brands where this pattern is reliably accessory rather than
+   legitimate co-marketing. */
+const FOR_BRAND_PATTERN = /\bfor\s+(stanley\s*quencher|stanley\s*ice\s*flow|stanley\s*iceflow|yeti\s+rambler|hydroflask|owala\s*freesip|airpods|iphone\s*\d|macbook|galaxy\s*s\d|nintendo\s*switch|ps[45]|xbox|playstation)\b/i;
 
 export function looksLikeAccessory(title: string): boolean {
   const t = title.toLowerCase();
+  if (FOR_BRAND_PATTERN.test(t)) return true;
   return ACCESSORY_NOISE.some((kw) => {
     const pattern = new RegExp(`(^|[^a-z])${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z]|$)`);
     return pattern.test(t);

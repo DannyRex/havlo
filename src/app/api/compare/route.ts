@@ -353,12 +353,23 @@ export async function GET(req: NextRequest) {
            the original empty result so the empty-state UI renders
            sensibly. */
         if (synthFiltered.mode === "similar") {
-          return NextResponse.json(synthFiltered, { headers });
+          return NextResponse.json(
+            { ...synthFiltered, displayCurrency: country.currency, displayCountry: country.code },
+            { headers },
+          );
         }
       }
     }
 
-    return NextResponse.json(filtered, { headers });
+    /* displayCurrency / displayCountry — tells downstream consumers
+       (and any external API user) what currency the frontend converts
+       offers to before rendering. Items' raw `currency` is the
+       ingest-time stored value; displayCurrency is the user-visible
+       currency. See /api/deals for matching doc. */
+    return NextResponse.json(
+      { ...filtered, displayCurrency: country.currency, displayCountry: country.code },
+      { headers },
+    );
   } catch (err) {
     console.error("[/api/compare]", err);
     return NextResponse.json(

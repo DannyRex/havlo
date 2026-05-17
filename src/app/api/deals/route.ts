@@ -629,7 +629,27 @@ export async function GET(req: NextRequest) {
     }
 
     return new Response(
-      JSON.stringify({ items, total, hasMore, originCounts, stores: storesAggregate, provider: provider.id, suggestions }),
+      JSON.stringify({
+        items,
+        total,
+        hasMore,
+        originCounts,
+        stores: storesAggregate,
+        provider: provider.id,
+        suggestions,
+        /* displayCurrency — the currency every item SHOULD be presented
+           in to the requesting visitor. Added May 2026 v3 to harden
+           the latent risk for downstream API consumers. Items still
+           carry their raw `currency` field (USD / NGN as stored at
+           ingest) — that's the source-of-truth from the ingest path.
+           displayCurrency tells consumers what the FRONTEND
+           converts to before render via formatPriceForUser /
+           formatLocal helpers. Without this, an external consumer
+           reading the API would see currency="USD" for a UK
+           retailer row and incorrectly display $ instead of £. */
+        displayCurrency: country.currency,
+        displayCountry:  country.code,
+      }),
       {
         status: 200,
         headers: {

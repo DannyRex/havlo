@@ -372,7 +372,10 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
         <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-ink-3 mb-0.5 sm:mb-1 leading-none min-w-0">
           <span className="font-medium text-ink-2 truncate">{displayStore}</span>
           <span aria-hidden="true" className="shrink-0 hidden sm:inline">·</span>
-          <span className="shrink-0 hidden sm:inline">{timeAgo(deal.postedAt)}</span>
+          {/* suppressHydrationWarning — timeAgo reads Date.now() at
+              render. SSR/CSR can disagree at minute/day boundaries.
+              Visual UX identical; this just silences the warning. */}
+          <span className="shrink-0 hidden sm:inline" suppressHydrationWarning>{timeAgo(deal.postedAt)}</span>
         </div>
 
         <p className="text-[12px] sm:text-[13px] font-medium text-ink leading-snug line-clamp-2 mb-1 sm:mb-1.5 tracking-[-0.005em]">

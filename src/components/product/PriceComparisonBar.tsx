@@ -597,7 +597,14 @@ export default function PriceComparisonBar({
             Lowest tracked: <span className="font-semibold text-ink tabular-nums">
               {formatPriceForUser(priceHistory.allTimeLowNgn, country)}
             </span>
-            <span className="text-ink-3"> · {timeAgo(priceHistory.allTimeLowAt)}</span>
+            {/* suppressHydrationWarning — timeAgo reads Date.now()
+                at render time. SSR happens at server T0, hydration at
+                client T1, so the relative string can differ across a
+                day boundary or even a minute boundary depending on
+                cron timing. The mismatch is visually identical to
+                the user but React strict mode raises a hydration
+                warning. */}
+            <span className="text-ink-3" suppressHydrationWarning> · {timeAgo(priceHistory.allTimeLowAt)}</span>
             {priceHistory.thisStoreLowNgn !== undefined
               && priceHistory.thisStoreLowNgn < thisPriceNgn
               && priceHistory.allTimeLowStoreId !== thisStoreId && (
@@ -630,7 +637,12 @@ export default function PriceComparisonBar({
           {confidence.label}
         </span>
         {lastCheckedAt && (
-          <span className="inline-flex items-center gap-1 text-ink-3">
+          /* suppressHydrationWarning — same reason as above:
+             timeAgo reads Date.now() at render so the relative
+             string ("4d ago" vs "5d ago" at a day boundary) can
+             differ between SSR and CSR. Visual UX is identical;
+             the suppress just silences the warning. */
+          <span className="inline-flex items-center gap-1 text-ink-3" suppressHydrationWarning>
             <span aria-hidden="true">·</span>
             Verified {timeAgo(lastCheckedAt)}
           </span>

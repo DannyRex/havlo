@@ -187,7 +187,9 @@ export default function ListCard({ deal, linkHref }: Props) {
         <div className="flex items-center gap-1 text-[11px] text-ink-3 leading-none">
           <span className="font-medium truncate text-ink-2">{displayStore}</span>
           <span aria-hidden="true">·</span>
-          <span className="shrink-0">{timeAgo(deal.postedAt)}</span>
+          {/* suppressHydrationWarning — same SSR/CSR Date.now()
+              divergence as the masonry version. */}
+          <span className="shrink-0" suppressHydrationWarning>{timeAgo(deal.postedAt)}</span>
         </div>
 
         <p className="mt-1.5 text-[13px] font-medium text-ink leading-snug line-clamp-2 tracking-[-0.005em]">
