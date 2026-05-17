@@ -79,6 +79,13 @@ const HOST_REFERER: Record<string, string> = {
      enforce Referer; sending the original would also be fine but
      omitting it avoids leaking the user's browsing context. */
   "amazonaws.com":                    "",
+  /* SerpAPI cache CDN — google_images responses occasionally return
+     a serpapi.com/searches/{id}/images/{token}.jpeg cached URL
+     instead of the original merchant CDN. Open access, no Referer
+     enforcement. Without this entry the proxy 403'd those rows
+     even though the source returned 200 → users saw the Havlo H
+     fallback on every affected PDP. May 2026 v3. */
+  "serpapi.com":                      "",
 };
 
 /* Reasonable upper bound for cache lifetime. Product images don't
