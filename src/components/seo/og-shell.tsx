@@ -57,26 +57,35 @@ export function OgShell({
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      {/* Wordmark */}
+      {/* Wordmark — uses the real /icon.png brand mark (chrome "h"
+          on dark ground) instead of the geometric SVG placeholder
+          that was here before. ImageResponse's renderer (Satori)
+          accepts <img> with a fully-qualified URL; SITE_URL is
+          hardcoded since edge-runtime can't read process.env at
+          render time and OG cards always render against prod.
+
+          Note: img must be wrapped in a div with display: flex to
+          satisfy Satori's layout requirements. */}
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <div
           style={{
             width: 44,
             height: 44,
             borderRadius: 10,
-            background: "#0057FF",
+            overflow: "hidden",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <svg width="28" height="28" viewBox="0 0 64 64">
-            <g fill="#FFFFFF">
-              <rect x="18" y="15" width="7" height="34" rx="1.5" />
-              <rect x="18" y="26" width="27" height="7" rx="1.5" />
-              <rect x="38" y="26" width="7" height="23" rx="1.5" />
-            </g>
-          </svg>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://havlo.io/icon.png"
+            alt="Havlo"
+            width={44}
+            height={44}
+            style={{ width: 44, height: 44, objectFit: "cover" }}
+          />
         </div>
         <span style={{ fontSize: 32, fontWeight: 700, letterSpacing: -0.5 }}>
           havlo
