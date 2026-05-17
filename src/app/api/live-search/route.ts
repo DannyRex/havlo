@@ -77,29 +77,63 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Run all providers in parallel; per-provider failures don't break the request
-  const results = await Promise.allSettled(
-    providers.map((p) => p.searchDeals({ q, countryCode, limit })),
+  /* Sequential provider call with early-exit (May 2026 v3).
+     Previously fired all providers in parallel via Promise.allSettled,
+     burning a SerpAPI credit per provider per call — even when the
+     first provider's results were sufficient.
+
+     New behaviour: walk providers in cost-priority order (cheapest
+     first), stop as soon as we have ENOUGH_FOR_USER results. Typical
+     case: first provider returns 10+ results → other providers never
+     fire → 1 credit per query instead of 3-4.
+
+     Provider cost order (cheapest first):
+       1. aliexpress-affiliate (FREE — affiliate API, no SerpAPI)
+       2. amazon-paapi          (separate credit pool, often free tier)
+       3. serpapi-shopping      (paid, $0.005/call)
+       4. serpapi-jumia         (paid, $0.005/call)
+
+     Each successful provider counts toward the SerpAPI soft cap (only
+     paid providers). Failures don't break the request; we just continue
+     to the next provider. */
+  const ENOUGH_FOR_USER = Math.max(8, Math.ceil(limit * 0.6));
+  const COST_ORDER: Record<string, number> = {
+    "aliexpress-affiliate": 0,
+    "amazon-paapi":         1,
+    "serpapi-shopping":     2,
+    "serpapi-jumia":        3,
+  };
+  const sortedProviders = [...providers].sort((a, b) =>
+    (COST_ORDER[a.id] ?? 99) - (COST_ORDER[b.id] ?? 99)
   );
 
-  /* Record one credit per provider that succeeded (each provider
-     call hits its own upstream API). Fire-and-forget — the counter
-     is a soft cap; missing a write isn't a correctness issue. */
-  const successfulProviderCount = results.filter((r) => r.status === "fulfilled").length;
-  if (successfulProviderCount > 0) {
-    void recordSerpApiCall(successfulProviderCount);
+  const items: Deal[] = [];
+  let paidProviderCallCount = 0;
+  for (const provider of sortedProviders) {
+    if (items.length >= ENOUGH_FOR_USER) {
+      /* Have enough — skip remaining providers entirely. This is the
+         primary cost-saver: in the typical case where AliExpress (free)
+         and Amazon PA-API return ~10-15 results, the SerpAPI providers
+         never fire. */
+      break;
+    }
+    try {
+      const providerResults = await provider.searchDeals({ q, countryCode, limit });
+      items.push(...providerResults);
+      if (provider.id.includes("serpapi")) paidProviderCallCount++;
+    } catch (err) {
+      if (err instanceof ProviderError) {
+        console.warn(`[live-search] ${provider.id} failed:`, err.message);
+      } else {
+        console.warn(`[live-search] ${provider.id} threw:`, err);
+      }
+    }
   }
 
-  const items = results.flatMap((r, i) => {
-    if (r.status === "fulfilled") return r.value;
-    const provider = providers[i];
-    if (r.reason instanceof ProviderError) {
-      console.warn(`[live-search] ${provider.id} failed:`, r.reason.message);
-    } else {
-      console.warn(`[live-search] ${provider.id} threw:`, r.reason);
-    }
-    return [];
-  });
+  /* Record paid SerpAPI calls only (free providers don't count). */
+  if (paidProviderCallCount > 0) {
+    void recordSerpApiCall(paidProviderCallCount);
+  }
 
   // Lightweight URL-based dedupe across providers
   const seen = new Set<string>();
@@ -214,20 +248,24 @@ export async function GET(req: NextRequest) {
     void persistLiveResults(q, countryCode, priceFiltered);
   }
 
-  /* Edge-cache aggressively. Was s-maxage=300 / swr=900 (5min / 15min).
-     Bumped to 1h / 1d because:
-       - SerpAPI calls cost real $$ per request
-       - Most product prices don't move enough in 1h to matter
-       - stale-while-revalidate keeps responses instant; the
-         background revalidation runs at most once per hour per
-         unique query per region
-     User-visible UX is faster (warm cache); revenue-side $$ drops. */
+  /* Edge-cache aggressively. Cadence history:
+       Initial: s-maxage=300 / swr=900    (5min / 15min)
+       v2:      s-maxage=3600 / swr=86400 (1h / 1d)
+       v3:      s-maxage=21600 / swr=604800 (6h / 7d, May 2026)
+
+     v3 reasoning: live-search calls are the variable-cost lane (SerpAPI
+     billed per request). Most live queries are flagship products whose
+     prices don't move within a 6-hour window. The 7-day SWR keeps
+     responses instant for an entire week even when the cached value is
+     stale — the revalidation runs at most once per 6h per unique query
+     per region. Per-query SerpAPI cost drops from ~24 calls/day to ~4
+     calls/day for hot queries. */
   return NextResponse.json(
     {
       items: itemsForResponse,
       providers: providers.map((p) => p.id),
     },
-    { headers: { "Cache-Control": "s-maxage=3600, stale-while-revalidate=86400" } },
+    { headers: { "Cache-Control": "s-maxage=21600, stale-while-revalidate=604800" } },
   );
 }
 
