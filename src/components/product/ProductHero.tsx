@@ -292,7 +292,7 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
           </div>
           {secondaryStr && (
             <p className="text-sm text-ink-3 mt-1 tabular-nums">
-              {secondaryStr} <span className="text-ink-3/70">in {offer.currency}</span>
+              {secondaryStr}
             </p>
           )}
           {hasDiscount && savingsAbs > 0 && (

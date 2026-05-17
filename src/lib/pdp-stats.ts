@@ -95,6 +95,7 @@ export function computeAnchorStats(
   anchorOffers: StoreOffer[],
   anchorPriceNgn: number,
   country: Country,
+  family?: string | null,
 ): AnchorStats {
   const countryFiltered = country.code === "ng"
     ? anchorOffers
@@ -102,20 +103,20 @@ export function computeAnchorStats(
 
   const deduped = dedupAnchorOffers(countryFiltered, country);
 
-  /* Outlier filter — defense against over-merged products in the DB.
-     QA report May 2026 found a PDP whose product_id contained a £14
-     accessory listing alongside the real £400+ Dyson V11 offers (the
-     accessory was mis-signed at ingest and merged by the resignature
-     script before the price-spread guard was added). At render time
-     we don't have access to re-validate the merge, but we can refuse
-     to plot an offer whose effective price is more than 4× off the
-     anchor or more than 4× off the median offer.
+  /* Outlier filter — defense against over-merged products in the DB
+     AND against legitimate-but-misleading storage-tier spreads (the
+     QA report May 2026 caught Galaxy S24 Ultra showing 2.27× because
+     256GB and 1TB share product_id by design — color/storage are
+     intentionally not part of the signature key).
 
-     Median chosen over mean because a single £14 outlier wrecks the
-     mean for a 5-offer spectrum. 4× chosen to match the resignature
-     guard's MAX_GROUP_RATIO. Cross-border landed prices are used so
-     the comparison apples-to-apples in the user's currency. */
-  const ANCHOR_OUTLIER_RATIO = 4;
+     Tightened to a family-aware band so phones/electronics get a
+     2.5× ceiling (catches storage-tier outliers without losing
+     legitimate cross-store price variation) while fashion/beauty
+     stay at 4× (real cross-store spread is wider there). */
+  const ANCHOR_OUTLIER_RATIO =
+    family === "fashion"  || family === "beauty"  || family === "sports" ? 4 :
+    family === "home"     || family === "appliances" || family === "health" ? 3 :
+    /* phones, electronics, computing, audio, gaming, default */         2.5;
   const offerPrices = deduped.map((o) => effectiveLandedPrice(o, country)).filter((p) => p > 0);
   let medianPrice = 0;
   if (offerPrices.length > 0) {

@@ -544,6 +544,7 @@ export default async function ProductPage({ params }: PageProps) {
     augmentedAnchorOffers,
     anchorPriceNgn,
     country,
+    offer.category_slug ?? null,
   );
 
   /* Strip variants from the "You may also like" rail. They're now

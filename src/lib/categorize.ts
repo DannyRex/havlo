@@ -340,6 +340,11 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
      "T-Shirts", "T shirts". `tee\s*(shirt|top|dress)` matches "Tee
      shirt", "Tee top", "Tee dress" without false-matching golf "tee". */
   { pattern: /\b(t[-\s]?shirts?|tee[-\s]?shirts?|tee\s+(top|dress|shirt))\b/i, slug: "fashion", reason: "tee shirt" },
+  /* No-space concatenations — Konga / Jumia titles often pipe-
+     concatenate without a space ("PoloShirt|Turquoise", "TShirtMen").
+     Word-boundary regex misses these because there's no boundary
+     between the words. Match the compound forms explicitly. */
+  { pattern: /\b(polo|t|tee|sweat|under|night|swim|sport|gym|dress|work)shirts?\b/i, slug: "fashion", reason: "concatenated shirt compound" },
   /* Generic "shirt" — only when paired with a clothing qualifier
      so it doesn't catch "shirt-pocket", "shirt cable" (a real
      AliExpress phone-cable listing), etc. */
