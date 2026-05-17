@@ -155,7 +155,13 @@ async function synthesizeAnchorFromOfferRow(row: OfferRow): Promise<SearchOutput
     mode:   "similar",
     query:  row.title,
     anchor,
-    dupes:  partition.otherProducts,
+    /* Include siblings + cross-brand in the rail. Cheaper-only price
+       filter upstream keeps more-expensive siblings (Plus, Ultra,
+       Pro Max) out automatically; what survives is genuinely-cheaper
+       same-line variants (M3 vs M4, S23 vs S24) which ARE legit
+       alternatives. See pgFtsFindByProductId for the matching
+       comment + reasoning. */
+    dupes:  [...partition.siblingVariants, ...partition.otherProducts],
   };
 }
 

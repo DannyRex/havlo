@@ -982,9 +982,6 @@ export async function pgFtsFindByProductId(
     max_results: 60,
   });
 
-  const anchorVariants     = extractVariantTokens(anchor.title);
-  const anchorNumbers      = extractRequiredNumbers(anchor.title);
-  const anchorModelTokens  = extractRequiredModelTokens(anchor.title);
   const anchorBrand        = anchor.brand ?? extractQueryBrand(anchor.title);
   const anchorFamily       = detectQueryFamily(anchor.title);
   const anchorIsAccessory  = looksLikeAccessory(anchor.title);
@@ -1010,14 +1007,27 @@ export async function pgFtsFindByProductId(
        must match. Skipped when family is null (allows broad
        'gift for mum'-style anchors to surface anything). */
     .filter((r) => !anchorFamily || detectFamily(r.title) === anchorFamily)
-    /* Variant gate: 'pro max' / 'ultra' / 'plus' must be honoured. */
-    .filter((r) => candidateHasAllVariants(r.title, anchorVariants))
-    /* Generation gate: 'iPhone 15' must NOT match 'iPhone 16' rows. */
-    .filter((r) => candidateHasAllNumbers(r.title, anchorNumbers))
-    /* Model-token gate: 'Galaxy S24' must NOT match 'Galaxy S25' rows. */
-    .filter((r) => candidateHasAllModelTokens(r.title, anchorModelTokens))
     /* Brand gate: a Nike anchor must surface Nike alternatives. */
     .filter((r) => candidateHasBrand(r.title, anchorBrand))
+    /* Variant / number / model-token gates REMOVED from this path
+       May 2026 v3 — they were rejecting legitimate cross-tier
+       alternatives. For a 'MacBook Air M4' anchor with pid set,
+       candidates like 'MacBook Air M3' (different chip generation)
+       were filtered out, leaving the cheaper-alternatives rail
+       empty. User report: pid-anchored /compare?q=MacBook+Air+M4
+       returned 0 dupes despite plenty of related products.
+
+       The partitionDupesByVariantMatch call below already correctly
+       separates same-product (spectrum) from siblings (excluded
+       from rail) from cross-tier alternatives (the rail itself).
+       Pre-filtering by variant tokens here was strictness applied
+       twice; the partition handles it correctly without us
+       constraining the candidate set first.
+
+       Mirrors the lenient mode added to pgFtsFindDupes in v3.
+       Strict pid lookup still benefits from family + brand + price
+       + accessory gates above — those are correctness, not
+       relevance, filters. */
     /* Family compatibility — drops cross-family same-brand rows
        (Nike Dunk → Nike Crew Socks). alternativeFamilyMatches is
        stricter than familiesIncompatible for the dupes path. */
@@ -1069,10 +1079,19 @@ export async function pgFtsFindByProductId(
     mode: "similar",
     query: anchorPayload.title,
     anchor: augmentedAnchor,
-    /* Dupes rail loses variants — they're now on the anchor card
-       directly. Genuinely different products (different size,
-       different generation) stay. */
-    dupes: partition.otherProducts,
+    /* Cheaper-alternatives rail (May 2026 v3): include BOTH siblings
+       and cross-brand alternatives. The cheaper-only price filter
+       upstream already prevents 'iPhone 15 Plus' (more expensive)
+       from polluting the rail when looking at iPhone 15 — only
+       siblings that ARE cheaper survive (iPhone 14 vs 15, MacBook
+       Air M3 vs M4, Galaxy S23 vs S24). Those are legitimate
+       cheaper alternatives that users want to see.
+
+       Previously the rail was only partition.otherProducts which
+       stripped ALL siblings — leaving rails empty for any anchor
+       with mostly same-line cheaper variants (the QA-reported
+       MacBook Air M4 / iPhone 15 cases). */
+    dupes: [...partition.siblingVariants, ...partition.otherProducts],
   };
 }
 
