@@ -151,11 +151,17 @@ export default function DupeCard({
                     (3C Hub, etc.) so the logo stays visible inside the
                     light bg-surface-2 chip in light mode. Shared util
                     keeps DupeCard / PriceResults / StoreLogo in sync. */}
-                <Image
+                {/* Plain <img> — 16×16 store logos don't benefit
+                    enough from next/image's optimizer to justify
+                    a transformation each. Avoids the Vercel cap. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                   src={bestOffer.storeLogoUrl}
                   alt=""
                   width={16}
                   height={16}
+                  loading="lazy"
+                  decoding="async"
                   className={`object-contain ${storeLogoInvertClass(bestOffer.storeId)}`}
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                 />
@@ -221,12 +227,16 @@ export default function DupeCard({
                     className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border hover:border-border-strong hover:bg-surface-2 transition-colors text-[11px]"
                   >
                     <div className="w-4 h-4 rounded overflow-hidden bg-surface-2 shrink-0 flex items-center justify-center">
-                      {/* Same invert rule as the primary CTA above. */}
-                      <Image
+                      {/* Same invert rule as the primary CTA above.
+                          Plain <img> to skip Vercel transform cap. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
                         src={offer.storeLogoUrl}
                         alt=""
                         width={16}
                         height={16}
+                        loading="lazy"
+                        decoding="async"
                         className={`object-contain ${storeLogoInvertClass(offer.storeId)}`}
                         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                       />

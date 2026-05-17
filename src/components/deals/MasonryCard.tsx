@@ -98,32 +98,34 @@ function ResilientImage({ deal, priority }: { deal: Deal; priority: boolean }) {
      skips the proxy. */
   const imgSrc = proxiedImageUrl(deal.imageUrl);
 
-  /* next/image instead of raw <img> — PSI flagged "Improve image
-     delivery — Est savings of 157 KiB" on May 2026 perf audit.
-     Wrapping with next/image gets:
-       - Automatic AVIF / WebP conversion (~50% smaller than the JPEG
-         upstream CDNs serve)
-       - Responsive srcset so mobile gets a 320px-wide variant
-         instead of the 1500px CDN original
-       - Edge cache via Vercel's image optimizer so the second visitor
-         skips the upstream waterfall entirely
-     Composes with /api/img-proxy: next/image fetches the proxy URL,
-     the proxy fetches with the right Referer, next/image transforms
-     and caches. First hit slightly slower, every subsequent hit fast. */
+  /* Was next/image (PSI flagged ~157 KiB savings from AVIF/WebP).
+     Switched to plain <img> May 2026 v3 after the Vercel free-tier
+     transformation cap exhausted (5K/mo). The masonry renders 16
+     cards per /deals page load × thousands of unique products =
+     the largest transformation consumer in the codebase. Skipping
+     the optimizer is the single biggest cap saver.
+
+     Trade-offs accepted:
+       - No AVIF/WebP conversion (JPG/PNG serves as-is from CDN)
+       - No responsive srcset (mobile downloads larger asset)
+       - Loses ~150 KiB per card in modern browsers
+     Mitigations in play:
+       - /api/img-proxy still handles hotlink-block defense
+       - loading="lazy" defers below-fold images
+       - fetchPriority="high" preserves LCP signal for top cards
+
+     Re-enable next/image when the Vercel plan can absorb the cost
+     (Pro tier = 50K transformations/month, ~10× current need). */
   return (
-    <Image
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
       src={imgSrc}
       alt={altText}
-      fill
-      /* sizes: tell the optimizer what render size to expect at each
-         breakpoint so it picks the right srcset entry. Matches the
-         columns-2/3/4 layout in TrendingDeals: 50vw mobile (2-col),
-         33vw tablet (3-col), 25vw desktop (4-col), then capped by
-         the max-w-7xl container width on very wide viewports. */
-      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-      priority={priority}
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : "auto"}
+      decoding="async"
       onError={() => setFailed(true)}
-      className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05] motion-reduce:group-hover:scale-100"
+      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05] motion-reduce:group-hover:scale-100"
     />
   );
 }

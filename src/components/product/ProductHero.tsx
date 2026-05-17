@@ -201,20 +201,24 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
       {/* ── Image column ─────────────────────────────────────────── */}
       <div className="relative aspect-square md:aspect-[4/5] rounded-2xl sm:rounded-3xl bg-surface-2 border border-border overflow-hidden">
         {imgSrc && !imgFailed ? (
-          <Image
+          /* Plain <img> (May 2026 v3) — was next/image with priority.
+             Vercel free-tier image transformation cap (5K/mo) was
+             exhausted; LCP candidates kept erroring on new variants.
+             The trade-off is no AVIF/WebP for PDP hero images, but
+             the PDP renders one hero per page so the cumulative
+             bandwidth impact is negligible. fetchPriority="high"
+             still gives LCP its preload signal.
+             object-contain + absolute fill keeps small source images
+             (300-500px from Jumia/Konga/SerpAPI) from upscaling blur. */
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
             src={imgSrc}
             alt={cleanedTitle.slice(0, 120)}
-            fill
-            sizes="(max-width: 768px) 100vw, 50vw"
-            priority
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
             onError={() => setImgFailed(true)}
-            /* object-contain so small source images (often 300-500px
-               from Jumia / Konga / SerpAPI snippets) display at
-               native size without upscaling blur. The bg-surface-2
-               around small images is intentional — better breathing
-               room than fuzzy pixels. Large images still fill the
-               frame naturally. */
-            className="object-contain p-3 sm:p-4"
+            className="absolute inset-0 w-full h-full object-contain p-3 sm:p-4"
           />
         ) : (
           /* Havlo logo fallback matches MasonryCard's ResilientImage

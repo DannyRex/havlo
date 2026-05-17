@@ -89,19 +89,26 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
       <div className="relative rounded-2xl border border-border bg-surface p-4 sm:p-6 overflow-hidden">
 
         <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
-          {/* Image — LCP candidate on /compare for clicks landing
-              via PDP CTAs, so next/image with priority cuts a
-              ~200ms decode + paint. width/height match the
-              sm:w-28 / sm:h-28 cell (112px CSS, 224 for retina). */}
+          {/* Image — was next/image with priority for LCP. Switched
+              to plain <img> May 2026 v3 after the Vercel free-tier
+              transformation cap exhausted (5K/month). The anchor
+              card renders ONE image per /compare load, but external
+              CDN URLs (SerpAPI gstatic, Amazon CDN, etc.) need a
+              fresh transformation per unique URL. Skipping the
+              optimizer avoids broken-image holes during the rest
+              of the cycle. Trade-off: image not AVIF/WebP-converted,
+              but next/image's value on a single static-aspect cell
+              was modest anyway. */}
           {anchor.imageUrl ? (
             <div className="relative w-full sm:w-28 h-40 sm:h-28 rounded-xl overflow-hidden flex-shrink-0 bg-white">
-              <Image
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
                 src={anchor.imageUrl}
                 alt={anchor.title}
-                fill
-                sizes="(max-width: 640px) 100vw, 112px"
-                priority
-                className="object-contain p-2"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                className="absolute inset-0 w-full h-full object-contain p-2"
               />
             </div>
           ) : (

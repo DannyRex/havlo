@@ -122,9 +122,12 @@ export default function PriceResults({
                   etc.) stay visible against light bg-surface-2 in
                   light mode. */}
               <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-surface-2 p-1.5 shrink-0">
-                <Image src={p.storeLogoUrl} alt={p.storeName} width={28} height={28}
-                       className={`object-contain ${storeLogoInvertClass(p.storeId)}`}
-                       onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                {/* Plain <img> — skip Vercel transform for 28×28 logo. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.storeLogoUrl} alt={p.storeName} width={28} height={28}
+                     loading="lazy" decoding="async"
+                     className={`object-contain ${storeLogoInvertClass(p.storeId)}`}
+                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
               </div>
 
               {/* Product thumbnail from this store (helps verify it's the same item) */}

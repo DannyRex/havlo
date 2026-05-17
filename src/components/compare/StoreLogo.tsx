@@ -70,11 +70,18 @@ export default function StoreLogo({
   return (
     <div className={cellClass} style={{ width: size, height: size }}>
       {!failed && storeLogoUrl ? (
-        <Image
+        /* Plain <img> — skip Vercel transform cap for store logo
+           thumbnails. These render dozens of times per page (compare,
+           PDP spectrum, deals grid) and aren't AVIF/WebP candidates
+           (PNGs already optimized). */
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
           src={storeLogoUrl}
           alt={storeName}
           width={inner}
           height={inner}
+          loading="lazy"
+          decoding="async"
           className={`object-contain ${invertClass}`}
           onError={() => setFailed(true)}
         />
