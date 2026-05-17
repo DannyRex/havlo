@@ -655,6 +655,13 @@ export async function GET(req: NextRequest) {
         headers: {
           "Content-Type":  "application/json",
           "Cache-Control": cacheControlHeader,
+          /* Vary on Accept-Encoding so the CDN keeps a single
+             compressed variant per encoding (gzip / br). Without
+             this, Vercel can serve an uncompressed body to a client
+             whose Accept-Encoding negotiated brotli — Vary tells the
+             edge cache that the response varies by encoding. Added
+             May 2026 v3 along with the egress-relief push. */
+          "Vary":            "Accept-Encoding",
           /* Diagnostic header so we can grep nginx / Vercel logs for
              fallback hits and know when to investigate the RPC. */
           "X-Havlo-Degraded": looksLikeCuratedFallback ? "curated-fallback" : "ok",

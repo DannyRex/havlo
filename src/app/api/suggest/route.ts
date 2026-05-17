@@ -23,6 +23,15 @@ export async function GET(req: NextRequest) {
      minutes drop function executions ~10× per query. */
   return NextResponse.json(
     { items },
-    { headers: { "Cache-Control": "private, s-maxage=600, stale-while-revalidate=86400" } },
+    {
+      headers: {
+        "Cache-Control": "private, s-maxage=600, stale-while-revalidate=86400",
+        /* Vary on Accept-Encoding so the edge keeps a single
+           brotli'd variant per query — without it, a brotli-
+           capable client could be served the gzip variant or
+           uncompressed bytes. Added May 2026 v3. */
+        "Vary":          "Accept-Encoding",
+      },
+    },
   );
 }

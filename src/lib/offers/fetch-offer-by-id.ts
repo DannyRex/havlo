@@ -64,10 +64,20 @@ export async function fetchOfferById(offerId: string): Promise<OfferRow | null> 
   const supa = getSupabaseAdmin();
 
   if (supa) {
-    /* (1) product_best_offers view — the hot path. */
+    /* (1) product_best_offers view — the hot path. Explicit column
+       list (was .select("*") before May 2026 v3 egress pass) so we
+       don't drag along source_country, store_country, or is_deal —
+       the view exposes those for filter pushdown in browse-db.ts but
+       this single-row fetch never reads them. ~57 bytes/row saved
+       across ~50% of PDP hits.
+
+       NOTE: must be a single string literal — Supabase's typed
+       client narrows the result shape by parsing the column list at
+       compile time, and concatenated strings collapse the inferred
+       type to GenericStringError. */
     const { data: viewRow } = await supa
       .from("product_best_offers")
-      .select("*")
+      .select("product_id, offer_id, store_id, url, current_price, original_price, discount_percent, currency, scraped_at, title, category_slug, brand, image_url, store_name, store_logo_url, is_international")
       .eq("offer_id", offerId)
       .maybeSingle();
 

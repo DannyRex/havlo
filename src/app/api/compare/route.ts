@@ -23,7 +23,14 @@ import type { SearchOutput, ProductGroup, DupeResult, StoreOffer } from "@/lib/s
    product catalog refreshes Mon+Thu, and a 1h cache window with
    1d SWR means hot queries hit our function ~24× per day instead
    of ~720× per day. Big CPU saving with negligible UX impact. */
-const headers = { "Cache-Control": "s-maxage=3600, stale-while-revalidate=86400" };
+/* Vary: Accept-Encoding so the CDN keeps a single compressed variant
+   per encoding (gzip/br) instead of serving an uncompressed body to
+   a client whose Accept-Encoding negotiated brotli. Added May 2026
+   v3 alongside the Supabase egress trim. */
+const headers = {
+  "Cache-Control": "s-maxage=3600, stale-while-revalidate=86400",
+  "Vary":          "Accept-Encoding",
+};
 
 /* ── oid fallback — synthesize a single-offer anchor from an
    OfferRow when pid + FTS both miss.

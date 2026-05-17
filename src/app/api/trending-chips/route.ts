@@ -25,6 +25,10 @@ export async function GET(): Promise<NextResponse> {
       {
         headers: {
           "Cache-Control": "s-maxage=3600, stale-while-revalidate=86400",
+          /* CDN keeps one gzipped + one brotli'd variant. Without
+             this, the edge can serve uncompressed bytes to a client
+             that negotiated brotli. Added May 2026 v3. */
+          "Vary":          "Accept-Encoding",
         },
       },
     );
