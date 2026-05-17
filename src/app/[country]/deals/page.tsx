@@ -98,7 +98,11 @@ async function fetchInitialDeals(
      * cache-hit visits, ~1.5s for the 1-in-60s cache-miss visitor.
      */
     const url = `${proto}://${host}/api/deals?${qs.toString()}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    /* revalidate bumped May 2026 v3 (60s → 600s) for Fluid CPU
+       relief. Matches /api/deals own s-maxage=600 so the two
+       caches align — no point hitting the API more frequently
+       than the API itself wants to revalidate. */
+    const res = await fetch(url, { next: { revalidate: 600 } });
     if (!res.ok) return null;
     const j = await res.json();
     return {

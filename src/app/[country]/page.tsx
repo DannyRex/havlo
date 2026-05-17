@@ -28,7 +28,11 @@ import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList } from "@/lib/se
 
    The trending shuffle still rotates because the underlying ranker
    uses popularity_score that updates with click telemetry. */
-export const revalidate = 1800;
+/* Bumped May 2026 v3 (1800s → 3600s) for Vercel Fluid CPU relief.
+   The country home doesn't need minute-level freshness — Mon+Thu
+   ingest is the real source of new content, so any stale window
+   between cron runs is invisible to users. */
+export const revalidate = 3600;
 
 export function generateStaticParams() {
   return COUNTRIES.map((c) => ({ country: c.code }));

@@ -57,7 +57,13 @@ import type { Deal } from "@/types";
    on every request. 1 hour is a sensible default — the underlying
    price/availability changes slowly enough that an hour of staleness
    is invisible to users, and the warm cache keeps SSR latency low. */
-export const revalidate = 3600;
+/* ISR window bumped May 2026 v3 from 1h → 6h to cut Vercel Fluid
+   Active CPU. PDP content (anchor offer + dupes + price-history)
+   changes slowly — Mon+Thu ingest is the only real source of
+   freshness, and any stale window between cron runs is irrelevant
+   to user trust. 6h means each unique PDP regenerates ~4× per day
+   instead of ~24×. */
+export const revalidate = 21600;
 
 interface PageProps {
   params: { country: string; id: string };
@@ -247,12 +253,15 @@ export default async function ProductPage({ params }: PageProps) {
        spectrum-bound subset. */
     async (title: string) => pgFtsFindDupes(title, 0, { limit: 20, strict: false }),
     ["pdp-dupes"],
-    { revalidate: 300, tags: ["pdp-dupes"] },
+    /* TTL bumped May 2026 v3 (300s → 1800s) for Fluid CPU relief.
+       Dupes pool changes only on ingest, fine to cache 30min. */
+    { revalidate: 1800, tags: ["pdp-dupes"] },
   );
   const fetchAnchorOffersCached = unstable_cache(
     async (productId: string) => pgFtsAnchorOffersByProductId(productId),
     ["pdp-anchor-offers"],
-    { revalidate: 300, tags: ["pdp-anchor-offers"] },
+    /* TTL bumped May 2026 v3 (300s → 1800s) for Fluid CPU relief. */
+    { revalidate: 1800, tags: ["pdp-anchor-offers"] },
   );
   const [dupes, anchorOffers] = await Promise.all([
     fetchDupesCached(offer.title),
@@ -435,7 +444,7 @@ export default async function ProductPage({ params }: PageProps) {
         return deals;
       },
       ["pdp-fallback"],
-      { revalidate: 300, tags: ["pdp-fallback"] },
+      { revalidate: 1800, tags: ["pdp-fallback"] },
     );
     const raw = await fetchFallbackCached(offer.category_slug, country.code);
     const countryFiltered = filterDealsForCountry(raw, country);
@@ -623,7 +632,7 @@ export default async function ProductPage({ params }: PageProps) {
   const fetchPriceHistoryCached = unstable_cache(
     async (productId: string) => fetchProductPriceHistory(productId, 90),
     ["pdp-price-history"],
-    { revalidate: 300, tags: ["pdp-price-history"] },
+    { revalidate: 1800, tags: ["pdp-price-history"] },
   );
   const priceHistoryRows = offer.product_id
     ? await fetchPriceHistoryCached(offer.product_id)

@@ -14,7 +14,16 @@ import type { SearchOutput, ProductGroup, DupeResult, StoreOffer } from "@/lib/s
    sniffing fall through to pg-fts (which won't FTS-match them) → the
    UI's live SerpAPI section takes over. */
 
-const headers = { "Cache-Control": "s-maxage=120, stale-while-revalidate=600" };
+/* Edge cache history:
+     v1: s-maxage=120 / swr=600        (2min / 10min — too tight)
+     v2: s-maxage=3600 / swr=86400     (1h / 1d — May 2026 v3 after
+                                        Vercel Fluid Active CPU hit
+                                        100% of the 4h free tier)
+   Compare results don't change within an hour — the underlying
+   product catalog refreshes Mon+Thu, and a 1h cache window with
+   1d SWR means hot queries hit our function ~24× per day instead
+   of ~720× per day. Big CPU saving with negligible UX impact. */
+const headers = { "Cache-Control": "s-maxage=3600, stale-while-revalidate=86400" };
 
 /* ── oid fallback — synthesize a single-offer anchor from an
    OfferRow when pid + FTS both miss.

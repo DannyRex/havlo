@@ -17,11 +17,14 @@ import { getTrendingMultiStoreTitles } from "@/lib/trending-multi-store";
 export async function GET(): Promise<NextResponse> {
   try {
     const items = await getTrendingMultiStoreTitles();
+    /* Cache bumped May 2026 v3 (60s → 1h + swr 5min → 1d) to
+       relieve Vercel Fluid Active CPU. Trending chips are based
+       on a rolling 30-day popularity window — change slowly. */
     return NextResponse.json(
       { items },
       {
         headers: {
-          "Cache-Control": "s-maxage=60, stale-while-revalidate=300",
+          "Cache-Control": "s-maxage=3600, stale-while-revalidate=86400",
         },
       },
     );

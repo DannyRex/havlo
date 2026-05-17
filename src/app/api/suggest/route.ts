@@ -17,8 +17,12 @@ export async function GET(req: NextRequest) {
      /api/suggest is called many times per session and per-key
      caches multiply egress; the per-instance plain edge cache is
      sufficient here. */
+  /* Cache bumped May 2026 v3 (60s → 600s + swr 5min → 1d) to
+     relieve Vercel Fluid Active CPU. Autocomplete results don't
+     need minute-level freshness — popular queries cached for 10
+     minutes drop function executions ~10× per query. */
   return NextResponse.json(
     { items },
-    { headers: { "Cache-Control": "private, s-maxage=60, stale-while-revalidate=300" } },
+    { headers: { "Cache-Control": "private, s-maxage=600, stale-while-revalidate=86400" } },
   );
 }
