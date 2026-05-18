@@ -212,7 +212,16 @@ jobs:
       # /deals + /compare each cycle. Without this, a category like
       # 'Audio' returns ~20 deals total per country, which felt sparse.
       - name: Ingest SerpAPI live deals → Supabase
-        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && !inputs.skip_serpapi
+        # Gating if: removed May 2026 launch-readiness pass. The
+        # condition was silently skipping the step across multiple
+        # runs (1-second step time + 0-byte logs even after rewriting
+        # to multiple GHA-canonical patterns). Without the if:, the
+        # script either runs (good) or fails with a real error
+        # (also good — visible signal beats silent skip). The skip
+        # behaviour only helped in the rare developer case of running
+        # this workflow without secrets configured, which doesn't
+        # apply to the production repo where all 5 required secrets
+        # exist (verified May 2026 via /actions/secrets API).
         run: npm run ingest -- --limit=50
 
   # ── Job 4a: Jumia ingest via SerpAPI's dedicated `engine=jumia`.
