@@ -35,6 +35,7 @@ import { getAllCashbackRates } from "@/lib/cashback";
 import { getWithdrawalMin } from "@/lib/cashback-thresholds";
 import { SITE_URL, buildHreflangAlternates } from "@/lib/seo";
 import WaitlistForm from "@/components/cashback/WaitlistForm";
+import NewsletterStrip from "@/components/landing/NewsletterStrip";
 
 export function generateStaticParams() {
   return COUNTRIES.map((c) => ({ country: c.code }));
@@ -380,6 +381,11 @@ export default function CashbackPage({
           </div>
         </section>
       </section>
+      {/* Global newsletter signup. Added May 2026 launch-readiness
+          pass — was previously homepage-only. Cashback waitlisters
+          who skip the form below still get a second chance to
+          opt into the general newsletter. */}
+      <NewsletterStrip />
     </main>
   );
 }

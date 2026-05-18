@@ -40,7 +40,7 @@ export function CountryProvider({ initialCode, children }: Props) {
   const router   = useRouter();
   const pathname = usePathname();
 
-  /* Resolution order: URL pathname → cookie → default.
+  /* Resolution order: URL pathname → initialCode → cookie → default.
 
      CRITICAL: this runs during the useState initialiser, NOT in a
      post-mount useEffect. The previous useEffect-based approach
@@ -55,17 +55,46 @@ export function CountryProvider({ initialCode, children }: Props) {
      HTML using DEFAULT_COUNTRY (server has no window/cookie
      access in this provider; cookies() would break ISR), so the
      hydration produces a mismatch on country-derived UI — handled
-     by suppressHydrationWarning on the navbar flag wrapper. */
+     by suppressHydrationWarning on the navbar flag wrapper.
+
+     May 2026 launch-readiness audit bug: URL pathname now wins
+     over initialCode. Previously `if (initialCode) return
+     initialCode` short-circuited the URL check, so a visitor on
+     /us with an NG cookie saw the NG flag persistently in the
+     navbar (root layout's initialCode = getServerCountry().code
+     = "ng" from the cookie). URL is the strongest signal — a
+     user on /us is definitionally browsing US, regardless of
+     their cookie state. */
   const [code, setCode] = useState<string>(() => {
-    if (initialCode) return initialCode;
     if (typeof window !== "undefined") {
       const seg = window.location.pathname.split("/")[1]?.toLowerCase();
       if (seg && COUNTRY_CODES.has(seg)) return seg;
+    }
+    if (initialCode) return initialCode;
+    if (typeof window !== "undefined") {
       const cookie = readCookie(COUNTRY_COOKIE);
       if (cookie && COUNTRY_CODES.has(cookie)) return cookie;
     }
     return DEFAULT_COUNTRY;
   });
+
+  /* Pathname-tracked re-sync. Without this, an in-app client
+     navigation from /uk/deals to /us/deals (via the country
+     selector or a programmatic router.push) wouldn't update the
+     state because useState's initialiser only runs once per mount.
+     React's automatic re-rendering of the route DOESN'T re-mount
+     the provider — it's persistent across child remounts. So the
+     navbar flag would stay on the OLD country until a hard refresh.
+
+     Effect dependency on pathname guarantees we resync to the URL
+     on every navigation. Safe because setCode is a no-op when the
+     value hasn't changed (React's bail-out heuristic). */
+  useEffect(() => {
+    const seg = pathname.split("/")[1]?.toLowerCase();
+    if (seg && COUNTRY_CODES.has(seg) && seg !== code) {
+      setCode(seg);
+    }
+  }, [pathname, code]);
 
   const setCountry = useCallback(
     (next: string) => {

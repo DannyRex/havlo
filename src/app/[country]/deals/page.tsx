@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import DealFeed from "@/components/deals/DealFeed";
 import JsonLd from "@/components/seo/JsonLd";
+import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import { getCountry } from "@/lib/country";
 import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList } from "@/lib/seo";
 import type { Deal } from "@/types";
@@ -185,6 +186,11 @@ export default async function DealsPage({
           initialStoreOptions={initial?.storeOptions}
         />
       </Suspense>
+      {/* Newsletter signup at the bottom of the feed. Added May 2026
+          launch-readiness pass — was previously homepage-only. A
+          visitor who scrolls the whole /deals feed without finding
+          what they want still gets the signup prompt. */}
+      <NewsletterStrip />
     </>
   );
 }

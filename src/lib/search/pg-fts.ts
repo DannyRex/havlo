@@ -1079,19 +1079,26 @@ export async function pgFtsFindByProductId(
     mode: "similar",
     query: anchorPayload.title,
     anchor: augmentedAnchor,
-    /* Cheaper-alternatives rail (May 2026 v3): include BOTH siblings
-       and cross-brand alternatives. The cheaper-only price filter
-       upstream already prevents 'iPhone 15 Plus' (more expensive)
-       from polluting the rail when looking at iPhone 15 — only
-       siblings that ARE cheaper survive (iPhone 14 vs 15, MacBook
-       Air M3 vs M4, Galaxy S23 vs S24). Those are legitimate
-       cheaper alternatives that users want to see.
+    /* Cheaper-alternatives rail (May 2026 launch-readiness audit):
+       siblings DROPPED from the rail. The May 2026 v3 attempt to
+       include them on the theory that "the cheaper-only filter would
+       hide more-expensive siblings" missed cases where a sibling
+       happens to be cheaper than the anchor — iPhone 15 Plus on
+       deep promo can come in under iPhone 15 RRP, and the rail
+       happily surfaced it as a "cheaper alternative" for the user's
+       iPhone 15 search. Audit caught this regression directly.
 
-       Previously the rail was only partition.otherProducts which
-       stripped ALL siblings — leaving rails empty for any anchor
-       with mostly same-line cheaper variants (the QA-reported
-       MacBook Air M4 / iPhone 15 cases). */
-    dupes: [...partition.siblingVariants, ...partition.otherProducts],
+       Cross-generation comparisons (iPhone 14 vs iPhone 15, MacBook
+       Air M3 vs M4, Galaxy S23 vs S24) still surface — those don't
+       match sibling detection (different numeric markers) so they
+       land in otherProducts and survive here.
+
+       Same-generation sub-tier (iPhone 15 vs iPhone 15 Plus/Pro/Max,
+       Galaxy S24 vs S24 Ultra, MacBook Pro M3 vs M3 Max) is what
+       the sibling gate catches. Those are legitimately a different
+       product — the user wanted base iPhone 15, recommending the
+       Plus is misleading even if temporarily cheaper. */
+    dupes: partition.otherProducts,
   };
 }
 

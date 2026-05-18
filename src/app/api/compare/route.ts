@@ -177,7 +177,13 @@ async function synthesizeAnchorFromOfferRow(row: OfferRow): Promise<SearchOutput
        same-line variants (M3 vs M4, S23 vs S24) which ARE legit
        alternatives. See pgFtsFindByProductId for the matching
        comment + reasoning. */
-    dupes:  [...partition.siblingVariants, ...partition.otherProducts],
+    /* Siblings (same generation, different sub-tier — iPhone 15 vs
+       iPhone 15 Plus) deliberately DROPPED May 2026 launch-readiness
+       audit. The earlier theory that "cheaper-only filter would
+       suppress more-expensive siblings" missed cases where a sibling
+       was on deeper promo than the anchor. See pg-fts.ts buildSimilar
+       result for the full rationale. */
+    dupes:  partition.otherProducts,
   };
 }
 

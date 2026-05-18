@@ -101,7 +101,22 @@ interface SerpProductResponse {
 function isGoogleRelay(u: string): boolean {
   try {
     const h = new URL(u).hostname.toLowerCase();
-    return h === "google.com" || h.endsWith(".google.com");
+    /* google.com + subdomains — Google Shopping relays (?prds=...),
+       Google's own /url?q= redirect wrapper. */
+    if (h === "google.com" || h.endsWith(".google.com")) return true;
+    /* Google's ad-redirect infrastructure. SerpAPI sometimes stores
+       these as the offer URL when the click came from a Google
+       Shopping ad rather than an organic listing. Without this
+       branch, /api/go's passthrough sent the user to googleads
+       (often a tracking pixel + bounce-back to a stale URL) and
+       the audit caught the destination as "google.com" in the
+       redirect chain. May 2026 launch-readiness audit B4 fix. */
+    if (h === "googleadservices.com" || h.endsWith(".googleadservices.com")) return true;
+    if (h === "googlesyndication.com" || h.endsWith(".googlesyndication.com")) return true;
+    if (h === "doubleclick.net" || h.endsWith(".doubleclick.net")) return true;
+    /* Google Shopping aggregator domains. */
+    if (h === "shopping.google.com") return true;  // covered by .google.com above; explicit for grep
+    return false;
   } catch {
     return false;
   }

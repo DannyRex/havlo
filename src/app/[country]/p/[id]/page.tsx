@@ -28,8 +28,6 @@
 
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import Script from "next/script";
-
 import { getCountry } from "@/lib/country";
 import { unstable_cache } from "next/cache";
 import { COUNTRIES } from "@/lib/country";
@@ -45,6 +43,7 @@ import { usdToNgn } from "@/lib/utils";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getCategory } from "@/lib/data/categories";
 import JsonLd from "@/components/seo/JsonLd";
+import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import SimilarProducts from "@/components/product/SimilarProducts";
 import FallbackCategoryRail from "@/components/product/FallbackCategoryRail";
@@ -732,13 +731,13 @@ export default async function ProductPage({ params }: PageProps) {
 
   return (
     <main className="bg-bg">
-      <JsonLd data={breadcrumb} />
-      <Script
-        id="product-jsonld"
-        type="application/ld+json"
-        strategy="afterInteractive"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
-      />
+      {/* JSON-LD: breadcrumb + product, both server-rendered inline.
+          The product schema was previously injected via next/script
+          with strategy=afterInteractive, which deferred the <script>
+          tag until after hydration — invisible to Google's initial
+          crawl. Switched to <JsonLd /> (raw inline <script>) May 2026
+          launch-readiness pass so Rich Results pick it up. */}
+      <JsonLd data={[breadcrumb, productSchema]} />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         {/* Back link — context-aware via document.referrer.
@@ -842,6 +841,9 @@ export default async function ProductPage({ params }: PageProps) {
             codebase — keep it around in case we want to revive the
             pattern as an opt-in toggle later. */}
       </div>
+      {/* Newsletter signup at the bottom of the PDP. Added May 2026
+          launch-readiness pass — was previously homepage-only. */}
+      <NewsletterStrip />
     </main>
   );
 }

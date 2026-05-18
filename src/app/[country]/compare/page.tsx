@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { SearchX, CheckCircle, AlertCircle, Coins } from "lucide-react";
 import Link from "next/link";
+import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import SearchBar from "@/components/compare/SearchBar";
 import PriceResults from "@/components/compare/PriceResults";
 import CompareAnchorCard from "@/components/compare/CompareAnchorCard";
@@ -641,6 +642,9 @@ export default function ComparePage() {
           because it reads useSearchParams. */}
       <DealUnavailableBanner />
       <CompareContent />
+      {/* Newsletter signup after search results. Added May 2026
+          launch-readiness pass — was previously homepage-only. */}
+      <NewsletterStrip />
     </Suspense>
   );
 }
