@@ -385,7 +385,13 @@ export async function GET(req: NextRequest) {
      calls for Google relays. The flag staying `true` here would
      be a lie that distorts every cost / efficacy analysis. */
   if (titleHint && (storeIdHint || storeNameHint)) {
-    const m = merchantSearchUrl(storeIdHint, storeNameHint, titleHint);
+    /* country.code threaded through so country-routed merchants
+       (e.g. Ubuy, which lives on per-country subdomains) can land
+       the visitor on inventory they can actually buy. Verified
+       fix May 2026 v3 — Ubuy CTAs were routing to ubuy.com (a
+       global country-selector landing page that returns no
+       product results) instead of ubuy.com.ng for NG visitors. */
+    const m = merchantSearchUrl(storeIdHint, storeNameHint, titleHint, country.code);
     if (m) return sendOut(m.url, "merchant_search", { serpapiAttempted: false, serpapiResolved: false });
   }
 

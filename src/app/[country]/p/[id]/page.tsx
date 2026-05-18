@@ -268,17 +268,81 @@ export default async function ProductPage({ params }: PageProps) {
     fetchAnchorOffersCached(offer.product_id),
   ]);
 
+  /* ── Anchor country-relevance guard ───────────────────────────────
+     If the visitor is on /<country>/p/<offerId> but the offer's
+     store doesn't serve that country (e.g. an NG visitor lands on a
+     PDP whose anchor is amazon.ae), the CTA button would route them
+     to a merchant they can't actually buy from. User report May 2026
+     v3:
+       "https://havlo.io/ng/p/7e817add-... points to amazon.ae"
+
+     Recovery strategy: look for the SAME product at a country-
+     appropriate store and redirect to that offer's PDP. Two pools:
+       1. anchorOffers — pgFtsAnchorOffersByProductId returns same-
+          product offers across all stores (matched by signature).
+          Empty for curated Amazon rows whose product_id is a
+          synthetic slug, not a real products.id UUID.
+       2. dupes — broader FTS title match. Catches the curated case
+          AND near-duplicate products where the strict signature
+          pool missed.
+
+     If neither pool has a country-appropriate alternative, fall
+     through to notFound() rather than render a CTA the visitor
+     can't use. We avoid silently rendering the anchor anyway
+     because the PDP's outbound CTA is the value proposition — a
+     PDP that can't deliver a working CTA is broken UX. */
+  const anchorAsOfferLike = {
+    storeId:         offer.store_id,
+    storeName:       offer.store_name,
+    isInternational: offer.is_international,
+  };
+  if (!isOfferAllowedForCountry(anchorAsOfferLike, country)) {
+    /* Same-product pool first (strongest signal: literally the same
+       SKU at a different store). Sorted by price ascending — the
+       redirect should land the visitor on the BEST in-market deal
+       for this product, not just any in-market deal. */
+    const sameProduct = anchorOffers
+      .filter((o) => isOfferAllowedForCountry(o, country))
+      .filter((o) => o.offerId)               // skip live-SerpAPI rows with no offerId
+      .sort((a, b) => a.price - b.price);
+    if (sameProduct.length > 0) {
+      redirect(`/${country.code}/p/${sameProduct[0].offerId}`);
+    }
+    /* Fall back to broader dupes — covers curated rows whose
+       product_id wouldn't match anchorOffers' UUID lookup. */
+    const broaderMatch = dupes
+      .flatMap((d) => d.offers)
+      .filter((o) => isOfferAllowedForCountry(o, country))
+      .filter((o) => o.offerId)
+      .sort((a, b) => a.price - b.price);
+    if (broaderMatch.length > 0) {
+      redirect(`/${country.code}/p/${broaderMatch[0].offerId}`);
+    }
+    /* No country-appropriate alternative anywhere — better to
+       send the visitor back to /deals than render a CTA they
+       can't use. */
+    redirect(`/${country.code}/deals`);
+  }
+
   /* Drop dupe-offers from stores that aren't appropriate for the
      visitor's market (e.g. NG-anchored Konga rows on a UK PDP).
-     Same shape /api/compare/dupes already applies. */
-  const countryFilteredDupes = country.code === "ng"
-    ? dupes
-    : dupes
-        .map((d) => ({
-          ...d,
-          offers: d.offers.filter((o) => isOfferAllowedForCountry(o, country)),
-        }))
-        .filter((d) => d.offers.length > 0);
+     Same shape /api/compare/dupes already applies.
+
+     NG-tightening May 2026 v3 — was previously `country.code === "ng" ? dupes : ...`
+     i.e. NG visitors saw EVERYTHING including Amazon AE / Amazon IN /
+     Amazon DE / Flipkart, on the theory that NG shoppers cross-border
+     so they tolerate more variety. But the broader country-awareness
+     audit established NG should only see NG-anchored + US + UK + truly
+     global stores (AliExpress / Shein / Temu / etc.). User report:
+     "/ng PDP showed amazon.ae link" — exactly the case this fix
+     stops. isOfferAllowedForCountry now uniformly applies for every
+     country including NG. */
+  const countryFilteredDupes = dupes
+    .map((d) => ({
+      ...d,
+      offers: d.offers.filter((o) => isOfferAllowedForCountry(o, country)),
+    }))
+    .filter((d) => d.offers.length > 0);
 
   /* Anchor price normalised to NGN — needed UP HERE so the dupe
      price-band gate (filteredDupes below) can reference it. Moved

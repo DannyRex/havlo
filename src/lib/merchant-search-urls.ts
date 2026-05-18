@@ -24,12 +24,52 @@
 interface MerchantHandlers {
   /** Pretty merchant name for the user-facing message. */
   name: string;
-  /** Build a search URL given a query string. Returns null when
-      the merchant doesn't have a usable search endpoint and we
-      should send the user to the homepage instead. */
-  searchUrl: (query: string) => string | null;
+  /** Build a search URL given a query string. The optional country
+      argument is the visitor's Havlo country code ("ng"/"uk"/"us"/
+      etc.) — most merchants ignore it and serve the same URL to
+      every market. A handful (Ubuy, with its country-subdomain
+      architecture) actually need it to route to inventory the
+      visitor can buy. Returns null when the merchant doesn't have a
+      usable search endpoint and we should send the user to the
+      homepage instead. */
+  searchUrl: (query: string, country?: string) => string | null;
   /** Homepage fallback when searchUrl returns null or fails. */
   homepage: string;
+}
+
+/* Country → Ubuy subdomain map. Ubuy operates a country-routed
+   storefront (each market has its own inventory + pricing + checkout
+   flow), and ubuy.com (no subdomain) is a country-selector landing
+   page that does not return product results — clicking "search" on
+   that page just asks the visitor to pick their country first. So a
+   search URL pointed at ubuy.com is effectively dead for everyone
+   except visitors who happen to already have a country cookie set
+   from a prior visit.
+
+   These mappings route to the actual market subdomain. Verified
+   patterns:
+     NG → ubuy.com.ng    UK → ubuy.co.uk    US → ubuy.us
+     AE → ubuy.com.kw    DE → ubuy.de       IN → ubuy.co.in
+     ZA → ubuy.co.za
+   (AE → KW because Ubuy is Kuwait-headquartered and the KW
+   subdomain serves the same GCC inventory that Emirati buyers
+   use; ubuy.ae redirects to ubuy.com.kw at the time of writing.)
+
+   If a country isn't in the map, fall back to ubuy.com — broken
+   but at least branded; better than a 404. */
+const UBUY_SUBDOMAIN: Record<string, string> = {
+  ng: "ubuy.com.ng",
+  uk: "ubuy.co.uk",
+  us: "ubuy.us",
+  ae: "ubuy.com.kw",
+  de: "ubuy.de",
+  in: "ubuy.co.in",
+  za: "ubuy.co.za",
+};
+
+function ubuyHostForCountry(country?: string): string {
+  if (!country) return "www.ubuy.com.ng";  // NG is our launch market — best default
+  return UBUY_SUBDOMAIN[country.toLowerCase()] ?? "www.ubuy.com";
 }
 
 /* Ordered most-specific first so substring matching picks the
@@ -218,7 +258,17 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "nfm":                        { name: "NFM",                 searchUrl: (q) => `https://www.nfm.com/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.nfm.com" },
   "dick-s-sporting-goods":      { name: "DICK'S Sporting Goods", searchUrl: (q) => `https://www.dickssportinggoods.com/search/SearchDisplay?searchTerm=${encodeURIComponent(q)}`, homepage: "https://www.dickssportinggoods.com" },
   "b-h-photo-video-audio":      { name: "B&H Photo",           searchUrl: (q) => `https://www.bhphotovideo.com/c/search?Ntt=${encodeURIComponent(q)}`, homepage: "https://www.bhphotovideo.com" },
-  "ubuy":                       { name: "Ubuy",                searchUrl: (q) => `https://www.ubuy.com/en/search/?ref=${encodeURIComponent(q)}`,     homepage: "https://www.ubuy.com" },
+  /* Ubuy: country-routed storefront. Each market lives on its own
+     subdomain (ubuy.com.ng, ubuy.co.uk, ubuy.us, etc.) with its own
+     inventory + pricing. The bare ubuy.com is a country-selector
+     landing page that does NOT return product results — verified
+     May 2026 v3 from a user-reported broken CTA:
+       "ubuy pdp points to https://ubuy.com/en/search/?ref=Giantex
+        41" Kitchen Pantry Cabinet (broken)"
+     Now routes through the visitor's country subdomain via the
+     UBUY_SUBDOMAIN map at the top of this file. ?ref= IS Ubuy's
+     real search param on the country subdomains. */
+  "ubuy":                       { name: "Ubuy",                searchUrl: (q, country) => `https://${ubuyHostForCountry(country)}/en/search/?ref=${encodeURIComponent(q)}`,     homepage: "https://www.ubuy.com.ng" },
   /* User-reported: storeName "Marks Electrical" was slugifying to
      markselectrical.com (404). Correct brand domain is
      markselectrical.co.uk. */
@@ -390,6 +440,7 @@ export function merchantSearchUrl(
   storeId: string | null | undefined,
   storeName: string | null | undefined,
   query: string,
+  country?: string,
 ): { url: string; merchantName: string } | null {
   if (!query || !query.trim()) return null;
   const sid = (storeId ?? "").toLowerCase().trim();
@@ -399,7 +450,7 @@ export function merchantSearchUrl(
   /* Pass 1: exact storeId match. */
   if (sid && MERCHANTS[sid]) {
     const m = MERCHANTS[sid];
-    const url = m.searchUrl(query) ?? m.homepage;
+    const url = m.searchUrl(query, country) ?? m.homepage;
     return { url, merchantName: m.name };
   }
 
@@ -410,7 +461,7 @@ export function merchantSearchUrl(
     for (const key of keys) {
       if (sid.includes(key)) {
         const m = MERCHANTS[key];
-        const url = m.searchUrl(query) ?? m.homepage;
+        const url = m.searchUrl(query, country) ?? m.homepage;
         return { url, merchantName: m.name };
       }
     }
@@ -420,7 +471,7 @@ export function merchantSearchUrl(
   if (sname) {
     for (const [key, m] of Object.entries(MERCHANTS)) {
       if (sname.includes(key) || sname.includes(m.name.toLowerCase())) {
-        const url = m.searchUrl(query) ?? m.homepage;
+        const url = m.searchUrl(query, country) ?? m.homepage;
         return { url, merchantName: m.name };
       }
     }
