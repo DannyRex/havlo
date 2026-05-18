@@ -374,6 +374,29 @@ export const COUNTRY_STORES: Record<string, string[]> = {
        "ebay-uk" so UK-specific variants match before falling
        through to the bare US "ebay". */
     "ebay uk", "ebay-uk",
+    /* v5 additions (May 2026 launch-readiness audit). EE
+       (BT-owned UK mobile carrier) and Ubisoft Store UK called
+       out specifically as untagged contaminators. EE is "ee" so
+       we use ee.co.uk to avoid a 2-char substring collision with
+       hundreds of store names containing "ee". Ubisoft has a
+       global store; the UK variant uses ubisoft.com/en-gb path
+       which SerpAPI tags as separate. */
+    "ee.co.uk", "ee mobile", "ee-mobile",
+    "ubisoft store uk", "ubisoft-store-uk", "ubisoft.com/en-gb",
+    "store.ubisoft.com/uk",
+    "currys business", "currys-business", "currys for business",
+    /* UK gaming / electronics tail */
+    "game.co.uk", "gameuk", "game-uk", "scan.co.uk", "scanuk",
+    "overclockers", "overclockers.co.uk", "ebuyer", "ebuyer.com",
+    /* UK supermarket clothing + general */
+    "george.com", "george at asda", "fatface", "fat face",
+    "white stuff", "whitestuff", "joules", "seasalt",
+    "hobbs", "phase eight", "phaseeight", "monsoon",
+    "accessorize", "the body shop", "thebodyshop", "lush",
+    "molton brown", "moltonbrown",
+    /* UK furniture / home tail */
+    "dfs", "dfs.co.uk", "made.com", "loaf", "loaf.com",
+    "graham and green", "grahamandgreen",
   ],
   us: [
     "amazon.com", "walmart", "best buy", "bestbuy", "target", "newegg",
@@ -393,21 +416,92 @@ export const COUNTRY_STORES: Record<string, string[]> = {
     "gamestop", "qvc.com", "qvc-com",
     "fashion nova", "fashion-nova",
     "dick's sporting", "dick-s-sporting", "dicks sporting",
+    /* v4 additions (May 2026 launch-readiness audit). Each one
+       was found contaminating non-US pools as untagged stores
+       OR appearing on /us/deals via a non-roster path. Adding
+       them here gives inferStoreCountry an explicit "US" answer
+       so the new strict untagged-store filter doesn't drop them.
+
+       boohoo USA — sibling to UK boohoo, anchored US via the .us
+       subdomain (boohoo.com is UK). NFM — Nebraska Furniture Mart,
+       Midwest US furniture chain. "Express" — US fashion brand
+       (collision risk with "express checkout" etc. so we use the
+       distinctive "express.com" form). "going-going-gone" / "ggg"
+       — US clearance retailer. xbox.com / store.xbox.com / xbox
+       — Microsoft's US gaming store (cross-region storefronts
+       exist but the bare domain anchors US). bloomingdales,
+       neiman marcus, saks (already in NG cross-border, adding to
+       US roster too so inference works), bed bath beyond. */
+    "boohoo-usa", "boohoo usa", "boohoo.us",
+    "nfm", "nebraska furniture", "nebraskafurniture",
+    "express.com", "express-com",
+    "going-going-gone", "going going gone", "ggg",
+    "xbox.com", "xbox-com", "store.xbox.com",
+    "bloomingdales", "bloomingdale", "neiman marcus", "neiman-marcus",
+    "saks", "bed bath beyond", "bedbathandbeyond", "bedbath",
+    "ann taylor", "anntaylor", "loft", "j.crew", "jcrew",
+    "michael kors", "michaelkors", "tory burch", "toryburch",
+    "ralph lauren", "ralphlauren", "polo ralph lauren",
+    /* US gaming / electronics tail commonly surfaced by SerpAPI */
+    "best buy mobile", "newegg.com", "tigerdirect", "microcenter",
+    /* US carrier sites — they sell phones direct, anchored US */
+    "verizon", "verizon.com", "att.com", "at&t", "t-mobile", "tmobile",
+    "boost mobile", "boostmobile", "cricket wireless", "cricketwireless",
   ],
   de: [
-    "amazon.de", "mediamarkt", "media-markt", "saturn", "otto", "zalando",
+    "amazon.de", "amazon-de", "amazon germany",
+    "mediamarkt", "media-markt", "saturn", "otto", "zalando",
     "idealo", "notebooksbilliger", "alternate", "cyberport", "lidl",
     "kaufland", "real.de", "tchibo",
+    /* v4 additions (May 2026 launch-readiness audit). Audit found
+       DE local roster collapsed to 2 stores — Amazon DE + Amazon.de
+       (duplicate). Adding the actual DE retailer set so /de/deals
+       shows real local variety. */
+    "mediamarkt.de", "saturn.de", "ottoversand", "otto.de",
+    "conrad", "conrad.de", "computeruniverse", "voelkner",
+    "alza.de", "smyths-toys.de", "rewe", "edeka",
+    "myToys", "mytoys", "bonprix", "redcoon", "comtech",
+    "douglas", "douglas.de", "rossmann", "dm.de", "deichmann",
+    "thalia.de", "thalia", "weltbild", "hugendubel",
+    "schiesser", "esprit.de", "h&m de", "h-m-de",
+    /* Microsoft / Apple DE storefronts */
+    "apple.de", "microsoft.de", "xbox.de",
   ],
   ae: [
-    "amazon.ae", "noon", "sharaf dg", "sharafdg", "carrefour.ae",
-    "lulu hypermarket", "luluhypermarket", "first cry", "firstcry.ae",
-    "centrepoint", "namshi", "ounass", "6thstreet",
+    "amazon.ae", "amazon-ae", "amazon uae",
+    "noon", "noon.com", "sharaf dg", "sharafdg", "sharaf-dg",
+    "carrefour.ae", "carrefour uae",
+    "lulu hypermarket", "luluhypermarket", "luluwebstore",
+    "first cry", "firstcry.ae", "firstcry-ae",
+    "centrepoint", "centrepointstores", "namshi", "ounass", "6thstreet",
+    /* v4 additions (May 2026 launch-readiness audit) — AE local
+       roster was too tight (12 → was showing 3 effective). */
+    "ace", "ace.ae", "acehardware.ae", "jumbo.ae", "jumbo electronics",
+    "emax", "emax.ae", "plug-ins", "plugins.ae",
+    "max fashion", "max-fashion", "maxfashion.ae",
+    "splash", "splashfashions.com", "splash fashions",
+    "babyshop", "babyshopstores", "mothercare.ae",
+    "shukran", "shukran.ae", "homecentre", "home centre",
+    "westelm.ae", "west elm uae", "pottery barn uae",
+    "ubuy.ae", "desertcart", "desertcart.ae",
+    "letstango", "letstango.com", "menakart", "menakart.com",
   ],
   in: [
-    "amazon.in", "flipkart", "myntra", "ajio", "tata cliq", "tatacliq",
+    "amazon.in", "amazon-in", "amazon india",
+    "flipkart", "myntra", "ajio", "tata cliq", "tatacliq",
     "snapdeal", "nykaa", "firstcry", "meesho", "croma", "reliance digital",
     "reliancedigital", "vijay sales", "vijaysales", "shopclues",
+    /* v4 additions (May 2026 launch-readiness audit). naaptol was
+       specifically called out as contaminating the NG default tab —
+       adding it to IN roster so inferStoreCountry resolves it
+       correctly. */
+    "naaptol", "naaptol.com",
+    "indiamart", "purplle", "1mg", "tata 1mg", "tata-1mg",
+    "lenskart", "boat-lifestyle", "boat lifestyle", "mamaearth",
+    "swiggy", "zomato", "blinkit",
+    "limeroad", "voonik", "abof", "yepme",
+    "vivo india", "oneplus india", "samsung india",
+    "smytten", "swiss-beauty", "hyugalife", "sangeetha-mobiles",
   ],
   za: [
     /* v3: tightened "game" → "game.co.za" / "game stores" because the
@@ -418,6 +512,18 @@ export const COUNTRY_STORES: Record<string, string[]> = {
     "takealot", "makro", "game.co.za", "game stores", "loot.co.za", "wantitall",
     "yuppiechef", "superbalist", "zando", "everyshop", "incredible connection",
     "incredibleconnection", "checkers", "pick n pay", "picknpay",
+    /* v4 additions (May 2026 launch-readiness audit). ZA showed
+       2 deals from 1 store — Wellness Warehouse was leaking into
+       NG instead of resolving here. */
+    "wellness warehouse", "wellness-warehouse", "wellnesswarehouse",
+    "clicks", "clicks.co.za", "dis-chem", "dischem",
+    "woolworths sa", "woolworths.co.za", "woolworthsza",
+    "raru", "raru.co.za", "evetech", "evetech.co.za",
+    "bobshop", "bobshop.co.za", "spree", "spree.co.za",
+    "mr price", "mrp.com", "mrprice", "edgars", "ackermans",
+    "pep", "pepstores", "shoprite", "checkers hyper",
+    "builders warehouse", "builders.co.za",
+    "wantitall.co.za", "kalahari", "kalahari.com",
   ],
 };
 
@@ -649,17 +755,22 @@ export function filterDealsForCountry<T extends DealLike>(deals: T[], country: C
       if (isNigerianStore(d)) return true;
       if (isCrossBorderStore(d, "ng")) return true;
       const tag = dealCountryTag(d);
-      /* Untagged rows — was unconditional pass-through. Tightened
-         May 2026 v3 to mirror the non-NG path: only keep if the
-         store either (a) can't be inferred to a specific country
-         (truly global like AliExpress/Shein/Temu) OR (b) is in a
-         country on NG's cross-border allowlist (US/UK/AE).
-         Without this, Amazon DE and Amazon IN slipped through
-         even after removing the broad "amazon" substring from
-         NG's cross-border list. */
+      /* Untagged rows — tightened May 2026 launch-readiness pass.
+         Previous behaviour: `if (inferred === null) return true` —
+         truly-unknown stores got a free pass. Audit caught Brown
+         Thomas (IE), Wellness Warehouse (ZA), naaptol (IN), EE (UK
+         telecom), and a long tail of niche stores landing in the
+         NG default tab because they weren't in any roster.
+
+         New behaviour: untagged + inferred-null = DROP. Truly-
+         unknown stores need an explicit country signal (either
+         a SerpAPI country tag or a roster match) before they
+         qualify. Trades off losing some legit-but-obscure
+         catalog rows for the guarantee that NG visitors only
+         see stores Nigerians can actually shop at. */
       if (tag === null) {
         const inferred = inferStoreCountry(d.storeId, d.storeName);
-        if (inferred === null) return true;
+        if (inferred === null) return false;        // was: return true (leak)
         const ic = inferred.toLowerCase();
         /* AE removed May 2026 v3 — user wants only NG/US/UK
            shoppable retailers in the NG pool. */
@@ -705,13 +816,20 @@ export function filterDealsForCountry<T extends DealLike>(deals: T[], country: C
          passes. QA report May 2026: "/us/deals?origin=intl shows UK
          retailers as if they were international US options."
 
-         Fix: when the store's name/id IS recognised as belonging to
-         another country's roster (via inferStoreCountry), drop it
-         even if currency matches. Truly unknown stores still pass
-         (inferStoreCountry returns null → keep, matches the prior
-         "broadly relevant" bias). */
+         May 2026 launch-readiness pass: tightened further. Was:
+         `if (inferred === null) return true` — truly-unknown stores
+         got a free pass via currency-match. Audit caught Brown
+         Thomas (IE), boohoo USA (?), Express, NFM, Going Going
+         Gone, naaptol, Wellness Warehouse all landing in non-NG
+         local pools because their storeIds weren't in any roster.
+
+         New behaviour: untagged + inferred-null = DROP even when
+         currency matches. Same trade-off as the NG path — losing
+         legit-but-obscure stores in exchange for guaranteed-clean
+         per-country pools. Expand the rosters in COUNTRY_STORES
+         to re-admit stores that show up frequently in audits. */
       const inferred = inferStoreCountry(d.storeId, d.storeName);
-      if (inferred === null) return true;
+      if (inferred === null) return false;          // was: return true (leak)
       return inferred.toLowerCase() === country.code.toLowerCase();
     }
     return false;
@@ -771,6 +889,31 @@ export function isOfferAllowedForCountry<T extends OfferLike>(o: T, country: Cou
 
   // NG-anchored stores never for non-NG
   if (matchesAny(idLc, NG_STORES) || matchesAny(nameLc, NG_STORES)) return false;
+
+  /* Local-currency-priced row (USD-priced for US visitor, GBP-priced
+     for UK visitor — though SerpAPI normalises everything to USD so
+     this mostly hits US in practice) where inferStoreCountry CAN
+     resolve to this country's roster. Mirrors the symmetric path in
+     filterDealsForCountry — without this, /compare returned mode:
+     "empty" for the entire non-NG world because every offer was
+     classified as `isInternational=true` (USD-priced) and the only
+     pass-through was an explicit roster match.
+
+     Audit May 2026 launch-readiness pass: "compare returns zero
+     anchors for UK, US, AE, DE, IN, ZA — only NG works." Root
+     cause was the missing-vs-filterDealsForCountry path; the
+     filter was strict-roster-only, so any product whose only
+     in-market offer came from a non-roster store became empty.
+
+     Truly-unknown stores (inferStoreCountry === null) still drop
+     here — same tightening as filterDealsForCountry's untagged-
+     + currency-match path. Keeps the long tail of niche retailers
+     out without re-introducing the contamination the audit found. */
+  if (o.isInternational !== false) {
+    const inferred = inferStoreCountry(o.storeId, o.storeName);
+    if (inferred && inferred.toLowerCase() === country.code.toLowerCase()) return true;
+  }
+
   if (o.isInternational === false) return false;
 
   /* Symmetric tightening with filterDealsForCountry. Was `return true`
