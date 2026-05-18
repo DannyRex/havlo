@@ -105,6 +105,39 @@ function canonicaliseSource(raw: string): string {
 }
 
 function inferStoreId(source: string): string {
+  /* Canonical short IDs for Amazon marketplaces so the slugifier
+     doesn't produce amazon-germany / amazon-uae / amazon-india /
+     amazon-canada (the verbose forms canonicaliseSource emits for
+     human-readable display names). Without this, every cron run
+     re-creates the verbose-named store_id rows that migration 0033
+     consolidates — and the DB drifts back to a fragmented state.
+     Re-audit May 2026 launch-readiness pass caught this exact
+     regression: amazon-germany + amazon-india reappeared after one
+     cron run despite 0033 having run.
+
+     The map mirrors what migration 0033 + the roster expansion in
+     country.ts treat as canonical: amazon-uk / amazon-de / amazon-ae
+     / amazon-in / amazon-ca / amazon. */
+  const lc = source.toLowerCase().trim();
+  switch (lc) {
+    case "amazon uk":
+    case "amazon.co.uk":          return "amazon-uk";
+    case "amazon germany":
+    case "amazon.de":
+    case "amazon de":             return "amazon-de";
+    case "amazon uae":
+    case "amazon.ae":
+    case "amazon ae":             return "amazon-ae";
+    case "amazon india":
+    case "amazon.in":
+    case "amazon in":             return "amazon-in";
+    case "amazon canada":
+    case "amazon.ca":
+    case "amazon ca":             return "amazon-ca";
+    case "amazon":
+    case "amazon.com":            return "amazon";
+  }
+
   return source
     .toLowerCase()
     .replace(/\.(com|ng|co|uk|net|org)(\.[a-z]{2})?$/, "")
