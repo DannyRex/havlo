@@ -149,6 +149,17 @@ function hostnameMatchesStore(
 ): boolean {
   try {
     const got = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+    /* Defensive: a Google relay URL is NEVER a valid resolved
+       destination. Without this, cached google.com URLs were leaking
+       through cache_hit when the merchant wasn't in our table:
+       hostnameMatchesStore was returning true (permissive default),
+       sendOut sent the user to Google instead of falling through to
+       merchant_search / smart_fallback. Re-audit May 2026 caught
+       9 of 15 US PDP CTAs landing on google.com because of this. */
+    if (got === "google.com" || got.endsWith(".google.com")) return false;
+    if (got === "googleadservices.com" || got.endsWith(".googleadservices.com")) return false;
+    if (got === "googlesyndication.com" || got.endsWith(".googlesyndication.com")) return false;
+    if (got === "doubleclick.net" || got.endsWith(".doubleclick.net")) return false;
     /* Reuse the curated merchant homepage as the source of truth for
        the expected hostname. If we don't know the merchant at all,
        skip the check (no signal to validate against). */

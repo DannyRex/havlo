@@ -769,7 +769,12 @@ export default async function ProductPage({ params }: PageProps) {
           <section className="mt-12 sm:mt-16">
             <header className="mb-6 sm:mb-8">
               <h2 className="text-[22px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
-                {siblingsForRail.length > 0 ? "Cheaper alternatives" : "You may also like"}
+                {/* Always "You may also like" now that the siblings
+                    rail is gone (May 2026 launch-readiness re-audit).
+                    The dynamic "Cheaper alternatives" label tied to
+                    siblings existence didn't make sense once the
+                    sibling rail was removed. */}
+                You may also like
               </h2>
               {/* Green "N alternatives found" pill — mirrors the
                   CompareAnchorCard connector chip so the design
@@ -806,25 +811,17 @@ export default async function ProductPage({ params }: PageProps) {
           </section>
         ) : null}
 
-        {siblingsForRail.length > 0 && (
-          /* Sibling rail — same brand + same model line, different
-             sub-tier (iPhone 15 ↔ Plus/Pro/Max, Galaxy S24 ↔ Ultra/FE).
-             Surfaces BELOW the cross-brand cheaper alternatives per
-             user preference (May 2026 v3) — cheaper-different-product
-             is the higher-intent surface; same-line different-config
-             is a secondary browse aid. */
-          <section className="mt-12 sm:mt-16">
-            <header className="mb-6 sm:mb-8">
-              <h2 className="text-[22px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
-                Other models in this line
-              </h2>
-              <p className="text-sm sm:text-base text-ink-2 mt-1.5">
-                {siblingsForRail.length} {siblingsForRail.length === 1 ? "configuration" : "configurations"} of the same model line.
-              </p>
-            </header>
-            <SimilarProducts dupes={siblingsForRail} countryCode={country.code} />
-          </section>
-        )}
+        {/* "Other models in this line" sibling rail REMOVED May 2026
+            launch-readiness re-audit. Surfacing iPhone 15 Plus when the
+            anchor is iPhone 15 (or S24 Ultra when anchor is S24) was
+            flagged as a sibling-gate regression — users on a base-tier
+            PDP shouldn't be steered to a sub-tier they didn't ask for,
+            even labelled as "Other models". If we want to bring this
+            back later, gate it behind an explicit "Compare configurations"
+            click rather than auto-rendering. The partition logic in
+            partitionDupesByVariantMatch still computes siblingVariants
+            so the spectrum pool can pull them in (likelyVariants), it
+            just no longer renders as its own rail. */}
 
         {/* Live deals rail removed (May 2026).
             Earlier this surface fetched /api/live-search on mount,

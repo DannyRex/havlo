@@ -755,33 +755,24 @@ export function filterDealsForCountry<T extends DealLike>(deals: T[], country: C
       if (isNigerianStore(d)) return true;
       if (isCrossBorderStore(d, "ng")) return true;
       const tag = dealCountryTag(d);
-      /* Untagged rows — tightened May 2026 launch-readiness pass.
-         Previous behaviour: `if (inferred === null) return true` —
-         truly-unknown stores got a free pass. Audit caught Brown
-         Thomas (IE), Wellness Warehouse (ZA), naaptol (IN), EE (UK
-         telecom), and a long tail of niche stores landing in the
-         NG default tab because they weren't in any roster.
-
-         New behaviour: untagged + inferred-null = DROP. Truly-
-         unknown stores need an explicit country signal (either
-         a SerpAPI country tag or a roster match) before they
-         qualify. Trades off losing some legit-but-obscure
-         catalog rows for the guarantee that NG visitors only
-         see stores Nigerians can actually shop at. */
-      if (tag === null) {
-        const inferred = inferStoreCountry(d.storeId, d.storeName);
-        if (inferred === null) return false;        // was: return true (leak)
-        const ic = inferred.toLowerCase();
-        /* AE removed May 2026 v3 — user wants only NG/US/UK
-           shoppable retailers in the NG pool. */
-        return ic === "ng" || ic === "us" || ic === "uk";
-      }
       // Tagged country:ng → keep (SerpAPI ingest)
       if (tag === "ng") return true;
-      // Tagged for a foreign market — only keep if the store is known
-      // cross-border-friendly for Nigerians (e.g. tagged country:us
-      // but it's actually amazon.com which Nigerians use)
-      return isCrossBorderStore(d, "ng");
+      /* Everything else: DROP. May 2026 launch-readiness re-tighten.
+         The previous "inferred-US/UK → keep" fallback re-introduced
+         leaks: any store I added to the US roster (LOFT, boohoo USA,
+         NFM, Going Going Gone, etc.) would resolve `inferStoreCountry`
+         to "US" and pass through to NG visitors — but those stores
+         AREN'T cross-border-friendly for Nigerians (no freight route,
+         no NG payment integration). Re-audit caught this:
+           "NG default still pulls in non-NG stores (LOFT, QVC UK,
+            boohoo USA)"
+         The NG cross-border allowlist (COUNTRY_CROSS_BORDER.ng) is
+         the authoritative source for what NG visitors can shop. A
+         store the JS layer can place in some country roster but
+         that's NOT in the NG cross-border list = NG buyers don't
+         actually use it. Drop. To re-admit a store, add it
+         explicitly to the NG cross-border list. */
+      return false;
     }
 
     /* Non-NG path. Order is intentional:
