@@ -124,6 +124,58 @@ const SUPPORTED_GL = new Set([
 
 const FALLBACK_COUNTRY = "us";
 
+/* Per-country Google domain. Critical for non-English markets — `gl`
+   alone tells Google Shopping the user's COUNTRY but routes through
+   google.com by default, which biases the index toward US/UK inventory.
+   `google_domain` actually routes through the country-specific Google
+   index (google.de for Germany, google.co.za for South Africa, etc.)
+   which surfaces local-merchant inventory Google.com doesn't.
+
+   Audit May 2026 launch-readiness pass: DE/AE/IN/ZA were returning
+   2-3 stores' worth of inventory each because the SerpAPI ingest was
+   hitting google.com instead of country-routed domains. Setting
+   google_domain.de for the DE ingest pulls MediaMarkt / Saturn / Otto
+   / Conrad rows that google.com simply doesn't surface for Eurozone
+   queries.
+
+   List from https://serpapi.com/google-domains. Coverage: every
+   country we support. Verified live May 2026 against SerpAPI's
+   country-domain table. */
+const GOOGLE_DOMAIN_BY_COUNTRY: Record<string, string> = {
+  us: "google.com",
+  uk: "google.co.uk", gb: "google.co.uk",
+  ca: "google.ca", au: "google.com.au", nz: "google.co.nz",
+  de: "google.de", fr: "google.fr", es: "google.es", it: "google.it",
+  nl: "google.nl", be: "google.be", at: "google.at", ch: "google.ch",
+  ie: "google.ie", pt: "google.pt", se: "google.se", no: "google.no",
+  dk: "google.dk", fi: "google.fi", pl: "google.pl", cz: "google.cz",
+  ro: "google.ro", tr: "google.com.tr",
+  in: "google.co.in", jp: "google.co.jp",
+  br: "google.com.br", mx: "google.com.mx", ar: "google.com.ar",
+  cl: "google.cl", co: "google.com.co",
+  za: "google.co.za", ae: "google.ae", sa: "google.com.sa",
+  hk: "google.com.hk", sg: "google.com.sg", my: "google.com.my",
+  th: "google.co.th", id: "google.co.id", ph: "google.com.ph",
+  vn: "google.com.vn", tw: "google.com.tw", kr: "google.co.kr",
+};
+
+/* Per-country interface language. Mostly stays "en" because:
+   - Our query strings are in English ("iphone 15 pro max deals")
+   - English listings are the most cross-merchant comparable
+   - We don't translate the UI on the receiving end
+
+   Exception: DE specifically benefits from hl=de — German shoppers
+   search Google in German, so the Google Shopping index is more
+   complete in German for products like home appliances, books,
+   household goods where the German title differs significantly
+   from the English one (Spülmaschine vs dishwasher). For other
+   non-English markets (AE, IN, ZA) English is the lingua franca of
+   commerce, so en is fine. */
+const HL_BY_COUNTRY: Record<string, string> = {
+  de: "de",
+  // every other supported country uses default "en"
+};
+
 /* Approximate FX → USD. Used to normalise prices across markets so the
    `offers.current_price` column is always comparable in USD.
    These are static — refresh quarterly or wire a real FX feed later. */
@@ -342,7 +394,15 @@ export const serpapiSearchProvider: SearchProvider = {
     url.searchParams.set("engine", "google_shopping");
     url.searchParams.set("q", effectiveQuery);
     url.searchParams.set("gl", country);
-    url.searchParams.set("hl", "en");
+    /* google_domain routes through the country-specific Google index.
+       Without this every query hits google.com (which biases toward
+       US/UK inventory) — even when gl=de. Added May 2026 launch-
+       readiness pass after the audit caught DE/AE/IN/ZA pools at
+       2-3 stores each. Falls back to google.com for the (now
+       impossible) case where a SUPPORTED_GL country doesn't have a
+       google_domain entry — defensive only. */
+    url.searchParams.set("google_domain", GOOGLE_DOMAIN_BY_COUNTRY[country] ?? "google.com");
+    url.searchParams.set("hl", HL_BY_COUNTRY[country] ?? "en");
     url.searchParams.set("api_key", apiKey);
     if (mode === "deals") {
       /* recency sort — helps surface fresher promotions */
