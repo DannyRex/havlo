@@ -177,13 +177,17 @@ jobs:
   #          1,000-credit Starter plan). ──
   ingest-serpapi:
     runs-on: ubuntu-latest
-    # Was 25 — hit the cap before the ingestion.ts batch refactor
-    # (per-deal N+1 SELECTs made the 60-call cron take ~20-25 min of
-    # DB time alone). Post-refactor: 3 bulk lookups per call + 1
-    # bulk insert + 1 bulk upsert = ~5-7 min wall-time across 60
-    # calls. 15 min gives ~3x headroom for SerpAPI jitter or
-    # Supabase slowdowns.
-    timeout-minutes: 15
+    # Timeout history:
+    #   25 (initial) → 15 (post batch-refactor that cut wall-time to
+    #     ~5-7 min) → 25 (restored May 2026 after the SerpAPI geo-
+    #     bias landed; google.de / google.co.za / google.ae routing
+    #     adds ~1-2s per call AND the wider category fan-out runs
+    #     longer per country. Re-audit caught a 15m16s timeout on
+    #     the May 18 manual trigger right after the Developer-plan
+    #     credit top-up — the script reached "de Audio" before
+    #     getting killed, with all 6 countries × ~6 categories
+    #     still to go. 25m gives ~2x headroom for current scale).
+    timeout-minutes: 25
     env:
       SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
