@@ -447,6 +447,12 @@ export const COUNTRY_STORES: Record<string, string[]> = {
     /* US carrier sites — they sell phones direct, anchored US */
     "verizon", "verizon.com", "att.com", "at&t", "t-mobile", "tmobile",
     "boost mobile", "boostmobile", "cricket wireless", "cricketwireless",
+    /* Sephora US — explicit .com form so the short "sephora" entry
+       in this list doesn't substring-match sephora-uae / sephora-de
+       under the new longest-match logic in inferStoreCountry. The
+       per-market sephora variants are added to AE / DE rosters
+       below for the same reason. */
+    "sephora.com", "sephora-com", "sephora us", "sephora-us",
   ],
   de: [
     "amazon.de", "amazon-de", "amazon germany",
@@ -466,6 +472,13 @@ export const COUNTRY_STORES: Record<string, string[]> = {
     "schiesser", "esprit.de", "h&m de", "h-m-de",
     /* Microsoft / Apple DE storefronts */
     "apple.de", "microsoft.de", "xbox.de",
+    /* Country-variant collisions — explicit DE-specific forms so
+       longest-match in inferStoreCountry routes these to DE instead
+       of the parent brand's home market (e.g. Sephora US bare entry
+       would substring-match sephora.de). Per the May 2026 launch-
+       readiness re-audit. */
+    "sephora.de", "sephora-de", "sephora deutschland",
+    "carrefour.de", "ikea.de", "h&m.de",
   ],
   ae: [
     "amazon.ae", "amazon-ae", "amazon uae",
@@ -485,6 +498,14 @@ export const COUNTRY_STORES: Record<string, string[]> = {
     "westelm.ae", "west elm uae", "pottery barn uae",
     "ubuy.ae", "desertcart", "desertcart.ae",
     "letstango", "letstango.com", "menakart", "menakart.com",
+    /* Country-variant collisions — explicit AE-specific forms so
+       longest-match in inferStoreCountry wins over a parent brand's
+       short entry in another country roster. Per May 2026 launch-
+       readiness re-audit ("Sephora UAE" landing in US local). */
+    "sephora-uae", "sephora uae", "sephora.ae", "sephora-ae",
+    "carrefour-uae", "carrefour uae", "ikea uae", "ikea.ae",
+    "bath & body works uae", "bath-body-works-uae", "bathbodyworks.ae",
+    "the body shop uae", "thebodyshop.ae",
   ],
   in: [
     "amazon.in", "amazon-in", "amazon india",
@@ -719,18 +740,35 @@ export function inferStoreCountry(storeId: string, storeName: string): string | 
      COUNTRY_STORES rosters. */
   if (matchesAny(id, NG_STORES) || matchesAny(name, NG_STORES)) return "NG";
 
-  /* Other countries — check each roster. First-match wins. The
-     iteration order matches Object.keys(COUNTRY_STORES) which is
-     insertion order from the literal — uk, us, de, ae, in, za —
-     same as the rest of the codebase. */
+  /* For COUNTRY_STORES, find the LONGEST matching entry across all
+     rosters (instead of first-match). Was first-match before May 2026
+     launch-readiness re-audit which caught "sephora-uae" landing in
+     US local because US roster had "sephora" (short substring) and
+     iterated before AE in Object.keys order.
+
+     Longest-match is the right behaviour: a more-specific roster
+     entry should always win over a less-specific one. So if AE
+     roster has "sephora-uae" (11 chars) and US has "sephora" (7
+     chars), the AE entry wins for storeId "sephora-uae" because
+     it's a more-precise signal of the store's anchor market.
+
+     Adding the country-specific roster variants (sephora-uae,
+     sephora-de, etc.) is a separate change — this longest-match
+     logic is the GENERIC fix that prevents the whole class of
+     substring-collision bugs going forward. */
+  let bestCountry: string | null = null;
+  let bestMatchLength = 0;
   for (const code of Object.keys(COUNTRY_STORES)) {
     const list = COUNTRY_STORES[code];
-    if (matchesAny(id, list) || matchesAny(name, list)) {
-      return code.toUpperCase();
+    for (const entry of list) {
+      const entryLc = entry.toLowerCase();
+      if ((id.includes(entryLc) || name.includes(entryLc)) && entry.length > bestMatchLength) {
+        bestMatchLength = entry.length;
+        bestCountry = code.toUpperCase();
+      }
     }
   }
-
-  return null;
+  return bestCountry;
 }
 
 /** Filter a deals list for the given country preference.

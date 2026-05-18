@@ -10,7 +10,7 @@
 import type { Deal } from "@/types";
 import { getSupabaseAdmin } from "./db-client";
 import { buildSignature } from "@/lib/search/normalize";
-import { inferStoreCountry } from "@/lib/country";
+import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { categoryDisagreesWithTitle } from "@/lib/categorize";
 import { categories } from "@/lib/data/categories";
 
@@ -48,19 +48,46 @@ function dealToStoreRow(d: Deal): StoreRow {
      (USD = international price tag) since downstream filters lean on
      it as a proxy for 'has cross-border price'.
 
-     `country` now uses the COUNTRY_STORES roster via inferStoreCountry
-     so a UK retailer (ASOS, Currys, Argos) tags as 'UK' and a US
-     retailer (Walmart, Best Buy, Macy's) tags as 'US' instead of
-     null. The previous 'NGN → NG, USD → null' rule left every
-     non-NG retailer untagged, which broke per-country queries like
-     the chip pool RPC. Truly global cross-border stores (AliExpress,
-     DHGate, Shein, Temu) still tag null because they don't have a
-     native market. */
+     `country` uses a two-layer resolution:
+       1. inferStoreCountry — JS-roster match (most reliable when the
+          store IS in COUNTRY_STORES). Returns canonical country code.
+       2. Country-tag fallback — SerpAPI ingest writes a `country:xx`
+          tag on every Deal indicating which country's query surfaced
+          it. For stores not in any JS roster, this tag is the best
+          available signal that the store IS reachable from that
+          market (Google Shopping returned it via google.co.za / etc.).
+
+     Truly global cross-border stores (AliExpress / DHGate / Shein /
+     Temu) appear in MULTIPLE countries' tags AND aren't in any
+     country roster — they stay NULL via this path. But the layer-2
+     fallback handles single-country leaf stores like Pepperfry-from-
+     ZA-query that would otherwise be orphaned with NULL country.
+
+     Added May 2026 launch-readiness re-audit: 188 ZA SerpAPI upserts
+     landed on NULL-country stores → only 4 showed in /za/deals
+     because the local-tab filter relies on store_country tagging.
+     The country-tag fallback ensures new ingests get tagged
+     correctly going forward; migration 0037 cleaned the existing
+     backlog of NULL-country single-source-query stores. */
   const isIntl = d.currency === "USD";
+  let country = inferStoreCountry(d.storeId, d.storeName);
+  if (!country && !isGlobalIntlStore(d.storeId, d.storeName)) {
+    /* Country-tag fallback. SKIP for known multi-market stores
+       (AliExpress / Shein / Temu / DHgate / etc.) — those legitimately
+       appear in queries from MANY countries and shouldn't be anchored
+       to whichever one happened to be the most-recent ingest. */
+    const countryTag = d.tags.find((t) => t.startsWith("country:"));
+    if (countryTag) {
+      const cc = countryTag.slice("country:".length).toUpperCase();
+      if (/^(NG|UK|US|DE|AE|IN|ZA)$/.test(cc)) {
+        country = cc;
+      }
+    }
+  }
   return {
     id:               d.storeId,
     name:             d.storeName,
-    country:          inferStoreCountry(d.storeId, d.storeName),
+    country,
     url:              null,
     logo_url:         `/logos/${d.storeId}.png`,
     is_international: isIntl,
