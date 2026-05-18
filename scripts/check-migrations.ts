@@ -177,7 +177,10 @@ async function check0006_cashback(): Promise<CheckResult> {
 }
 
 async function check0007_product_requests(): Promise<CheckResult> {
-  const has = await tableHasColumn("product_requests", "url");
+  /* Probe `query` column — actual migration columns are query/email/
+     country/source/etc. Earlier verifier probed `url` which doesn't
+     exist in this migration. */
+  const has = await tableHasColumn("product_requests", "query");
   return {
     migration:   "0007-product-requests",
     description: "product_requests table",
@@ -247,7 +250,10 @@ async function check0014_newsletter_categories(): Promise<CheckResult> {
 }
 
 async function check0015_clicks(): Promise<CheckResult> {
-  const has = await tableHasColumn("outbound_clicks", "product_id");
+  /* Probe `deal_id` — actual schema is id/deal_id/query/position/
+     mode/clicked_at. Earlier verifier probed `product_id` which
+     belongs to the popular_products RPC return, not the table. */
+  const has = await tableHasColumn("outbound_clicks", "deal_id");
   return {
     migration:   "0015-clicks-popularity",
     description: "outbound_clicks table",
@@ -327,7 +333,11 @@ async function check0026_search_query_log(): Promise<CheckResult> {
 }
 
 async function check0027_price_history(): Promise<CheckResult> {
-  const has = await tableHasColumn("offer_price_history", "current_price");
+  /* Probe `price` column — actual schema is id/offer_id/product_id/
+     price/currency/discount_percent/recorded_at. Earlier verifier
+     probed `current_price` (the column name on offers, not on
+     this history table). */
+  const has = await tableHasColumn("offer_price_history", "price");
   return {
     migration:   "0027-offer-price-history",
     description: "offer_price_history table",
