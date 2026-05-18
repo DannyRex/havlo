@@ -20,7 +20,7 @@ import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { wrapWithAffiliate } from "@/lib/affiliate";
 import { convertAliexpressUrl, aliexpressApiActive } from "@/lib/aliexpress-converter";
 import { getServerCountry } from "@/lib/country-server";
-import { merchantSearchUrl, merchantHomepage, smartFallbackUrl } from "@/lib/merchant-search-urls";
+import { merchantSearchUrl, merchantHomepage, smartFallbackUrl, rewriteUbuyHostForCountry } from "@/lib/merchant-search-urls";
 
 /* Click-resolution telemetry. Every redirect writes one row to
    click_resolutions so we can debug "this click went to the wrong
@@ -287,10 +287,20 @@ export async function GET(req: NextRequest) {
      The telemetry log captures the PRE-wrap URL so we can see the
      resolver's decision separately from the affiliate tag layer. */
   const sendOut = (url: string, step: ResolutionStep, opts: { serpapiAttempted?: boolean; serpapiResolved?: boolean } = {}) => {
-    const wrapped = wrapWithAffiliate(url, ctx).toString();
+    /* Country-routed host rewrites BEFORE affiliate wrapping. Catches
+       stored-URL hosts that don't serve the visitor's market —
+       currently just bare ubuy.com → country subdomain (verified
+       user-reported broken CTA May 2026 v3). The rewrite is keyed
+       on hostname so it's safe to call on every URL: non-matching
+       hosts pass through unchanged. Without this, fixing
+       merchantSearchUrl alone wouldn't help — ingestion-stored
+       URLs flow through the passthrough branch and never hit
+       merchantSearchUrl. */
+    const normalised = rewriteUbuyHostForCountry(url, country.code);
+    const wrapped = wrapWithAffiliate(normalised, ctx).toString();
     logResolution({
       ...baseLog,
-      resolvedUrl: url,
+      resolvedUrl: normalised,
       step,
       serpapiAttempted: opts.serpapiAttempted ?? false,
       serpapiResolved:  opts.serpapiResolved  ?? false,

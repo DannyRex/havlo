@@ -67,9 +67,32 @@ const UBUY_SUBDOMAIN: Record<string, string> = {
   za: "ubuy.co.za",
 };
 
-function ubuyHostForCountry(country?: string): string {
+export function ubuyHostForCountry(country?: string): string {
   if (!country) return "www.ubuy.com.ng";  // NG is our launch market — best default
   return UBUY_SUBDOMAIN[country.toLowerCase()] ?? "www.ubuy.com";
+}
+
+/* Runtime URL rewriter for stored Ubuy URLs. Catches the bare
+   ubuy.com (country-selector splash, returns no product results)
+   and re-hosts the path on the visitor's country subdomain. Does
+   NOT touch URLs already on a country subdomain — those are
+   presumed correct.
+
+   Used by /api/go to fix ingestion-stored ubuy.com URLs at click
+   time without an ingest re-run. The path + querystring + fragment
+   are preserved exactly so search queries (?ref=...) carry
+   through unchanged onto the country host where they actually
+   return results. */
+export function rewriteUbuyHostForCountry(url: string, country?: string): string {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase().replace(/^www\./, "");
+    if (host !== "ubuy.com") return url;       // already on a country subdomain or not Ubuy
+    u.hostname = ubuyHostForCountry(country);
+    return u.toString();
+  } catch {
+    return url;
+  }
 }
 
 /* Ordered most-specific first so substring matching picks the
