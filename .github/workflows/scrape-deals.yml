@@ -193,35 +193,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Diagnostic — prints PRESENCE of each gating var without leaking
-      # values, so we can tell from logs whether the if-condition below
-      # is going to fire. Added May 2026 after the cron silently skipped
-      # SerpAPI ingest for 4+ runs and the only signal was 1s step
-      # duration. Will remove once root cause is settled.
-      - name: Debug env presence
-        run: |
-          echo "SUPABASE_URL set: ${SUPABASE_URL:+yes}${SUPABASE_URL:-NO}"
-          echo "SUPABASE_SERVICE_ROLE_KEY set: ${SUPABASE_SERVICE_ROLE_KEY:+yes}${SUPABASE_SERVICE_ROLE_KEY:-NO}"
-          echo "SERPAPI_KEY set: ${SERPAPI_KEY:+yes}${SERPAPI_KEY:-NO}"
-          echo "skip_serpapi input: '${{ inputs.skip_serpapi }}'"
-          echo "skip_serpapi negated: '${{ !inputs.skip_serpapi }}'"
-
       # --limit=50 (was the script default 20). One SerpAPI search is
       # one credit regardless of result count, so bumping the per-call
       # ceiling is free and roughly doubles the deal pool surfacing on
       # /deals + /compare each cycle. Without this, a category like
       # 'Audio' returns ~20 deals total per country, which felt sparse.
       - name: Ingest SerpAPI live deals → Supabase
-        # Gating if: removed May 2026 launch-readiness pass. The
-        # condition was silently skipping the step across multiple
-        # runs (1-second step time + 0-byte logs even after rewriting
-        # to multiple GHA-canonical patterns). Without the if:, the
-        # script either runs (good) or fails with a real error
-        # (also good — visible signal beats silent skip). The skip
-        # behaviour only helped in the rare developer case of running
-        # this workflow without secrets configured, which doesn't
-        # apply to the production repo where all 5 required secrets
-        # exist (verified May 2026 via /actions/secrets API).
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
         run: npm run ingest -- --limit=50
 
   # ── Job 4a: Jumia ingest via SerpAPI's dedicated `engine=jumia`.
@@ -259,7 +237,7 @@ jobs:
       # If Jumia inventory ever becomes time-sensitive (flash sales),
       # widen back to Mon + Thu by removing the day-gate.
       - name: Ingest Jumia deals (SerpAPI engine=jumia) → Supabase
-        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && !inputs.skip_serpapi && (github.event.schedule == null || contains(github.event.schedule, '4'))
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true && (github.event.schedule == null || contains(github.event.schedule, '4'))
         run: npm run ingest:jumia
 
   # ── Job 4: UK retailer-biased SerpAPI ingest. Standard ingest above
@@ -295,7 +273,7 @@ jobs:
         run: npm ci
 
       - name: Ingest UK retailer deals → Supabase
-        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && !inputs.skip_serpapi
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
         run: npm run ingest:uk-retailers
 
   # ── Job 5: Dedup pass. Re-keys product signatures with the compact
