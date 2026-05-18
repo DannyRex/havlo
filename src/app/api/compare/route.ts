@@ -296,7 +296,14 @@ export async function GET(req: NextRequest) {
     }
     const pidMissedOrAbsent = !result || result.mode === "empty";
     if (pidMissedOrAbsent && q.trim()) {
-      result = await pgFtsFindSimilar(q);
+      /* Country threaded through so pgFtsFindSimilar.pickAnchor can
+         skip FTS candidates whose offers all get country-filtered.
+         Before this, /compare?q=iphone+15&country=uk would pick an
+         Indian-store anchor (highest FTS score) → filterByCountry
+         wiped it → mode:empty. Now the anchor selection skips to
+         the next FTS candidate that has at least one UK-allowed
+         offer. Re-audit May 2026 launch-readiness fix. */
+      result = await pgFtsFindSimilar(q, { country });
     }
     if (!result) {
       result = { mode: "empty", query: q, suggestions: [] };
@@ -338,7 +345,7 @@ export async function GET(req: NextRequest) {
             && titleStripped.includes(stripped);
       });
       if (pivot) {
-        const pivoted = await pgFtsFindSimilar(pivot.title);
+        const pivoted = await pgFtsFindSimilar(pivot.title, { country });
         if (pivoted.mode !== "empty") {
           result = { ...pivoted, query: pivot.title, pivotedFromQuery: q } as SearchOutput & { pivotedFromQuery?: string };
         }

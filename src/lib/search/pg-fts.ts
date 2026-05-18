@@ -680,7 +680,7 @@ async function fetchDidYouMean(q: string): Promise<SearchSuggestion[]> {
 
 export async function pgFtsFindSimilar(
   rawQuery: string,
-  opts?: { limit?: number },
+  opts?: { limit?: number; country?: import("@/lib/country").Country },
 ): Promise<SearchOutput> {
   const q = rawQuery.trim();
   if (!q) return { mode: "empty", query: q, suggestions: [] };
@@ -837,7 +837,26 @@ export async function pgFtsFindSimilar(
 
     for (const { row } of qualifyingCandidates) {
       const anchor = await resolveAnchorFromRow(row);
-      if (anchor) return { row, anchor };
+      if (!anchor) continue;
+      /* Country-aware anchor selection (May 2026 launch-readiness
+         re-audit). Before this, pickAnchor returned the FIRST
+         FTS-scoring product without checking country relevance —
+         /compare?q=iphone+15&country=uk would pick "Apple iPhone 15"
+         on 93mobiles (an Indian retailer) as the anchor, then the
+         downstream country filter would drop every offer and the
+         response collapsed to mode:"empty".
+
+         Now: if a country is passed, the anchor must have AT LEAST
+         ONE offer that survives isOfferAllowedForCountry. Iterate
+         to the next candidate when the current one wipes out.
+         Falls through to candidates without country check when no
+         country passed (preserves the no-country callers' behaviour). */
+      if (opts?.country) {
+        const { isOfferAllowedForCountry } = await import("@/lib/country");
+        const passing = anchor.offers.filter((o) => isOfferAllowedForCountry(o, opts.country!));
+        if (passing.length === 0) continue;
+      }
+      return { row, anchor };
     }
     return null;
   }
