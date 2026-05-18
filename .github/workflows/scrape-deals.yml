@@ -2,14 +2,23 @@ name: Refresh data (scrape + ingest)
 
 on:
   schedule:
-    # Twice weekly — Monday + Thursday at 6:00 AM WAT (5:00 AM UTC).
-    # SerpAPI Starter ships 1,000 credits/month; daily fan-out
-    # (60 calls × 30 days = 1,800/month) blew the budget. Twice
-    # weekly = 60 × 8 = 480/month, leaving ~500 credits for the
-    # curated ingest + live search + buffer. Bump back to daily
-    # if you upgrade to Developer ($75/mo, 5,000 credits) or
-    # Production ($150/mo, 15,000 credits).
-    - cron: "0 5 * * 1,4"
+    # Weekly (Thursday) — temporarily reduced from Mon+Thu on May 18
+    # 2026 when GitHub Actions monthly budget hit 90% (1,800 of 2,000
+    # free minutes used, 14 days remaining in cycle, ~50 billable
+    # minutes per full run including the parallel jobs).
+    #
+    # Math: 4 runs at twice-weekly would put us 200 min over budget
+    # by reset. Single weekly Thursday run = ~100 min total for the
+    # remaining window = comfortable headroom.
+    #
+    # Restore Mon+Thu by changing back to "0 5 * * 1,4" after the
+    # June 1 reset, OR consider self-hosted runner / paid Actions
+    # minutes if launch traffic justifies daily ingest.
+    #
+    # SerpAPI budget note (separate constraint): Starter ships 1,000
+    # credits/month; daily would blow that. Twice weekly used 60 × 8
+    # = 480/month. Weekly = 60 × 4 = 240/month — well under Starter.
+    - cron: "0 5 * * 4"
   workflow_dispatch:
     # Manual run from GitHub UI. Inputs let us refresh just the
     # free data sources (Playwright scrapers + AliExpress affiliate

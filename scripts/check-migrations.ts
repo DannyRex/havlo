@@ -235,10 +235,12 @@ async function check0011_backfill_countries(): Promise<CheckResult> {
 }
 
 async function check0014_newsletter_categories(): Promise<CheckResult> {
-  const has = await tableHasColumn("newsletter_subscribers", "categories");
+  /* Migration adds `category` (singular). The earlier verifier
+     check used `categories` (plural) by accident — fixed May 2026. */
+  const has = await tableHasColumn("newsletter_subscribers", "category");
   return {
     migration:   "0014-newsletter-categories",
-    description: "newsletter_subscribers.categories column",
+    description: "newsletter_subscribers.category column",
     status:      has === true ? "PASS" : has === false ? "FAIL" : "UNKNOWN",
     detail:      has === true ? "exists" : "missing",
   };
