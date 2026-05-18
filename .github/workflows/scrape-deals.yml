@@ -193,6 +193,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Diagnostic — prints PRESENCE of each gating var without leaking
+      # values, so we can tell from logs whether the if-condition below
+      # is going to fire. Added May 2026 after the cron silently skipped
+      # SerpAPI ingest for 4+ runs and the only signal was 1s step
+      # duration. Will remove once root cause is settled.
+      - name: Debug env presence
+        run: |
+          echo "SUPABASE_URL set: ${SUPABASE_URL:+yes}${SUPABASE_URL:-NO}"
+          echo "SUPABASE_SERVICE_ROLE_KEY set: ${SUPABASE_SERVICE_ROLE_KEY:+yes}${SUPABASE_SERVICE_ROLE_KEY:-NO}"
+          echo "SERPAPI_KEY set: ${SERPAPI_KEY:+yes}${SERPAPI_KEY:-NO}"
+          echo "skip_serpapi input: '${{ inputs.skip_serpapi }}'"
+          echo "skip_serpapi negated: '${{ !inputs.skip_serpapi }}'"
+
       # --limit=50 (was the script default 20). One SerpAPI search is
       # one credit regardless of result count, so bumping the per-call
       # ceiling is free and roughly doubles the deal pool surfacing on
