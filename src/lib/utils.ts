@@ -64,6 +64,23 @@ export function getClickThroughUrl(item: { url: string; id?: string; title?: str
       if (item.title     && !u.searchParams.get("title"))     u.searchParams.set("title",     item.title.slice(0, 120));
       if (item.storeId   && !u.searchParams.get("store"))     u.searchParams.set("store",     item.storeId);
       if (item.storeName && !u.searchParams.get("storeName")) u.searchParams.set("storeName", item.storeName);
+      /* SSR pre-resolve also runs on the already-wrapped path
+         (May 2026 re-audit — most stored offer URLs ARE
+         pre-wrapped as `/api/go?url=https://google.com/...` from
+         older ingest runs, so the fresh-wrap pre-resolve branch
+         below never fired for them). Read the inner url param; if
+         it's a google-relay AND we have hints, swap the inner
+         url to the merchant URL.
+
+         Same fallback shape as the fresh path: when
+         merchantSearchUrl can't resolve, keep the original inner
+         url and let /api/go's runtime smart-fallback handle the
+         click. */
+      const innerUrl = u.searchParams.get("url");
+      if (innerUrl && isGoogleRelay(innerUrl) && (item.storeId || item.storeName) && item.title) {
+        const m = merchantSearchUrl(item.storeId ?? "", item.storeName ?? "", item.title, item.country);
+        if (m) u.searchParams.set("url", m.url);
+      }
       /* Return as a path-only URL so it stays same-origin. */
       return u.pathname + (u.search ? u.search : "");
     } catch {
