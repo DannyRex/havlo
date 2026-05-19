@@ -61,8 +61,17 @@ const KNOWN_RULES: Array<{ test: (lc: string) => boolean; out: string }> = [
   { test: (lc) => lc.startsWith("jd sports")  || lc.startsWith("jdsports"),         out: "JD Sports" },
   { test: (lc) => lc.startsWith("currys"),                                          out: "Currys" },
   { test: (lc) => lc.startsWith("john lewis"),                                      out: "John Lewis & Partners" },
+  /* Walmart — the SerpAPI / Google Shopping feed returns ~20+
+     "Walmart - SellerXYZ" sub-marketplace variants for the same
+     parent. Collapsing them to "Walmart" matches user mental model
+     and prevents the audit's "noisy store list" finding. */
   { test: (lc) => lc.startsWith("walmart"),                                         out: "Walmart" },
   { test: (lc) => lc.startsWith("best buy")   || lc.startsWith("bestbuy"),          out: "Best Buy" },
+  /* eBay — same sub-seller pattern. "eBay - authenticdeals" /
+     "eBay - mich_592413" / etc. all collapse to "eBay". Per-seller
+     reputation isn't a price-comparison axis users care about at
+     the listing level. */
+  { test: (lc) => lc.startsWith("ebay")       || lc.startsWith("e-bay"),            out: "eBay" },
   { test: (lc) => lc.startsWith("noon"),                                            out: "Noon" },
   { test: (lc) => lc.startsWith("myntra"),                                          out: "Myntra" },
   { test: (lc) => lc.startsWith("flipkart"),                                        out: "Flipkart" },

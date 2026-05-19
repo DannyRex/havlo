@@ -374,6 +374,15 @@ export const COUNTRY_STORES: Record<string, string[]> = {
        "ebay-uk" so UK-specific variants match before falling
        through to the bare US "ebay". */
     "ebay uk", "ebay-uk",
+    /* v6 (May 2026 re-audit) — explicit UK-suffix variants so
+       longest-match wins over bare brand entries in other rosters.
+       Examples that were leaking before:
+         - "acer-store-uk" → AE (AE roster had bare "ace" / "acer") */
+    "acer-store-uk", "acer store uk", "acer.co.uk",
+    "samsung.co.uk", "samsung-uk", "lg.co.uk", "lg uk",
+    "sony.co.uk", "sony uk", "apple.co.uk", "apple uk",
+    "nike.co.uk", "nike uk", "adidas.co.uk", "adidas uk",
+    "puma.co.uk", "puma uk", "hm.co.uk", "h&m uk",
     /* v5 additions (May 2026 launch-readiness audit). EE
        (BT-owned UK mobile carrier) and Ubisoft Store UK called
        out specifically as untagged contaminators. EE is "ee" so
@@ -488,16 +497,22 @@ export const COUNTRY_STORES: Record<string, string[]> = {
     "first cry", "firstcry.ae", "firstcry-ae",
     "centrepoint", "centrepointstores", "namshi", "ounass", "6thstreet",
     /* v4 additions (May 2026 launch-readiness audit) — AE local
-       roster was too tight (12 → was showing 3 effective). */
-    "ace", "ace.ae", "acehardware.ae", "jumbo.ae", "jumbo electronics",
-    "emax", "emax.ae", "plug-ins", "plugins.ae",
+       roster was too tight (12 → was showing 3 effective).
+       v5 tightening (May 2026 re-audit): bare "ace" / "acer" /
+       "desertcart" were substring-matching foreign stores
+       (acer-store-uk, desertcart-in). Removed bare forms; kept
+       only the .ae-specific variants. The longest-match logic
+       in inferStoreCountry needs the more-specific entry to
+       beat foreign rosters' bare forms. */
+    "ace.ae", "acehardware.ae", "jumbo.ae", "jumbo electronics",
+    "emax.ae", "plug-ins", "plugins.ae",
     "max fashion", "max-fashion", "maxfashion.ae",
-    "splash", "splashfashions.com", "splash fashions",
-    "babyshop", "babyshopstores", "mothercare.ae",
-    "shukran", "shukran.ae", "homecentre", "home centre",
+    "splashfashions.com", "splash fashions",
+    "babyshopstores", "mothercare.ae",
+    "shukran.ae", "home centre uae", "homecentre.ae",
     "westelm.ae", "west elm uae", "pottery barn uae",
-    "ubuy.ae", "desertcart", "desertcart.ae",
-    "letstango", "letstango.com", "menakart", "menakart.com",
+    "ubuy.ae", "desertcart.ae",
+    "letstango.com", "menakart.com",
     /* Country-variant collisions — explicit AE-specific forms so
        longest-match in inferStoreCountry wins over a parent brand's
        short entry in another country roster. Per May 2026 launch-
@@ -523,6 +538,22 @@ export const COUNTRY_STORES: Record<string, string[]> = {
     "limeroad", "voonik", "abof", "yepme",
     "vivo india", "oneplus india", "samsung india",
     "smytten", "swiss-beauty", "hyugalife", "sangeetha-mobiles",
+    /* v5 (May 2026 re-audit): country-variant overrides so the
+       longest-match in inferStoreCountry routes the .co.in /
+       India-tagged variants of global brands to IN rather than
+       to whichever country's roster has the bare brand name.
+       Examples that were leaking before:
+         - "adidas.co.in" → US (US roster had bare "adidas")
+         - "desertcart.in" → AE (AE roster had bare "desertcart")
+         - other India-suffix brand storefronts likely affected. */
+    "adidas.co.in", "adidas-co-in", "adidas india",
+    "desertcart.in", "desertcart-in",
+    "nike-co-in", "nike.co.in", "nike india",
+    "puma.co.in", "puma-india", "puma india",
+    "h&m.co.in", "h&m india", "hm-india",
+    "zara india", "zara-india", "zara.in",
+    "samsung.com/in", "samsung-india-com",
+    "lg india", "sony india", "apple india", "apple-india",
   ],
   za: [
     /* v3: tightened "game" → "game.co.za" / "game stores" because the

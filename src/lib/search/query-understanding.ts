@@ -74,6 +74,16 @@ const ACCESSORY_NOISE = [
   "silicone boot", "silicone sleeve", "straw cover", "straw replacement",
   "lid replacement", "spare part", "spare parts", "replacement straw",
   "replacement lid",
+  /* Laptop replacement parts — added May 2026 re-audit after
+     /compare?q=macbook+air anchored on "New A3240 Laptop Battery
+     11.58V 4645mAh For Apple macbook air 13 inch M4" (an aliexpress
+     battery, not the laptop). Filter applies broadly — any title
+     containing these phrases is treated as a part, not a product. */
+  "laptop battery", "replacement battery", "battery pack for",
+  "keyboard for macbook", "keyboard cover for", "trackpad replacement",
+  "screen for macbook", "lcd panel for", "display panel for",
+  "ssd upgrade for", "ram upgrade for", "memory upgrade for",
+  "charging port", "power button", "logic board",
 ];
 
 /* Pattern: "for {brand}" — flags accessories whose title doesn't
@@ -81,8 +91,15 @@ const ACCESSORY_NOISE = [
    AS for a major brand (e.g. "Carry Bag for Yeti Rambler",
    "Anti-slip Grip for AirPods Max"). Tight on the brand list — only
    brands where this pattern is reliably accessory rather than
-   legitimate co-marketing. */
-const FOR_BRAND_PATTERN = /\bfor\s+(stanley\s*quencher|stanley\s*ice\s*flow|stanley\s*iceflow|yeti\s+rambler|hydroflask|owala\s*freesip|airpods|iphone\s*\d|macbook|galaxy\s*s\d|nintendo\s*switch|ps[45]|xbox|playstation)\b/i;
+   legitimate co-marketing.
+
+   Extended May 2026 re-audit: now also allows ONE optional brand
+   word between "for" and the model token, catching the common
+   AliExpress listing pattern "Battery For Apple macbook air".
+   Previous regex required brand to come directly after "for", so
+   "for Apple macbook" wasn't caught — only "for macbook" would
+   have matched. */
+const FOR_BRAND_PATTERN = /\bfor\s+(?:apple\s+|samsung\s+|sony\s+|microsoft\s+|google\s+)?(stanley\s*quencher|stanley\s*ice\s*flow|stanley\s*iceflow|yeti\s+rambler|hydroflask|owala\s*freesip|airpods|iphone\s*\d|ipad|macbook|imac|galaxy\s*s\d|galaxy\s*tab|surface\s+pro|surface\s+book|pixel\s*\d|nintendo\s*switch|ps[45]|xbox|playstation)\b/i;
 
 export function looksLikeAccessory(title: string): boolean {
   const t = title.toLowerCase();
