@@ -80,11 +80,19 @@ const TARGETS = [
   "Le Creuset Dutch Oven", "Instant Pot Duo 6QT", "Stanley Quencher 40oz",
 ];
 
-/* Country fan-out — these are the markets where SerpAPI / native
-   providers actually return locally-relevant retailers. NG covers
-   Konga + AliExpress + cross-border. US/UK get Amazon variants +
-   country-roster stores via SerpAPI. */
-const COUNTRIES = ["ng", "us", "uk"];
+/* Country fan-out — every launch market. Expanded May 2026 re-audit
+   from {ng,us,uk} to the full 7 because the audit kept reporting
+   "/compare?q=iphone+15 empty for AE/DE/IN/ZA" — those markets had
+   zero iPhone 15 / Galaxy S24 / MacBook Air offers because the
+   generic category-name ingest ("phones") doesn't surface specific
+   flagship SKUs. The curated-targets path queries by SKU name
+   ("iPhone 15") so the SerpAPI result set is guaranteed to contain
+   that specific model.
+
+   Credit cost: ~50 targets × 7 countries × 1-2 SerpAPI providers
+   = ~350-700 calls. Developer plan (5K credits/mo) absorbs this
+   comfortably; run on-demand around audits, not on every cron. */
+const COUNTRIES = ["ng", "us", "uk", "de", "ae", "in", "za"];
 
 const PER_QUERY_LIMIT = 5;
 
