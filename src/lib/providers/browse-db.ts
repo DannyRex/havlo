@@ -28,6 +28,11 @@ interface BestOfferRow {
   store_name: string;
   is_international: boolean;
   store_logo_url: string | null;
+  /** Restored on RPC return by migration 0038. Lets isLocalToUser
+      use the DB-authoritative store_country instead of relying on
+      the hardcoded JS roster — fixes /za/deals showing 4 cards
+      despite 159 ZA-anchored offers in the view. */
+  store_country: string | null;
 }
 
 function rowToDeal(r: BestOfferRow, popularity?: PopularityRecord): Deal {
@@ -60,6 +65,7 @@ function rowToDeal(r: BestOfferRow, popularity?: PopularityRecord): Deal {
        theory return something unexpected. */
     clicks: (popularity && typeof popularity === "object" && popularity[r.product_id]) || 0,
     postedAt: r.scraped_at.slice(0, 10),
+    storeCountry: r.store_country ?? null,
   };
 }
 

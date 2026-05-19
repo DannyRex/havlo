@@ -24,6 +24,8 @@ interface FtsRow {
   discount_percent: number | null;
   currency:         "NGN" | "USD";
   rank:             number;
+  /** Restored on RPC return by migration 0038. */
+  store_country?:   string | null;
 }
 
 function rowToDeal(r: FtsRow): Deal {
@@ -50,6 +52,7 @@ function rowToDeal(r: FtsRow): Deal {
     saves:           0,
     clicks:          0,
     postedAt:        new Date().toISOString().slice(0, 10),
+    storeCountry:    r.store_country ?? null,
   };
 }
 

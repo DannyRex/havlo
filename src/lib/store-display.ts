@@ -32,14 +32,30 @@
    canonicaliseSource so display matches what new rows would store. */
 const KNOWN_RULES: Array<{ test: (lc: string) => boolean; out: string }> = [
   /* Amazon variants — UK first because it's the most-suffixed
-     ("Amazon.co.uk - Amazon.co.uk-Seller" pattern). */
-  { test: (lc) => lc.includes("amazon.co.uk") || lc.startsWith("amazon uk"),         out: "Amazon UK" },
-  { test: (lc) => lc.includes("amazon.de")    || lc.startsWith("amazon germany"),   out: "Amazon Germany" },
-  { test: (lc) => lc.includes("amazon.ae")    || lc.startsWith("amazon uae"),       out: "Amazon UAE" },
-  { test: (lc) => lc.includes("amazon.in")    || lc.startsWith("amazon india"),     out: "Amazon India" },
-  { test: (lc) => lc.includes("amazon.ca")    || lc.startsWith("amazon canada"),    out: "Amazon Canada" },
+     ("Amazon.co.uk - Amazon.co.uk-Seller" pattern).
+
+     Each rule catches THREE shapes of the same merchant: the
+     dotted-domain form, the country-word form, AND the bare 2-letter
+     country code with whitespace separator. Without the third form,
+     re-audit caught "Amazon DE" (literal storeName) NOT matching
+     the Germany rule (no dot, no "germany" word) → falling through
+     to the generic stripper → displayed as "Amazon DE" → not
+     deduped with the "Amazon Germany" canonical key → /de/deals
+     stores list showed both as separate entries despite being
+     the same merchant. */
+  { test: (lc) => lc.includes("amazon.co.uk") || lc.startsWith("amazon uk")
+                  || lc.startsWith("amazon-uk"),                                    out: "Amazon UK" },
+  { test: (lc) => lc.includes("amazon.de")    || lc.startsWith("amazon germany")
+                  || lc.startsWith("amazon de") || lc.startsWith("amazon-de"),     out: "Amazon Germany" },
+  { test: (lc) => lc.includes("amazon.ae")    || lc.startsWith("amazon uae")
+                  || lc.startsWith("amazon ae") || lc.startsWith("amazon-ae"),     out: "Amazon UAE" },
+  { test: (lc) => lc.includes("amazon.in")    || lc.startsWith("amazon india")
+                  || lc.startsWith("amazon in") || lc.startsWith("amazon-in"),     out: "Amazon India" },
+  { test: (lc) => lc.includes("amazon.ca")    || lc.startsWith("amazon canada")
+                  || lc.startsWith("amazon ca") || lc.startsWith("amazon-ca"),     out: "Amazon Canada" },
   { test: (lc) => lc.includes("amazon.com")   || lc.startsWith("amazon - amazon")
-                  || lc === "amazon"          || lc.startsWith("amazon seller"),    out: "Amazon" },
+                  || lc === "amazon"          || lc.startsWith("amazon seller")
+                  || lc.startsWith("amazon us") || lc.startsWith("amazon-us"),     out: "Amazon" },
 
   /* Retailer-specific variants. */
   { test: (lc) => lc.startsWith("jd sports")  || lc.startsWith("jdsports"),         out: "JD Sports" },

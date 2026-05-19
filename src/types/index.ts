@@ -33,6 +33,15 @@ export interface Deal {
   categorySlug: string;
   storeId: string;
   storeName: string;
+  /** ISO-2 country code of the store's anchor market (from
+      stores.country in the DB, e.g. "NG", "UK", "ZA"). NULL for
+      truly global stores (AliExpress / Shein / Temu) that aren't
+      anchored to any single market. Optional because legacy Deal
+      sources (curated catalogs, AliExpress search results) don't
+      carry it. Added May 2026 launch-readiness re-audit so
+      /api/deals isLocalToUser can correctly bucket country-tagged
+      stores that aren't in the hardcoded JS roster. */
+  storeCountry?: string | null;
   originalPrice: number;
   salePrice: number;
   discountPercent: number;

@@ -296,18 +296,28 @@ export async function GET(req: NextRequest) {
        → INTL for everyone. Falls back to the currency check when
        the store can't be inferred (rare, niche scrapers). */
     const isLocalToUser = (d: typeof broadCountryFiltered[0]): boolean => {
+      /* Primary signal: DB-tagged store_country (Deal.storeCountry).
+         Restored on the RPC return in migration 0038 + threaded
+         through rowToDeal. Authoritative because it covers stores
+         the hardcoded JS COUNTRY_STORES roster doesn't enumerate
+         (the ~600 stores backfilled by migration 0037 from
+         offer.source_query). Before this, /za/deals?origin=local
+         showed 4 items even though the head count was 159 ZA-
+         tagged offers — the JS roster only knew 2 of the 94
+         ZA-anchored stores in the DB. */
+      if (d.storeCountry) {
+        return d.storeCountry.toLowerCase() === country.code.toLowerCase();
+      }
+      /* Fallback 1: JS roster check (covers the curated/AliExpress
+         paths where storeCountry is undefined). */
       const storeCountry = inferStoreCountry(d.storeId, d.storeName);
       if (storeCountry !== null) {
         return storeCountry.toLowerCase() === country.code.toLowerCase();
       }
-      /* Explicit global cross-border stores (AliExpress, Shein, Temu,
-         DHgate, …) are NEVER local. Without this short-circuit the
-         currency fallback below misclassifies USD-priced AliExpress
-         rows as "local" for US visitors (US currency = USD) — exactly
-         the bug the May 2026 cross-country audit caught (AliExpress
-         was the top store in the US "local" pool at 63 deals). */
+      /* Fallback 2: explicit global cross-border stores (AliExpress /
+         Shein / Temu / DHgate) are NEVER local. */
       if (isGlobalIntlStore(d.storeId, d.storeName)) return false;
-      // Fallback to currency match when store country can't be inferred
+      /* Fallback 3: currency match for fully-untagged rows. */
       return d.currency === country.currency;
     };
 
