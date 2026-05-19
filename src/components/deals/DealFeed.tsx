@@ -404,7 +404,13 @@ export default function DealFeed({
        SECOND run onward (any filter change) we behave as before. */
     if (!hasConsumedInitialRef.current) {
       hasConsumedInitialRef.current = true;
-      offsetRef.current = PAGE_SIZE;
+      /* Sync offsetRef to the ACTUAL initialItems length, not the
+         hardcoded PAGE_SIZE. SSR may seed more (or fewer) than
+         PAGE_SIZE — re-audit May 2026 bumped SSR fetch to 60 for
+         crawler/audit visibility while keeping client PAGE_SIZE at
+         24 for subsequent scrolls. Without this sync, next loadMore
+         would re-fetch items already on screen. */
+      offsetRef.current = initialItems?.length ?? PAGE_SIZE;
       return;
     }
 
