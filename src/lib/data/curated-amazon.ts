@@ -255,12 +255,19 @@ interface Marketplace {
   hostname:    string;
 }
 
+/* storeName values aligned with canonicaliseSource() output in
+   search-serpapi.ts so the curated catalog and the SerpAPI ingest
+   write the same display string to Deal.storeName for the same
+   storeId. Without this alignment, /api/deals returns mixed names
+   ("Amazon DE" from curated + "Amazon Germany" from SerpAPI) for
+   the same amazon-de store — re-audit caught this directly with
+   the 51 vs 15 split. Same applied to AE / IN for consistency. */
 const MARKETPLACES: Marketplace[] = [
-  { countryCode: "us", storeId: "amazon",       storeName: "Amazon",    hostname: "www.amazon.com" },
-  { countryCode: "uk", storeId: "amazon-co-uk", storeName: "Amazon UK", hostname: "www.amazon.co.uk" },
-  { countryCode: "de", storeId: "amazon-de",    storeName: "Amazon DE", hostname: "www.amazon.de" },
-  { countryCode: "ae", storeId: "amazon-ae",    storeName: "Amazon AE", hostname: "www.amazon.ae" },
-  { countryCode: "in", storeId: "amazon-in",    storeName: "Amazon IN", hostname: "www.amazon.in" },
+  { countryCode: "us", storeId: "amazon",       storeName: "Amazon",         hostname: "www.amazon.com" },
+  { countryCode: "uk", storeId: "amazon-co-uk", storeName: "Amazon UK",      hostname: "www.amazon.co.uk" },
+  { countryCode: "de", storeId: "amazon-de",    storeName: "Amazon Germany", hostname: "www.amazon.de" },
+  { countryCode: "ae", storeId: "amazon-ae",    storeName: "Amazon UAE",     hostname: "www.amazon.ae" },
+  { countryCode: "in", storeId: "amazon-in",    storeName: "Amazon India",   hostname: "www.amazon.in" },
 ];
 
 /* Spread one product across all 5 marketplaces. */

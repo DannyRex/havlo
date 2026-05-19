@@ -191,6 +191,11 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
     title:     offer.title,
     storeId:   offer.storeId,
     storeName: offer.storeName,
+    /* country threaded through so Ubuy/etc country-routed merchants
+       resolve via merchantSearchUrl with the right subdomain. Also
+       drives the SSR google-relay pre-resolve added May 2026
+       re-audit (see getClickThroughUrl docstring). */
+    country:   countryCode,
   });
 
   const hasDiscount = offer.discountPercent > 0;

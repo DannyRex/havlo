@@ -36,6 +36,25 @@
    credit per unique URL per 30 days (~100 / month for the UK
    retailer pool, well within budget). The user-facing win: UK
    retailers finally surface on /uk/deals + /uk/compare. */
+/* True if the URL is a Google relay (Shopping / ad-redirect /
+   syndication / doubleclick). Used to short-circuit relay handling
+   at multiple layers — /api/go's resolver, the SSR pre-resolve in
+   getClickThroughUrl (which replaces the relay with the merchant
+   search URL so the rendered CTA href doesn't contain google.com).
+   Mirrors the isGoogleRelay() in /api/go/route.ts; kept in sync. */
+export function isGoogleRelay(u: string): boolean {
+  try {
+    const h = new URL(u).hostname.toLowerCase();
+    if (h === "google.com" || h.endsWith(".google.com")) return true;
+    if (h === "googleadservices.com" || h.endsWith(".googleadservices.com")) return true;
+    if (h === "googlesyndication.com" || h.endsWith(".googlesyndication.com")) return true;
+    if (h === "doubleclick.net" || h.endsWith(".doubleclick.net")) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function isUsableMerchantUrl(url: string): boolean {
   /* Internal /api/go wrapper — always keep. Resolver handles
      relay URLs at click time. */

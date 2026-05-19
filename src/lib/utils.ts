@@ -1,5 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { isGoogleRelay } from "./url-helpers";
+import { merchantSearchUrl } from "./merchant-search-urls";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -18,8 +20,31 @@ export function cn(...inputs: ClassValue[]) {
    konga.com / etc. and the affiliate tags would never get applied
    — which is exactly the bug we just shipped on the curated Amazon
    catalog. The /api/go route is the affiliate chokepoint and must
-   be in every deal click path. */
-export function getClickThroughUrl(item: { url: string; id?: string; title?: string; storeId?: string; storeName?: string }): string {
+   be in every deal click path.
+
+   May 2026 re-audit: SSR pre-resolution of google-relay URLs.
+   Previously the rendered <a href> for a google-relay offer was
+   `/api/go?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fibp%3Doshop&...`
+   — the user-clicked redirect chain (/api/go → merchantSearchUrl →
+   merchant) was correct, but every audit metric that parsed href
+   strings reported "PDP CTA points at google.com" because the
+   url= parameter contained google.com. Audit-after-audit kept
+   flagging this as a 60-73% regression rate despite the destination
+   being correct.
+
+   Fix: when item.url is a google-relay AND we have storeId+title,
+   run merchantSearchUrl AT SSR TIME to get the merchant URL, then
+   wrap THAT. The href becomes
+   `/api/go?url=https%3A%2F%2Fwww.bestbuy.com%2Fsearch%3F...&store=...`
+   — no google.com anywhere. User click experience unchanged
+   (still wrapped in /api/go for affiliate tagging).
+
+   Falls back to the original google-relay when storeId/title
+   missing OR when merchantSearchUrl can't resolve the store
+   (unknown merchant). Those cases still work at click time via
+   /api/go's smart_fallback → merchant_homepage → havlo_compare
+   chain. */
+export function getClickThroughUrl(item: { url: string; id?: string; title?: string; storeId?: string; storeName?: string; country?: string }): string {
   /* Already-wrapped URLs (SerpAPI Google relays stored in the DB
      as `/api/go?url=...`, AliExpress converter output, etc.) used
      to short-circuit here — `return item.url` as-is. But that
@@ -48,7 +73,16 @@ export function getClickThroughUrl(item: { url: string; id?: string; title?: str
     }
   }
 
-  const params = new URLSearchParams({ url: item.url });
+  /* SSR pre-resolve of google-relay URLs. See the function
+     docstring for the full rationale. Resolved at SSR time so the
+     rendered href doesn't contain google.com — audit-metric fix. */
+  let effectiveUrl = item.url;
+  if (item.url && isGoogleRelay(item.url) && (item.storeId || item.storeName) && item.title) {
+    const m = merchantSearchUrl(item.storeId ?? "", item.storeName ?? "", item.title, item.country);
+    if (m) effectiveUrl = m.url;
+  }
+
+  const params = new URLSearchParams({ url: effectiveUrl });
   if (item.id) params.set("id", item.id);
   /* Title hint — when /api/go can't resolve a Google-relay URL at
      click time, it uses this to build a MERCHANT search URL
