@@ -23,6 +23,7 @@
 import { useState, type FormEvent } from "react";
 import { Loader2, Check, AlertTriangle, ArrowRight } from "lucide-react";
 import { track } from "@/lib/analytics";
+import { useCountry } from "@/components/providers/CountryProvider";
 
 interface Props {
   /** Override endpoint at the call site (e.g. for an A/B test or a
@@ -50,6 +51,11 @@ export default function EmailCapture({
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  /* Subscriber's country — sent with the signup so the welcome
+     email links to their own /{country}/deals. Without this the
+     /api/newsletter route had no country and fell back to /ng (a UK
+     signup got an ng/deals link). */
+  const { country } = useCountry();
 
   /* Default to the in-house /api/newsletter route. The mailto
      fallback was firing for every signup because the env var was
@@ -75,7 +81,7 @@ export default function EmailCapture({
       const res = await fetch(resolvedEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ email: trimmed, source }),
+        body: JSON.stringify({ email: trimmed, source, country: country.code }),
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));

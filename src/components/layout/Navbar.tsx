@@ -92,13 +92,18 @@ export default function Navbar() {
   return (
     <>
       {/* ── Top header (desktop + mobile) ──────────────────────────
-          - sticky + transform-gpu forces a compositing layer so iOS
-            Safari doesn't repaint the bar on every scroll frame
-          - backdrop-blur is heavy; only apply on sm+ where the GPU
-            cost is worth it. Mobile gets a solid 95% bg instead. */}
+          - sticky top-0. Mobile uses a fully-opaque bg and NO
+            transform: a translateZ compositing layer on a
+            position:sticky element jitters during momentum scroll
+            on mobile Safari (the "navbar shakes on scroll" report).
+            Opaque background + no transform is the most
+            scroll-stable combination.
+          - backdrop-blur is heavy and only worth it on sm+; the GPU
+            compositing layer (sm:transform-gpu) is scoped to that
+            same breakpoint so it helps the blur without destabilis-
+            ing the mobile bar. */}
       <header
-        className="sticky top-0 z-40 border-b border-border bg-bg/95 sm:bg-bg/85 sm:backdrop-blur-xl transform-gpu"
-        style={{ WebkitBackdropFilter: undefined }}
+        className="sticky top-0 z-40 border-b border-border bg-bg sm:bg-bg/85 sm:backdrop-blur-xl sm:transform-gpu"
       >
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
 

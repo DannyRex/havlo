@@ -63,6 +63,17 @@ const nextConfig = {
      first section retains its slug. */
   async redirects() {
     return [
+      /* Canonical host — force www.havlo.io -> havlo.io (308 permanent).
+         Both hosts were serving the app, so Google indexed each
+         separately with drifting metadata. A permanent host redirect
+         consolidates them onto the non-www canonical that every
+         <link rel="canonical"> and SITE_URL already uses. */
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.havlo.io" }],
+        destination: "https://havlo.io/:path*",
+        permanent: true,
+      },
       { source: "/disclaimer",                           destination: "/how-we-make-money", permanent: true },
       { source: "/disclaimer/:path*",                    destination: "/how-we-make-money/:path*", permanent: true },
     ];

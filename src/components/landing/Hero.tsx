@@ -5,8 +5,8 @@ import { useRef, useState, useEffect } from "react";
 import { ArrowUp, Link2, Search as SearchIcon, Store as StoreIcon } from "lucide-react";
 import Link from "next/link";
 import {
-  PhoneIcon, LaptopIcon, SneakerIcon, EarbudsIcon, TvIcon,
-  HomeIcon, FashionIcon, BeautyIcon, GamingIcon, FurnitureIcon,
+  PhoneIcon, LaptopIcon, EarbudsIcon, TvIcon, GamingIcon,
+  HomeIcon, FashionIcon, BeautyIcon, SportsIcon, AppliancesIcon,
 } from "@/components/ui/CategoryIcons";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { logSearchEvent } from "@/lib/search/log-search";
@@ -21,31 +21,30 @@ interface SuggestionItem {
   storeCount: number;
 }
 
-/* Each pill maps to a real category slug from src/lib/data/categories.ts
-   so /deals can apply its category filter directly (not a fuzzy text
-   search). Sub-category pills (Sneakers, TVs, Furniture) carry an
-   optional `search` so the deals page filters by category AND
-   narrows to the specific product type within it. */
+/* Each pill maps 1:1 to a real category slug from
+   src/lib/data/categories.ts and applies that category filter on
+   /deals — a filter, never a text search. Earlier the sub-category
+   pills (Sneakers/TVs/Furniture) also dropped a `search` term into
+   the /deals search box, which read as a search rather than a
+   filter and was inconsistent with the top-level pills. Removed
+   May 2026 per founder direction: a pill is a filter. */
 type CatItem = {
   label: string;
   slug:  string;
-  /** Optional text-search override applied alongside the category
-      filter when the pill is a sub-category of the slug it maps to. */
-  search?: string;
   Icon:  ComponentType<{ size?: number; className?: string }>;
 };
 
 const CATEGORIES: CatItem[] = [
-  { label: "Phones",     slug: "phones",                            Icon: PhoneIcon },
-  { label: "Laptops",    slug: "computing",                         Icon: LaptopIcon },
-  { label: "Sneakers",   slug: "fashion",      search: "sneakers",  Icon: SneakerIcon },
-  { label: "Earbuds",    slug: "audio",                             Icon: EarbudsIcon },
-  { label: "TVs",        slug: "electronics",  search: "tv",        Icon: TvIcon },
-  { label: "Home",       slug: "home",                              Icon: HomeIcon },
-  { label: "Fashion",    slug: "fashion",                           Icon: FashionIcon },
-  { label: "Beauty",     slug: "beauty",                            Icon: BeautyIcon },
-  { label: "Gaming",     slug: "gaming",                            Icon: GamingIcon },
-  { label: "Furniture",  slug: "home",         search: "furniture", Icon: FurnitureIcon },
+  { label: "Phones",     slug: "phones",      Icon: PhoneIcon },
+  { label: "Laptops",    slug: "computing",   Icon: LaptopIcon },
+  { label: "Sports",     slug: "sports",      Icon: SportsIcon },
+  { label: "Earbuds",    slug: "audio",       Icon: EarbudsIcon },
+  { label: "TVs",        slug: "electronics", Icon: TvIcon },
+  { label: "Home",       slug: "home",        Icon: HomeIcon },
+  { label: "Fashion",    slug: "fashion",     Icon: FashionIcon },
+  { label: "Beauty",     slug: "beauty",      Icon: BeautyIcon },
+  { label: "Gaming",     slug: "gaming",      Icon: GamingIcon },
+  { label: "Appliances", slug: "appliances",  Icon: AppliancesIcon },
 ];
 
 interface Props {
@@ -213,13 +212,11 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
   }, []);
 
   /* Category pill click routes to /deals with the category SLUG
-     pre-applied (not a fuzzy text search). Sub-category pills carry
-     a search term so /deals shows the right narrow slice (e.g.
-     Sneakers = category=fashion + search=sneakers). */
+     pre-applied — a filter, never a text search. Pills used to be
+     able to carry a `search` term too; removed May 2026 so every
+     pill behaves consistently as a category filter. */
   const goToCategory = (cat: CatItem) => {
-    const params = new URLSearchParams({ category: cat.slug });
-    if (cat.search) params.set("search", cat.search);
-    router.push(`/${country.code}/deals?${params.toString()}`);
+    router.push(`/${country.code}/deals?category=${encodeURIComponent(cat.slug)}`);
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
