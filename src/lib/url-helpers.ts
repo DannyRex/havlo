@@ -45,7 +45,21 @@
 export function isGoogleRelay(u: string): boolean {
   try {
     const h = new URL(u).hostname.toLowerCase();
+    /* All Google country-specific Shopping domains. Re-audit
+       May 2026 caught a broken PDP whose stored URL was
+       `https://www.google.co.uk/search?ibp=oshop&q=...` — the
+       previous .google.com-only check missed it, so the SSR
+       pre-resolve never fired and the CTA passed the raw Google
+       URL through /api/go's passthrough branch, landing users
+       on Google's search results page instead of the merchant.
+
+       Pattern matches:
+         google.com, www.google.com, shopping.google.com
+         google.co.uk, www.google.co.uk
+         google.de, google.fr, google.it, ...
+         google.co.in, google.com.au, google.com.br, ... */
     if (h === "google.com" || h.endsWith(".google.com")) return true;
+    if (/^(www\.)?google\.[a-z.]{2,8}(\/|$)/.test(h + "/")) return true;
     if (h === "googleadservices.com" || h.endsWith(".googleadservices.com")) return true;
     if (h === "googlesyndication.com" || h.endsWith(".googlesyndication.com")) return true;
     if (h === "doubleclick.net" || h.endsWith(".doubleclick.net")) return true;

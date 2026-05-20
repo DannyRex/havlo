@@ -104,6 +104,14 @@ function isGoogleRelay(u: string): boolean {
     /* google.com + subdomains — Google Shopping relays (?prds=...),
        Google's own /url?q= redirect wrapper. */
     if (h === "google.com" || h.endsWith(".google.com")) return true;
+    /* Google country-specific Shopping domains (google.co.uk,
+       google.de, google.com.au, google.co.in, etc.). Re-audit
+       May 2026 caught /uk/p/661bbc27... with stored URL
+       https://www.google.co.uk/search?ibp=oshop&q=... — the
+       previous .google.com-only check missed it, so /api/go
+       passed it through and the user landed on Google's search
+       results page instead of the merchant. */
+    if (/^(www\.)?google\.[a-z.]{2,8}(\/|$)/.test(h + "/")) return true;
     /* Google's ad-redirect infrastructure. SerpAPI sometimes stores
        these as the offer URL when the click came from a Google
        Shopping ad rather than an organic listing. Without this
@@ -114,8 +122,6 @@ function isGoogleRelay(u: string): boolean {
     if (h === "googleadservices.com" || h.endsWith(".googleadservices.com")) return true;
     if (h === "googlesyndication.com" || h.endsWith(".googlesyndication.com")) return true;
     if (h === "doubleclick.net" || h.endsWith(".doubleclick.net")) return true;
-    /* Google Shopping aggregator domains. */
-    if (h === "shopping.google.com") return true;  // covered by .google.com above; explicit for grep
     return false;
   } catch {
     return false;
