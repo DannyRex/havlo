@@ -13,6 +13,7 @@
    ────────────────────────────────────────────────────────────────── */
 
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { getActiveSearchProviders, ProviderError } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry } from "@/lib/country";
@@ -245,7 +246,18 @@ export async function GET(req: NextRequest) {
      Fire-and-forget: not awaited. Failures log but don't block
      the user response — the live-results UI still renders. */
   if (priceFiltered.length > 0) {
-    void persistLiveResults(q, countryCode, priceFiltered);
+    /* Background-persist with waitUntil so Vercel keeps the function
+       alive past the response. Was `void persistLiveResults(...)`
+       (fire-and-forget) — the response would return immediately and
+       the runtime would tear down the serverless context, killing
+       the in-flight Supabase writes before they completed.
+
+       Re-audit verified: hitting /api/live-search?q=nokia+3310 with
+       x-vercel-cache: MISS (fresh run, not cached) returned 2 items,
+       but a DB check 8 seconds later found ZERO Nokia products and
+       ZERO live-search offers persisted. waitUntil() guarantees the
+       persistDeals call completes before the function ends. */
+    waitUntil(persistLiveResults(q, countryCode, priceFiltered));
   }
 
   /* Edge-cache aggressively. Cadence history:
