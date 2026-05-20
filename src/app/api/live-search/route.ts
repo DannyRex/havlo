@@ -23,6 +23,18 @@ import { ingestDeals } from "@/lib/providers/ingestion";
 import { withinBudget, recordSerpApiCall } from "@/lib/serpapi-budget";
 import type { Deal } from "@/types";
 
+/* Module-level in-flight guard for the persist path. The /compare
+   fetchLive effect double-fires under React StrictMode and on rapid
+   re-search; without a guard, two ingestDeals runs execute
+   concurrently for the same query and race each other's
+   (store_id, url) offer upserts, orphaning each other's freshly-
+   inserted products. This Set lives at module scope so it survives
+   across requests handled by the same warm Vercel function instance
+   (the common case for the double-fire). Cross-instance concurrency
+   is far rarer, and ingestDeals' Step 5b orphan reconciliation
+   catches anything this misses. */
+const persistInFlight = new Set<string>();
+
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
   /* Default countryCode from the user's cookie (set by CountryProvider).
@@ -165,6 +177,19 @@ export async function GET(req: NextRequest) {
         return queryTokens.some((t) => title.includes(t));
       });
 
+  /* PERSIST SET — every token-relevant live result, country- and
+     counterfeit-price filtered, but NOT narrowed by the accessory /
+     family filters below. Founder direction May 2026: "save them
+     all, whether they're direct siblings or not. No new product must
+     go unsaved." The accessory + family filters are DISPLAY relevance
+     only; a real product that isn't a direct sibling of the query is
+     still worth having in the catalog so the next search resolves
+     from the DB instead of burning another live-search credit.
+     Counterfeit-priced rows stay excluded — those are junk, not
+     catalog gaps. */
+  const persistSet = filterDealsForCountry(tokenRelevant, cookieCountry)
+    .filter((it) => priceLooksPlausibleForLiveDeal(it.salePrice, it.title));
+
   /* Accessory exclusion — when the query itself is a product name (e.g.
      "iphone 15 pro max"), drop results whose titles are accessories /
      parts (case, cover, screen protector, replacement LCD, etc.). The
@@ -245,19 +270,27 @@ export async function GET(req: NextRequest) {
 
      Fire-and-forget: not awaited. Failures log but don't block
      the user response — the live-results UI still renders. */
-  if (priceFiltered.length > 0) {
-    /* Background-persist with waitUntil so Vercel keeps the function
-       alive past the response. Was `void persistLiveResults(...)`
-       (fire-and-forget) — the response would return immediately and
-       the runtime would tear down the serverless context, killing
-       the in-flight Supabase writes before they completed.
+  /* Persist the FULL token-relevant set (persistSet), not the
+     family-narrowed display set — see persistSet above.
 
-       Re-audit verified: hitting /api/live-search?q=nokia+3310 with
-       x-vercel-cache: MISS (fresh run, not cached) returned 2 items,
-       but a DB check 8 seconds later found ZERO Nokia products and
-       ZERO live-search offers persisted. waitUntil() guarantees the
-       persistDeals call completes before the function ends. */
-    waitUntil(persistLiveResults(q, countryCode, priceFiltered));
+     Background-persist with waitUntil so Vercel keeps the function
+     alive past the response. Was `void persistLiveResults(...)`
+     (fire-and-forget) — the response would return immediately and
+     the runtime would tear down the serverless context, killing the
+     in-flight Supabase writes before they completed. waitUntil()
+     guarantees the persist call completes before the function ends. */
+  if (persistSet.length > 0) {
+    /* In-flight guard — collapse concurrent persists of the same
+       {country}:{query} (the StrictMode / rapid-re-search double-
+       fire) to a single ingestDeals run. Two concurrent runs race
+       each other's (store_id, url) offer upserts and orphan each
+       other's products. The slot is released in persistLiveResults'
+       finally block once the run ends. */
+    const persistKey = `${countryCode.toLowerCase()}:${q.toLowerCase()}`;
+    if (!persistInFlight.has(persistKey)) {
+      persistInFlight.add(persistKey);
+      waitUntil(persistLiveResults(q, countryCode, persistSet, persistKey));
+    }
   }
 
   /* Edge-cache aggressively. Cadence history:
@@ -294,6 +327,7 @@ async function persistLiveResults(
   query: string,
   countryCode: string,
   items: Deal[],
+  persistKey?: string,
 ): Promise<void> {
   try {
     await ingestDeals("live-search", `${countryCode}:${query}`, items);
@@ -302,5 +336,9 @@ async function persistLiveResults(
        as an error. Log + continue — the cache layer still helps
        for the immediate-repeat case. */
     console.warn("[live-search] persist failed:", (err as Error).message);
+  } finally {
+    /* Release the in-flight slot however the run ends, so a genuine
+       re-search after the cache window can persist fresh data again. */
+    if (persistKey) persistInFlight.delete(persistKey);
   }
 }

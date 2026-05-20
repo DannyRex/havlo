@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { SearchX, CheckCircle, AlertCircle, Coins } from "lucide-react";
 import Link from "next/link";
@@ -53,15 +53,26 @@ function CompareContent() {
   const [liveResults, setLiveResults]   = useState<Deal[]>([]);
   const [liveLoading, setLiveLoading]   = useState(false);
   const [liveProviders, setLiveProviders] = useState<string[]>([]);
+  /* Guards fetchLive against the StrictMode double-invoke and rapid
+     re-search firing the same live query twice. A duplicate live
+     search also spawns a duplicate server-side persist run — the
+     concurrency that orphaned products in the catalog. */
+  const lastLiveQueryRef = useRef<string>("");
 
   /* ── Fetch live SerpAPI results in parallel with the internal search ── */
   const fetchLive = useCallback(async (q: string) => {
-    if (!q.trim()) return;
+    const trimmed = q.trim();
+    if (!trimmed) return;
+    /* Skip a back-to-back identical live query (the double-fire). A
+       genuinely new query always differs from the immediately
+       previous one, so this only collapses true duplicates. */
+    if (lastLiveQueryRef.current === trimmed) return;
+    lastLiveQueryRef.current = trimmed;
     setLiveLoading(true);
     setLiveResults([]);
     setLiveProviders([]);
     try {
-      const res = await fetch(`/api/live-search?q=${encodeURIComponent(q)}&limit=12`);
+      const res = await fetch(`/api/live-search?q=${encodeURIComponent(trimmed)}&limit=12`);
       const data = await res.json();
       setLiveResults(Array.isArray(data.items) ? (data.items as Deal[]) : []);
       setLiveProviders(Array.isArray(data.providers) ? (data.providers as string[]) : []);

@@ -12,6 +12,7 @@ import { MASONRY_ASPECTS } from "./masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
 import EmptySearchState from "@/components/empty/EmptySearchState";
 import CategorySubscribe from "./CategorySubscribe";
+import LiveResults from "@/components/compare/LiveResults";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { cn } from "@/lib/utils";
 import { categories } from "@/lib/data/categories";
@@ -22,6 +23,11 @@ type ViewMode = "grid" | "list";
 const VIEW_STORAGE_KEY = "havlo:deals:viewMode";
 
 const PAGE_SIZE = 24;
+
+/* When a text search returns fewer than this many catalog results,
+   DealFeed fans out to the live shopping providers. Founder direction
+   May 2026: /deals triggers live search when the catalog is thin. */
+const LIVE_SEARCH_THRESHOLD = 5;
 
 const TIERS: { value: DiscountTier; label: string }[] = [
   { value: "all", label: "All" },
@@ -215,6 +221,14 @@ export default function DealFeed({
      pills on EmptySearchState. Empty array = no pills, falls back
      to the bare "Nothing found" heading. */
   const [suggestions, setSuggestions] = useState<Array<{ title: string; key: string }>>([]);
+  /* Live-search fallback state. When a catalog search returns fewer
+     than LIVE_SEARCH_THRESHOLD results, DealFeed fans out to the live
+     shopping providers (/api/live-search) — both to show the user
+     options and so the route persists those results into the catalog
+     for the next search. Rendered below the grid via <LiveResults>. */
+  const [liveItems, setLiveItems]         = useState<Deal[]>([]);
+  const [liveLoading, setLiveLoading]     = useState(false);
+  const [liveProviders, setLiveProviders] = useState<string[]>([]);
   /* Selected store IDs from the StoreFilter popover. Persists to URL
      via buildParams (?stores=argos,currys). */
   const [selectedStores, setSelectedStores] = useState<Set<string>>(initialStores);
@@ -395,6 +409,28 @@ export default function DealFeed({
     return p.toString();
   }, [category, tier, sort, searchDebounced, origin, selectedStores, country.code]);
 
+  /* Sparse-search live fallback — fired from the main fetch effect
+     when a text search returns a thin catalog (< LIVE_SEARCH_THRESHOLD
+     rows). /api/live-search returns live provider results AND persists
+     them so the next search resolves from the DB. `seq` is the
+     fetchSeqRef value of the triggering fetch; a newer search bumps
+     fetchSeqRef and the handlers below bail so stale live results
+     never clobber a fresher search. */
+  const fetchLiveDeals = useCallback((q: string, seq: number) => {
+    setLiveLoading(true);
+    setLiveItems([]);
+    setLiveProviders([]);
+    fetch(`/api/live-search?q=${encodeURIComponent(q)}&country=${country.code}&limit=${PAGE_SIZE}`)
+      .then((r) => r.json())
+      .then(({ items: live, providers }) => {
+        if (seq !== fetchSeqRef.current) return;
+        setLiveItems(Array.isArray(live) ? (live as Deal[]) : []);
+        setLiveProviders(Array.isArray(providers) ? (providers as string[]) : []);
+      })
+      .catch(() => { if (seq === fetchSeqRef.current) setLiveItems([]); })
+      .finally(() => { if (seq === fetchSeqRef.current) setLiveLoading(false); });
+  }, [country.code]);
+
   // Reset + first page on filter change
   useEffect(() => {
     /* SSR'd-content optimisation: skip the very first effect run when
@@ -417,6 +453,9 @@ export default function DealFeed({
     const mySeq = ++fetchSeqRef.current;
     setLoading(true);
     setItems([]);
+    /* Clear any live-search results from the previous query so they
+       don't linger under a fresh search's catalog grid. */
+    setLiveItems([]);
     offsetRef.current = 0;
 
     fetch(`/api/deals?${buildParams(0)}`)
@@ -474,6 +513,17 @@ export default function DealFeed({
           requestAnimationFrame(() => {
             window.scrollTo({ top: 0, behavior: "instant" });
           });
+        }
+        /* Sparse-search live fallback — when a text search returns a
+           thin catalog, fan out to the live providers. /api/live-search
+           also persists the results so the next search resolves from
+           the DB. mySeq guards against a newer search clobbering. */
+        if (searchDebounced.trim() && Array.isArray(items) && items.length < LIVE_SEARCH_THRESHOLD) {
+          fetchLiveDeals(searchDebounced.trim(), mySeq);
+        } else {
+          setLiveItems([]);
+          setLiveLoading(false);
+          setLiveProviders([]);
         }
       })
       .catch(() => {})
@@ -959,11 +1009,16 @@ export default function DealFeed({
            trigram-similarity RPC and are rendered as the headline
            recovery path when present. */
         searchDebounced.trim() ? (
-          <EmptySearchState
-            query={searchDebounced.trim()}
-            source="deals"
-            suggestions={suggestions}
-          />
+          /* Hold the empty state while the live-search fallback is
+             still running or has results — otherwise it flashes
+             "nothing found" before the live section paints below. */
+          (!liveLoading && liveItems.length === 0) ? (
+            <EmptySearchState
+              query={searchDebounced.trim()}
+              source="deals"
+              suggestions={suggestions}
+            />
+          ) : null
         ) : (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <Search size={32} className="text-ink-3 mb-3" strokeWidth={1.5} />
@@ -986,6 +1041,15 @@ export default function DealFeed({
         )
       )}
 
+      {/* Sparse-search live results — rendered below the catalog grid
+          when a thin search triggered the live fallback. Reuses the
+          /compare LiveResults component; its cards route through
+          pdpUrlForDeal so live rows get a synthetic /p/live PDP and
+          never dead-link. */}
+      {searchDebounced.trim() && (liveLoading || liveItems.length > 0) && (
+        <LiveResults items={liveItems} loading={liveLoading} providers={liveProviders} />
+      )}
+
       {/* Sentinel */}
       {!loading && hasMore && <div ref={sentinelRef} className="mt-10" />}
 
@@ -997,7 +1061,7 @@ export default function DealFeed({
       )}
 
       {/* End of feed */}
-      {!loading && !hasMore && items.length > 0 && (
+      {!loading && !hasMore && items.length > 0 && liveItems.length === 0 && !liveLoading && (
         <p className="text-center text-xs text-ink-3 mt-12">
           That&apos;s all {total.toLocaleString()} deals for now.
         </p>

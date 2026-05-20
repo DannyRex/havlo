@@ -49,7 +49,10 @@ async function main() {
   /* Pull all product_ids that have at least one offer. Paginate
      because PostgREST caps single responses at 1000. */
   const PAGE = 1000;
-  const PAGES = 30;
+  /* Raised 30 -> 60 (May 2026): the catalog grew past 40k products,
+     so the old 30k-row ceiling silently missed ~12k products and
+     left their orphans uncounted. 60 pages = 60k-row headroom. */
+  const PAGES = 60;
   const offerReqs = Array.from({ length: PAGES }, (_, i) =>
     supa.from("offers").select("product_id").range(i * PAGE, (i + 1) * PAGE - 1),
   );

@@ -368,6 +368,10 @@ export async function ingestDeals(
   const newProducts: NewProduct[] = [];
   const offerWrites: Array<{ deal: Deal; productId: string }> = [];
   const imageBackfills: Array<{ productId: string; imageUrl: string }> = [];
+  /* product_ids inserted by THIS run (populated in Step 3). The
+     Step 5b orphan-reconciliation pass uses this to delete any
+     that ended up with no offer pointing at them. */
+  const insertedProductIds: string[] = [];
 
   for (let i = 0; i < deals.length; i++) {
     const d = deals[i];
@@ -430,6 +434,7 @@ export async function ingestDeals(
       result.errors.push(`Bulk insert ${insertList.length} products: ${insErr?.message}`);
     } else {
       const insertedRows = inserted as Array<{ id: string }>;
+      insertedProductIds.push(...insertedRows.map((r) => r.id));
       /* PostgREST INSERT...RETURNING preserves the VALUES-clause
          order, so index-based mapping is safe. Each deal's
          insert-index points at the corresponding inserted row. */
@@ -463,6 +468,49 @@ export async function ingestDeals(
       result.errors.push(`Bulk upsert ${offerWrites.length} offers: ${offerErr.message}`);
     } else {
       result.upserted = offerWrites.length;
+    }
+  }
+
+  /* Step 5b: orphan reconciliation — the guard that makes ingestDeals
+     orphan-proof. A product is only reachable if an offer points at
+     it (product_best_offers inner-joins offers, so an offer-less
+     product is invisible to every search surface). The split above
+     (insert products, THEN upsert offers) has a window where a
+     product can be left with no offer:
+
+       • The offer upsert is keyed on (store_id, url). If a concurrent
+         run already wrote that offer, this run's upsert UPDATEs the
+         existing row and re-points it — the product we just inserted
+         gets nothing.
+       • A partial offer-upsert failure leaves inserted products with
+         no offer.
+
+     Either way the freshly-inserted product becomes a permanent
+     orphan. A May 2026 audit found 63% of the catalog orphaned this
+     way, almost all from the /api/live-search persist path double-
+     firing. The fix: after the offer write, delete any product THIS
+     run inserted that ended up with zero offers. Strictly scoped to
+     insertedProductIds so it can never touch pre-existing rows. */
+  if (insertedProductIds.length > 0) {
+    const { data: withOffers, error: probeErr } = await supa
+      .from("offers")
+      .select("product_id")
+      .in("product_id", insertedProductIds);
+    if (probeErr) {
+      result.errors.push(`Orphan-reconciliation probe: ${probeErr.message}`);
+    } else {
+      const haveOffer = new Set(
+        (withOffers ?? []).map((r) => (r as { product_id: string }).product_id),
+      );
+      const orphanIds = insertedProductIds.filter((id) => !haveOffer.has(id));
+      if (orphanIds.length > 0) {
+        const { error: delErr } = await supa.from("products").delete().in("id", orphanIds);
+        if (delErr) {
+          result.errors.push(`Orphan reconciliation delete (${orphanIds.length}): ${delErr.message}`);
+        } else {
+          console.log(`[ingest] orphan reconciliation: removed ${orphanIds.length} offer-less product(s) created this run.`);
+        }
+      }
     }
   }
 
