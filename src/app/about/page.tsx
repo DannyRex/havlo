@@ -129,7 +129,7 @@ export default function AboutPage() {
             users who want to read more. */}
         <section className="mb-12">
           <h2 className="text-xl sm:text-2xl font-bold text-ink tracking-[-0.02em] mb-3">
-            Independent by design
+            Why we stay independent
           </h2>
           <div className="space-y-3.5 text-ink-2 text-[15px] leading-relaxed">
             <p>

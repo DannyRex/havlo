@@ -16,7 +16,7 @@ export async function generateMetadata({
   const country = getCountry(params.country);
   const url = `${SITE_URL}/${country.code}/deals`;
   const title = `Deals worth checking today in ${country.name}`;
-  const description = `Fresh price drops + standout offers across the stores you already shop in ${country.name}. Filter by category, brand, and discount.`;
+  const description = `Price drops and offers from the stores you already shop in ${country.name}. Filter by category, brand, and discount.`;
 
   return {
     title,

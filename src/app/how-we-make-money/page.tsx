@@ -65,7 +65,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "How Havlo makes money",
     description:
-      "Independent by design. Free for shoppers. The cheapest verified option always ranks first.",
+      "Havlo is free for shoppers, and retailers can't pay to rank higher. The cheapest verified option always shows first.",
     url: "/how-we-make-money",
     type: "website",
   },
@@ -78,7 +78,7 @@ export default function HowWeMakeMoneyPage() {
          transparency, not legal disclosure. */
       eyebrow="About Havlo"
       title="How Havlo makes money"
-      description="Havlo is free for shoppers and independent by design. This page covers how that works, where our listings come from, and the limits of what we can guarantee."
+      description="Havlo is free for shoppers, and retailers can't pay to rank higher. This page covers how that works, where our listings come from, and the limits of what we can guarantee."
       lastUpdated="12 May 2026"
       sections={sections}
     />

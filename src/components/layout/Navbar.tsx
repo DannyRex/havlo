@@ -258,7 +258,7 @@ export default function Navbar() {
               secondary link. */}
           <div className="mt-auto pt-6 border-t border-border">
             <p className="text-[11px] text-ink-3 leading-relaxed">
-              Find similar products for less. Across local and global stores.
+              Find similar products for less, across local and global stores.
             </p>
             <Link
               href="/contact"

@@ -149,7 +149,7 @@ export default function EmptySearchState({ query, source, browseHref, suggestion
               Did you mean one of these?
             </h3>
             <p className="text-sm text-ink-3 leading-relaxed">
-              We didn&apos;t find an exact match for &ldquo;{query}&rdquo; - these are the closest.
+              We didn&apos;t find an exact match for &ldquo;{query}&rdquo;. These are the closest.
             </p>
           </>
         ) : (
@@ -162,8 +162,8 @@ export default function EmptySearchState({ query, source, browseHref, suggestion
             </h3>
             <p className="text-sm text-ink-3 leading-relaxed">
               {isUrlQuery
-                ? "We couldn't find this in the catalog yet. Pick a way forward."
-                : "Three ways forward. Pick whichever fits."}
+                ? "We couldn't find this in the catalog yet. Try one of these."
+                : "Try one of these instead."}
             </p>
           </>
         )}
