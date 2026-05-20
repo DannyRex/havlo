@@ -20,6 +20,7 @@ import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { wrapWithAffiliate } from "@/lib/affiliate";
 import { convertAliexpressUrl, aliexpressApiActive } from "@/lib/aliexpress-converter";
 import { getServerCountry } from "@/lib/country-server";
+import { verifyGoTarget } from "@/lib/go-signing";
 import { merchantSearchUrl, merchantHomepage, smartFallbackUrl, rewriteUbuyHostForCountry } from "@/lib/merchant-search-urls";
 
 /* Click-resolution telemetry. Every redirect writes one row to
@@ -303,12 +304,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(homeUrl, 307);
   }
 
-  /* Reject non-http(s) targets. The url param is attacker-reachable,
-     so it must never become a redirect Location for a javascript:,
-     data:, or file: scheme. (Fully closing the external-host
-     open-redirect needs a signed url param; that's tracked
-     separately because offer URLs are pre-wrapped as /api/go?url=
-     at ingest time, so signing touches the ingest pipeline.) */
+  /* Reject non-http(s) targets so the url param can't become a
+     redirect Location for a javascript:, data:, or file: scheme. */
   try {
     const scheme = new URL(target).protocol;
     if (scheme !== "http:" && scheme !== "https:") throw new Error("non-http scheme");
@@ -316,6 +313,31 @@ export async function GET(req: NextRequest) {
     const homeUrl = new URL(`/${country.code}`, req.nextUrl.origin).toString();
     logResolution({ ...baseLog, resolvedUrl: homeUrl, step: "missing_url", serpapiAttempted: false, serpapiResolved: false });
     return NextResponse.redirect(homeUrl, 307);
+  }
+
+  /* Signature gate — this is what closes the open redirect. Every
+     Havlo-issued /api/go link is signed (lib/go-signing): the sig
+     is an HMAC of the url param. A missing/invalid signature means
+     the link was not issued by Havlo (an open-redirect / phishing
+     attempt) or predates signing (an unsigned legacy link, e.g. in
+     an old email or a PDP page cached before this shipped). Either
+     way we never redirect to the external target — degrade to an
+     internal Havlo page: /compare for the product when a title
+     hint is present, otherwise /deals. */
+  if (!verifyGoTarget(target, req.nextUrl.searchParams.get("sig"))) {
+    const fallback = new URL(
+      titleHint ? `/${country.code}/compare` : `/${country.code}/deals`,
+      req.nextUrl.origin,
+    );
+    if (titleHint) fallback.searchParams.set("q", titleHint);
+    logResolution({
+      ...baseLog,
+      resolvedUrl: fallback.toString(),
+      step: titleHint ? "havlo_compare" : "havlo_deals",
+      serpapiAttempted: false,
+      serpapiResolved: false,
+    });
+    return NextResponse.redirect(fallback, 307);
   }
 
   /* AliExpress: prefer the official API converter (proper attribution,

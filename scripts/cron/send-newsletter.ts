@@ -43,6 +43,7 @@ import { newsletterDigest } from "../../src/lib/email/templates/newsletter-diges
 import { sendEmail } from "../../src/lib/email/send";
 import { categories } from "../../src/lib/data/categories";
 import { getClickThroughUrl } from "../../src/lib/utils";
+import { appendSignature } from "../../src/lib/go-signing";
 import type { Country } from "../../src/lib/country";
 import type { Deal } from "../../src/types";
 
@@ -137,7 +138,7 @@ async function buildDigestDeals(
       originalDisplay: d.originalPrice > d.salePrice ? formatLocal(orig, country) : null,
       discountPercent: d.discountPercent ?? 0,
       storeName:       d.storeName,
-      url:             `${SITE_URL}${getClickThroughUrl(d)}`,
+      url:             `${SITE_URL}${appendSignature(getClickThroughUrl(d))}`,
     };
   });
 }

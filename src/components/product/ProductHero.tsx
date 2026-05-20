@@ -66,6 +66,13 @@ export interface OfferData {
 interface Props {
   offer:        OfferData;
   countryCode:  string;
+  /** Server-signed /api/go outbound URL for the View-at-merchant
+      CTA. The PDP page computes and signs it (the HMAC needs a
+      server-only secret); ProductHero just renders it. Falls back
+      to an unsigned client-built URL when absent — that still
+      works, it just degrades to a Havlo page at /api/go rather
+      than reaching the merchant. */
+  signedOutboundUrl?: string;
   /** Total count of stores carrying this product (anchor + dupes).
       Drives the "Compare prices across N stores" CTA label so the
       user knows how much broader the compare view is than the PDP. */
@@ -99,7 +106,7 @@ function convertToUserCurrency(
   return country.currency === "USD" ? Math.round(out * 100) / 100 : Math.round(out);
 }
 
-export default function ProductHero({ offer, countryCode, totalStores, perStoreOffers, priceHistory }: Props) {
+export default function ProductHero({ offer, countryCode, totalStores, perStoreOffers, priceHistory, signedOutboundUrl }: Props) {
   const country = getCountry(countryCode);
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -185,7 +192,7 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
      attaches the title + storeId + storeName fallback hints so
      /api/go can complete the redirect even if the underlying URL
      is a Google relay that needs merchant-fallback resolution. */
-  const outboundUrl = getClickThroughUrl({
+  const outboundUrl = signedOutboundUrl ?? getClickThroughUrl({
     url:       offer.url,
     id:        offer.offerId,
     title:     offer.title,

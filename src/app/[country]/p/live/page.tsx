@@ -42,6 +42,8 @@ import { pgFtsFindDupes } from "@/lib/search/pg-fts";
 import { isOfferAllowedForCountry } from "@/lib/country";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import SimilarProducts from "@/components/product/SimilarProducts";
+import { getClickThroughUrl } from "@/lib/utils";
+import { appendSignature } from "@/lib/go-signing";
 
 /* Synthetic PDPs are never indexed — they're transient anchors for
    external offers that may or may not exist tomorrow. Keeps Google
@@ -187,7 +189,19 @@ export default async function LivePdpPage({ params, searchParams }: PageProps) {
           Back to results
         </Link>
 
-        <ProductHero offer={offer} countryCode={country.code} totalStores={totalStores} />
+        <ProductHero
+          offer={offer}
+          countryCode={country.code}
+          signedOutboundUrl={appendSignature(getClickThroughUrl({
+            url:       offer.url,
+            id:        offer.offerId,
+            title:     offer.title,
+            storeId:   offer.storeId,
+            storeName: offer.storeName,
+            country:   country.code,
+          }))}
+          totalStores={totalStores}
+        />
 
         {filteredDupes.length > 0 && (
           <section className="mt-12 sm:mt-16">

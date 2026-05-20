@@ -45,6 +45,8 @@ import { getCategory } from "@/lib/data/categories";
 import JsonLd from "@/components/seo/JsonLd";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
+import { getClickThroughUrl } from "@/lib/utils";
+import { appendSignature } from "@/lib/go-signing";
 import SimilarProducts from "@/components/product/SimilarProducts";
 import FallbackCategoryRail from "@/components/product/FallbackCategoryRail";
 import PdpBackLink from "@/components/product/PdpBackLink";
@@ -767,6 +769,16 @@ export default async function ProductPage({ params }: PageProps) {
         <ProductHero
           offer={heroData}
           countryCode={country.code}
+          /* Signed server-side — see go-signing.ts. ProductHero is a
+             client component and can't hold the HMAC secret. */
+          signedOutboundUrl={appendSignature(getClickThroughUrl({
+            url:       heroData.url,
+            id:        heroData.offerId,
+            title:     heroData.title,
+            storeId:   heroData.storeId,
+            storeName: heroData.storeName,
+            country:   country.code,
+          }))}
           totalStores={totalStores}
           perStoreOffers={perStoreOffers}
           priceHistory={priceHistorySummary}
