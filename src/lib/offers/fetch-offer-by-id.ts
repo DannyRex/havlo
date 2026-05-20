@@ -56,6 +56,17 @@ export interface OfferRow {
       build a single-offer anchor in the StoreOffer shape, which
       requires the flag for landed-price math. */
   is_international: boolean;
+  /** Store's DB-tagged country anchor (stores.country). Lets the
+      PDP's anchor-relevance guard use the DB signal instead of
+      falling through to the JS COUNTRY_STORES roster, which misses
+      stores like `onbuy` (UK marketplace) that are tagged country=UK
+      in the DB but absent from the hardcoded roster. Re-audit
+      May 2026: /uk/p/661bbc27... infinite-looped to itself because
+      anchorAsOfferLike lacked storeCountry → isOfferAllowedForCountry
+      fell to the roster fallback → returned false → the PDP fired
+      the recovery redirect → picked the same offer as the
+      "alternative" (only candidate in the pool) → looped. */
+  store_country?:   string | null;
 }
 
 export async function fetchOfferById(offerId: string): Promise<OfferRow | null> {
@@ -77,7 +88,7 @@ export async function fetchOfferById(offerId: string): Promise<OfferRow | null> 
        type to GenericStringError. */
     const { data: viewRow } = await supa
       .from("product_best_offers")
-      .select("product_id, offer_id, store_id, url, current_price, original_price, discount_percent, currency, scraped_at, title, category_slug, brand, image_url, store_name, store_logo_url, is_international")
+      .select("product_id, offer_id, store_id, url, current_price, original_price, discount_percent, currency, scraped_at, title, category_slug, brand, image_url, store_name, store_logo_url, is_international, store_country")
       .eq("offer_id", offerId)
       .maybeSingle();
 
@@ -104,7 +115,7 @@ export async function fetchOfferById(offerId: string): Promise<OfferRow | null> 
     if (offer) {
       const [{ data: product }, { data: store }] = await Promise.all([
         supa.from("products").select("title, category_slug, brand, image_url").eq("id", offer.product_id).maybeSingle(),
-        supa.from("stores").select("name, logo_url, is_international").eq("id", offer.store_id).maybeSingle(),
+        supa.from("stores").select("name, logo_url, is_international, country").eq("id", offer.store_id).maybeSingle(),
       ]);
       if (product && store) {
         return {
@@ -128,6 +139,7 @@ export async function fetchOfferById(offerId: string): Promise<OfferRow | null> 
           store_name:       store.name,
           store_logo_url:   store.logo_url,
           is_international: store.is_international ?? false,
+          store_country:    (store as { country?: string | null }).country ?? null,
         };
       }
     }
@@ -163,6 +175,12 @@ export async function fetchOfferById(offerId: string): Promise<OfferRow | null> 
          the marketplace's home market. Currency-based heuristic
          matches the ingest behaviour for is_international. */
       is_international: curated.currency === "USD",
+      /* Parse marketplace from the curated id (e.g.
+         "amazon-us-iphone-15-pro-max" → "US"). Lets the PDP's
+         anchor-relevance guard correctly route curated rows to
+         their home market without falling through to the JS
+         roster fallback. */
+      store_country:    (curated.id.match(/^amazon-(us|uk|de|ae|in)-/i)?.[1] ?? "").toUpperCase() || null,
     };
   }
 

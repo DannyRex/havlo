@@ -294,25 +294,38 @@ export default async function ProductPage({ params }: PageProps) {
     storeId:         offer.store_id,
     storeName:       offer.store_name,
     isInternational: offer.is_international,
+    /* DB-tagged country anchor — primary signal in
+       isOfferAllowedForCountry. Without this, the gate fell through
+       to the JS COUNTRY_STORES roster and dropped DB-tagged stores
+       not in the hardcoded roster (e.g. `onbuy` for UK). Re-audit
+       caught the resulting infinite-redirect loop on /uk/p/661bbc27...
+       (Nokia 3310 at onbuy, country=UK in DB but not in JS roster). */
+    storeCountry:    offer.store_country ?? null,
   };
   if (!isOfferAllowedForCountry(anchorAsOfferLike, country)) {
     /* Same-product pool first (strongest signal: literally the same
        SKU at a different store). Sorted by price ascending — the
        redirect should land the visitor on the BEST in-market deal
-       for this product, not just any in-market deal. */
+       for this product, not just any in-market deal.
+
+       EXCLUDE the current offer.id from candidates: if the recovery
+       finds the same offer we just rejected as the "alternative",
+       we'd redirect to the same URL → infinite loop. Re-audit
+       symptom on /uk/p/661bbc27... before this guard. */
     const sameProduct = anchorOffers
+      .filter((o) => o.offerId && o.offerId !== offer.offer_id)
       .filter((o) => isOfferAllowedForCountry(o, country))
-      .filter((o) => o.offerId)               // skip live-SerpAPI rows with no offerId
       .sort((a, b) => a.price - b.price);
     if (sameProduct.length > 0) {
       redirect(`/${country.code}/p/${sameProduct[0].offerId}`);
     }
     /* Fall back to broader dupes — covers curated rows whose
-       product_id wouldn't match anchorOffers' UUID lookup. */
+       product_id wouldn't match anchorOffers' UUID lookup. Same
+       self-exclude rule. */
     const broaderMatch = dupes
       .flatMap((d) => d.offers)
+      .filter((o) => o.offerId && o.offerId !== offer.offer_id)
       .filter((o) => isOfferAllowedForCountry(o, country))
-      .filter((o) => o.offerId)
       .sort((a, b) => a.price - b.price);
     if (broaderMatch.length > 0) {
       redirect(`/${country.code}/p/${broaderMatch[0].offerId}`);
