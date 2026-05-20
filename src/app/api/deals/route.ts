@@ -365,14 +365,34 @@ export async function GET(req: NextRequest) {
       country:      country.code,
     }).catch(() => null);
 
-    /* Fallback: if the head-count call failed (provider missing
-       method, network blip), use the in-memory pool length. Less
-       accurate but never breaks the response shape. */
-    const originCounts = headOriginCounts ?? {
-      all:   qualifyingCountryFiltered.length,
-      local: qualifyingLocal.length,
-      intl:  qualifyingIntl.length,
-    };
+    /* When a search query is present, ALWAYS derive originCounts from
+       the in-memory filtered pool rather than the head-count RPC.
+       Reason: head count uses search_deals_fts with candidates[0]
+       only, while the items pool walks all FTS candidates AND applies
+       additional JS-side filters (isUsableMerchantUrl, country
+       roster, dedup). The two paths can disagree by 1-2 rows for
+       narrow result sets, producing the "4 in tab, 3 displayed"
+       UX bug from the re-audit (UK lawn-mower search).
+
+       For browse-mode (no search), keep the head-count behaviour —
+       it intentionally surfaces the true catalog count beyond the
+       3-pass pool cap so the pill reads "5,453" not "1,000". The
+       discrepancy only matters when the in-memory pool IS the full
+       result set (i.e. for narrow searches where rows < cap). */
+    const originCounts = (search && search.trim())
+      ? {
+          all:   qualifyingCountryFiltered.length,
+          local: qualifyingLocal.length,
+          intl:  qualifyingIntl.length,
+          allDeals:   qualifyingCountryFiltered.filter((d) => d.discountPercent > 0).length,
+          localDeals: qualifyingLocal.filter((d) => d.discountPercent > 0).length,
+          intlDeals:  qualifyingIntl.filter((d) => d.discountPercent > 0).length,
+        }
+      : (headOriginCounts ?? {
+          all:   qualifyingCountryFiltered.length,
+          local: qualifyingLocal.length,
+          intl:  qualifyingIntl.length,
+        });
 
     /* Items pool: qualifying pool, narrowed to the user's origin choice. */
     let qualifyingByOrigin =
