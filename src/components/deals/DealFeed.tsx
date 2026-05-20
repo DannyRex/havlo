@@ -447,6 +447,17 @@ export default function DealFeed({
          24 for subsequent scrolls. Without this sync, next loadMore
          would re-fetch items already on screen. */
       offsetRef.current = initialItems?.length ?? PAGE_SIZE;
+      /* SSR-prefetch path: page.tsx already fetched the catalog, so
+         the client re-fetch is skipped. But a search deep-link, a
+         shared /deals?search=... URL, and the homepage / compare
+         "freeform text -> /deals" navigations all land here too — and
+         if the SSR'd catalog came back thin, the live fallback must
+         still fire, or the user sees a bare empty grid. fetchSeqRef
+         is still 0 here; a later real search bumps it and the stale
+         guard inside fetchLiveDeals drops this result. */
+      if (searchDebounced.trim() && (initialItems?.length ?? 0) < LIVE_SEARCH_THRESHOLD) {
+        fetchLiveDeals(searchDebounced.trim(), fetchSeqRef.current);
+      }
       return;
     }
 
