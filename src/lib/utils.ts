@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { isGoogleRelay } from "./url-helpers";
-import { merchantSearchUrl } from "./merchant-search-urls";
+import { merchantSearchUrl, smartFallbackUrl } from "./merchant-search-urls";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -77,9 +77,13 @@ export function getClickThroughUrl(item: { url: string; id?: string; title?: str
          url and let /api/go's runtime smart-fallback handle the
          click. */
       const innerUrl = u.searchParams.get("url");
-      if (innerUrl && isGoogleRelay(innerUrl) && (item.storeId || item.storeName) && item.title) {
-        const m = merchantSearchUrl(item.storeId ?? "", item.storeName ?? "", item.title, item.country);
-        if (m) u.searchParams.set("url", m.url);
+      if (innerUrl && isGoogleRelay(innerUrl) && (item.storeId || item.storeName)) {
+        const m = item.title
+          ? merchantSearchUrl(item.storeId ?? "", item.storeName ?? "", item.title, item.country)
+          : null;
+        const fb = !m ? smartFallbackUrl(item.storeId ?? "", item.storeName ?? "", item.title ?? "") : null;
+        if (m)       u.searchParams.set("url", m.url);
+        else if (fb) u.searchParams.set("url", fb.url);
       }
       /* Return as a path-only URL so it stays same-origin. */
       return u.pathname + (u.search ? u.search : "");
@@ -92,11 +96,19 @@ export function getClickThroughUrl(item: { url: string; id?: string; title?: str
 
   /* SSR pre-resolve of google-relay URLs. See the function
      docstring for the full rationale. Resolved at SSR time so the
-     rendered href doesn't contain google.com — audit-metric fix. */
+     rendered href doesn't contain google.com — audit-metric fix.
+     Falls through to smartFallbackUrl when the merchant isn't in
+     our curated MERCHANTS table — handles long-tail UK / DE / etc.
+     marketplaces (OnBuy, B-stock, etc.) that exist in our offers
+     but aren't enumerated as merchant-search targets. */
   let effectiveUrl = item.url;
-  if (item.url && isGoogleRelay(item.url) && (item.storeId || item.storeName) && item.title) {
-    const m = merchantSearchUrl(item.storeId ?? "", item.storeName ?? "", item.title, item.country);
-    if (m) effectiveUrl = m.url;
+  if (item.url && isGoogleRelay(item.url) && (item.storeId || item.storeName)) {
+    const m = item.title
+      ? merchantSearchUrl(item.storeId ?? "", item.storeName ?? "", item.title, item.country)
+      : null;
+    const fb = !m ? smartFallbackUrl(item.storeId ?? "", item.storeName ?? "", item.title ?? "") : null;
+    if (m)       effectiveUrl = m.url;
+    else if (fb) effectiveUrl = fb.url;
   }
 
   const params = new URLSearchParams({ url: effectiveUrl });

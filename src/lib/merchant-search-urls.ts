@@ -219,6 +219,12 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "ajio":           { name: "Ajio",          searchUrl: (q) => `https://www.ajio.com/search/?text=${encodeURIComponent(q)}`,                      homepage: "https://www.ajio.com" },
   "tatacliq":       { name: "Tata CLiQ",     searchUrl: (q) => `https://www.tatacliq.com/search/?searchCategory=all&text=${encodeURIComponent(q)}`, homepage: "https://www.tatacliq.com" },
   "takealot":       { name: "Takealot",      searchUrl: (q) => `https://www.takealot.com/all?qsearch=${encodeURIComponent(q)}`,                   homepage: "https://www.takealot.com" },
+  /* OnBuy — UK marketplace surfaced by SerpAPI for many UK live
+     searches. storeName "OnBuy.com" / storeId "onbuy". Without an
+     explicit entry, /api/go's smart fallback uses "onbuy.com"
+     homepage (no search query). Re-audit May 2026: /uk/p/661bbc27
+     (Nokia 3310 at onbuy) — verified onbuy.com supports ?q= search. */
+  "onbuy":          { name: "OnBuy",         searchUrl: (q) => `https://www.onbuy.com/gb/search/?q=${encodeURIComponent(q)}`,                       homepage: "https://www.onbuy.com" },
   /* Audit May 2026 row 33: storeId "cash-converters" had no entry,
      so /api/go's smart fallback synthesised cashconverters.com which
      redirects to a global splash page (no search). The real ZA
