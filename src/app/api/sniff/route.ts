@@ -17,6 +17,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { safeFetch } from "@/lib/ssrf-guard";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 export interface SniffResult {
   ok: boolean;
@@ -371,6 +373,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "url param required" }, { status: 400 });
   }
 
+  /* Rate-limit the paid path — a successful sniff spends an OpenAI
+     call. Per-IP, in-memory, per-instance (see lib/rate-limit.ts). */
+  if (!rateLimit(`sniff:${clientIp(req)}`, 20, 60_000)) {
+    return NextResponse.json(
+      { ok: false, error: "Rate limit exceeded. Try again shortly." },
+      { status: 429, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   // Validate URL
   let parsedUrl: URL;
   try {
@@ -430,28 +441,28 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     ];
     let res: Response | null = null;
     for (const { ua, extraHeaders } of uaChain) {
-      try {
-        const r = await fetch(parsedUrl.toString(), {
-          headers: {
-            "User-Agent": ua,
-            Accept:
-              "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Cache-Control": "no-cache",
-            ...(extraHeaders ?? {}),
-          },
-          /* Real-browser UA gets a slightly longer window — Amazon
-             can be slow to render HTML for browser requests because
-             it kicks off more SSR work than for bot UAs. */
-          signal: AbortSignal.timeout(extraHeaders ? 8_000 : 5_000),
-          redirect: "follow",
-        });
-        if (r.ok) { res = r; break; }
-      } catch {
-        // timeout / network — try next UA
-      }
+      /* safeFetch validates the URL AND every redirect hop against
+         the SSRF blocklist (private / loopback / link-local ranges,
+         incl. the 169.254.169.254 cloud-metadata address) and
+         follows redirects manually. It never throws — a block or a
+         network failure comes back as ok:false, so the loop just
+         moves to the next UA. */
+      const sf = await safeFetch(parsedUrl.toString(), {
+        headers: {
+          "User-Agent": ua,
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Cache-Control": "no-cache",
+          ...(extraHeaders ?? {}),
+        },
+        /* Real-browser UA gets a slightly longer window — Amazon
+           can be slow to render HTML for browser requests. */
+        signal: AbortSignal.timeout(extraHeaders ? 8_000 : 5_000),
+      });
+      if (sf.ok && sf.response?.ok) { res = sf.response; break; }
     }
-    if (!res) throw new Error("All UAs blocked");
+    if (!res) throw new Error("All UAs blocked or URL rejected");
     // Only read the <head> section — saves bandwidth, reduces parse time.
     // Stream and cut off after </head> or 64 KB, whichever comes first.
     const reader = res.body?.getReader();

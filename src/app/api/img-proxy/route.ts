@@ -135,15 +135,39 @@ export async function GET(req: NextRequest) {
   };
   if (referer) headers.Referer = referer;
 
-  let upstream: Response;
+  /* Fetch with redirect:"manual" and re-validate every hop. An
+     allowlisted host (e.g. any *.amazonaws.com S3 bucket) could
+     otherwise 302 the proxy to an internal address; re-checking
+     each redirect target against the same host allowlist + scheme
+     check closes that SSRF-via-redirect gap. */
+  let upstream: Response | undefined;
   try {
-    upstream = await fetch(target.toString(), { headers, redirect: "follow" });
+    let fetchTarget = target.toString();
+    for (let hop = 0; hop < 4; hop++) {
+      upstream = await fetch(fetchTarget, { headers, redirect: "manual" });
+      if (upstream.status < 300 || upstream.status >= 400) break;
+      const loc = upstream.headers.get("location");
+      if (!loc) break;
+      let next: URL;
+      try {
+        next = new URL(loc, fetchTarget);
+      } catch {
+        return new NextResponse("Invalid redirect target", { status: 502 });
+      }
+      if (next.protocol !== "https:" && next.protocol !== "http:") {
+        return new NextResponse("Unsupported redirect scheme", { status: 400 });
+      }
+      if (findRefererForHost(next.hostname) === null) {
+        return new NextResponse(`Redirect host not allowed: ${next.hostname}`, { status: 403 });
+      }
+      fetchTarget = next.toString();
+    }
   } catch {
     return new NextResponse("Upstream fetch failed", { status: 502 });
   }
 
-  if (!upstream.ok || !upstream.body) {
-    return new NextResponse(`Upstream ${upstream.status}`, { status: 502 });
+  if (!upstream || !upstream.ok || !upstream.body) {
+    return new NextResponse(`Upstream ${upstream?.status ?? "error"}`, { status: 502 });
   }
 
   /* Stream the body straight through. Long cache so the browser /

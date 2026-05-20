@@ -303,6 +303,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(homeUrl, 307);
   }
 
+  /* Reject non-http(s) targets. The url param is attacker-reachable,
+     so it must never become a redirect Location for a javascript:,
+     data:, or file: scheme. (Fully closing the external-host
+     open-redirect needs a signed url param; that's tracked
+     separately because offer URLs are pre-wrapped as /api/go?url=
+     at ingest time, so signing touches the ingest pipeline.) */
+  try {
+    const scheme = new URL(target).protocol;
+    if (scheme !== "http:" && scheme !== "https:") throw new Error("non-http scheme");
+  } catch {
+    const homeUrl = new URL(`/${country.code}`, req.nextUrl.origin).toString();
+    logResolution({ ...baseLog, resolvedUrl: homeUrl, step: "missing_url", serpapiAttempted: false, serpapiResolved: false });
+    return NextResponse.redirect(homeUrl, 307);
+  }
+
   /* AliExpress: prefer the official API converter (proper attribution,
      full commission rates) over the ?aff_short_key= fallback. Falls
      back gracefully if the API call fails or credentials aren't set. */

@@ -173,7 +173,10 @@ export default function CashbackPage({
         id="cashback-jsonld"
         type="application/ld+json"
         strategy="afterInteractive"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(ldJson) }}
+        /* .replace escapes "<" so a string value containing
+           "</script>" can't break out of the JSON-LD block (XSS).
+           < is valid JSON — crawlers parse it unchanged. */
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(ldJson).replace(/</g, "\\u003c") }}
       />
 
       <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">

@@ -21,6 +21,7 @@ import { detectFamily, alternativeFamilyMatches } from "@/lib/search/families";
 import { priceLooksPlausibleForLiveDeal } from "@/lib/search/price-floor";
 import { ingestDeals } from "@/lib/providers/ingestion";
 import { withinBudget, recordSerpApiCall } from "@/lib/serpapi-budget";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 import type { Deal } from "@/types";
 
 /* Module-level in-flight guard for the persist path. The /compare
@@ -48,6 +49,19 @@ export async function GET(req: NextRequest) {
 
   if (!q) {
     return NextResponse.json({ error: "Query required" }, { status: 400 });
+  }
+
+  /* Rate-limit the paid path. /api/live-search burns a SerpAPI
+     credit on every cache-miss; without a per-IP cap a flood of
+     unique queries drains the monthly budget. The 6h edge cache
+     means this only ever counts genuine cache-miss (credit-
+     spending) hits. In-memory + per-instance — see lib/rate-limit.ts;
+     a shared store (Vercel KV / Upstash) is the robust upgrade. */
+  if (!rateLimit(`live-search:${clientIp(req)}`, 20, 60_000)) {
+    return NextResponse.json(
+      { items: [], providers: [], error: "Rate limit exceeded. Try again shortly." },
+      { status: 429, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const providers = getActiveSearchProviders();

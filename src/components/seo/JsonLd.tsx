@@ -10,9 +10,11 @@ export default function JsonLd({ data }: Props) {
   return (
     <script
       type="application/ld+json"
-      /* dangerouslySetInnerHTML keeps Next from JSON-escaping the
-         content twice — Google parses the verbatim JSON. */
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+      /* dangerouslySetInnerHTML keeps Next from double-escaping the
+         JSON. .replace() escapes "<" to < so a string value
+         containing "</script>" can't break out of the <script>
+         block (XSS); < is valid JSON — crawlers still parse it. */
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }}
     />
   );
 }
