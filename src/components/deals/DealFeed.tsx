@@ -455,7 +455,11 @@ export default function DealFeed({
          still fire, or the user sees a bare empty grid. fetchSeqRef
          is still 0 here; a later real search bumps it and the stale
          guard inside fetchLiveDeals drops this result. */
-      if (searchDebounced.trim() && (initialItems?.length ?? 0) < LIVE_SEARCH_THRESHOLD) {
+      /* All-origins catalog count (initialOriginCounts.all), not the
+         origin-filtered initialItems length — see the fetch effect
+         below for why a common product must not trigger live search. */
+      const ssrCatalogCount = initialOriginCounts?.all ?? (initialItems?.length ?? 0);
+      if (searchDebounced.trim() && ssrCatalogCount < LIVE_SEARCH_THRESHOLD) {
         fetchLiveDeals(searchDebounced.trim(), fetchSeqRef.current);
       }
       return;
@@ -525,11 +529,19 @@ export default function DealFeed({
             window.scrollTo({ top: 0, behavior: "instant" });
           });
         }
-        /* Sparse-search live fallback — when a text search returns a
-           thin catalog, fan out to the live providers. /api/live-search
+        /* Sparse-search live fallback — when a text search is a genuine
+           catalog gap, fan out to the live providers. /api/live-search
            also persists the results so the next search resolves from
-           the DB. mySeq guards against a newer search clobbering. */
-        if (searchDebounced.trim() && Array.isArray(items) && items.length < LIVE_SEARCH_THRESHOLD) {
+           the DB. mySeq guards against a newer search clobbering.
+
+           Gate on the ALL-origins catalog count (originCounts.all), NOT
+           items.length — items is origin-filtered, so a common product
+           like "iphone" looks thin on the Local tab while the catalog
+           holds dozens. Firing a live search there would burn a SerpAPI
+           credit re-finding products we already have. Only a real gap
+           (few results across every origin) should trigger it. */
+        const catalogCount = originCounts?.all ?? (Array.isArray(items) ? items.length : 0);
+        if (searchDebounced.trim() && catalogCount < LIVE_SEARCH_THRESHOLD) {
           fetchLiveDeals(searchDebounced.trim(), mySeq);
         } else {
           setLiveItems([]);
