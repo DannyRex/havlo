@@ -9,7 +9,10 @@ interface Suggestion { title: string; key: string; storeCount: number }
 
 interface Props {
   initialQuery: string;
-  onSearch: (query: string) => void;
+  /* pid — the product_id of a picked autocomplete suggestion. Passed
+     through so the parent can anchor /compare on exactly that product
+     instead of re-running a fuzzy FTS match that can mis-anchor. */
+  onSearch: (query: string, pid?: string) => void;
   loading: boolean;
   /* When true, the "Try:" chip rail under the input is hidden.
      Set on /compare where the dedicated TrendingChipRail above
@@ -207,7 +210,7 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  const submit = (q: string) => {
+  const submit = (q: string, pid?: string) => {
     setOpen(false);
     setHighlighted(-1);
     const trimmed = q.trim();
@@ -227,7 +230,7 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
         props: { query: trimmed, source: "compare", country: country?.code },
       });
     }
-    onSearch(trimmed);
+    onSearch(trimmed, pid);
   };
 
   const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -235,8 +238,12 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
     else if (e.key === "ArrowUp") { e.preventDefault(); setHighlighted((h) => Math.max(h - 1, -1)); }
     else if (e.key === "Enter") {
       e.preventDefault();
-      const pick = highlighted >= 0 ? suggestions[highlighted]?.title : value;
-      if (pick) submit(pick);
+      /* A highlighted suggestion is a specific product — pass its key
+         as the pid backstop so /compare anchors on exactly that
+         product instead of re-running a fuzzy title match. */
+      const picked = highlighted >= 0 ? suggestions[highlighted] : null;
+      if (picked) submit(picked.title, picked.key);
+      else if (value.trim()) submit(value);
     } else if (e.key === "Escape") {
       setOpen(false);
     }
@@ -355,7 +362,7 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
               <button
                 key={s.key}
                 type="button"
-                onMouseDown={(e) => { e.preventDefault(); submit(s.title); }}
+                onMouseDown={(e) => { e.preventDefault(); submit(s.title, s.key); }}
                 onMouseEnter={() => setHighlighted(i)}
                 /* Round-4 QA: round-3 horizontal flex (title + count
                    side-by-side) was still clipping titles to "Apple

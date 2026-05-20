@@ -227,6 +227,23 @@ function CompareContent() {
     }
   }, [router, handleUrlSearch, fetchLive]);
 
+  /* ── SearchBar submit handler ─────────────────────────────────────────
+     Mirrors the homepage hero's intent fork so the two search surfaces
+     behave the same:
+       • URL paste           → sniff + anchor on /compare
+       • picked suggestion   → /compare, anchored by pid (exact product)
+       • freeform typed text → /deals grid. An ambiguous query wants a
+                               grid to pick from; /deals → PDP → /compare
+                               is the full drill-down chain.
+     Only USER-initiated submits fork here. The URL-change effect below
+     still calls handleSearch directly, so a shared /compare?q=… link
+     and any chip-driven navigation resolve on /compare unchanged. */
+  const onSearchSubmit = useCallback((q: string, pid?: string) => {
+    if (looksLikeUrl(q)) { handleUrlSearch(q); return; }
+    if (pid) { handleSearch(q, pid); return; }
+    router.push(`/${country.code}/deals?search=${encodeURIComponent(q.trim())}&origin=all`);
+  }, [router, country.code, handleUrlSearch, handleSearch]);
+
   /* ── React to URL changes (initial load, back/forward) ─────────────── */
   useEffect(() => {
     if (initialKey) fetchByKey(initialKey, initialQuery);
@@ -260,7 +277,7 @@ function CompareContent() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
       <SearchBar
         initialQuery={query}
-        onSearch={handleSearch}
+        onSearch={onSearchSubmit}
         loading={loading || sniffLoading}
         /* /compare renders TrendingChipRail below — Popular
            comparisons section serves the same role as the SearchBar
