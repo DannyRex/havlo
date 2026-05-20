@@ -43,6 +43,9 @@ interface FtsRow {
   discount_percent: number | null;
   currency:         "NGN" | "USD";
   rank:             number;
+  /** Added by migration 0041. Optional because legacy callers may
+      hit the pre-0041 RPC during the deploy window. */
+  store_country?:   string | null;
 }
 
 interface NestedStore {
@@ -50,6 +53,11 @@ interface NestedStore {
   name:             string;
   logo_url:         string | null;
   is_international: boolean;
+  /** Added May 2026 re-audit. Lets offerToStoreOffer surface
+      stores.country onto StoreOffer so the country gate
+      (isOfferAllowedForCountry) can use the DB-authoritative
+      anchor signal instead of the JS roster fallback. */
+  country:          string | null;
 }
 
 interface NestedOffer {
@@ -256,6 +264,10 @@ function offerToStoreOffer(o: NestedOffer, productTitle?: string): StoreOffer {
     isInternational: isIntl,
     landedCostExtra: landedExtra,
     landedPrice:    priceN + landedExtra,
+    /* DB-authoritative country tag — lets isOfferAllowedForCountry
+       use storeCountry as primary signal (covers stores backfilled
+       by 0037 that aren't in the JS COUNTRY_STORES roster). */
+    storeCountry:   store?.country ?? null,
   };
 }
 
@@ -280,6 +292,9 @@ function ftsRowToSingleOffer(r: FtsRow): StoreOffer {
     isInternational: r.is_international,
     landedCostExtra: landedExtra,
     landedPrice:    priceN + landedExtra,
+    /* DB-authoritative country tag from migration 0041's expanded
+       search_products_fts return shape. */
+    storeCountry:   r.store_country ?? null,
   };
 }
 
@@ -353,7 +368,7 @@ async function fetchAnchorProductWithSiblings(
       id, title, category_slug, brand, image_url, signature,
       offers (
         id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
-        stores ( id, name, logo_url, is_international )
+        stores ( id, name, logo_url, is_international, country )
       )
     `)
     .eq("id", productId)
@@ -382,7 +397,7 @@ async function fetchAnchorProductWithSiblings(
       id, title, category_slug, brand, image_url,
       offers (
         id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
-        stores ( id, name, logo_url, is_international )
+        stores ( id, name, logo_url, is_international, country )
       )
     `)
     .eq("signature", base.signature)

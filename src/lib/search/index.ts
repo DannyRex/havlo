@@ -54,6 +54,14 @@ export interface StoreOffer {
   landedCostExtra: number;
   /** price + landedCostExtra */
   landedPrice: number;
+  /** DB-authoritative anchor country (stores.country). Optional
+      because live SerpAPI search results don't carry it. When
+      present, isOfferAllowedForCountry uses it as the PRIMARY
+      signal instead of the hardcoded JS roster check. Added May
+      2026 re-audit so /compare can correctly route offers for
+      stores backfilled by migration 0037 that aren't in
+      COUNTRY_STORES. */
+  storeCountry?: string | null;
 }
 
 export interface ProductGroup {

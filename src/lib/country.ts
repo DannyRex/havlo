@@ -675,6 +675,16 @@ export interface OfferLike {
   storeId:          string;
   storeName:        string;
   isInternational?: boolean;
+  /** DB-authoritative anchor country (stores.country). Optional
+      because legacy curated paths and AliExpress search results
+      don't carry it. When present, isOfferAllowedForCountry uses
+      it as the PRIMARY signal — preferred over the hardcoded JS
+      COUNTRY_STORES roster check. Added May 2026 launch-readiness
+      re-audit so /compare can correctly route offers for stores
+      backfilled by migration 0037 (handysparkauf, refurbed-de,
+      fonezone, bigbasket, istore-south-africa, etc.) that aren't
+      in the JS roster but ARE country-tagged in the DB. */
+  storeCountry?:    string | null;
 }
 
 function lc(s: string): string { return s.toLowerCase(); }
@@ -935,15 +945,39 @@ export function isOfferAllowedForCountry<T extends OfferLike>(o: T, country: Cou
   const nameLc = lc(o.storeName);
   const xb     = crossBorderListFor(country.code);
 
+  /* PRIMARY signal: DB-authoritative store_country when present.
+     Covers the ~600 stores backfilled by migration 0037 from
+     offer.source_query that aren't in the hardcoded JS
+     COUNTRY_STORES roster (handysparkauf, refurbed-de, fonezone,
+     bigbasket, istore-south-africa, etc.). Without this branch
+     /compare returned mode:empty for DE/IN/ZA on flagship queries
+     even though the iPhone 15 / Galaxy S24 / MacBook offers existed
+     in those markets — they just weren't in the JS roster so the
+     downstream string-match gates dropped them.
+
+     Skip this short-circuit for NG: NG cross-border is the strongest
+     signal there (a US-tagged Amazon row IS shoppable from NG via
+     freight forwarders), and we handle that explicitly below. */
+  if (o.storeCountry && country.code !== "ng") {
+    if (o.storeCountry.toLowerCase() === country.code.toLowerCase()) return true;
+    /* Foreign country anchor — still pass if explicitly cross-border
+       (Amazon.com tagged country=US is cross-border-shoppable for
+       UK/DE/etc. visitors via the cross-border allowlist). */
+    if (matchesAny(idLc, xb) || matchesAny(nameLc, xb)) return true;
+    return false;
+  }
+
   // NG: keep all NG retailers + country-appropriate cross-border
   if (country.code === "ng") {
     if (matchesAny(idLc, NG_STORES) || matchesAny(nameLc, NG_STORES)) return true;
     if (matchesAny(idLc, xb) || matchesAny(nameLc, xb)) return true;
+    /* NG-storeCountry rows pass the explicit NG path. */
+    if (o.storeCountry && o.storeCountry.toLowerCase() === "ng") return true;
     if (o.isInternational === false) return true;        // NGN-priced row
     return matchesAny(idLc, xb) || matchesAny(nameLc, xb);
   }
 
-  // Non-NG: cross-border per country + country-anchored retailers
+  // Non-NG (storeCountry not set): cross-border per country + country-anchored retailers
   if (matchesAny(idLc, xb) || matchesAny(nameLc, xb)) return true;
   if (isStoreInCountry(o, country.code)) return true;
 
