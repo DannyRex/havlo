@@ -105,19 +105,54 @@ export default function TrendingChipRail({
   }, [items.length, limit, rotateEveryMs]);
 
   /* Visible chips. Only products carried by 2 or more distinct stores
-     belong in a "Popular comparisons" rail; a single-store chip would
-     click into a page with nothing to compare. The source
-     (/api/trending-chips) is already filtered to multi-store products,
-     so the storeCount filter here is a defensive second gate. First
-     render (tick=0) uses a seeded shuffle so SSR and the first client
-     paint agree on the order; later ticks use Math.random() for
-     genuine rotation variety. */
+     belong in a "Popular comparisons" rail; the storeCount filter is a
+     defensive second gate on top of the API, which already filters to
+     multi-store products.
+
+     Selection is grouped by category and drawn round-robin (one chip
+     per category each pass) so every category with comparable data
+     gets an even share of the rail. A category with no >= 2-store
+     products simply is not in the pool, so its slots redistribute to
+     the categories that do have data (the requested fallback). tick 0
+     is seeded so the first paint is stable; later ticks use
+     Math.random() for rotation variety. */
   const visible = useMemo<MultiStoreChip[]>(() => {
     const pool = items.filter((c) => c.storeCount >= 2);
     if (pool.length === 0) return [];
-    return tick === 0
-      ? seededShuffle(pool, pool.length || 1).slice(0, limit)
-      : pickRandom(pool, limit);
+
+    /* Group the >= 2-store pool into per-category buckets. */
+    const byCategory = new Map<string, MultiStoreChip[]>();
+    for (const c of pool) {
+      const cat = c.categorySlug ?? "other";
+      const arr = byCategory.get(cat) ?? [];
+      arr.push(c);
+      byCategory.set(cat, arr);
+    }
+
+    /* Shuffle within each bucket, and shuffle the category order, so
+       the rail varies between page loads and rotations. */
+    const buckets = Array.from(byCategory.values()).map((arr, i) =>
+      tick === 0 ? seededShuffle(arr, arr.length + i + 1) : pickRandom(arr, arr.length),
+    );
+    const ordered = tick === 0
+      ? seededShuffle(buckets, buckets.length + 1)
+      : pickRandom(buckets, buckets.length);
+
+    /* Round-robin: one chip per category each pass until the rail is
+       full or every bucket is drained. Even representation; a category
+       that runs out drops from the rotation and its slots go to the
+       rest. */
+    const out: MultiStoreChip[] = [];
+    let drew = true;
+    while (out.length < limit && drew) {
+      drew = false;
+      for (const bucket of ordered) {
+        if (out.length >= limit) break;
+        const next = bucket.shift();
+        if (next) { out.push(next); drew = true; }
+      }
+    }
+    return out;
   }, [items, tick, limit]);
 
   /* Loading skeleton — small placeholder chips so the layout doesn't
