@@ -53,6 +53,27 @@ interface PoolCacheEntry {
 const POOL_CACHE = new Map<string, PoolCacheEntry>();
 const POOL_TTL_MS = 5 * 60 * 1000;
 
+/* When a text search returns fewer than this many catalog rows,
+   DealFeed (src/components/deals/DealFeed.tsx) fans out to the live
+   shopping providers via /api/live-search, which persists the fresh
+   results back into the catalog. This route mirrors that threshold:
+   a search at or below it is "about to be backfilled," so its
+   response and pool are deliberately left uncached (see isSparseSearch
+   in the handler and SEARCH_POOL_MIN_CACHEABLE below) — otherwise the
+   pre-backfill thin result is pinned and the user's very next search
+   for the same term keeps seeing the gap instead of the just-persisted
+   deals. Keep in sync with DealFeed's LIVE_SEARCH_THRESHOLD. */
+const LIVE_SEARCH_THRESHOLD = 5;
+
+/* A search pool smaller than one page (24 rows) can't be paginated, so
+   POOL_CACHE — whose whole job is making load-more fast — gains nothing
+   by holding it. It is also the size range that trips the live-search
+   backfill above, and caching it would hide the just-persisted deals
+   from the next identical search for the full 5-min TTL. Thin search
+   pools are therefore never cached; browse pools and healthy,
+   paginable search pools are unaffected. */
+const SEARCH_POOL_MIN_CACHEABLE = 24;
+
 /* Cache key version prefix — bump whenever the merged-pool shape
    changes (e.g., 3-pass refactor) so any stale entries from old
    function instances become unreachable. Old instances may still
@@ -122,10 +143,21 @@ async function fetchPoolCached(params: {
   const looksLikeCuratedFallback = data.length > 0 && data.length <= 80 &&
     data.every((d) => d.storeId.startsWith("amazon-") || d.storeId === "amazon");
 
+  /* Thin search pool — see SEARCH_POOL_MIN_CACHEABLE. A search that
+     comes back below one page is about to trigger the live-search
+     backfill; caching it here would pin the pre-backfill (thin) pool
+     for the full TTL and hide the freshly-persisted deals from the
+     user's next identical search. */
+  const isThinSearchPool = !!params.search?.trim() &&
+    data.length > 0 && data.length < SEARCH_POOL_MIN_CACHEABLE;
+
   if (data.length === 0) {
     /* Skip cache entirely. Next request to the same key retries the
        DB. Caller already returned `return data` below so flow
        proceeds normally. */
+  } else if (isThinSearchPool) {
+    /* Skip cache — the next search for this term must see the rows
+       the live-search backfill is about to persist. */
   } else if (looksLikeCuratedFallback) {
     POOL_CACHE.set(key, { data, expires: now + 30_000 });
   } else {
@@ -639,8 +671,22 @@ export async function GET(req: NextRequest) {
          degraded → no-store
            browse_deals RPC fall-through served the curated catalog.
            Don't cache the degraded shape — next request retries. */
+    /* Sparse-search guard — a text search that resolves below the
+       live-search threshold is about to be backfilled: DealFeed fires
+       /api/live-search, which persists fresh rows into the catalog.
+       Caching this pre-backfill response — even for the 60s relevance
+       window — pins the thin result so the user's very next search for
+       the same term keeps seeing the gap instead of the deals the live
+       search just persisted. Serve it no-store so the re-search
+       re-queries the now-populated catalog. originCounts.all is the
+       all-origins catalog count — the exact figure DealFeed gates its
+       live fallback on. */
+    const isSparseSearch = !!(search && search.trim()) &&
+      originCounts.all < LIVE_SEARCH_THRESHOLD;
+
     const cacheControlHeader =
       looksLikeCuratedFallback ? "private, no-store, no-cache, max-age=0, must-revalidate" :
+      isSparseSearch           ? "private, no-store, no-cache, max-age=0, must-revalidate" :
       sort === "relevance"     ? "s-maxage=60, stale-while-revalidate=120"                 :
                                  "s-maxage=600, stale-while-revalidate=3600";
 

@@ -32,6 +32,19 @@ const headers = {
   "Vary":          "Accept-Encoding",
 };
 
+/* Empty results are NOT cached. An empty /compare response is exactly
+   what makes the UI fall through to the live SerpAPI section, which
+   then persists fresh offers into the catalog. Caching the empty
+   response (s-maxage=3600) would pin that "nothing found" state for an
+   hour — the user's next search for the same product keeps seeing
+   empty even after the live backfill committed real rows. no-store
+   keeps the re-search honest: it re-queries the now-populated catalog
+   and resolves from the DB. */
+const emptyHeaders = {
+  "Cache-Control": "no-store",
+  "Vary":          "Accept-Encoding",
+};
+
 /* ── oid fallback — synthesize a single-offer anchor from an
    OfferRow when pid + FTS both miss.
 
@@ -243,7 +256,10 @@ export async function GET(req: NextRequest) {
 
   // Key-based direct lookup (legacy /compare?key= URLs)
   if (key) {
-    return NextResponse.json(searchByKey(key), { headers });
+    const keyed = searchByKey(key);
+    return NextResponse.json(keyed, {
+      headers: keyed.mode === "empty" ? emptyHeaders : headers,
+    });
   }
 
   if (!q.trim() && !pid && !oid) {
@@ -397,13 +413,13 @@ export async function GET(req: NextRequest) {
        currency. See /api/deals for matching doc. */
     return NextResponse.json(
       { ...filtered, displayCurrency: country.currency, displayCountry: country.code },
-      { headers },
+      { headers: filtered.mode === "empty" ? emptyHeaders : headers },
     );
   } catch (err) {
     console.error("[/api/compare]", err);
     return NextResponse.json(
       { mode: "empty", query: q, suggestions: [] },
-      { headers },
+      { headers: emptyHeaders },
     );
   }
 }
