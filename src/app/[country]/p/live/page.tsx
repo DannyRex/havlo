@@ -67,10 +67,54 @@ function parseNumber(v: string | string[] | undefined, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/* Generous price ceiling for synthetic offers. The offer payload
+   rides in the URL query string, so a malformed or hostile link can
+   carry negative, Infinity, or 1e308 values. Anything at or above
+   this is garbage rather than a product, so the offer is rejected
+   instead of rendering a broken or layout-breaking price. */
+const PRICE_MAX = 1_000_000_000;
+
 function searchParamsToOffer(sp: PageProps["searchParams"]): OfferData | null {
-  const title = single(sp.t).trim();
-  const url   = single(sp.u).trim();
-  if (!title || !url) return null;
+  /* Cap the title. A 2000-char `t=` would otherwise flow straight
+     into a 2000-char <title> tag and browser-tab label. */
+  const title  = single(sp.t).trim().slice(0, 200);
+  const rawUrl = single(sp.u).trim();
+  if (!title || !rawUrl) return null;
+
+  /* The merchant URL must be a real http(s) link. This value gets
+     signed into an /api/go redirect, so a javascript: / data: / other
+     scheme is rejected here rather than relying on /api/go to scrub a
+     URL we have already vouched for with a signature. */
+  let url: string;
+  try {
+    const u = new URL(rawUrl);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    url = u.toString();
+  } catch {
+    return null;
+  }
+
+  /* Price must be finite, positive, and under the ceiling. An
+     implausible price means a bogus synthetic offer, so return null
+     and let the page 404 instead of rendering a negative or a
+     14-digit price. */
+  const currentPrice = parseNumber(sp.p);
+  if (!Number.isFinite(currentPrice) || currentPrice <= 0 || currentPrice >= PRICE_MAX) {
+    return null;
+  }
+  /* Original ("was") price: clamped to at least the current price so
+     an op<p inversion cannot render a nonsense strikethrough, and to
+     the same ceiling. */
+  const originalPrice = Math.min(
+    PRICE_MAX,
+    Math.max(currentPrice, parseNumber(sp.op, currentPrice)),
+  );
+  /* Discount is DERIVED from the two prices, never trusted from the
+     `dp=` param. The param is what let a "150% OFF" badge render
+     against unrelated prices. Capped at 99. */
+  const discountPercent = originalPrice > currentPrice
+    ? Math.min(99, Math.round((1 - currentPrice / originalPrice) * 100))
+    : 0;
 
   const ccyRaw = single(sp.c).toUpperCase();
   const currency: "NGN" | "USD" = ccyRaw === "NGN" ? "NGN" : "USD";
@@ -83,21 +127,21 @@ function searchParamsToOffer(sp: PageProps["searchParams"]): OfferData | null {
     offerId:         "",
     productId:       "",
     storeId:         single(sp.s) || "external",
-    storeName:       single(sp.sn) || "Merchant",
+    storeName:       (single(sp.sn) || "Merchant").slice(0, 80),
     storeLogoUrl:    single(sp.sl) || null,
     title,
     category:        "general",
     brand:           null,
     imageUrl:        single(sp.i) || undefined,
     url,
-    currentPrice:    parseNumber(sp.p),
-    originalPrice:   parseNumber(sp.op, parseNumber(sp.p)),
-    discountPercent: Math.round(parseNumber(sp.dp)),
+    currentPrice,
+    originalPrice,
+    discountPercent,
     currency,
     /* External / live offers default to in-stock; we have no way to
        check without re-scraping. Stale ones the user clicks
-       gracefully degrade to "View at merchant → maybe oos" rather
-       than blocking the click. */
+       gracefully degrade to "View at merchant" rather than blocking
+       the click. */
     inStock:         true,
     scrapedAt:       new Date().toISOString(),
   };
