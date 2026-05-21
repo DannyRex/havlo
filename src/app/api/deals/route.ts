@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveBrowseProvider } from "@/lib/providers";
+import { spaceByStore } from "@/lib/providers/curated-helper";
 import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { isStoreSearchUrl } from "@/lib/utils";
@@ -438,9 +439,10 @@ export async function GET(req: NextRequest) {
        newest / discount / price sorts stay strictly deterministic
        because their ordering carries explicit semantic meaning.
 
-       Approach: shuffle the top SHUFFLE_WINDOW items with a time-
-       bucketed seed. Items outside the shuffle window keep their
-       original relevance order so coarse ranking is preserved.
+       Approach: jitter every deal's relevance rank by a seeded random
+       amount, then re-sort. The strongest deals still tend to lead
+       (their starting rank is low) but the visible first page rotates
+       through a deep slice of the catalog, not a fixed top band.
 
        Rotation cadence: 60 seconds. Paired with a matching
        s-maxage=60 edge cache for sort=relevance responses (see
@@ -457,7 +459,6 @@ export async function GET(req: NextRequest) {
        "cant relevance rotate on every call or more frequently?"
        Tightened to 60s. */
     if (sort === "relevance" && qualifyingByOrigin.length > 12) {
-      const SHUFFLE_WINDOW    = 60;                    // top 60 rotate among themselves
       const ROTATION_BUCKET_MS = 60 * 1000;            // new shuffle every 60 seconds
       const bucket = Math.floor(Date.now() / ROTATION_BUCKET_MS);
       /* Per-country seed component so /uk and /ng don't share a
@@ -478,14 +479,24 @@ export async function GET(req: NextRequest) {
         t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
       };
-      const top  = qualifyingByOrigin.slice(0, SHUFFLE_WINDOW);
-      const rest = qualifyingByOrigin.slice(SHUFFLE_WINDOW);
-      /* Fisher-Yates with the seeded rng. */
-      for (let i = top.length - 1; i > 0; i--) {
-        const j = Math.floor(rng() * (i + 1));
-        [top[i], top[j]] = [top[j], top[i]];
-      }
-      qualifyingByOrigin = [...top, ...rest];
+      /* Rank jitter. Each deal's relevance rank (its index) is nudged
+         by a seeded random amount, up to JITTER/2 positions in either
+         direction, then the pool is re-sorted by the jittered rank.
+         The visible first page then rotates through roughly the top
+         ~200 deals across visits instead of a fixed ~60, while a low
+         starting rank still keeps the strongest deals surfacing most
+         of the time. JITTER is the one knob: larger trades "best
+         first" for more variety. Founder direction May 2026: "reveal
+         other less-seen products." */
+      const JITTER = 320;
+      const jittered = qualifyingByOrigin
+        .map((deal, idx) => ({ deal, rank: idx + (rng() - 0.5) * JITTER }))
+        .sort((a, b) => a.rank - b.rank)
+        .map((x) => x.deal);
+      /* The jitter can place same-store items next to each other;
+         re-run spaceByStore (gap 6) so the rotated feed keeps the
+         no-clustering property the relevance sort gives it. */
+      qualifyingByOrigin = spaceByStore(jittered, 6);
     }
 
     /* Degraded-response detector — fires when browse_deals RPC failed
