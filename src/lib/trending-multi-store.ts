@@ -119,17 +119,6 @@ export interface MultiStoreChip {
    include products from other categories... Add more and randomise". */
 const PER_CATEGORY_CAP = 12;
 
-/* Thin-coverage categories that rarely hit ≥2 stores. We relax to
-   ≥1 store for these so the rail can show beauty / fashion / home
-   / appliances at all. Honest framing: the chip badge still shows
-   the real store count, so users know up-front whether it's a real
-   "compare across N stores" or a "1 store, popular item". */
-const THIN_COVERAGE_CATEGORIES = new Set([
-  "beauty", "fashion", "home", "appliances", "sports", "books",
-  "groceries", "garden", "pets", "music", "automotive", "tv",
-]);
-const MIN_DISCOUNT_FOR_THIN_CAT = 25;  // %, only show meaningfully-discounted single-store items
-
 async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
   const supa = getSupabaseAdmin();
   if (!supa) return [];
@@ -208,41 +197,15 @@ async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
   }
   const multiStoreChips = Array.from(seenFriendly.values());
 
-  /* Top up the pool with single-store products from thin-coverage
-     categories (beauty / fashion / home / appliances / sports / etc.)
-     that have a meaningful discount. Without this the rail is 60%
-     phones because that's where the catalog overlaps. Honest framing:
-     the badge still shows the real store count, so a "1" tells users
-     it's a single-store popular item rather than a multi-store
-     comparison. */
-  const topUp: MultiStoreChip[] = [];
-  /* For each thin-coverage category, pull a small top-discount slice. */
-  for (const cat of Array.from(THIN_COVERAGE_CATEGORIES)) {
-    const { data: catRows } = await supa
-      .from("product_best_offers")
-      .select("product_id, title, category_slug, discount_percent")
-      .eq("category_slug", cat)
-      .gte("discount_percent", MIN_DISCOUNT_FOR_THIN_CAT)
-      .order("discount_percent", { ascending: false })
-      .limit(20);
-    if (!catRows) continue;
-    for (const r of catRows as Array<{ product_id: string; title: string; category_slug: string | null }>) {
-      if (!r.title || looksLikeChipJunk(r.title)) continue;
-      const friendly = friendlifyChipTitle(r.title);
-      if (!friendly || friendly.length < 4) continue;
-      /* Don't double-count products already in the multi-store pool. */
-      if (seenFriendly.has(friendly)) continue;
-      const stores = productStores.get(r.product_id)?.size ?? 1;
-      topUp.push({
-        title:        friendly,
-        searchQuery:  r.title,
-        productId:    r.product_id,
-        storeCount:   stores,
-        categorySlug: r.category_slug,
-      });
-      seenFriendly.set(friendly, topUp[topUp.length - 1]);
-    }
-  }
+  /* multiStoreChips is the entire chip pool. Every entry has at least
+     MIN_STORES_FOR_CHIP distinct stores, so every chip clicks into a
+     genuine cross-store comparison. An earlier single-store "top-up"
+     that padded thin categories (beauty / fashion / home) was removed:
+     a one-store product has nothing to compare and does not belong in
+     a "Popular comparisons" rail (founder direction May 2026). The
+     per-category cap below is the diversity lever; the rail leans
+     toward categories where the catalog has real cross-store overlap,
+     and broadening that is a catalog-coverage task, not a display one. */
 
   /* Group by category, cap each, then merge. Round-robin across
      categories so the final pool order is interleaved (phones,
@@ -250,9 +213,8 @@ async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
      phones, ...) — TrendingChipRail picks 10 random from this
      pre-mixed pool so the visible chips look diverse even before
      the rotation kicks in. */
-  const combined = [...multiStoreChips, ...topUp];
   const byCategory = new Map<string, MultiStoreChip[]>();
-  for (const c of combined) {
+  for (const c of multiStoreChips) {
     const cat = c.categorySlug ?? "other";
     const arr = byCategory.get(cat) ?? [];
     arr.push(c);

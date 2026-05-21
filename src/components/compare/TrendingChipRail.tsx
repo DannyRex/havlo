@@ -104,34 +104,20 @@ export default function TrendingChipRail({
     return () => clearInterval(id);
   }, [items.length, limit, rotateEveryMs]);
 
-  /* Visible chips. First render (tick=0) uses a seeded shuffle so
-     SSR + first hydration agree on the same order. Subsequent ticks
-     use Math.random() for genuine rotation variety.
-
-     Prioritisation: chips with ≥2 stores fill the rail first, then
-     single-store chips backfill remaining slots. Multi-store chips
-     click into a real cross-store comparison (which is the chip
-     rail's whole value prop); single-store chips are useful for
-     category diversity (beauty / fashion / home rarely have ≥2
-     merchants), but only when there aren't enough multi-store
-     chips to fill the rail. */
+  /* Visible chips. Only products carried by 2 or more distinct stores
+     belong in a "Popular comparisons" rail; a single-store chip would
+     click into a page with nothing to compare. The source
+     (/api/trending-chips) is already filtered to multi-store products,
+     so the storeCount filter here is a defensive second gate. First
+     render (tick=0) uses a seeded shuffle so SSR and the first client
+     paint agree on the order; later ticks use Math.random() for
+     genuine rotation variety. */
   const visible = useMemo<MultiStoreChip[]>(() => {
-    if (items.length === 0) return [];
-    const multi  = items.filter((c) => c.storeCount >= 2);
-    const single = items.filter((c) => c.storeCount <  2);
-
-    if (tick === 0) {
-      /* Seeded shuffle keeps SSR + first hydration in sync. Order
-         within each tier is shuffled independently, then the tiers
-         concatenate so multi always renders first. */
-      const shuffledMulti  = seededShuffle(multi,  multi.length || 1);
-      const shuffledSingle = seededShuffle(single, single.length || 1);
-      return [...shuffledMulti, ...shuffledSingle].slice(0, limit);
-    }
-    const pickedMulti = pickRandom(multi, Math.min(limit, multi.length));
-    const remaining   = limit - pickedMulti.length;
-    if (remaining <= 0) return pickedMulti;
-    return [...pickedMulti, ...pickRandom(single, remaining)];
+    const pool = items.filter((c) => c.storeCount >= 2);
+    if (pool.length === 0) return [];
+    return tick === 0
+      ? seededShuffle(pool, pool.length || 1).slice(0, limit)
+      : pickRandom(pool, limit);
   }, [items, tick, limit]);
 
   /* Loading skeleton — small placeholder chips so the layout doesn't
@@ -165,7 +151,10 @@ export default function TrendingChipRail({
     );
   }
 
-  if (items.length === 0) return null;
+  /* Hide the whole rail when there are no genuinely-comparable chips,
+     rather than rendering a "Popular comparisons" header with nothing
+     (or single-store filler) under it. */
+  if (visible.length === 0) return null;
 
   return (
     <section className="mt-6 sm:mt-8" aria-label="Popular comparisons">
