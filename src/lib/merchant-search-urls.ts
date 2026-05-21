@@ -37,29 +37,27 @@ interface MerchantHandlers {
   homepage: string;
 }
 
-/* Country → Ubuy subdomain map. Ubuy operates a country-routed
-   storefront (each market has its own inventory + pricing + checkout
-   flow), and ubuy.com (no subdomain) is a country-selector landing
-   page that does not return product results — clicking "search" on
-   that page just asks the visitor to pick their country first. So a
-   search URL pointed at ubuy.com is effectively dead for everyone
-   except visitors who happen to already have a country cookie set
-   from a prior visit.
+/* Country → Ubuy host map. Ubuy runs a country-routed storefront
+   (each market has its own inventory, pricing and checkout), and the
+   bare ubuy.com is a country-selector landing page that returns no
+   product results.
 
-   These mappings route to the actual market subdomain. Verified
-   patterns:
-     NG → ubuy.com.ng    UK → ubuy.co.uk    US → ubuy.us
-     AE → ubuy.com.kw    DE → ubuy.de       IN → ubuy.co.in
-     ZA → ubuy.co.za
-   (AE → KW because Ubuy is Kuwait-headquartered and the KW
-   subdomain serves the same GCC inventory that Emirati buyers
-   use; ubuy.ae redirects to ubuy.com.kw at the time of writing.)
+   Host patterns are NOT uniform. Verified May 2026 by direct probe:
+     US ubuy.us   IN ubuy.co.in   ZA ubuy.co.za   AE ubuy.com.kw
+     UK www.u-buy.co.uk           NG www.u-buy.com.ng
+   UK and NG no longer resolve on the un-hyphenated ubuy.co.uk /
+   ubuy.com.ng (DNS retired) and serve only on the hyphenated u-buy
+   domain. Caught from a user-reported unreachable UK CTA.
+   DE ubuy.de is UNVERIFIED: both ubuy.de and u-buy.de timed out in
+   the probe. Left as-is, no regression, pending a manual check.
+   AE routes to the KW host because Ubuy is Kuwait-headquartered and
+   KW serves the GCC inventory Emirati buyers use.
 
-   If a country isn't in the map, fall back to ubuy.com — broken
-   but at least branded; better than a 404. */
+   If a country is not in the map, fall back to ubuy.com: branded and
+   reachable, better than a dead host. */
 const UBUY_SUBDOMAIN: Record<string, string> = {
-  ng: "ubuy.com.ng",
-  uk: "ubuy.co.uk",
+  ng: "www.u-buy.com.ng",
+  uk: "www.u-buy.co.uk",
   us: "ubuy.us",
   ae: "ubuy.com.kw",
   de: "ubuy.de",
@@ -68,26 +66,32 @@ const UBUY_SUBDOMAIN: Record<string, string> = {
 };
 
 export function ubuyHostForCountry(country?: string): string {
-  if (!country) return "www.ubuy.com.ng";  // NG is our launch market — best default
+  if (!country) return "www.u-buy.com.ng";  // NG is our launch market, best default
   return UBUY_SUBDOMAIN[country.toLowerCase()] ?? "www.ubuy.com";
 }
 
-/* Runtime URL rewriter for stored Ubuy URLs. Catches the bare
-   ubuy.com (country-selector splash, returns no product results)
-   and re-hosts the path on the visitor's country subdomain. Does
-   NOT touch URLs already on a country subdomain — those are
-   presumed correct.
+/* Hosts that no longer serve product pages and must be re-pointed to
+   a working Ubuy host at click time: the bare ubuy.com country-
+   selector splash, plus ubuy.co.uk and ubuy.com.ng, the UK and NG
+   un-hyphenated domains Ubuy has retired (DNS no longer resolves,
+   verified May 2026). Stored URLs ingested before the move still
+   carry these dead hosts. */
+const DEAD_UBUY_HOSTS = new Set(["ubuy.com", "ubuy.co.uk", "ubuy.com.ng"]);
 
-   Used by /api/go to fix ingestion-stored ubuy.com URLs at click
-   time without an ingest re-run. The path + querystring + fragment
-   are preserved exactly so search queries (?ref=...) carry
-   through unchanged onto the country host where they actually
-   return results. */
+/* Runtime URL rewriter for stored Ubuy URLs. Re-hosts any URL on a
+   dead Ubuy host (DEAD_UBUY_HOSTS) onto the visitor's working
+   country host. Does NOT touch URLs already on a live host: those
+   are presumed correct.
+
+   Used by /api/go to fix ingestion-stored Ubuy URLs at click time
+   without an ingest re-run. The path, querystring and fragment are
+   preserved exactly so a stored product path carries through
+   unchanged onto the working host. */
 export function rewriteUbuyHostForCountry(url: string, country?: string): string {
   try {
     const u = new URL(url);
     const host = u.hostname.toLowerCase().replace(/^www\./, "");
-    if (host !== "ubuy.com") return url;       // already on a country subdomain or not Ubuy
+    if (!DEAD_UBUY_HOSTS.has(host)) return url;  // already on a working host, or not Ubuy
     u.hostname = ubuyHostForCountry(country);
     return u.toString();
   } catch {
@@ -287,17 +291,16 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "nfm":                        { name: "NFM",                 searchUrl: (q) => `https://www.nfm.com/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.nfm.com" },
   "dick-s-sporting-goods":      { name: "DICK'S Sporting Goods", searchUrl: (q) => `https://www.dickssportinggoods.com/search/SearchDisplay?searchTerm=${encodeURIComponent(q)}`, homepage: "https://www.dickssportinggoods.com" },
   "b-h-photo-video-audio":      { name: "B&H Photo",           searchUrl: (q) => `https://www.bhphotovideo.com/c/search?Ntt=${encodeURIComponent(q)}`, homepage: "https://www.bhphotovideo.com" },
-  /* Ubuy: country-routed storefront. Each market lives on its own
-     subdomain (ubuy.com.ng, ubuy.co.uk, ubuy.us, etc.) with its own
-     inventory + pricing. The bare ubuy.com is a country-selector
-     landing page that does NOT return product results — verified
-     May 2026 v3 from a user-reported broken CTA:
-       "ubuy pdp points to https://ubuy.com/en/search/?ref=Giantex
-        41" Kitchen Pantry Cabinet (broken)"
-     Now routes through the visitor's country subdomain via the
-     UBUY_SUBDOMAIN map at the top of this file. ?ref= IS Ubuy's
-     real search param on the country subdomains. */
-  "ubuy":                       { name: "Ubuy",                searchUrl: (q, country) => `https://${ubuyHostForCountry(country)}/en/search/?ref=${encodeURIComponent(q)}`,     homepage: "https://www.ubuy.com.ng" },
+  /* Ubuy: country-routed storefront. See UBUY_SUBDOMAIN at the top
+     of this file for the per-market host map. The search path is
+     /search/ with the query in ?q= ; ?ref_p=ser_tp is Ubuy's source
+     tag that marks it as a search-bar query. The earlier
+     /en/search/?ref= form was wrong on every market: verified
+     May 2026 against the live UK storefront after a user-reported
+     unreachable CTA.
+       was:     https://ubuy.co.uk/en/search/?ref=Nokia+1600   (dead)
+       correct: https://www.u-buy.co.uk/search/?ref_p=ser_tp&q=nokia+1600 */
+  "ubuy":                       { name: "Ubuy",                searchUrl: (q, country) => `https://${ubuyHostForCountry(country)}/search/?ref_p=ser_tp&q=${encodeURIComponent(q)}`, homepage: "https://www.u-buy.com.ng" },
   /* User-reported: storeName "Marks Electrical" was slugifying to
      markselectrical.com (404). Correct brand domain is
      markselectrical.co.uk. */
