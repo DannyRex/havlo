@@ -5,7 +5,7 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import ThemeProvider from "@/components/ui/ThemeProvider";
 import { CountryProvider } from "@/components/providers/CountryProvider";
-import { getServerCountry } from "@/lib/country-server";
+import { getRequestCountry } from "@/lib/country-server";
 import JsonLd from "@/components/seo/JsonLd";
 import GoogleAnalytics from "@/components/seo/GoogleAnalytics";
 import Skimlinks from "@/components/seo/Skimlinks";
@@ -179,15 +179,15 @@ export default function RootLayout({
       </head>
       <body className="min-h-[100dvh] flex flex-col antialiased font-sans bg-bg text-ink">
         <ThemeProvider>
-          {/* Resolve country server-side from cookie → geo-IP so the
-              SSR'd Navbar flag matches the user's country on the FIRST
-              paint. Without this seed, Navbar (which lives in root
-              layout, above the inner [country] CountryProvider) used
-              the client lazy-initializer only, producing a brief NG
-              flag flash on /uk/compare etc. before client hydration
-              swapped it. QA report May 2026 caught this on /compare
-              specifically. */}
-          <CountryProvider initialCode={getServerCountry().code}>
+          {/* Seed CountryProvider with the country middleware resolved
+              for this request (the x-havlo-country header): the URL's
+              /[country]/ segment when present, else cookie/geo. The
+              Navbar lives here in the root layout, above the inner
+              [country] CountryProvider, so without a URL-accurate seed
+              its SSR render used the cookie's country while the client
+              resolved the URL's. That hydration mismatch threw React
+              #418/#423/#425 and flashed the wrong flag on first paint. */}
+          <CountryProvider initialCode={getRequestCountry().code}>
             <Navbar />
             <main className="flex-1">{children}</main>
             <Footer />

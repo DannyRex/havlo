@@ -51,3 +51,24 @@ export function getServerCountry(): Country {
   if (geoCode) return getCountry(geoCode);
   return getCountry(undefined);
 }
+
+/* Country for the CURRENT request, as resolved by middleware.
+
+   Middleware sets the `x-havlo-country` header on every request: the
+   URL's /[country]/ segment when present, else the cookie/geo pick.
+   The root layout seeds CountryProvider from this so SSR renders the
+   SAME country the client resolves from the URL on hydration, which
+   is what stops the navbar rendering the cookie's country on the
+   server and the URL's on the client (the M7 hydration mismatch).
+
+   Falls back to getServerCountry() if the header is somehow absent
+   (e.g. a path the middleware matcher skips). */
+export function getRequestCountry(): Country {
+  try {
+    const hdr = headers().get("x-havlo-country");
+    if (hdr && SUPPORTED_CODES.has(hdr.toLowerCase())) return getCountry(hdr);
+  } catch {
+    /* outside a request context (build-time, etc.) */
+  }
+  return getServerCountry();
+}

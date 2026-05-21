@@ -64,6 +64,25 @@ export function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const seg = path.split("/")[1]?.toLowerCase() ?? "";
 
+  /* Resolve the country for THIS request and attach it as the
+     x-havlo-country request header, which the root layout reads to
+     seed CountryProvider. URL /[country]/ segment wins, then cookie,
+     then geo-IP, then ng. Without this the navbar rendered the
+     cookie's country on the server and the URL's country on the
+     client: a hydration mismatch that threw React #418/#423/#425 and
+     flashed the wrong flag for several seconds before correcting. */
+  const reqCountry = ((): string => {
+    if (SUPPORTED.has(seg)) return seg;
+    const ck = req.cookies.get(COUNTRY_COOKIE)?.value?.toLowerCase();
+    if (ck && SUPPORTED.has(ck)) return ck;
+    return inferGeoCountry(req) ?? "ng";
+  })();
+  const passThrough = (): NextResponse => {
+    const fwd = new Headers(req.headers);
+    fwd.set("x-havlo-country", reqCountry);
+    return NextResponse.next({ request: { headers: fwd } });
+  };
+
   /* Case 1: URL has a valid country prefix.
 
      Middleware does NOT touch the country cookie here. The cookie is
@@ -89,7 +108,7 @@ export function middleware(req: NextRequest) {
       target.pathname = `/${path.split("/").slice(2).join("/")}`;
       return NextResponse.redirect(target, 307);
     }
-    return NextResponse.next();
+    return passThrough();
   }
 
   /* Case 2: bare country-scoped path (/, /deals, /compare) → redirect
@@ -119,7 +138,7 @@ export function middleware(req: NextRequest) {
     return res;
   }
 
-  return NextResponse.next();
+  return passThrough();
 }
 
 export const config = {
