@@ -141,7 +141,11 @@ function CompareContent() {
     /* Sniff produced a usable product (title + price)? Build the anchor
        client-side from the sniff itself; ask the server only for dupes
        that undercut the sniffed price. */
-    const sniffedAnchor = sniff ? sniffToAnchor(sniff) : null;
+    /* Gate on sniff.ok — a failed/degraded sniff (dead URL, blocked
+       page) must NOT build a "Your Pick" anchor from a placeholder
+       title. ok:false falls through to the legacy path, which shows
+       the honest empty state instead (robustness report M8). */
+    const sniffedAnchor = sniff?.ok ? sniffToAnchor(sniff) : null;
 
     if (sniffedAnchor) {
       try {

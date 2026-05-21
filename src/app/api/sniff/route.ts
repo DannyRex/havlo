@@ -518,12 +518,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     /* All bot UAs blocked AND slug yields nothing useful (opaque IDs
        like next.co.uk's /style/su800903/y02937).
 
-       Rather than returning a hard error, surface a graceful fallback:
-       store name from hostname + a generic title + favicon as the
-       image. The user still sees "we recognise this is a Next.co.uk
-       product, here's the link, click through to view it" instead of
-       a "page blocked" wall. ok:true so the compare page renders the
-       anchor card with cheaper-alternatives logic running on the title. */
+       We genuinely could not read the page: no title, no price, just
+       a hostname. Return ok:false so /compare shows its honest
+       "couldn't read this" state rather than a green-check "Found"
+       card (robustness report M8/m2). The response still carries the
+       hostname, ASIN and a favicon image for any consumer that wants
+       a best-effort label. */
     const hostname = parsedUrl.hostname.replace(/^www\./, "");
     const faviconImage = `https://www.google.com/s2/favicons?domain=${hostname}&sz=128`;
     /* Friendly placeholder when ALL extraction paths failed. The
@@ -538,7 +538,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         : "External product (couldn't read details)";
     return NextResponse.json<SniffResult>(
       {
-        ok: !!asin || !!store,
+        ok: false,
         url: rawUrl,
         store,
         rawTitle: "",
@@ -590,7 +590,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   if (!rawTitle) {
     return NextResponse.json<SniffResult>({
-      ok: !!asin,
+      ok: false,
       url: rawUrl,
       store,
       rawTitle: "",
