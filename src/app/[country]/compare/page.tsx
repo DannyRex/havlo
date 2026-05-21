@@ -228,21 +228,21 @@ function CompareContent() {
   }, [router, handleUrlSearch, fetchLive]);
 
   /* ── SearchBar submit handler ─────────────────────────────────────────
-     Mirrors the homepage hero's intent fork so the two search surfaces
-     behave the same:
-       • URL paste           → sniff + anchor on /compare
-       • picked suggestion   → /compare, anchored by pid (exact product)
-       • freeform typed text → /deals grid. An ambiguous query wants a
-                               grid to pick from; /deals → PDP → /compare
-                               is the full drill-down chain.
-     Only USER-initiated submits fork here. The URL-change effect below
-     still calls handleSearch directly, so a shared /compare?q=… link
-     and any chip-driven navigation resolve on /compare unchanged. */
+     Every search from the /compare bar resolves ON /compare: a pasted
+     URL goes through handleUrlSearch (sniff + anchor); everything else
+     goes through handleSearch (a text search on /compare), with a
+     picked autocomplete suggestion also passing its pid for an exact
+     anchor.
+
+     A freeform typed query used to be forked out to the /deals grid on
+     the theory it was "ambiguous", but that bounced specific product
+     names too, mismatched the bar's own "Find cheaper" promise, and
+     disagreed with the page's URL-load path, where /compare?q=...
+     already resolves here via handleSearch. */
   const onSearchSubmit = useCallback((q: string, pid?: string) => {
     if (looksLikeUrl(q)) { handleUrlSearch(q); return; }
-    if (pid) { handleSearch(q, pid); return; }
-    router.push(`/${country.code}/deals?search=${encodeURIComponent(q.trim())}&origin=all`);
-  }, [router, country.code, handleUrlSearch, handleSearch]);
+    handleSearch(q, pid);
+  }, [handleUrlSearch, handleSearch]);
 
   /* ── React to URL changes (initial load, back/forward) ─────────────── */
   useEffect(() => {
