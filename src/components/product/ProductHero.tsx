@@ -211,7 +211,12 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
   return (
     <section className="grid md:grid-cols-[1fr,minmax(0,1.05fr)] gap-6 sm:gap-10 lg:gap-14">
       {/* ── Image column ─────────────────────────────────────────── */}
-      <div className="relative aspect-square md:aspect-[4/5] rounded-2xl sm:rounded-3xl bg-surface-2 border border-border overflow-hidden">
+      {/* White tile when an image is present so dark products (black
+          phones, speakers, TVs) don't vanish into the dark surface;
+          object-contain letterboxes, so the container colour shows
+          around the photo. Keeps bg-surface-2 for the no-image
+          HavloLogoFallback, which is designed for the dark surface. */}
+      <div className={`relative aspect-square md:aspect-[4/5] rounded-2xl sm:rounded-3xl border border-border overflow-hidden ${imgSrc && !imgFailed ? "bg-white" : "bg-surface-2"}`}>
         {imgSrc && !imgFailed ? (
           /* Plain <img> (May 2026 v3) — was next/image with priority.
              Vercel free-tier image transformation cap (5K/mo) was
