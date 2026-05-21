@@ -787,6 +787,17 @@ export async function pgFtsFindSimilar(
        "iPhone 17 Pro" as a strong match because "iphone" + "pro" both
        hit. By weighting model numbers heavily we keep the literal "15"
        in the user's query from being silently swapped for "17". */
+    /* Tighter-match tiebreak. scoreCandidate counts how many query
+       tokens a title contains, so for the query "iPhone 15" both
+       "iPhone 15" and "iPhone 15 Plus" score identically (each has
+       "iphone" + "15"). A candidate carrying variant tokens (pro /
+       plus / max / ultra ...) the user did NOT type is a sibling
+       model, not the literal match. extraVariantCount pins the exact
+       model the user named. `variants` is the original query's
+       variant set, computed above. */
+    const extraVariantCount = (title: string): number =>
+      extractVariantTokens(title).filter((v) => !variants.includes(v)).length;
+
     const candidates = (data as FtsRow[])
       .filter((r) => !looksLikeAccessory(r.title))
       .filter((r) => !looksSuspicious(r.title))
@@ -814,9 +825,11 @@ export async function pgFtsFindSimilar(
          → "Samsung 55 Inch Smart TV". Bypassed when the query
          doesn't include any recognized brand. */
       .filter((r) => candidateHasBrand(r.title, queryBrand))
-      .map((r) => ({ row: r, score: scoreCandidate(query, r.title) }))
-      // Stable sort: score desc, then preserve original FTS rank as tiebreak
-      .sort((a, b) => b.score - a.score);
+      .map((r) => ({ row: r, score: scoreCandidate(query, r.title), extra: extraVariantCount(r.title) }))
+      /* Sort: query-token score desc, then fewest unsolicited variant
+         tokens (the tighter model match). Array.sort is stable, so an
+         exact tie still preserves the original FTS rank. */
+      .sort((a, b) => (b.score - a.score) || (a.extra - b.extra));
 
     /* Confidence floor: when the candidates haven't matched the
        bare minimum query-token signal, prefer empty over
