@@ -9,25 +9,10 @@
    <button> trigger; arrow-key list traversal can come later. */
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronDown, Globe } from "lucide-react";
 import { useCountry } from "@/components/providers/CountryProvider";
-import { COUNTRIES } from "@/lib/country";
 import { cn } from "@/lib/utils";
 import CountryFlag from "@/components/ui/CountryFlag";
-
-const COUNTRY_CODES = new Set(COUNTRIES.map((c) => c.code));
-
-/* Pull the path WITHOUT the country prefix.
-   /uk/deals → /deals · /us → / · /contact → /contact (no country in URL) */
-function stripCountryPrefix(pathname: string): string {
-  const segs = pathname.split("/");
-  if (segs.length >= 2 && COUNTRY_CODES.has(segs[1]?.toLowerCase())) {
-    const rest = "/" + segs.slice(2).join("/");
-    return rest === "/" ? "" : rest;
-  }
-  return pathname === "/" ? "" : pathname;
-}
 
 interface Props {
   /** Open the menu upward instead of downward — for footer placements
@@ -37,8 +22,6 @@ interface Props {
 
 export default function CountrySelect({ dropUp = false }: Props = {}) {
   const { country, countries, setCountry } = useCountry();
-  const router = useRouter();
-  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -125,13 +108,14 @@ export default function CountrySelect({ dropUp = false }: Props = {}) {
                     aria-selected={active}
                     onClick={() => {
                       setOpen(false);
-                      /* Update context immediately for snappy UI feedback;
-                         then navigate to the new country URL. Middleware
-                         picks up the prefix and writes the cookie so the
-                         next request renders with the right country. */
+                      /* setCountry owns the switch: it writes the cookie,
+                         fires the analytics event, and navigates to the
+                         new country URL with the current query string
+                         preserved. A second router.push here used to
+                         clobber that with a query-stripped path, which
+                         404'd the synthetic /p/live PDP whose entire
+                         offer payload lives in the query string. */
                       setCountry(c.code);
-                      const rest = stripCountryPrefix(pathname);
-                      router.push(`/${c.code}${rest}`);
                     }}
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left transition-colors",
