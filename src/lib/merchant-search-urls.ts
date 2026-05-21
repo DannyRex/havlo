@@ -44,12 +44,12 @@ interface MerchantHandlers {
 
    Host patterns are NOT uniform. Verified May 2026 by direct probe:
      US ubuy.us   IN ubuy.co.in   ZA ubuy.co.za   AE ubuy.com.kw
-     UK www.u-buy.co.uk           NG www.u-buy.com.ng
+     UK www.u-buy.co.uk    NG www.u-buy.com.ng    DE www.ubuy.de.com
    UK and NG no longer resolve on the un-hyphenated ubuy.co.uk /
    ubuy.com.ng (DNS retired) and serve only on the hyphenated u-buy
-   domain. Caught from a user-reported unreachable UK CTA.
-   DE ubuy.de is UNVERIFIED: both ubuy.de and u-buy.de timed out in
-   the probe. Left as-is, no regression, pending a manual check.
+   domain. DE serves from a .de.com domain, confirmed as Ubuy's German
+   store by a link from the official ubuy.com. All three were caught
+   from user-reported broken Ubuy CTAs.
    AE routes to the KW host because Ubuy is Kuwait-headquartered and
    KW serves the GCC inventory Emirati buyers use.
 
@@ -60,7 +60,7 @@ const UBUY_SUBDOMAIN: Record<string, string> = {
   uk: "www.u-buy.co.uk",
   us: "ubuy.us",
   ae: "ubuy.com.kw",
-  de: "ubuy.de",
+  de: "www.ubuy.de.com",
   in: "ubuy.co.in",
   za: "ubuy.co.za",
 };
