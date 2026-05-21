@@ -74,6 +74,16 @@ export default function WaitlistForm({ country, source = "cashback-page", compac
       inFlight.current = false;
       return;
     }
+    /* Client-side format check — catches a malformed address before
+       the POST, so the user gets a friendly message instead of the
+       server's 400 surfacing as a raw error. Same regex EmailCapture
+       uses, so the two signup forms behave consistently. */
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setStatus("error");
+      setErrorMsg("That email address doesn't look right.");
+      inFlight.current = false;
+      return;
+    }
 
     /* Verbose error handling: distinguish between
          (a) fetch never reached the server (offline / DNS / aborted)
@@ -98,15 +108,24 @@ export default function WaitlistForm({ country, source = "cashback-page", compac
       }
 
       if (!res.ok) {
-        /* (b) — server returned 4xx/5xx. Try to read body for context
-           but don't crash if it's an HTML error page. */
-        let bodyHint = "";
+        /* (b) — server returned 4xx/5xx. Our API errors come back as
+           clean JSON { ok:false, error } (validation, rate limit), so
+           surface that error verbatim: it is already user-facing copy.
+           Fall back to a generic line only when the body is not JSON
+           (an HTML 5xx page from the edge runtime). Never dump the raw
+           response body at the user. */
+        let friendly = "";
         try {
-          const txt = await res.text();
-          bodyHint = txt.length > 0 ? ` (${txt.slice(0, 100)})` : "";
-        } catch { /* ignore */ }
+          const j = (await res.json()) as { error?: string };
+          if (typeof j?.error === "string" && j.error.trim()) friendly = j.error.trim();
+        } catch { /* not JSON — use the generic fallback below */ }
         setStatus("error");
-        setErrorMsg(`Server returned ${res.status}.${bodyHint} Try again in a moment.`);
+        setErrorMsg(
+          friendly ||
+          (res.status === 429
+            ? "Too many attempts. Give it a minute and try again."
+            : "Something went wrong on our end. Try again in a moment."),
+        );
         return;
       }
 
