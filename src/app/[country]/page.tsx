@@ -26,8 +26,12 @@ import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList } from "@/lib/se
    side <RefreshOnInterval /> below kicks in every 5 minutes for users
    already on the page so freshness on the live surface is preserved.
 
-   The trending shuffle still rotates because the underlying ranker
-   uses popularity_score that updates with click telemetry. */
+   Trending-deal rotation does NOT depend on this revalidate window:
+   <TrendingDeals/> ships several precomposed variants in the ISR
+   payload and <TrendingDealsGrid/> picks one client-side per visit,
+   so the homepage surfaces a fresh set even while the HTML is cached.
+   See TrendingDealsGrid.tsx for why rotation must be client-side
+   under ISR. */
 /* Bumped May 2026 v3 (1800s → 3600s) for Vercel Fluid CPU relief.
    The country home doesn't need minute-level freshness — Mon+Thu
    ingest is the real source of new content, so any stale window

@@ -3,28 +3,15 @@ import { getActiveBrowseProvider } from "@/lib/providers";
 import { filterDealsForCountry, type Country } from "@/lib/country";
 import { classifyDeal, spaceByStore } from "@/lib/providers/curated-helper";
 import type { Deal } from "@/types";
-import MasonryCard from "@/components/deals/MasonryCard";
-import { MASONRY_ASPECTS } from "@/components/deals/masonry-layout";
-import AnimateIn from "@/components/ui/AnimateIn";
+import TrendingDealsGrid from "@/components/landing/TrendingDealsGrid";
 
-/* Deterministic seed bucketed into 5-minute windows so picks rotate
-   every 5 min. Server-rendered → no hydration mismatch. */
-const ROTATION_MS = 5 * 60 * 1000;
-
-function freshnessSeed(): number {
-  const bucket = Math.floor(Date.now() / ROTATION_MS).toString();
-  let h = 2166136261;
-  for (let i = 0; i < bucket.length; i++) {
-    h ^= bucket.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
+/* ── Seeded RNG ─────────────────────────────────────────────────────
+   mulberry32 PRNG + Fisher-Yates shuffle. Each trending VARIANT is a
+   composition of the candidate pool under a distinct shuffle seed. */
 function makeRng(seed: number) {
   let s = seed || 1;
   return () => {
-    s = (s + 0x6D2B79F5) >>> 0;
+    s = (s + 0x6d2b79f5) >>> 0;
     let t = s;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
@@ -41,129 +28,84 @@ function seededShuffle<T>(items: T[], rng: () => number): T[] {
   return arr;
 }
 
-/* `country` arrives as a prop from the page so this component stays
-   statically renderable per /[country]/. Removing the cookies() read
-   here was part of the May 2026 perf fix that unlocked ISR caching. */
-export default async function TrendingDeals({ country }: { country: Country }) {
-  /* Pull from whichever browse provider is active (DB when populated,
-     static fallback otherwise). Sort by discount → over-sample top N
-     → shuffle → per-store cap → take 16. */
-  const provider = await getActiveBrowseProvider();
+/* Distinct shuffle seeds — TrendingDeals composes one full 16-card
+   variant per seed and ships them all in the ISR payload;
+   <TrendingDealsGrid/> rotates between them client-side, one per
+   visit. 6 variants × the grid's 5-minute rotation bucket = a
+   30-minute cycle, so a visitor returning within the half hour
+   reliably sees a fresh set even though the page HTML is ISR-cached
+   (revalidate=3600) and identical for every visitor in that window.
 
-  const isNG = country.code === "ng";
+   Why not just rotate server-side? ISR means the server renders the
+   homepage once per cache window and every visitor gets that same
+   HTML — a server-picked seed is frozen for the whole hour. Rotation
+   has to happen on the client. See TrendingDealsGrid for the detail.
 
-  const qualityFilter = (d: Deal) =>
-    d.title.length >= 10 &&
-    d.title.length <= 70 &&
-    !d.title.includes("\\") &&
-    !(d.currency === "USD" && d.salePrice < 10);
+   The seed values are arbitrary well-known hash constants; only their
+   distinctness matters — each yields a different Fisher-Yates order,
+   so each variant draws a near-disjoint set from the (deep) pool.
+   Across the 6 variants a visitor sees ~6× more distinct products
+   over a session than the previous single frozen pick did. */
+const VARIANT_SEEDS = [
+  0x9e3779b9, 0x85ebca6b, 0xc2b2ae35, 0x27d4eb2f, 0x165667b1, 0xff51afd7,
+] as const;
 
-  /* Composition is now bucket-based, not origin-based.
+/* ── Trending composition ───────────────────────────────────────────
+   composeVariant() is pure — (pool, isNG, seed) → Deal[] — so the
+   server can run it once per VARIANT_SEED at no extra DB cost (the
+   pool is fetched once; only the in-memory shuffle/fill repeats).
 
-     Buckets:
-       local      → country-native retailers the visitor can shop
-                    same-day. For NG: only is_international=false rows
-                    (Konga, Jumia, 3C Hub, Slot, HealthPlus, Supermart).
-                    For non-NG: anything not Amazon/AliExpress in the
-                    country-filtered intl pool (Currys, ASOS, Best Buy,
-                    John Lewis, …).
-       amazon     → all amazon-* marketplaces (.com, .co.uk, .de, .ae,
-                    .in). The biggest commission stream we have.
-       aliexpress → just the one storeId. Cross-border tail.
-       intl-other → NG-only. Non-monetised cross-border retailers
-                    (Best Buy, Currys, ASOS, Macy's, …). NG shoppers
-                    DO use these via freight forwarders, but they
-                    shouldn't crowd same-day NG retailers out of the
-                    primary 'local' quota. Now has its own small
-                    primary quota so it surfaces every rotation.
+   Composition is bucket-based, not origin-based:
+     local      → country-native retailers the visitor can shop
+                  same-day. For NG: only is_international=false rows
+                  (Konga, Jumia, 3C Hub, Slot, HealthPlus, Supermart).
+                  For non-NG: anything not Amazon/AliExpress in the
+                  country-filtered intl pool (Currys, ASOS, Best Buy…).
+     amazon     → all amazon-* marketplaces (.com/.co.uk/.de/.ae/.in).
+                  The biggest commission stream we have.
+     aliexpress → just the one storeId. Cross-border tail.
+     intl-other → NG-only. Non-monetised cross-border retailers
+                  (Best Buy, Currys, ASOS, Macy's…). NG shoppers DO
+                  use these via freight forwarders, but they shouldn't
+                  crowd same-day NG retailers out of the local quota.
 
-     Target mix: 55% local, 30% Amazon + AliExpress, ~12.5% intl-other
-     (9 / 4 + 1 / 2 of 16). Reasoning:
-       • 55% local keeps the homepage anchored in stores the visitor
-         already trusts and can buy from same-day. Bumped from 50%
-         after the NG-local audit showed the bucket was being
-         crowded out by intl-other leak.
-       • Amazon + AliExpress combined at 30% keeps the monetised
-         affiliate streams visible without over-rotating to them.
-         Split 4:1 (Amazon:AliExpress) to preserve the prior weight
-         — Amazon has higher commission per click and stronger NG
-         delivery via marketplace sellers.
-       • intl-other gets a small dedicated 2-slot quota (was
-         backfill-only) so cross-border retailers like Currys / Best
-         Buy / John Lewis surface every rotation for shoppers who
-         use freight forwarders.
+   Target mix: 9 local / 4 Amazon / 1 AliExpress / 2 intl-other = 16
+   (≈55% local, ≈30% Amazon+AliExpress, ≈12.5% intl-other). Reasoning:
+     • 55% local keeps the homepage anchored in stores the visitor
+       already trusts and can buy from same-day.
+     • Amazon + AliExpress at ≈30% keeps the monetised affiliate
+       streams visible without over-rotating to them. Split 4:1 —
+       Amazon has higher commission per click and stronger NG delivery
+       via marketplace sellers.
+     • intl-other gets a dedicated 2-slot quota so cross-border
+       retailers surface every rotation for freight-forwarder users.
 
-     If a bucket is thin at the current rotation window, the cascade
-     backfills from the others — never showing fewer than 16 cards. */
-  const TARGET_TOTAL = 16;
-  const Q_LOCAL      = 9;
-  const Q_AMAZON     = 4;
-  const Q_ALIEXPRESS = 1;
-  const Q_INTL_OTHER = 2;
+   If a bucket is thin for a given seed the cascade backfills from the
+   others — never showing fewer than 16 cards while the pool allows. */
+const TARGET_TOTAL = 16;
+const Q_LOCAL = 9;
+const Q_AMAZON = 4;
+const Q_ALIEXPRESS = 1;
+const Q_INTL_OTHER = 2;
 
-  const rng = makeRng(freshnessSeed());
+function composeVariant(pool: Deal[], isNG: boolean, seed: number): Deal[] {
+  const rng = makeRng(seed);
 
-  /* Build the candidate pool. NG users get both local NGN + intl USD
-     pools merged; non-NG users only see intl filtered to their country.
-
-     NG-only third pool — `localFresh` — fetches 0%-discount local
-     inventory sorted by newest. This is the bridge for retailers
-     whose ingest path doesn't carry original_price metadata
-     (Jumia via SerpAPI Google site-filter, Bitmarte, HealthPlus,
-     etc). Without this pool they're invisible on the homepage
-     because the discount>=15 floor on the other two pools
-     excludes every row with discountPercent=0. Per-store cap in
-     the bucket fill still prevents any single fresh-only store
-     from dominating; the freshness sort keeps the rotation
-     pointing at the most recently scraped inventory. */
-  let pool: Deal[];
-  if (!isNG) {
-    const raw = await provider.fetchDeals({
-      sort: "discount", minDiscount: 15, origin: "intl",
-    });
-    pool = filterDealsForCountry(raw.filter(qualityFilter), country);
-  } else {
-    /* NG fetches 4 pools in parallel. The 4th is a Jumia-only direct
-       pull as a backstop: the localFresh pool depends on Pass A+B+C
-       merge order putting Jumia rows ahead of other stores in the
-       sort=newest result. If the localFresh's first 1000 rows happen
-       to skew Konga/Ajebomarket-heavy, Jumia drops below the merge
-       cap and the floor logic later can't find any Jumia in `pool`.
-       The dedicated Jumia fetch guarantees there's always Jumia
-       inventory available to displace into the rotation. */
-    const [localPool, intlPool, localFreshPool, jumiaOnlyPool] = await Promise.all([
-      provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "local" }),
-      provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "intl" }),
-      provider.fetchDeals({ sort: "newest",   minDiscount: 0,  origin: "local" }),
-      provider.fetchDeals({ sort: "newest",   minDiscount: 0,  origin: "local", stores: ["jumia"] }),
-    ]);
-    pool = [
-      ...localPool.filter(qualityFilter),
-      ...intlPool.filter(qualityFilter),
-      ...localFreshPool.filter(qualityFilter),
-      ...jumiaOnlyPool.filter(qualityFilter),
-    ];
-  }
-
-  if (pool.length === 0) return null;
-
-  /* Bucket the pool by classification, then shuffle each bucket
-     within the rotation window so picks rotate every 5 min.
+  /* Bucket the pool by classification.
 
      NG nuance: classifyDeal treats anything-not-Amazon-not-AliExpress
      as "local", which works for non-NG countries (the pool is pre-
      filtered to country-appropriate stores by filterDealsForCountry).
-     For NG it leaks — Best Buy, Currys, ASOS, John Lewis, etc. all
-     fall into 'local' and crowd actual NG retailers (Konga, 3C Hub,
-     HealthPlus, …) out of the 8-slot local quota. Audit found
-     ~14% of the NG 'local' bucket was actually NG-local.
-
-     Fix: for NG, route non-monetised intl rows into a separate
-     intl-other bucket. Backfill-only so they can still surface when
-     the primary buckets are thin, but they don't take from the local
-     quota up-front. */
+     For NG it leaks — Best Buy, Currys, ASOS, etc. all fall into
+     'local' and crowd actual NG retailers out of the local quota. So
+     for NG, route non-NGN intl rows into a separate intl-other
+     bucket: they keep their own small quota but don't take from the
+     local quota up-front. */
   const bucketed: Record<"local" | "amazon" | "aliexpress" | "intl-other", Deal[]> = {
-    local: [], amazon: [], aliexpress: [], "intl-other": [],
+    local: [],
+    amazon: [],
+    aliexpress: [],
+    "intl-other": [],
   };
   for (const d of pool) {
     const base = classifyDeal(d);
@@ -173,9 +115,9 @@ export default async function TrendingDeals({ country }: { country: Country }) {
       bucketed[base].push(d);
     }
   }
-  bucketed.local        = seededShuffle(bucketed.local,        rng);
-  bucketed.amazon       = seededShuffle(bucketed.amazon,       rng);
-  bucketed.aliexpress   = seededShuffle(bucketed.aliexpress,   rng);
+  bucketed.local = seededShuffle(bucketed.local, rng);
+  bucketed.amazon = seededShuffle(bucketed.amazon, rng);
+  bucketed.aliexpress = seededShuffle(bucketed.aliexpress, rng);
   bucketed["intl-other"] = seededShuffle(bucketed["intl-other"], rng);
 
   const seen = new Set<string>();
@@ -193,21 +135,20 @@ export default async function TrendingDeals({ country }: { country: Country }) {
     return true;
   }
 
-  /* Per-store cap. Local bucket is many-store (Konga, Jumia, 3C Hub,
-     ASOS, Currys, …) so we size cap = quota / distinct-stores with a
-     floor of 3 so a thin pool still fills up. Amazon needs a higher
-     cap (3-4) because each marketplace counts as its own storeId
-     even though they share commission economics. AliExpress only
-     has one storeId so its cap is the full quota. */
-  function distinctStoreCap(pool: Deal[], quota: number, floor = 3): number {
-    const stores = new Set(pool.map((d) => d.storeId)).size;
+  /* Per-store cap. Local bucket is many-store so we size cap =
+     quota / distinct-stores with a floor of 3 so a thin pool still
+     fills. Amazon needs a higher cap because each marketplace counts
+     as its own storeId despite shared commission economics.
+     AliExpress is one storeId so its cap is the full quota. */
+  function distinctStoreCap(bucket: Deal[], quota: number, floor = 3): number {
+    const stores = new Set(bucket.map((d) => d.storeId)).size;
     if (stores === 0) return floor;
     return Math.max(floor, Math.ceil(quota / stores));
   }
-  const capLocal      = distinctStoreCap(bucketed.local,      Q_LOCAL);
-  const capAmazon     = Math.max(3, distinctStoreCap(bucketed.amazon, Q_AMAZON, 3));
+  const capLocal = distinctStoreCap(bucketed.local, Q_LOCAL);
+  const capAmazon = Math.max(3, distinctStoreCap(bucketed.amazon, Q_AMAZON, 3));
   const capAliExpress = Q_ALIEXPRESS;
-  const capIntlOther  = distinctStoreCap(bucketed["intl-other"], Q_INTL_OTHER, 1);
+  const capIntlOther = distinctStoreCap(bucketed["intl-other"], Q_INTL_OTHER, 1);
 
   function fill(bucket: Deal[], quota: number, cap: number): number {
     let added = 0;
@@ -218,23 +159,18 @@ export default async function TrendingDeals({ country }: { country: Country }) {
     return added;
   }
 
-  fill(bucketed.local,         Q_LOCAL,       capLocal);
-  fill(bucketed.amazon,        Q_AMAZON,      capAmazon);
-  fill(bucketed.aliexpress,    Q_ALIEXPRESS,  capAliExpress);
-  fill(bucketed["intl-other"], Q_INTL_OTHER,  capIntlOther);
+  fill(bucketed.local, Q_LOCAL, capLocal);
+  fill(bucketed.amazon, Q_AMAZON, capAmazon);
+  fill(bucketed.aliexpress, Q_ALIEXPRESS, capAliExpress);
+  fill(bucketed["intl-other"], Q_INTL_OTHER, capIntlOther);
 
   /* NG-only: guarantee at least 2 Jumia cards in the rotation. Jumia's
-     ingest path pulls a high-volume catalogue but their offers tend to
-     have small or zero discounts (SerpAPI google rich-snippets often
-     skip the strikethrough), so they get crowded out by higher-discount
-     Konga / MedPlus rows in the local quota. Without this floor, Jumia
-     can rotate to zero cards on a given 5-min window even though the
-     pool has hundreds of fresh Jumia rows.
-
-     Strategy: count current Jumia picks; if <2, pull more from any
-     bucket that contains Jumia rows (mostly localFresh) and displace
-     the lowest-priority current picks until we hit 2. Only kicks in
-     when pool actually has Jumia rows so it's a no-op on cold ingests. */
+     ingest pulls a high-volume catalogue but the offers tend to have
+     small or zero discounts (SerpAPI google rich-snippets often skip
+     the strikethrough), so they get crowded out by higher-discount
+     Konga / MedPlus rows. Without this floor Jumia can rotate to zero
+     cards for a given seed even though the pool has hundreds of fresh
+     Jumia rows. Only kicks in when the pool actually has Jumia rows. */
   if (isNG) {
     const JUMIA_FLOOR = 2;
     const jumiaInPool = pool.filter((d) => d.storeId === "jumia");
@@ -247,10 +183,10 @@ export default async function TrendingDeals({ country }: { country: Country }) {
         if (added >= need) break;
         const key = d.storeId + d.title.slice(0, 20);
         if (seen.has(key)) continue;
-        /* Displace the last non-Jumia pick from the lowest-priority
-           bucket (intl-other → aliexpress → amazon → local last) so
-           we don't push out a Konga/3C Hub local card when we can
-           drop an intl-other instead. */
+        /* Displace the lowest-priority current pick (intl-other →
+           aliexpress → amazon → anything-non-Jumia) so we don't push
+           out a Konga/3C Hub local card when we can drop an
+           intl-other instead. */
         const displaceOrder: Array<(p: Deal) => boolean> = [
           (p) => bucketed["intl-other"].some((x) => x.id === p.id),
           (p) => p.storeId === "aliexpress",
@@ -280,10 +216,9 @@ export default async function TrendingDeals({ country }: { country: Country }) {
   }
 
   /* Backfill cascade — ordered by what we'd rather show if a bucket
-     under-filled. Local first (trust + same-day delivery), then Amazon
-     (highest commission), then AliExpress, then intl-other (NG only,
-     non-monetised cross-border retailers). Use a generous per-store
-     cap during backfill so a thin pool can still reach 16. */
+     under-filled: local first (trust + same-day delivery), then
+     Amazon (highest commission), AliExpress, then intl-other. A
+     generous per-store cap lets a thin pool still reach 16. */
   if (picks.length < TARGET_TOTAL) {
     for (const bucket of [
       bucketed.local,
@@ -299,20 +234,80 @@ export default async function TrendingDeals({ country }: { country: Country }) {
     }
   }
 
-  if (picks.length === 0) return null;
+  if (picks.length === 0) return [];
 
-  /* Spread same-storeId items so the masonry doesn't show 4 Konga
-     cards stacked vertically in column 0. minGap=4 matches the
-     desktop column count: items 0..3 (col 0 with column-fill:_balance)
-     are guaranteed to have 4 distinct stores. Mobile / tablet still
-     benefit because the ordering propagates through the same array
-     into their narrower column counts. */
-  const staggered = spaceByStore(picks, 4);
+  /* Spread same-storeId items so the masonry doesn't stack 4 Konga
+     cards in one column. minGap=4 matches the desktop column count. */
+  return spaceByStore(picks, 4);
+}
+
+/* `country` arrives as a prop from the page so this component stays
+   statically renderable per /[country]/. Removing the cookies() read
+   here was part of the May 2026 perf fix that unlocked ISR caching. */
+export default async function TrendingDeals({ country }: { country: Country }) {
+  /* Pull from whichever browse provider is active (DB when populated,
+     static fallback otherwise). */
+  const provider = await getActiveBrowseProvider();
+
+  const isNG = country.code === "ng";
+
+  const qualityFilter = (d: Deal) =>
+    d.title.length >= 10 &&
+    d.title.length <= 70 &&
+    !d.title.includes("\\") &&
+    !(d.currency === "USD" && d.salePrice < 10);
+
+  /* Build the candidate pool. NG users get both local NGN + intl USD
+     pools merged; non-NG users only see intl filtered to their
+     country.
+
+     NG-only third pool — `localFresh` — fetches 0%-discount local
+     inventory sorted by newest. This is the bridge for retailers
+     whose ingest path doesn't carry original_price metadata (Jumia
+     via SerpAPI Google site-filter, Bitmarte, HealthPlus, etc).
+     Without it they're invisible on the homepage because the
+     discount>=15 floor on the other two pools excludes every row with
+     discountPercent=0. The fourth pool is a Jumia-only direct pull as
+     a backstop so the NG Jumia floor in composeVariant always has
+     inventory to displace into the rotation. */
+  let pool: Deal[];
+  if (!isNG) {
+    const raw = await provider.fetchDeals({
+      sort: "discount",
+      minDiscount: 15,
+      origin: "intl",
+    });
+    pool = filterDealsForCountry(raw.filter(qualityFilter), country);
+  } else {
+    const [localPool, intlPool, localFreshPool, jumiaOnlyPool] = await Promise.all([
+      provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "local" }),
+      provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "intl" }),
+      provider.fetchDeals({ sort: "newest", minDiscount: 0, origin: "local" }),
+      provider.fetchDeals({ sort: "newest", minDiscount: 0, origin: "local", stores: ["jumia"] }),
+    ]);
+    pool = [
+      ...localPool.filter(qualityFilter),
+      ...intlPool.filter(qualityFilter),
+      ...localFreshPool.filter(qualityFilter),
+      ...jumiaOnlyPool.filter(qualityFilter),
+    ];
+  }
+
+  if (pool.length === 0) return null;
+
+  /* Compose one full trending variant per seed. The pool is fetched
+     once above; composeVariant is pure in-memory work, so six
+     variants cost six array shuffles, not six DB round-trips.
+     <TrendingDealsGrid/> rotates between them client-side per visit. */
+  const variants = VARIANT_SEEDS.map((seed) => composeVariant(pool, isNG, seed)).filter(
+    (v) => v.length > 0,
+  );
+
+  if (variants.length === 0) return null;
 
   return (
     <section className="py-12 sm:py-20 bg-bg">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-
         <div className="flex items-end justify-between mb-6 sm:mb-8 gap-4 px-1 sm:px-0">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
@@ -339,36 +334,15 @@ export default async function TrendingDeals({ country }: { country: Country }) {
           </Link>
         </div>
 
-        {/* Single render via CSS columns — addresses Bucket 1#24 from
-            QA audit. Previously rendered three full DOM copies (mobile
-            2-col / tablet 3-col / desktop 4-col), CSS-hidden via media
-            queries. Each <img> still fetched even when the parent was
-            display:none, costing 3× network requests for the trending
-            grid. CSS column-count picks the right column count per
-            viewport from a single rendering, and break-inside-avoid
-            keeps each card intact. eagerFirst is approximated as
-            'first 4 cards across all columns' since the browser
-            decides column allocation at paint time. */}
-        <div className="columns-2 sm:columns-3 lg:columns-4 gap-2 sm:gap-3 lg:gap-4 [column-fill:_balance]">
-          {staggered.map((d, i) => (
-            <div key={d.id} className="break-inside-avoid mb-2 sm:mb-3 lg:mb-4">
-              <AnimateIn delay={Math.min(i, 6) * 60}>
-                <MasonryCard
-                  deal={d}
-                  aspect={MASONRY_ASPECTS[i % MASONRY_ASPECTS.length]}
-                  priority={i < 4}
-                />
-              </AnimateIn>
-            </div>
-          ))}
-        </div>
+        {/* Card grid is a client component so it can rotate between the
+            precomposed variants per visit — see TrendingDealsGrid. */}
+        <TrendingDealsGrid variants={variants} />
 
         <div className="mt-8 text-center sm:hidden">
           <Link href="/deals" className="btn-secondary">
             See all deals →
           </Link>
         </div>
-
       </div>
     </section>
   );
