@@ -79,7 +79,7 @@ export default function TrendingChipRail({
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/trending-chips")
+    fetch(`/api/trending-chips?country=${encodeURIComponent(countryCode)}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;

@@ -119,21 +119,40 @@ export interface MultiStoreChip {
    include products from other categories... Add more and randomise". */
 const PER_CATEGORY_CAP = 12;
 
-async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
+async function fetchMultiStoreTitlesForCountry(countryCode: string): Promise<MultiStoreChip[]> {
   const supa = getSupabaseAdmin();
   if (!supa) return [];
 
-  /* PostgREST caps single responses at db-max-rows (default 1000).
-     Same fan-out pattern as browse-db.ts — pull up to 8000 in-stock
-     offers in one parallel round trip. Enough sample to find the
-     multi-store products without paying for a full table scan. */
+  const cc = countryCode.toUpperCase();
+
+  /* Pull (product_id, store_id) pairs for offers a shopper in
+     `countryCode` can actually buy: stores anchored to that country,
+     PLUS true cross-border globals (is_international with no country
+     anchor — AliExpress / SHEIN / Temu / DHgate). This is the same
+     country-shoppable definition browse-db.getOriginCounts uses, so a
+     chip's store count tracks what /compare surfaces for that visitor.
+
+     Why this matters: the pool used to be counted GLOBALLY (raw
+     `offers`, no country filter) while every chip links into a
+     country-scoped /compare. A chip could promise "9 stores" and the
+     comparison would show 2 — or zero, when all 9 stores were in
+     another market. Now both the pool membership (>= 2 stores) and the
+     displayed count are scoped to the visitor's country.
+
+     product_best_offers carries the store's country denormalised in
+     (store_country / is_international) and one row per (product,
+     store), so the .or() filter scopes the pull at the DB and distinct
+     store_id per product_id IS the country-scoped store count.
+     PostgREST caps a response at db-max-rows (1000) — fan out 8 pages
+     in parallel for the sample. */
   const PAGE  = 1000;
   const PAGES = 8;
+  const countryFilter = `store_country.eq.${cc},and(is_international.eq.true,store_country.is.null)`;
   const pageRequests = Array.from({ length: PAGES }, (_, i) =>
     supa
-      .from("offers")
+      .from("product_best_offers")
       .select("product_id, store_id")
-      .eq("in_stock", true)
+      .or(countryFilter)
       .order("scraped_at", { ascending: false })
       .range(i * PAGE, (i + 1) * PAGE - 1),
   );
@@ -246,11 +265,13 @@ async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
    cache. Multiple homepage renders within REVALIDATE_S share one DB
    round trip; after the window expires, the next render re-fetches
    in the background while serving the stale set. */
+/* Country-scoped: call as getTrendingMultiStoreTitles(countryCode).
+   The countryCode argument is part of the unstable_cache key, so each
+   market gets its own cached pool. */
 export const getTrendingMultiStoreTitles = unstable_cache(
-  fetchMultiStoreTitlesUncached,
-  /* v2 cache key bumped when the pool composition logic changed
-     (per-category cap + thin-category top-up). Old v1 cache entries
-     get bypassed automatically. */
-  ["trending-multi-store-v2"],
+  fetchMultiStoreTitlesForCountry,
+  /* v3 cache key — bumped when the pool became country-scoped (was a
+     global all-markets store count). Old v2 entries bypass automatically. */
+  ["trending-multi-store-v3-country"],
   { revalidate: REVALIDATE_S, tags: [CACHE_TAG] },
 );
