@@ -109,11 +109,18 @@ async function fetchInitialDeals(
      * cache-hit visits, ~1.5s for the 1-in-60s cache-miss visitor.
      */
     const url = `${proto}://${host}/api/deals?${qs.toString()}`;
-    /* revalidate bumped May 2026 v3 (60s → 600s) for Fluid CPU
-       relief. Matches /api/deals own s-maxage=600 so the two
-       caches align — no point hitting the API more frequently
-       than the API itself wants to revalidate. */
-    const res = await fetch(url, { next: { revalidate: 600 } });
+    /* Sort-aware cache window. The relevance sort uses seeded jitter
+       inside /api/deals (its own s-maxage is 60s for relevance) so a
+       visitor's first-page rotates as the jitter re-rolls — drop the
+       SSR fetch cache to 60s for relevance so the SSR'd first page
+       cycles in lockstep with that. The previous 600s window meant
+       every visit inside a 10-minute span saw the identical first 60
+       cards regardless of jitter, which read as "the pool didn't
+       increase". Non-rotating sorts (newest, price_*) stay on the
+       600s window — they don't benefit from faster cycling and the
+       longer window keeps Fluid CPU + Supabase egress in check. */
+    const isRotatingSort = !params.sort || params.sort === "relevance";
+    const res = await fetch(url, { next: { revalidate: isRotatingSort ? 60 : 600 } });
     if (!res.ok) return null;
     const j = await res.json();
     return {

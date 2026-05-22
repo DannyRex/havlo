@@ -482,13 +482,19 @@ export async function GET(req: NextRequest) {
       /* Rank jitter. Each deal's relevance rank (its index) is nudged
          by a seeded random amount, up to JITTER/2 positions in either
          direction, then the pool is re-sorted by the jittered rank.
-         The visible first page then rotates through roughly the top
-         ~200 deals across visits instead of a fixed ~60, while a low
-         starting rank still keeps the strongest deals surfacing most
-         of the time. JITTER is the one knob: larger trades "best
-         first" for more variety. Founder direction May 2026: "reveal
-         other less-seen products." */
-      const JITTER = 320;
+
+         Bumped 320 -> 1500 after follow-up feedback ("doesn't seem
+         like the pool has increased"). With JITTER=320 the visible
+         first ~60 was effectively sampled from only the top ~220
+         deals — so the same familiar items kept dominating. JITTER
+         =1500 widens that draw to roughly the top ~1,560: deals well
+         past idx 500 now get a real chance to appear. Top-relevance
+         items still surface frequently (a deal at idx 0 has rank
+         in [-750, 750] so it's still very likely to land in the
+         visible window), so the strongest deals don't get buried.
+         Larger is the one knob: it trades "best matches always
+         first" for "more reveal of less-seen items". */
+      const JITTER = 1500;
       const jittered = qualifyingByOrigin
         .map((deal, idx) => ({ deal, rank: idx + (rng() - 0.5) * JITTER }))
         .sort((a, b) => a.rank - b.rank)
