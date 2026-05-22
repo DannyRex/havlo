@@ -67,12 +67,30 @@ export default function StoreLogo({
   const invertClass = storeLogoInvertClass(storeId);
 
   return (
-    <div className={cellClass} style={{ width: size, height: size }}>
-      {!failed && storeLogoUrl ? (
+    <div className={`${cellClass} relative`} style={{ width: size, height: size }}>
+      {/* Letter badge — ALWAYS rendered as the base layer; the logo
+          <img> overlays it when present. This guarantees a visible
+          store indicator in BOTH themes even when storeLogoUrl is
+          missing, fails to load (onError), OR loads as a blank /
+          transparent favicon. That last case is the one onError can't
+          catch — the image request "succeeds" but paints nothing — and
+          it previously left an empty bordered box for long-tail stores
+          whose favicon is blank/transparent (Selfridges, Appliance
+          Direct, electricshop.com, …). An opaque real logo fully
+          covers the letter; a blank one lets it show through. */}
+      <span
+        aria-hidden="true"
+        className="font-bold text-ink-2 select-none"
+        style={{ fontSize: Math.max(11, Math.round(inner * 0.55)) }}
+      >
+        {initial}
+      </span>
+      {!failed && storeLogoUrl && (
         /* Plain <img> — skip Vercel transform cap for store logo
            thumbnails. These render dozens of times per page (compare,
            PDP spectrum, deals grid) and aren't AVIF/WebP candidates
-           (PNGs already optimized). */
+           (PNGs already optimized). Absolutely centered over the
+           letter base. */
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={storeLogoUrl}
@@ -81,17 +99,9 @@ export default function StoreLogo({
           height={inner}
           loading="lazy"
           decoding="async"
-          className={`object-contain ${invertClass}`}
+          className={`absolute inset-0 m-auto object-contain ${invertClass}`}
           onError={() => setFailed(true)}
         />
-      ) : (
-        <span
-          aria-hidden="true"
-          className="font-bold text-ink-2"
-          style={{ fontSize: Math.max(11, Math.round(inner * 0.55)) }}
-        >
-          {initial}
-        </span>
       )}
     </div>
   );
