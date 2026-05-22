@@ -198,6 +198,7 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                         storeId={offer.storeId}
                         storeName={offer.storeName}
                         storeLogoUrl={offer.storeLogoUrl}
+                        merchantUrl={offer.url}
                         size={40}
                       />
 
