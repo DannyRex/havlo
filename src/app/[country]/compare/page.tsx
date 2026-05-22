@@ -661,7 +661,7 @@ function CompareContent() {
   );
 }
 
-export default function ComparePage() {
+export default function ComparePage({ params }: { params: { country: string } }) {
   return (
     <Suspense fallback={
       <div className="max-w-7xl mx-auto px-4 py-12 flex items-center justify-center">
@@ -673,7 +673,16 @@ export default function ComparePage() {
           deal_unavailable=1 flag. Inside the same Suspense boundary
           because it reads useSearchParams. */}
       <DealUnavailableBanner />
-      <CompareContent />
+      {/* key={params.country} — force a remount on country switch.
+          Without it, CompareContent keeps all its state across the
+          swap and re-renders a STALE result (offers, prices, anchor
+          from the OLD country) against the NEW country context — the
+          client-side exception users hit when switching country here.
+          Remounting also makes /compare re-search in the new market
+          instead of silently showing the previous country's results.
+          Mirrors key={country.code} on DealFeed in
+          /[country]/deals/page.tsx, which fixed the same class of bug. */}
+      <CompareContent key={params.country} />
       {/* Newsletter signup after search results. Added May 2026
           launch-readiness pass — was previously homepage-only. */}
       <NewsletterStrip />
