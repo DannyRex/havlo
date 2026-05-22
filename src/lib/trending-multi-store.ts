@@ -119,40 +119,33 @@ export interface MultiStoreChip {
    include products from other categories... Add more and randomise". */
 const PER_CATEGORY_CAP = 12;
 
-async function fetchMultiStoreTitlesForCountry(countryCode: string): Promise<MultiStoreChip[]> {
+async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
   const supa = getSupabaseAdmin();
   if (!supa) return [];
 
-  const cc = countryCode.toUpperCase();
+  /* TODO — re-do country scoping in JS (post-fetch). An earlier attempt
+     (commit bedabc5) tried to scope at the DB level via an .or() filter
+     against product_best_offers and came back with empty results in
+     production, which hid the chip rail entirely. Reverted to the
+     working global query here; the right fix is to keep this fetch as
+     the safe broad query and then narrow the store-set per product in
+     JS using inferStoreCountry + isGlobalIntlStore (which need
+     store_name too, so we'll need to fetch store metadata alongside).
+     Trade-off until then: the chip's store count is global, so it can
+     overstate or, for a country with no shoppable stores for a given
+     product, lead into a thin /compare.
 
-  /* Pull (product_id, store_id) pairs for offers a shopper in
-     `countryCode` can actually buy: stores anchored to that country,
-     PLUS true cross-border globals (is_international with no country
-     anchor — AliExpress / SHEIN / Temu / DHgate). This is the same
-     country-shoppable definition browse-db.getOriginCounts uses, so a
-     chip's store count tracks what /compare surfaces for that visitor.
-
-     Why this matters: the pool used to be counted GLOBALLY (raw
-     `offers`, no country filter) while every chip links into a
-     country-scoped /compare. A chip could promise "9 stores" and the
-     comparison would show 2 — or zero, when all 9 stores were in
-     another market. Now both the pool membership (>= 2 stores) and the
-     displayed count are scoped to the visitor's country.
-
-     product_best_offers carries the store's country denormalised in
-     (store_country / is_international) and one row per (product,
-     store), so the .or() filter scopes the pull at the DB and distinct
-     store_id per product_id IS the country-scoped store count.
-     PostgREST caps a response at db-max-rows (1000) — fan out 8 pages
-     in parallel for the sample. */
+     PostgREST caps single responses at db-max-rows (default 1000).
+     Same fan-out pattern as browse-db.ts — pull up to 8000 in-stock
+     offers in one parallel round trip. Enough sample to find the
+     multi-store products without paying for a full table scan. */
   const PAGE  = 1000;
   const PAGES = 8;
-  const countryFilter = `store_country.eq.${cc},and(is_international.eq.true,store_country.is.null)`;
   const pageRequests = Array.from({ length: PAGES }, (_, i) =>
     supa
-      .from("product_best_offers")
+      .from("offers")
       .select("product_id, store_id")
-      .or(countryFilter)
+      .eq("in_stock", true)
       .order("scraped_at", { ascending: false })
       .range(i * PAGE, (i + 1) * PAGE - 1),
   );
@@ -265,13 +258,11 @@ async function fetchMultiStoreTitlesForCountry(countryCode: string): Promise<Mul
    cache. Multiple homepage renders within REVALIDATE_S share one DB
    round trip; after the window expires, the next render re-fetches
    in the background while serving the stale set. */
-/* Country-scoped: call as getTrendingMultiStoreTitles(countryCode).
-   The countryCode argument is part of the unstable_cache key, so each
-   market gets its own cached pool. */
 export const getTrendingMultiStoreTitles = unstable_cache(
-  fetchMultiStoreTitlesForCountry,
-  /* v3 cache key — bumped when the pool became country-scoped (was a
-     global all-markets store count). Old v2 entries bypass automatically. */
-  ["trending-multi-store-v3-country"],
+  fetchMultiStoreTitlesUncached,
+  /* v4 cache key — bumped to bust the empty-pool entries left by the
+     broken country-scoped query (commit bedabc5). Old v3 entries
+     bypass automatically. */
+  ["trending-multi-store-v4-revert"],
   { revalidate: REVALIDATE_S, tags: [CACHE_TAG] },
 );

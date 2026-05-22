@@ -14,19 +14,14 @@
 import { NextResponse } from "next/server";
 import { getTrendingMultiStoreTitles } from "@/lib/trending-multi-store";
 
-/* Markets Havlo supports — guards the ?country= param. */
-const SUPPORTED_COUNTRIES = new Set(["ng", "us", "uk", "ae", "de", "in", "za"]);
-
-export async function GET(req: Request): Promise<NextResponse> {
+/* The route still accepts a ?country= query param (the TrendingChipRail
+   still passes it) so the CDN keys cache entries per country and the
+   surface is forward-compatible with country-scoping. The underlying
+   pool is currently global — see the TODO in trending-multi-store.ts —
+   so all country variants return the same items today. Harmless. */
+export async function GET(): Promise<NextResponse> {
   try {
-    /* Country-scoped: the chip pool and each chip's store count are
-       computed for THIS market so they match the country-scoped
-       /compare the chip links into. Defaults to ng for a missing or
-       unsupported value. The CDN keys on the full URL, so ?country=uk
-       and ?country=ng are cached as separate edge entries. */
-    const requested = new URL(req.url).searchParams.get("country")?.toLowerCase();
-    const country = requested && SUPPORTED_COUNTRIES.has(requested) ? requested : "ng";
-    const items = await getTrendingMultiStoreTitles(country);
+    const items = await getTrendingMultiStoreTitles();
     /* Cache bumped May 2026 v3 (60s → 1h + swr 5min → 1d) to
        relieve Vercel Fluid Active CPU. Trending chips are based
        on a rolling 30-day popularity window — change slowly. */
