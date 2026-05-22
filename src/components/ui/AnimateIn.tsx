@@ -71,7 +71,13 @@ export default function AnimateIn({
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0)" : "translateY(14px)",
         transition: `opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms, transform 0.55s cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms`,
-        willChange: visible ? "auto" : "opacity, transform",
+        /* No `will-change`. It was previously set on every
+           not-yet-visible AnimateIn element, so a content-heavy page
+           (the homepage especially) speculatively promoted dozens of
+           compositor layers at once. On mobile that GPU-memory
+           pressure shows up as flicker while scrolling. opacity +
+           transform composite cheaply without the hint; the fade
+           still runs smoothly. */
       }}
     >
       {children}
