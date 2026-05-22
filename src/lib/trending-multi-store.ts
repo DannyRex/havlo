@@ -119,26 +119,67 @@ export interface MultiStoreChip {
    include products from other categories... Add more and randomise". */
 const PER_CATEGORY_CAP = 12;
 
-async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
-  const supa = getSupabaseAdmin();
-  if (!supa) return [];
+/* Helper: pull (product_id, store_id) pairs for offers a shopper in
+   countryCode can actually buy. Uses two parallel .eq()-based queries
+   against product_best_offers — the same patterns browse-db.ts already
+   uses successfully for getOriginCounts. An earlier attempt that used
+   a single .or() with a nested and() against the same view returned
+   empty in production (commit bedabc5), so this splits the OR into
+   two clean queries instead. Each query fans out 8 pages of 1000 rows
+   for sample depth.
 
-  /* TODO — re-do country scoping in JS (post-fetch). An earlier attempt
-     (commit bedabc5) tried to scope at the DB level via an .or() filter
-     against product_best_offers and came back with empty results in
-     production, which hid the chip rail entirely. Reverted to the
-     working global query here; the right fix is to keep this fetch as
-     the safe broad query and then narrow the store-set per product in
-     JS using inferStoreCountry + isGlobalIntlStore (which need
-     store_name too, so we'll need to fetch store metadata alongside).
-     Trade-off until then: the chip's store count is global, so it can
-     overstate or, for a country with no shoppable stores for a given
-     product, lead into a thin /compare.
+   Includes:
+     · store_country = countryCode      → country-anchored retailers
+     · is_international = true AND store_country IS NULL
+                                        → true cross-border globals
+                                          (AliExpress, SHEIN, Temu, …) */
+async function aggregateOfferPairsCountryScoped(
+  supa: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  countryCode: string,
+): Promise<Map<string, Set<string>>> {
+  const cc = countryCode.toUpperCase();
+  const PAGE  = 1000;
+  const PAGES = 8;
+  const localPages = Array.from({ length: PAGES }, (_, i) =>
+    supa
+      .from("product_best_offers")
+      .select("product_id, store_id")
+      .eq("store_country", cc)
+      .order("scraped_at", { ascending: false })
+      .range(i * PAGE, (i + 1) * PAGE - 1),
+  );
+  const intlPages = Array.from({ length: PAGES }, (_, i) =>
+    supa
+      .from("product_best_offers")
+      .select("product_id, store_id")
+      .eq("is_international", true)
+      .is("store_country", null)
+      .order("scraped_at", { ascending: false })
+      .range(i * PAGE, (i + 1) * PAGE - 1),
+  );
+  const results = await Promise.all([...localPages, ...intlPages]);
+  const map = new Map<string, Set<string>>();
+  for (const r of results) {
+    if (!r.data) continue;
+    for (const o of r.data as OfferRow[]) {
+      const set = map.get(o.product_id) ?? new Set<string>();
+      set.add(o.store_id);
+      map.set(o.product_id, set);
+    }
+  }
+  return map;
+}
 
-     PostgREST caps single responses at db-max-rows (default 1000).
-     Same fan-out pattern as browse-db.ts — pull up to 8000 in-stock
-     offers in one parallel round trip. Enough sample to find the
-     multi-store products without paying for a full table scan. */
+/* Helper: country-agnostic fallback used when the scoped fetch comes
+   back thin. Pulls from the raw `offers` table (in-stock only) — the
+   pre-country-scoping query that we know returns a real pool. Counts
+   in this branch are GLOBAL (not country-aware), but it guarantees
+   the chip rail keeps showing pills if anything in the scoped path
+   drifts (view columns rename, transient upstream blip, unsupported
+   country, …). */
+async function aggregateOfferPairsGlobal(
+  supa: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+): Promise<Map<string, Set<string>>> {
   const PAGE  = 1000;
   const PAGES = 8;
   const pageRequests = Array.from({ length: PAGES }, (_, i) =>
@@ -150,16 +191,45 @@ async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
       .range(i * PAGE, (i + 1) * PAGE - 1),
   );
   const results = await Promise.all(pageRequests);
-
-  /* Aggregate: product_id → set of distinct store_ids. */
-  const productStores = new Map<string, Set<string>>();
+  const map = new Map<string, Set<string>>();
   for (const r of results) {
     if (!r.data) continue;
     for (const o of r.data as OfferRow[]) {
-      const set = productStores.get(o.product_id) ?? new Set<string>();
+      const set = map.get(o.product_id) ?? new Set<string>();
       set.add(o.store_id);
-      productStores.set(o.product_id, set);
+      map.set(o.product_id, set);
     }
+  }
+  return map;
+}
+
+async function fetchMultiStoreTitlesForCountry(countryCode: string): Promise<MultiStoreChip[]> {
+  const supa = getSupabaseAdmin();
+  if (!supa) return [];
+
+  /* Country-scoped first: count distinct stores per product that a
+     shopper in this country can actually buy from. Same shoppable
+     definition browse-db.getOriginCounts uses, so a chip's store
+     count tracks what /compare actually surfaces for the visitor. */
+  let productStores = await aggregateOfferPairsCountryScoped(supa, countryCode);
+
+  /* Defensive fallback: if the country-scoped fetch yields too few
+     qualifying products (an unsupported country, view-column drift, a
+     transient upstream issue, …), fall back to the broader `offers`
+     query so the rail keeps showing pills with global counts rather
+     than going empty. The bedabc5 regression — empty chips on every
+     country — is exactly why this exists. A "thin" scoped pool is
+     fewer than MIN_SCOPED_QUALIFYING products with >= 2 stores; well
+     below what a healthy country pool returns. Logged so we notice
+     it in deploy traces. */
+  const MIN_SCOPED_QUALIFYING = 10;
+  const qualifiedCountScoped = Array.from(productStores.values())
+    .filter((s) => s.size >= MIN_STORES_FOR_CHIP).length;
+  if (qualifiedCountScoped < MIN_SCOPED_QUALIFYING) {
+    console.warn(
+      `[trending-multi-store] country=${countryCode} country-scoped pool only ${qualifiedCountScoped} qualifying products — falling back to global`,
+    );
+    productStores = await aggregateOfferPairsGlobal(supa);
   }
 
   /* Filter to products with the qualifying store count. Sort by
@@ -257,12 +327,16 @@ async function fetchMultiStoreTitlesUncached(): Promise<MultiStoreChip[]> {
 /* unstable_cache wraps the helper with Next's request-deduped + ISR
    cache. Multiple homepage renders within REVALIDATE_S share one DB
    round trip; after the window expires, the next render re-fetches
-   in the background while serving the stale set. */
+   in the background while serving the stale set.
+
+   Country-scoped: call as getTrendingMultiStoreTitles(countryCode).
+   The countryCode argument is part of the unstable_cache key, so each
+   market gets its own cached pool. */
 export const getTrendingMultiStoreTitles = unstable_cache(
-  fetchMultiStoreTitlesUncached,
-  /* v4 cache key — bumped to bust the empty-pool entries left by the
-     broken country-scoped query (commit bedabc5). Old v3 entries
-     bypass automatically. */
-  ["trending-multi-store-v4-revert"],
+  fetchMultiStoreTitlesForCountry,
+  /* v5 cache key — bumped on the second country-scoping attempt
+     (this one uses two .eq() queries + a global fallback, rather than
+     bedabc5's failed .or()). Old v4 entries bypass automatically. */
+  ["trending-multi-store-v5-country-scoped"],
   { revalidate: REVALIDATE_S, tags: [CACHE_TAG] },
 );
