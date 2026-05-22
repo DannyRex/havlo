@@ -92,18 +92,21 @@ export default function Navbar() {
   return (
     <>
       {/* ── Top header (desktop + mobile) ──────────────────────────
-          - sticky top-0. Mobile uses a fully-opaque bg and NO
-            transform: a translateZ compositing layer on a
-            position:sticky element jitters during momentum scroll
-            on mobile Safari (the "navbar shakes on scroll" report).
-            Opaque background + no transform is the most
-            scroll-stable combination.
-          - backdrop-blur is heavy and only worth it on sm+; the GPU
-            compositing layer (sm:transform-gpu) is scoped to that
-            same breakpoint so it helps the blur without destabilis-
-            ing the mobile bar. */}
+          sticky top-0, fully opaque (bg-bg) at EVERY breakpoint — no
+          backdrop-blur, no transform.
+
+          History: the bar was a frosted-glass panel on sm+ (bg-bg/85
+          + backdrop-blur-xl + transform-gpu). backdrop-filter on a
+          position:sticky element flickers during scroll — the browser
+          re-samples and re-blurs the backdrop every frame, so the
+          translucent background visibly strobes through the bar
+          (user report: "the background behind the navbar flickers").
+          Mobile was already opaque after an earlier "navbar shakes on
+          scroll" fix; this extends that opaque, transform-free,
+          most-scroll-stable treatment to every width. A solid header
+          beats a frosted one that flickers. */}
       <header
-        className="sticky top-0 z-40 border-b border-border bg-bg sm:bg-bg/85 sm:backdrop-blur-xl sm:transform-gpu"
+        className="sticky top-0 z-40 border-b border-border bg-bg"
       >
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
 
