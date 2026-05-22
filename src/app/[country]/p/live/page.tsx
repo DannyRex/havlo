@@ -44,6 +44,7 @@ import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import SimilarProducts from "@/components/product/SimilarProducts";
 import { getClickThroughUrl } from "@/lib/utils";
 import { appendSignature } from "@/lib/go-signing";
+import { toAbsoluteMerchantUrl } from "@/lib/pdp-url";
 
 /* Synthetic PDPs are never indexed — they're transient anchors for
    external offers that may or may not exist tomorrow. Keeps Google
@@ -78,7 +79,14 @@ function searchParamsToOffer(sp: PageProps["searchParams"]): OfferData | null {
   /* Cap the title. A 2000-char `t=` would otherwise flow straight
      into a 2000-char <title> tag and browser-tab label. */
   const title  = single(sp.t).trim().slice(0, 200);
-  const rawUrl = single(sp.u).trim();
+  /* Unwrap `/api/go?url=<abs>` relay wrappers (SerpAPI Google-relay
+     rows carry Deal.url in that form) to the absolute merchant URL.
+     Without this, the `new URL()` parse below throws on the relative
+     value and 404s a legitimate live deal. The link builder
+     (pdp-url.ts) now unwraps too, but pre-fix /p/live links — plus any
+     shared or search-indexed URL — still carry the wrapped form, so
+     the consume side must handle it as well. */
+  const rawUrl = toAbsoluteMerchantUrl(single(sp.u).trim());
   if (!title || !rawUrl) return null;
 
   /* The merchant URL must be a real http(s) link. This value gets

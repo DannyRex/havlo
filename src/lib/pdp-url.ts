@@ -52,7 +52,7 @@ function isSyntheticId(id: string | null | undefined): boolean {
    to the relay). Unwrap to the absolute inner URL here; /p/live
    re-applies its own /api/go wrap at the outbound CTA, so the
    redirect still happens, just at click time. */
-function toAbsoluteMerchantUrl(rawUrl: string): string {
+export function toAbsoluteMerchantUrl(rawUrl: string): string {
   if (!rawUrl || !rawUrl.startsWith("/api/go")) return rawUrl;
   const qIndex = rawUrl.indexOf("?");
   if (qIndex === -1) return rawUrl;
