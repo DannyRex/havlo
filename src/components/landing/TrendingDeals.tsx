@@ -272,12 +272,24 @@ export default async function TrendingDeals({ country }: { country: Country }) {
      inventory to displace into the rotation. */
   let pool: Deal[];
   if (!isNG) {
-    const raw = await provider.fetchDeals({
-      sort: "discount",
-      minDiscount: 15,
-      origin: "intl",
-    });
-    pool = filterDealsForCountry(raw.filter(qualityFilter), country);
+    /* Non-NG markets used to pull a single discount-sorted pool, which
+       left the trending grid drawing from at most ~500 country-relevant
+       deals after quality filtering — small enough that the 6 seeded
+       variants overlapped heavily and the random-pick rotation read as
+       "same products" (user report from /uk). Parallel-fetch a second
+       "newest" pool (any discount) so freshly-ingested low- and
+       zero-discount inventory can surface alongside the high-discount
+       items. Roughly doubles the candidate pool, makes the variants
+       more distinct, and brings non-NG closer to NG's multi-pool
+       composition. */
+    const [discountPool, freshPool] = await Promise.all([
+      provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "intl" }),
+      provider.fetchDeals({ sort: "newest",   minDiscount: 0,  origin: "intl" }),
+    ]);
+    pool = filterDealsForCountry(
+      [...discountPool, ...freshPool].filter(qualityFilter),
+      country,
+    );
   } else {
     const [localPool, intlPool, localFreshPool, jumiaOnlyPool] = await Promise.all([
       provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "local" }),
