@@ -1,68 +1,132 @@
 "use client";
 
 /* ──────────────────────────────────────────────────────────────────
-   Homepage "Trending right now" grid — client-side variant rotation.
+   Homepage "Trending right now" grid — client-side per-visit picks.
 
-   Why this is a client component:
-   The country home is ISR-cached (revalidate=3600 in page.tsx), so
-   every visitor inside the cache window is served the SAME static
-   HTML. A trending shuffle seeded on the server is therefore frozen
-   for up to an hour — every visit shows the identical 16 cards. That
-   is the "I keep seeing the same products" report.
+   The country home is ISR-cached (page.tsx `revalidate`), so every
+   visitor inside the cache window receives the SAME cached HTML. We
+   can't pick per-visit on the server. The earlier approach was to
+   pre-compose 6 balanced 16-card VARIANTS server-side and have the
+   client random-pick one — but that capped the entire ISR window's
+   variety at ~50-60 distinct cards (6 variants × 16 with overlap),
+   so after a few reloads the cards felt recycled (user feedback on
+   /uk after the random-variant-pick shipped).
 
-   Fix: TrendingDeals (server) precomputes several fully-composed
-   16-card VARIANTS — each a valid, quota-balanced, store-capped draw
-   from a different shuffle seed — and ships all of them in the ISR
-   payload. This component picks ONE variant per visit at random. The
-   pick runs after hydration, so it varies between visits even though
-   the cached HTML is identical for everyone. Rotation happens per
-   VISIT (mount), not on a timer — the grid never reshuffles while the
-   user is looking at it.
+   New shape:
+     · Server ships a wider, balanced POOL of ~80 candidates split
+       into category buckets (local / amazon / aliexpress / intlOther).
+     · This component picks 16 on every mount, sampling per quota from
+       each bucket so the result stays balanced. With ~80 cards in the
+       pool, the number of distinct 16-card subsets is combinatorially
+       large — every reload feels fresh, even within a single ISR
+       window.
 
-   Why random instead of a time bucket: an earlier version keyed the
-   pick to a 5-minute wall-clock bucket. Any reload inside the same
-   bucket landed on the same variant, so a visitor testing by
-   refreshing kept seeing the same set ("doesn't seem like the pool
-   has increased"). Pure random per mount makes rapid reloads cycle
-   through variants independently.
-
-   No visible swap:
-     · First render uses variant 0 — matches the SSR HTML, so there is
-       no hydration mismatch.
-     · A mount effect then selects the time-bucket variant. Every
-       MasonryCard starts at opacity:0 inside AnimateIn, and React 18
-       batches the variant swap into a single re-render before any
-       card is painted visible — so the user only ever sees the final
-       variant fade in on scroll.
-     · `priority` (eager image loading) is withheld until the variant
-       is settled, so variant 0's above-the-fold images aren't fetched
-       only to be replaced a frame later.
-   ────────────────────────────────────────────────────────────────── */
+   Hydration: useState starts at null, so SSR + first client render
+   show the deterministic take-first-N default. A mount effect then
+   re-picks randomly. AnimateIn keeps every card at opacity:0 on first
+   paint and React 18 batches the swap, so the user only sees the
+   final random picks fade in. */
 
 import { useEffect, useState } from "react";
 import type { Deal } from "@/types";
+import { spaceByStore } from "@/lib/providers/curated-helper";
 import MasonryCard from "@/components/deals/MasonryCard";
 import { MASONRY_ASPECTS } from "@/components/deals/masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
 
-export default function TrendingDealsGrid({ variants }: { variants: Deal[][] }) {
-  /* null = not yet picked → render variant 0. Variant 0 also matches
-     the server HTML, so first client render hydrates cleanly. The
-     mount effect below then sets the real time-bucket index. */
-  const [index, setIndex] = useState<number | null>(null);
+export interface TrendingBuckets {
+  local:      Deal[];
+  amazon:     Deal[];
+  aliexpress: Deal[];
+  intlOther:  Deal[];
+}
+
+/* Per-visit quota — same 56/25/6/13 split the prior variant
+   composition enforced. Sums to 16. Backfill below tops up the rest
+   from any non-empty bucket when one comes back thin (e.g. non-NG
+   markets have an empty intlOther bucket by classification). */
+const Q_LOCAL      = 9;
+const Q_AMAZON     = 4;
+const Q_ALIEXPRESS = 1;
+const Q_INTL_OTHER = 2;
+const TARGET       = 16;
+
+/* Pull n unique items from `bucket` into `out`, deduping via `seen`.
+   randomize=true uses a partial Fisher-Yates so each call returns a
+   fresh random subset; randomize=false takes the first n in order
+   (the SSR-stable default before the mount effect runs). */
+function selectFrom(
+  bucket: Deal[],
+  n: number,
+  randomize: boolean,
+  out: Deal[],
+  seen: Set<string>,
+): void {
+  if (n <= 0 || bucket.length === 0) return;
+  const arr = randomize ? [...bucket] : bucket;
+  if (randomize) {
+    const limit = Math.min(n, arr.length);
+    for (let i = 0; i < limit; i++) {
+      const j = i + Math.floor(Math.random() * (arr.length - i));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+  let added = 0;
+  for (const d of arr) {
+    if (added >= n) break;
+    if (seen.has(d.id)) continue;
+    seen.add(d.id);
+    out.push(d);
+    added++;
+  }
+}
+
+function composePicks(buckets: TrendingBuckets, randomize: boolean): Deal[] {
+  const picks: Deal[] = [];
+  const seen  = new Set<string>();
+
+  selectFrom(buckets.local,      Q_LOCAL,      randomize, picks, seen);
+  selectFrom(buckets.amazon,     Q_AMAZON,     randomize, picks, seen);
+  selectFrom(buckets.aliexpress, Q_ALIEXPRESS, randomize, picks, seen);
+  selectFrom(buckets.intlOther,  Q_INTL_OTHER, randomize, picks, seen);
+
+  /* Backfill: any bucket that came back thin (non-NG has no
+     intlOther, AliExpress is sometimes empty per country) gets
+     compensated by drawing more from the other buckets so the grid
+     never under-fills to <16. */
+  if (picks.length < TARGET) {
+    const need = TARGET - picks.length;
+    const all  = [
+      ...buckets.local,
+      ...buckets.amazon,
+      ...buckets.aliexpress,
+      ...buckets.intlOther,
+    ];
+    selectFrom(all, need, randomize, picks, seen);
+  }
+
+  /* Spread same-storeId items so the masonry doesn't stack four
+     Konga (or four Currys) cards in one column. minGap=4 matches the
+     desktop column count. */
+  return spaceByStore(picks, 4);
+}
+
+export default function TrendingDealsGrid({ buckets }: { buckets: TrendingBuckets }) {
+  /* null = not yet picked. SSR and the first client render fall
+     through to the deterministic take-first default below (matches
+     the SSR HTML so hydration is clean). The mount effect then
+     re-picks randomly per visit. */
+  const [picks, setPicks] = useState<Deal[] | null>(null);
 
   useEffect(() => {
-    if (variants.length === 0) return;
-    /* Random pick per mount. Every fresh page load — including a
-       rapid reload — lands on an independently-random variant.
-       variants.length is constant for the page's lifetime so this
-       still fires exactly once; the grid never reshuffles under the
-       user mid-session. */
-    setIndex(Math.floor(Math.random() * variants.length));
-  }, [variants.length]);
+    /* Pick once on mount — fresh random selection per page load.
+       Deliberately NOT re-run on an interval: the grid never
+       reshuffles under the user mid-session. */
+    setPicks(composePicks(buckets, true));
+  }, [buckets]);
 
-  const settled = index !== null;
-  const deals = variants[index ?? 0] ?? [];
+  const settled = picks !== null;
+  const deals   = picks ?? composePicks(buckets, false);
   if (deals.length === 0) return null;
 
   /* Single render via CSS columns (not three media-query-hidden DOM

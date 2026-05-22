@@ -32,11 +32,19 @@ import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList } from "@/lib/se
    so the homepage surfaces a fresh set even while the HTML is cached.
    See TrendingDealsGrid.tsx for why rotation must be client-side
    under ISR. */
-/* Bumped May 2026 v3 (1800s → 3600s) for Vercel Fluid CPU relief.
-   The country home doesn't need minute-level freshness — Mon+Thu
-   ingest is the real source of new content, so any stale window
-   between cron runs is invisible to users. */
-export const revalidate = 3600;
+/* Dropped 3600s -> 900s (May 2026 v4). The 3600s window kept the
+   trending pool frozen for an hour; even after switching to client-
+   side per-visit picks from a wider candidate pool (see
+   TrendingDealsGrid), the user reported the grid still felt
+   "recycled" on UK after several reloads inside the cache window.
+   900s = 15 min cycles, so the underlying pool itself refreshes
+   often enough during a testing or browsing session that returning
+   visitors see genuinely fresh inventory. Cost vs 3600: 4x the
+   cold-render rate, but the cold-render path is fanned out across
+   Suspense (Hero streams immediately, only TrendingDeals +
+   CategoryGrid sections wait for DB) so user-perceived TTFB is
+   barely affected. */
+export const revalidate = 900;
 
 export function generateStaticParams() {
   return COUNTRIES.map((c) => ({ country: c.code }));
