@@ -653,6 +653,21 @@ export default function DealFeed({
     return () => observer.disconnect();
   }, [loadMore]);
 
+  /* Counts for the ACTIVE origin tab. originCounts carries all three
+     origin slices (all / local / intl, each with an optional on-sale
+     sub-count) in one payload, and its STATE is gated-stable across
+     origin tab clicks (see originCountsKeyRef). Indexing it by the
+     active origin gives the header + toolbar a figure that matches
+     the highlighted tab without the per-request flicker that made the
+     all-origins number the prior choice. */
+  const activeCounts: { total: number; deals?: number } | undefined =
+    !originCounts
+      ? undefined
+      : origin === "local"
+        ? { total: originCounts.local, deals: originCounts.localDeals }
+        : origin === "intl"
+          ? { total: originCounts.intl, deals: originCounts.intlDeals }
+          : { total: originCounts.all, deals: originCounts.allDeals };
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-8 sm:py-12">
@@ -668,11 +683,13 @@ export default function DealFeed({
         <p className="text-sm sm:text-base text-ink-2 mt-2 max-w-2xl">
           Fresh deals first, then everything else worth seeing from the stores {country.name === "Nigeria" ? "Nigerians" : `${country.name} shoppers`} already shop.
         </p>
-        {originCounts?.allDeals !== undefined && originCounts.all > 0 && (
+        {activeCounts?.deals !== undefined && activeCounts.total > 0 && (
           /* Deal-count summary on its own line — separate paragraph
-             so the metric breathes instead of crowding the subhead. */
+             so the metric breathes instead of crowding the subhead.
+             Origin-scoped (activeCounts) so it agrees with the active
+             tab and the toolbar count — see the B1 regression fix. */
           <p className="text-xs sm:text-sm text-ink-3 mt-2 tabular-nums">
-            {originCounts.allDeals.toLocaleString()} on sale of {originCounts.all.toLocaleString()} total.
+            {activeCounts.deals.toLocaleString()} on sale of {activeCounts.total.toLocaleString()} total.
           </p>
         )}
       </div>
@@ -864,19 +881,22 @@ export default function DealFeed({
           <div className="hidden sm:flex items-center gap-3 flex-shrink-0 ml-auto">
             {!loading && (
               <span className="text-xs text-ink-3 tabular-nums">
-                {/* Use the all-origins total instead of the
-                    origin-filtered total. Otherwise this indicator
-                    flickers per tab click (2,975 → 1,960 → 1,015) and
-                    duplicates the toggle badges' job. originCounts.all
-                    is invariant to origin AND to selectedStores, so
-                    the figure stays stable when the user toggles
-                    tabs OR ticks stores. Falls back to `total` only
-                    on the initial render before originCounts has
-                    populated, so SSR placeholder still shows
-                    something sensible. User report May 2026:
-                    "switching tabs in the deals page changes the
-                    number count. should not be." */}
-                {(originCounts?.all ?? total).toLocaleString()} deals
+                {/* Origin-scoped count — reflects the active
+                    All/Local/Intl tab so the toolbar agrees with the
+                    highlighted tab. Regression B1: on the Local tab
+                    this read the all-origins 8,125 while the tab
+                    itself showed 2,673.
+
+                    This does NOT bring back the per-tab-click flicker
+                    the all-origins figure once dodged: originCounts
+                    STATE is gated-stable across origin clicks (see
+                    originCountsKeyRef) — it refreshes only when
+                    category/tier/sort/search/country change, never on
+                    an origin click. Switching tabs re-indexes an
+                    already-stable slice rather than chasing a
+                    per-request number. Falls back to `total` before
+                    originCounts populates. */}
+                {(activeCounts?.total ?? total).toLocaleString()} deals
               </span>
             )}
 
