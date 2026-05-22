@@ -383,6 +383,58 @@ export function shareAllSizeTokens(a: string, b: string): boolean {
 
    Returns true ONLY when the candidate passes EVERY gate (with
    loosening conditions noted above). */
+
+/* Coarse product-type lexicon — used by extractProductType + the
+   type-mismatch gate inside isLikelySameProduct.
+
+   User report May 2026: clicking from /ng/p/<cap-offer> through to
+   /ng/compare landed the visitor on /ng/p/<shorts-offer> because
+   "Nike Club Swoosh cap in brown" had pooled with "Nike Club shorts
+   in light blue" — same brand (Nike), same family (fashion), passes
+   the lenient 0.33x-3.0x price band — but they are different
+   products. The existing gates had no axis that distinguishes
+   "what kind of thing is this": cap, shorts, shoe, jacket, watch,
+   perfume, phone, etc. This list closes that gap.
+
+   Patterns are intentionally narrow (plural-form matchers anchored
+   on word boundaries) so common false positives (capacity, short-
+   sleeve) don't trigger. List order is "most specific first" so a
+   title containing multiple type words gets the most informative
+   label — fine in practice because most titles only match one. */
+const PRODUCT_TYPE_KEYWORDS: Array<[string, RegExp]> = [
+  ["cap",        /\b(?:caps?|snapback)\b/i],
+  ["hat",        /\b(?:hats?|beanie|fedora|bucket\s*hat)\b/i],
+  ["shorts",     /\bshorts\b/i],
+  ["jeans",      /\b(?:jeans|denim)\b/i],
+  ["pants",      /\b(?:pants|trousers|joggers|sweatpants|chinos|leggings|tights)\b/i],
+  ["shirt",      /\b(?:t[-\s]?shirts?|polo\s*shirts?|shirts?|tees?)\b/i],
+  ["jacket",     /\b(?:jacket|coat|blazer|parka|bomber|windbreaker|gilet)\b/i],
+  ["hoodie",     /\b(?:hoodie|sweatshirt)\b/i],
+  ["sweater",    /\b(?:sweater|jumper|cardigan|pullover)\b/i],
+  ["dress",      /\b(?:dress|gown)\b/i],
+  ["skirt",      /\bskirts?\b/i],
+  ["shoe",       /\b(?:shoes?|sneakers?|trainers?|boots?|sandals?|loafers?|heels?|slippers?)\b/i],
+  ["bag",        /\b(?:backpack|handbag|tote|clutch|purse|rucksack|duffel|holdall|messenger\s*bag)\b/i],
+  ["watch",      /\b(?:watches?|smartwatch|wristwatch)\b/i],
+  ["sunglasses", /\b(?:sunglasses|shades|eyewear)\b/i],
+  ["phone",      /\b(?:smartphones?|iphones?|galaxy|pixel|mobile\s*phones?)\b/i],
+  ["laptop",     /\b(?:laptops?|macbooks?|notebooks?|chromebooks?)\b/i],
+  ["tablet",     /\b(?:tablets?|ipads?)\b/i],
+  ["earphone",   /\b(?:earphones?|earbuds?|airpods?|headphones?|headsets?)\b/i],
+  ["speaker",    /\b(?:speakers?|soundbars?|subwoofers?)\b/i],
+  ["perfume",    /\b(?:perfumes?|fragrances?|eau\s*de\s*toilette|eau\s*de\s*parfum|edt|edp|cologne)\b/i],
+];
+
+/** Coarse product-type label inferred from a title. Returns null when
+    nothing matches — caller treats that as "unknown" and falls
+    through to other gates rather than auto-rejecting. */
+export function extractProductType(title: string): string | null {
+  for (const [type, re] of PRODUCT_TYPE_KEYWORDS) {
+    if (re.test(title)) return type;
+  }
+  return null;
+}
+
 export function isLikelySameProduct(
   anchor: { title: string; brand?: string | null; priceNgn?: number; family?: string | null },
   candidate: { title: string; brand?: string | null; priceNgn?: number },
@@ -393,6 +445,16 @@ export function isLikelySameProduct(
   const aBrand = (anchor.brand?.toLowerCase().trim() || null) ?? extractQueryBrand(anchor.title);
   const cBrand = (candidate.brand?.toLowerCase().trim() || null) ?? extractQueryBrand(candidate.title);
   if (aBrand && cBrand && aBrand !== cBrand) return false;
+
+  /* Product-TYPE discriminator. detectFamily groups things at
+     "fashion" / "electronics" / "home" — too coarse to separate
+     cap from shorts, shoe from jacket, perfume from skincare.
+     Reject the candidate when both sides label a concrete type and
+     they differ. Either side null → fall through (unknown type
+     can't disprove sameness). See PRODUCT_TYPE_KEYWORDS above. */
+  const aType = extractProductType(anchor.title);
+  const cType = extractProductType(candidate.title);
+  if (aType && cType && aType !== cType) return false;
 
   /* Family: both classified, must match. Either side null → fall
      through (the anchor-removal in pgFtsFindDupes already gates
