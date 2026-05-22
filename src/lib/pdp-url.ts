@@ -41,6 +41,25 @@ function isSyntheticId(id: string | null | undefined): boolean {
   return false;
 }
 
+/* SerpAPI Google-relay rows arrive with `Deal.url` already wrapped as
+   the internal redirect `/api/go?url=<absolute>` (see search-serpapi.ts
+   mapToDeal). That relative URL is fine as an outbound href, but the
+   /p/live PDP carries the merchant URL in a `?u=` query param and
+   parses it with `new URL()` — which THROWS on a relative URL, so the
+   page 404s on every Google-relay live result (regression: "/p/live
+   404s on titles with a quote char" — verbose old-product listings
+   are exactly the ones that lack a direct merchant link and fall back
+   to the relay). Unwrap to the absolute inner URL here; /p/live
+   re-applies its own /api/go wrap at the outbound CTA, so the
+   redirect still happens, just at click time. */
+function toAbsoluteMerchantUrl(rawUrl: string): string {
+  if (!rawUrl || !rawUrl.startsWith("/api/go")) return rawUrl;
+  const qIndex = rawUrl.indexOf("?");
+  if (qIndex === -1) return rawUrl;
+  const inner = new URLSearchParams(rawUrl.slice(qIndex + 1)).get("url");
+  return inner || rawUrl;
+}
+
 /** Build the PDP URL for a Deal-shaped object. Returns the live-PDP
     query-param variant for synthetic IDs, the standard /p/[id]
     path for real ones. */
@@ -50,7 +69,7 @@ export function pdpUrlForDeal(countryCode: string, deal: Deal): string {
   }
   const params = new URLSearchParams();
   params.set("t",  deal.title.slice(0, 250));
-  params.set("u",  deal.url);
+  params.set("u",  toAbsoluteMerchantUrl(deal.url));
   if (deal.storeId)        params.set("s",  deal.storeId);
   if (deal.storeName)      params.set("sn", deal.storeName);
   if (deal.salePrice)      params.set("p",  String(deal.salePrice));
@@ -79,7 +98,7 @@ export function pdpUrlForOffer(
   }
   const params = new URLSearchParams();
   if (offer.title)         params.set("t",  offer.title.slice(0, 250));
-  if (offer.url)           params.set("u",  offer.url);
+  if (offer.url)           params.set("u",  toAbsoluteMerchantUrl(offer.url));
   if (offer.storeId)       params.set("s",  offer.storeId);
   if (offer.storeName)     params.set("sn", offer.storeName);
   if (offer.price)         params.set("p",  String(offer.price));
