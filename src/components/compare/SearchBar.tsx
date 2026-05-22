@@ -363,7 +363,18 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
                 key={s.key}
                 type="button"
                 onMouseDown={(e) => { e.preventDefault(); submit(s.title, s.key); }}
-                onMouseEnter={() => setHighlighted(i)}
+                /* No onMouseEnter→setHighlighted: `highlighted` stays
+                   KEYBOARD-only (Arrow keys). Mouse hover gets its
+                   visual from the `hover:` class below, not from
+                   highlight state. Letting hover drive `highlighted`
+                   meant the Enter handler would submit whatever
+                   suggestion the cursor happened to rest over — so
+                   typing a fresh query and pressing Enter could anchor
+                   /compare on a sibling the mouse was incidentally
+                   hovering (regression A5: "iPhone 15" mis-anchored to
+                   "iPhone 15 Plus" when a prior search had left the
+                   cursor over the dropdown). A deliberate click still
+                   picks the suggestion via onMouseDown above. */
                 /* Round-4 QA: round-3 horizontal flex (title + count
                    side-by-side) was still clipping titles to "Apple
                    i..." on mobile because the input itself was too
