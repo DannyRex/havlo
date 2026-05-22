@@ -1033,15 +1033,29 @@ export async function pgFtsFindByProductId(
   const anchorFamily       = detectQueryFamily(anchor.title);
   const anchorIsAccessory  = looksLikeAccessory(anchor.title);
 
-  const dupes: DupeResult[] = ((similarMatches as FtsRow[]) ?? [])
+  /* Broad FTS candidate pool — every row that passes the
+     correctness gates (brand, family, accessory, suspicious,
+     plausibility, usable URL). The cheaper-only restriction is
+     deliberately deferred until AFTER the partition step so
+     same-product matches at the same or higher price still merge
+     into the anchor's spectrum.
+
+     Why this is split out from a single dupes list: the prior
+     version applied `< anchor.bestPrice * 0.99` here, before
+     partitioning. For any product where the anchor store happened
+     to be the cheapest (user report May 2026: AMOUROUD Lunar
+     Vetiver EDP 100ML at Essenza was the cheapest of 6 stores
+     carrying it) the partition received zero candidates → no
+     variant augmentation → /compare's anchor section showed 1
+     store while the PDP CTA (which uses a lenient dupes search +
+     the same variant partition) correctly showed 6.
+
+     Splitting fixes the drift: same-product matches augment the
+     anchor regardless of price; only the cheaper-alternatives
+     RAIL filters to cheaper, below. */
+  const broadDupes: DupeResult[] = ((similarMatches as FtsRow[]) ?? [])
     .filter((r) => r.product_id !== productId)
     .filter((r) => !anchor.category || anchor.category === "general" || r.category_slug === anchor.category)
-    /* Strict cheaper-only — pgFtsFindSimilar's contract. /compare's
-       "Cheaper alternatives" rail depends on this. PDP's "You may
-       also like" intentionally uses pgFtsFindDupes(title, 0) which
-       lifts this ceiling (broader browse intent). See PDP page.tsx
-       comment on the fetchDupesCached call. */
-    .filter((r) => priceInNgn(r.current_price, r.currency) < anchor.bestPrice * 0.99)
     .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug, r.title))
     .filter((r) => isUsableMerchantUrl(r.url))
     /* Accessory match-flip: if the anchor itself is an accessory
@@ -1056,55 +1070,28 @@ export async function pgFtsFindByProductId(
     .filter((r) => !anchorFamily || detectFamily(r.title) === anchorFamily)
     /* Brand gate: a Nike anchor must surface Nike alternatives. */
     .filter((r) => candidateHasBrand(r.title, anchorBrand))
-    /* Variant / number / model-token gates REMOVED from this path
-       May 2026 v3 — they were rejecting legitimate cross-tier
-       alternatives. For a 'MacBook Air M4' anchor with pid set,
-       candidates like 'MacBook Air M3' (different chip generation)
-       were filtered out, leaving the cheaper-alternatives rail
-       empty. User report: pid-anchored /compare?q=MacBook+Air+M4
-       returned 0 dupes despite plenty of related products.
-
-       The partitionDupesByVariantMatch call below already correctly
-       separates same-product (spectrum) from siblings (excluded
-       from rail) from cross-tier alternatives (the rail itself).
-       Pre-filtering by variant tokens here was strictness applied
-       twice; the partition handles it correctly without us
-       constraining the candidate set first.
-
-       Mirrors the lenient mode added to pgFtsFindDupes in v3.
-       Strict pid lookup still benefits from family + brand + price
-       + accessory gates above — those are correctness, not
-       relevance, filters. */
     /* Family compatibility — drops cross-family same-brand rows
        (Nike Dunk → Nike Crew Socks). alternativeFamilyMatches is
        stricter than familiesIncompatible for the dupes path. */
     .filter((r) => alternativeFamilyMatches(anchor.title, r.title))
-    .map((r) => ftsRowToDupe(r, anchor))
-    .filter((d) => d.savingsPercent > 0)
-    .slice(0, limit * 2)
-    .sort((a, b) => {
-      const aScore = a.similarityScore * 0.55 + Math.min(a.savingsPercent, 80) * 0.45;
-      const bScore = b.similarityScore * 0.55 + Math.min(b.savingsPercent, 80) * 0.45;
-      return bScore - aScore;
-    })
-    .slice(0, limit);
+    .map((r) => ftsRowToDupe(r, anchor));
 
   /* Variant-aware augmentation. The strict signature pool above
      misses real same-product matches whenever the brand/model
      parser fails at ingest time (Stanley Quencher tumblers,
-     non-canonical Apple-line titles, fashion items, etc.). The
-     dupes engine DID find the matching listings via FTS — promote
-     the ones that pass isLikelySameProduct (brand + family +
-     variant + size + model + price band) into the anchor pool, so
-     /compare's "Across N stores" section reflects the true
-     comparison breadth.
+     non-canonical Apple-line titles, niche perfumes, etc.). The
+     FTS engine DID find the matching listings — promote the ones
+     that pass isLikelySameProduct (brand + family + variant + size
+     + model + price band) into the anchor pool, so /compare's
+     "Across N stores" section reflects the true comparison breadth.
 
      The same partition runs PDP-side in /[country]/p/[id]/page.tsx
-     against fetchDupesCached. Doing it here too keeps /compare's
-     anchor section consistent with the PDP CTA's count promise. */
+     against fetchDupesCached. Doing it here on the BROAD set keeps
+     /compare's anchor section consistent with the PDP CTA's count
+     promise. */
   const partition = partitionDupesByVariantMatch(
     { title: anchor.title, brand: anchor.brand, priceNgn: anchor.bestPrice },
-    dupes,
+    broadDupes,
   );
   const augmentedOffers = [
     ...anchor.offers,
@@ -1121,6 +1108,21 @@ export async function pgFtsFindByProductId(
     worstPrice: augmentedOffers.length > 0 ? Math.max(...augmentedOffers.map((o) => o.landedPrice)) : anchor.worstPrice,
     storeCount: augmentedOffers.length,
   };
+
+  /* Cheaper-alternatives rail — apply the cheaper-only filter HERE
+     (rather than on broadDupes above) so the partition step gets to
+     see same-or-higher-priced variants for spectrum augmentation.
+     Score + slice mirror the chain that used to live inline on the
+     pre-partition broad list. */
+  const dupesForRail = partition.otherProducts
+    .filter((d) => d.savingsPercent > 0)
+    .slice(0, limit * 2)
+    .sort((a, b) => {
+      const aScore = a.similarityScore * 0.55 + Math.min(a.savingsPercent, 80) * 0.45;
+      const bScore = b.similarityScore * 0.55 + Math.min(b.savingsPercent, 80) * 0.45;
+      return bScore - aScore;
+    })
+    .slice(0, limit);
 
   return {
     mode: "similar",
@@ -1145,7 +1147,7 @@ export async function pgFtsFindByProductId(
        the sibling gate catches. Those are legitimately a different
        product — the user wanted base iPhone 15, recommending the
        Plus is misleading even if temporarily cheaper. */
-    dupes: partition.otherProducts,
+    dupes: dupesForRail,
   };
 }
 
