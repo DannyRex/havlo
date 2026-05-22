@@ -15,7 +15,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { buildHreflangAlternates } from "@/lib/seo";
 import Link from "next/link";
-import { ArrowLeft, Calendar, Clock } from "lucide-react";
+import { ArrowLeft, Clock } from "lucide-react";
 import { getPostBySlug, posts as allPosts } from "@/lib/blog/posts";
 import { COUNTRIES, getCountry } from "@/lib/country";
 
@@ -134,17 +134,11 @@ export default function CountryBlogPostPage({
           <p className="text-ink-2 text-[15px] sm:text-lg leading-relaxed mb-5">
             {post.description}
           </p>
+          {/* Publish date intentionally not shown — keeps evergreen
+              buyer's guides from reading as dated. post.publishedAt is
+              still used for /blog sort order, the sitemap lastmod and
+              the OpenGraph article timestamp. */}
           <div className="flex items-center gap-4 text-xs text-ink-3 pb-6 border-b border-border">
-            <span className="inline-flex items-center gap-1.5">
-              <Calendar size={12} />
-              <time dateTime={post.publishedAt}>
-                {new Date(post.publishedAt).toLocaleDateString(undefined, {
-                  year:  "numeric",
-                  month: "long",
-                  day:   "numeric",
-                })}
-              </time>
-            </span>
             <span className="inline-flex items-center gap-1.5">
               <Clock size={12} />
               {post.readMinutes} min read

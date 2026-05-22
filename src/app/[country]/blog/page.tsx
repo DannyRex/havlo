@@ -21,7 +21,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowUpRight, Calendar, Clock, Globe } from "lucide-react";
+import { ArrowUpRight, Clock, Globe } from "lucide-react";
 import { getPostsForCountry } from "@/lib/blog/posts";
 import { COUNTRIES, getCountry } from "@/lib/country";
 import { SITE_URL, buildHreflangAlternates } from "@/lib/seo";
@@ -123,16 +123,6 @@ export default function CountryBlogIndex({
                         {post.description}
                       </p>
                       <div className="flex items-center gap-4 text-xs text-ink-3">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Calendar size={12} />
-                          <time dateTime={post.publishedAt}>
-                            {new Date(post.publishedAt).toLocaleDateString(undefined, {
-                              year:  "numeric",
-                              month: "short",
-                              day:   "numeric",
-                            })}
-                          </time>
-                        </span>
                         <span className="inline-flex items-center gap-1.5">
                           <Clock size={12} />
                           {post.readMinutes} min read
