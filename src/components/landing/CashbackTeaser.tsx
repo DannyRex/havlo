@@ -65,18 +65,15 @@ export default function CashbackTeaser({ country }: { country: Country }) {
           </h2>
 
           {/* Body — concrete rate up front (teaser surface, the number
-              earns the click), then the founder-voice differentiation
-              ("Cash, not points.") compressed into the punchy two-word
-              coda the /cashback subhead uses. CTA "How it works →"
-              matches the destination page's first H2 so the link
-              promise lines up with what the user lands on.
+              earns the click) plus a CTA to the explainer. "How it
+              works →" matches the destination page's first H2 so the
+              link promise lines up with what the user lands on.
 
               Hardcoded "5%" rather than {topRate} so a future rate
               shuffle can't accidentally mis-quote the headline number
               without a deliberate copy edit. */}
           <p className="text-sm sm:text-base text-ink-2 max-w-xl mx-auto mb-6 sm:mb-8 leading-relaxed">
-            Up to 5% back on select stores when you shop through Havlo. Cash,
-            not points.{" "}
+            Up to 5% back on select stores when you shop through Havlo.{" "}
             <Link
               href={`/${country.code}/cashback`}
               className="text-ink font-medium underline underline-offset-2 hover:text-ink-2 transition-colors"

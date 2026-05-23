@@ -16,9 +16,10 @@
    the page. Hero H1 reframed from "Money back on the deals you'd
    buy anyway." to "Cashback that lands in your bank account."
    (concrete destination beats behavioural reframe at the top of
-   funnel). Subhead gains a "Not points. Real money." two-beat
-   coda that does the differentiation work the H1 used to carry,
-   in plain language. FAQ tightened: Q2 leads with a direct "Yes."
+   funnel). Subhead closes with "in cash, paid out as a bank
+   transfer" — an earlier "Not points. Real money." coda was
+   removed after user feedback that the binary contrast read as
+   AI. FAQ tightened: Q2 leads with a direct "Yes."
    answer instead of the softer "Honest answer:" preamble; Q3
    closer changed from "the cost of getting more" to "what keeps
    the rates this good" (less cryptic, same trade-off). The earlier
@@ -51,13 +52,13 @@ export async function generateMetadata({
   /* Title pattern carries the H1 hook into the SERP. ~50–60 chars
      across all locales (longest is "Havlo South Africa" at 59). */
   const title = `Cashback that lands in your bank account | Havlo ${country.name}`;
-  /* 154–158 chars. Names the country for local-search relevance,
-     ends with the conversion ask (waitlist). Aligned with the new
-     H1 voice: concrete destination ("bank account") + the founder-
-     voice coda ("Not points. Real money."). Surfaces in Google
-     SERPs + social-share previews so it counts as a visible
-     surface, not just SEO scaffolding. */
-  const description = `Cashback as a bank transfer when you shop through Havlo ${country.name}. Not points, not store credit. Join the waitlist for the launch announcement and an early account.`;
+  /* Names the country for local-search relevance, ends with the
+     conversion ask (waitlist). Leads with "Cash back to your bank
+     account" — concrete destination, no binary-contrast tic (the
+     earlier "Not points, not store credit." read as AI). Surfaces
+     in Google SERPs + social-share previews so it counts as a
+     visible surface, not just SEO scaffolding. */
+  const description = `Cash back to your bank account when you shop through Havlo ${country.name}. Join the waitlist for the launch announcement and an early account.`;
   const ogImage = `${SITE_URL}/og/cashback.png`;
 
   return {
@@ -189,19 +190,19 @@ export default function CashbackPage({
           </p>
           {/* H1 + subhead aligned with the founder-voice rules: no
               "Get paid to shop" genre cliché in the headline, no
-              three-part negative list in the body. The H1 names
-              the concrete destination ("bank account") so the
-              shopper knows exactly where the money lands, and the
-              subhead closes with a "Not points. Real money." two-
-              beat coda that does the differentiation work the H1
-              used to carry, in plain founder voice. */}
+              binary-contrast tic in the body. The H1 names the
+              concrete destination ("bank account") so the shopper
+              knows exactly where the money lands; the subhead
+              closes with "in cash, paid out as a bank transfer"
+              (an earlier "Not points. Real money." coda was
+              removed after user feedback that it read as AI). */}
           <h1 className="text-3xl sm:text-5xl font-bold text-ink tracking-[-0.025em] leading-[1.05] mb-5">
             Cashback that lands in your bank account.
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-lg leading-relaxed max-w-2xl">
             When you click through Havlo to shop, partner stores pay us a
             commission for sending you over. Once cashback launches, most of
-            that comes back to you as a bank transfer. Not points. Real money.
+            that comes back to you in cash, paid out as a bank transfer.
           </p>
         </header>
 
