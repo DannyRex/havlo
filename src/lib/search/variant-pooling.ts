@@ -146,7 +146,27 @@ export function partitionDupesByVariantMatch(
 /* Flatten variant DupeResults into a single StoreOffer[] suitable
    for merging into the anchor pool. Each variant carries its OWN
    per-store offers (a single dupe can have multiple stores when
-   FTS pooling found the same variant across retailers). */
+   FTS pooling found the same variant across retailers).
+
+   PRESERVES productTitle: each augmented offer is stamped with the
+   variant product's actual title (not the anchor's) so downstream
+   consumers — CompareAnchorCard's per-row "as titled at this store"
+   subtitle, click-through routing, debugging — can tell which
+   underlying product an offer really belongs to. Without this,
+   sibling-variant offers inherited the anchor's title at render
+   time and a user could click an offer expecting the anchor product
+   but land on a different one (May 2026 report: Nike Club Swoosh
+   cap anchor had a Nike Club shorts offer attached because the
+   variant gate let it through, and the /compare card showed no
+   indication that the offer was for a different product). The gate
+   itself has been tightened in query-understanding.ts; this is the
+   belt-and-braces complement so even a future loosening can't
+   mislead the UI. */
 export function variantOffers(variants: DupeResult[]): StoreOffer[] {
-  return variants.flatMap((v) => v.offers);
+  return variants.flatMap((v) =>
+    v.offers.map((o) => ({
+      ...o,
+      productTitle: o.productTitle ?? v.title,
+    })),
+  );
 }

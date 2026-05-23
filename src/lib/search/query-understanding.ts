@@ -435,6 +435,64 @@ export function extractProductType(title: string): string | null {
   return null;
 }
 
+/* Token-overlap helpers used as a second-line gate inside
+   isLikelySameProduct. PRODUCT_TYPE_KEYWORDS handles the obvious
+   "cap vs shorts" class; this catches harder same-type cases like
+   "Nike running shoes" vs "Nike walking shoes" or two unrelated
+   perfumes from the same house — they share brand + family + type
+   but their real product identity diverges in the descriptive
+   tokens.
+
+   STOP_WORDS removes generic descriptors that would otherwise
+   inflate overlap (colours, sizes, "for men/women", "new",
+   "original" etc.). Brand is stripped per-call so a brand-only
+   overlap doesn't qualify. */
+const STOP_WORDS = new Set([
+  "and", "the", "for", "with", "from", "set", "pack", "size", "color", "colour",
+  "men", "women", "kids", "boys", "girls", "unisex",
+  "small", "medium", "large", "xl", "xxl", "xs",
+  "new", "original", "official", "genuine", "premium", "edition", "version",
+  "black", "white", "brown", "blue", "red", "green", "yellow", "pink", "purple",
+  "orange", "grey", "gray", "silver", "gold", "navy", "olive", "tan", "beige",
+  "cream", "ivory", "khaki", "burgundy", "maroon", "light", "dark",
+]);
+
+function significantTokens(title: string, brand: string | null): Set<string> {
+  const out = new Set<string>();
+  for (const raw of title.toLowerCase().replace(/[^a-z0-9]+/g, " ").split(/\s+/)) {
+    if (raw.length < 3) continue;
+    if (STOP_WORDS.has(raw)) continue;
+    if (brand && brand.toLowerCase() === raw) continue;
+    out.add(raw);
+  }
+  return out;
+}
+
+/** True when anchor and candidate share at least min(2, |anchor
+    tokens|) significant tokens. "Significant" = length >= 3, not in
+    STOP_WORDS, not the brand. The min() makes very short titles
+    (1-token anchors) require only 1 overlap so we don't reject
+    legitimate matches against unusually terse anchors. */
+export function shareSignificantTokens(
+  anchorTitle: string,
+  candidateTitle: string,
+  brand: string | null,
+): boolean {
+  const aTokens = significantTokens(anchorTitle, brand);
+  if (aTokens.size === 0) return true; // nothing meaningful to gate on
+  const cTokens = significantTokens(candidateTitle, brand);
+  const required = Math.min(2, aTokens.size);
+  /* Array.from instead of for-of: tsconfig target is es2017 but
+     iteration over Set needs --downlevelIteration which we don't
+     ship. Same pattern used in StoreLogos.getStoreCountForCountry. */
+  let overlap = 0;
+  Array.from(aTokens).some((t) => {
+    if (cTokens.has(t)) overlap++;
+    return overlap >= required;
+  });
+  return overlap >= required;
+}
+
 export function isLikelySameProduct(
   anchor: { title: string; brand?: string | null; priceNgn?: number; family?: string | null },
   candidate: { title: string; brand?: string | null; priceNgn?: number },
@@ -455,6 +513,17 @@ export function isLikelySameProduct(
   const aType = extractProductType(anchor.title);
   const cType = extractProductType(candidate.title);
   if (aType && cType && aType !== cType) return false;
+
+  /* Token-overlap sanity gate. The type gate above catches the
+     cap/shorts/shoe/jacket class, but same-type same-brand pairs
+     can still be DIFFERENT products: "Nike running shoes" vs "Nike
+     walking shoes", two unrelated AMOUROUD fragrances under the
+     same brand, etc. Require >= min(2, |anchor significant tokens|)
+     overlap on length>=3 non-brand non-stopword tokens. Cheap and
+     defensive. */
+  if (!shareSignificantTokens(anchor.title, candidate.title, aBrand ?? cBrand)) {
+    return false;
+  }
 
   /* Family: both classified, must match. Either side null → fall
      through (the anchor-removal in pgFtsFindDupes already gates
