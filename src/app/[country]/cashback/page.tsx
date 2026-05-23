@@ -37,11 +37,12 @@
    promise, which earns the "coming soon" eyebrow. "How it works"
    step 2 closes with "as you would anyway", the quiet emotional
    hook of the whole pitch (this is found money, not behavior change).
-   Trust card 1 swapped enumerated denial ("We don't take a cut,
-   charge a withdrawal fee, or require...") for anaphora ("No cut.
-   No fee. No minimum.") because rhythm itself signals certainty.
-   FAQ Q3 now opens with "Two clocks have to tick first": picture
-   first, mechanics second. Waitlist H2 swapped cliché "Be first in
+   Trust card 1 kept its enumerated denial ("We don't take a cut,
+   charge a withdrawal fee, or require...") after a brief detour into
+   anaphora ("No cut. No fee. No minimum."); the long form reads more
+   like a founder spelling out their commitment, the short form read
+   like a marketing chip. FAQ Q3 now opens with "Two clocks have to
+   tick first": picture first, mechanics second. Waitlist H2 swapped cliché "Be first in
    line" for concrete reward "Get your account on day one." JSON-LD
    FAQ block updated to match visible copy verbatim (Google penalises
    divergence). NO em-dashes anywhere in user-facing copy per brand
@@ -307,8 +308,8 @@ export default function CashbackPage({
             <h3 className="font-bold text-ink text-[15px] mb-2">No hidden fees</h3>
             <p className="text-ink-2 text-sm leading-relaxed">
               Withdraw to your bank once your balance hits {min.display}.
-              No cut from your balance. No withdrawal fee. No monthly minimum
-              to keep your account active.
+              We don&apos;t take a cut of your balance, charge a withdrawal
+              fee, or require a monthly minimum to keep your account active.
             </p>
           </div>
           <div className="p-5 rounded-2xl border border-border bg-surface">
