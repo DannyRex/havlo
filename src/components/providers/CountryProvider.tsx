@@ -153,6 +153,23 @@ export function CountryProvider({ initialCode, children }: Props) {
               about picking up the new cookie on these surfaces. */
       const segments = pathname.split("/");
       if (segments[1] && COUNTRY_CODES.has(segments[1])) {
+        /* Compare-page escape hatch (May 2026 mobile crash report).
+           Swapping country on /[country]/compare while a search is
+           loaded can surface a mobile-only client-side exception:
+           the q/pid/oid in the URL resolve against the new country's
+           catalog but downstream renders trip on country-mismatched
+           data (a stale anchor UUID that doesn't exist in the new
+           country, an offer pruned by isOfferAllowedForCountry while
+           a child still references it, etc.). The key={params.country}
+           remount on the page was a partial fix that holds on desktop
+           but not on mobile under iOS Safari's tighter render budget.
+           User direction: don't preserve the path + search, just drop
+           the visitor on the new country's homepage. Loses the query
+           but trades zero crashes for one extra click. */
+        if (segments[2] === "compare") {
+          router.push(`/${normalized}`);
+          return;
+        }
         segments[1] = normalized;
         const newPath = segments.join("/") || `/${normalized}`;
         /* window.location.search includes the leading "?" or is

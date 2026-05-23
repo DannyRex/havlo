@@ -213,6 +213,18 @@ async function fetchMultiStoreTitlesForCountry(countryCode: string): Promise<Mul
      count tracks what /compare actually surfaces for the visitor. */
   let productStores = await aggregateOfferPairsCountryScoped(supa, countryCode);
 
+  /* Snapshot of country-permissible product IDs. A product appears
+     in the scoped result iff it has at least one country-allowed
+     offer in product_best_offers; use that as the safety gate for
+     the global fallback below so a chip pool from the global path
+     can never include a product with ZERO country-allowed offers.
+     User-reported bug (May 2026): "some pills return nothing found
+     on compare". Root cause: the global fallback was unfiltered,
+     so chips from it pointed at products whose offers all failed
+     isOfferAllowedForCountry once /api/compare ran, returning
+     mode:"empty" -> empty state. */
+  const countryProductIds = new Set(productStores.keys());
+
   /* Defensive fallback: if the country-scoped fetch yields too few
      qualifying products (an unsupported country, view-column drift, a
      transient upstream issue, …), fall back to the broader `offers`
@@ -229,7 +241,19 @@ async function fetchMultiStoreTitlesForCountry(countryCode: string): Promise<Mul
     console.warn(
       `[trending-multi-store] country=${countryCode} country-scoped pool only ${qualifiedCountScoped} qualifying products — falling back to global`,
     );
-    productStores = await aggregateOfferPairsGlobal(supa);
+    const global = await aggregateOfferPairsGlobal(supa);
+    /* Intersect: products with >=2 stores GLOBALLY (broader pool for
+       chip variety) AND >=1 country-allowed offer (so every chip
+       click resolves to at least an anchor card, never an empty
+       state). Display storeCount comes from the global map — the
+       chip's claim is "this product is compared across N stores
+       worldwide", which is honest even if the visitor can only
+       shop a subset from their country. */
+    const intersected = new Map<string, Set<string>>();
+    for (const [pid, set] of Array.from(global.entries())) {
+      if (countryProductIds.has(pid)) intersected.set(pid, set);
+    }
+    productStores = intersected;
   }
 
   /* Filter to products with the qualifying store count. Sort by
@@ -334,9 +358,11 @@ async function fetchMultiStoreTitlesForCountry(countryCode: string): Promise<Mul
    market gets its own cached pool. */
 export const getTrendingMultiStoreTitles = unstable_cache(
   fetchMultiStoreTitlesForCountry,
-  /* v5 cache key — bumped on the second country-scoping attempt
-     (this one uses two .eq() queries + a global fallback, rather than
-     bedabc5's failed .or()). Old v4 entries bypass automatically. */
-  ["trending-multi-store-v5-country-scoped"],
+  /* v6 cache key — bumped because the global-fallback path now
+     intersects with country-permissible product IDs so chips never
+     promise a comparison that resolves to "Nothing found." Old v5
+     entries served chips with un-permissible products; bypass them
+     so users see the corrected pool immediately on deploy. */
+  ["trending-multi-store-v6-country-permissible-fallback"],
   { revalidate: REVALIDATE_S, tags: [CACHE_TAG] },
 );
