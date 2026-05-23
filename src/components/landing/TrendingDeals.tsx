@@ -167,8 +167,15 @@ export default async function TrendingDeals({ country }: { country: Country }) {
               The biggest price drops we&apos;ve found across stores today.
             </p>
           </div>
+          {/* Country-prefixed href — a bare /deals would get bounced
+              through middleware, which falls back to the cookie when
+              there's no URL country segment. A stale cookie (the
+              visitor was on /uk last week, is on /ng today) then
+              redirects them to the WRONG country's deals page. Always
+              carry country.code from this component's prop so the
+              link is country-correct for the surface it renders on. */}
           <Link
-            href="/deals"
+            href={`/${country.code}/deals`}
             className="text-sm font-medium text-ink-2 hover:text-ink transition-colors hidden sm:inline-flex items-center gap-1 shrink-0"
           >
             See all →
@@ -182,7 +189,7 @@ export default async function TrendingDeals({ country }: { country: Country }) {
         <TrendingDealsGrid buckets={buckets} />
 
         <div className="mt-8 text-center sm:hidden">
-          <Link href="/deals" className="btn-secondary">
+          <Link href={`/${country.code}/deals`} className="btn-secondary">
             See all deals →
           </Link>
         </div>

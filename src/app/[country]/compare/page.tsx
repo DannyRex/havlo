@@ -636,7 +636,11 @@ function CompareContent() {
                 <p className="text-sm text-ink-3">
                   We don&apos;t have &ldquo;{displayQuery}&rdquo; in our index yet, and live
                   shopping providers aren&apos;t reachable right now. Try again in a moment, or browse{" "}
-                  <a href="/deals" className="text-ink underline underline-offset-2">deals</a>.
+                  {/* Country-prefixed: a bare /deals bounces through
+                      middleware and resolves via cookie, which can be
+                      stale across visits and drop the user on the
+                      wrong country. */}
+                  <a href={`/${country.code}/deals`} className="text-ink underline underline-offset-2">deals</a>.
                 </p>
               </div>
             ) : (

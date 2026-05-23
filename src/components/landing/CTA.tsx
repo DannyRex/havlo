@@ -228,16 +228,23 @@ export default async function CTA({ country }: { country: import("@/lib/country"
                   Paste a link or search any product. We find the same item, or a cheaper alternative, at the stores you already shop.
                 </p>
 
+                {/* Country-prefixed hrefs. A bare /compare or /deals
+                    would be bounced through middleware, which falls
+                    back to the cookie when there's no URL segment to
+                    read from. A stale cookie (e.g. last visit was
+                    /uk, this visit is /ng) then redirects to the
+                    WRONG country. Always carry country.code from the
+                    prop so the link is country-correct. */}
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Link
-                    href="/compare"
+                    href={`/${country.code}/compare`}
                     className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full font-semibold text-sm bg-white text-zinc-950 hover:bg-white/90 transition-colors active:scale-[0.98]"
                   >
                     <TrendingDown size={16} />
                     Find for less
                   </Link>
                   <Link
-                    href="/deals"
+                    href={`/${country.code}/deals`}
                     className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full font-semibold text-sm text-white border border-white/25 hover:bg-white/10 transition-colors active:scale-[0.98]"
                   >
                     Browse deals

@@ -88,11 +88,24 @@ export function CountryProvider({ initialCode, children }: Props) {
 
      Effect dependency on pathname guarantees we resync to the URL
      on every navigation. Safe because setCode is a no-op when the
-     value hasn't changed (React's bail-out heuristic). */
+     value hasn't changed (React's bail-out heuristic).
+
+     Cookie sync (May 2026): the cookie is the source of truth the
+     middleware uses to resolve bare paths like /deals. If a user
+     lands on /ng/ via a direct URL with a stale havlo-country=uk
+     cookie, every bare-path link in the app (the "See all deals"
+     CTA on the homepage, /about's "Compare a product", etc.) would
+     bounce them back to /uk. Writing the cookie on every URL-driven
+     country change keeps it in lockstep with the URL, so middleware
+     redirects always resolve to the country the user is actually
+     browsing. Defense in depth: hrefs in country-scoped components
+     already carry an explicit country prefix; this fix protects
+     anything that doesn't (global pages like /about). */
   useEffect(() => {
     const seg = pathname.split("/")[1]?.toLowerCase();
     if (seg && COUNTRY_CODES.has(seg) && seg !== code) {
       setCode(seg);
+      writeCookie(COUNTRY_COOKIE, seg, 365);
     }
   }, [pathname, code]);
 
