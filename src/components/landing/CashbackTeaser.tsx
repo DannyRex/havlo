@@ -73,13 +73,20 @@ export default function CashbackTeaser({ country }: { country: Country }) {
               shuffle can't accidentally mis-quote the headline number
               without a deliberate copy edit. */}
           <p className="text-sm sm:text-base text-ink-2 max-w-xl mx-auto mb-6 sm:mb-8 leading-relaxed">
-            Up to 5% back on select stores when you shop through Havlo.{" "}
-            <Link
-              href={`/${country.code}/cashback`}
-              className="text-ink font-medium underline underline-offset-2 hover:text-ink-2 transition-colors"
-            >
-              How it works →
-            </Link>
+            Get up to 5% back on select stores when you shop through Havlo.{" "}
+            {/* CTA stays inline on mobile (body reads as a single
+                sentence + ask). On sm+ it breaks onto its own line
+                for a cleaner two-line layout — span flips from
+                inline to block at the breakpoint, with a small
+                top margin for breathing room. */}
+            <span className="inline sm:block sm:mt-1">
+              <Link
+                href={`/${country.code}/cashback`}
+                className="text-ink font-medium underline underline-offset-2 hover:text-ink-2 transition-colors"
+              >
+                How it works →
+              </Link>
+            </span>
           </p>
 
           {/* Active rates pills — concrete proof, not marketing copy.
