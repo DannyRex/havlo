@@ -253,7 +253,14 @@ export default async function ProductPage({ params }: PageProps) {
        since the partition already enforces strictness for the
        spectrum-bound subset. */
     async (title: string) => pgFtsFindDupes(title, 0, { limit: 30, strict: false }),
-    ["pdp-dupes"],
+    /* Cache key bumped to v2-relaxed after 2937139 relaxed
+       pgFtsFindDupes' strict-family gate and lifted the limit
+       20 -> 30. Without the bump the prior 30-min TTL on the
+       v1 entries kept serving the pre-relaxation results, so a
+       PDP whose dupes were re-fetched 5 minutes before deploy
+       would show 1 alternative for the next 25 minutes despite
+       the new gates returning ~10. */
+    ["pdp-dupes-v2-relaxed"],
     /* TTL bumped May 2026 v3 (300s → 1800s) for Fluid CPU relief.
        Dupes pool changes only on ingest, fine to cache 30min. */
     { revalidate: 1800, tags: ["pdp-dupes"] },
