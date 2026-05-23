@@ -611,11 +611,23 @@ export async function pgFtsFindDupes(
     .filter((r) => !looksSuspicious(r.title))
     // Product-family gate: an iPhone anchor must not get iPad / MacBook dupes.
     .filter((r) => !familiesIncompatible(query, r.title))
-    /* Strict family match: anchor query family must equal candidate
-       family. Skipped for accessory queries because cases / cables
-       cross-fit between phones and tablets — matching by accessory
-       semantics is what we want there. */
-    .filter((r) => queryIsAccessory || !familyConstraint || detectFamily(r.title) === familyConstraint)
+    /* Family match.
+       - strict mode (PDP spectrum candidates): anchor query family
+         must equal candidate family.
+       - lenient mode (PDP "You may also like", /compare "Cheaper
+         alternatives", /p/live's rail): SKIPPED — the rails are
+         meant to err generous. A fashion cap anchor can surface a
+         related shoe, a headphone anchor can surface a speaker,
+         etc. familiesIncompatible above still blocks the obvious
+         absurdities (iPhone -> iPad, phone -> appliance) and the
+         accessory match-flip prevents case clutter on phone
+         anchors, so this gate going dormant in lenient mode only
+         widens the relevant suggestions — it doesn't open the
+         floodgates to random catalog rows.
+       Skipped for accessory queries regardless of strict because
+       cases / cables cross-fit between phones and tablets and the
+       accessory-semantic matching is what we want there. */
+    .filter((r) => queryIsAccessory || !familyConstraint || !strict || detectFamily(r.title) === familyConstraint)
     /* Strict-only gates. In lenient mode the alternatives rail
        wants iPhone 14 / Galaxy S23 to surface for iPhone 15 /
        S24 anchors — these are legit cheaper alternatives, not

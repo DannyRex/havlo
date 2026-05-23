@@ -252,7 +252,7 @@ export default async function ProductPage({ params }: PageProps) {
        Feeding strict candidates starves the rail without benefit
        since the partition already enforces strictness for the
        spectrum-bound subset. */
-    async (title: string) => pgFtsFindDupes(title, 0, { limit: 20, strict: false }),
+    async (title: string) => pgFtsFindDupes(title, 0, { limit: 30, strict: false }),
     ["pdp-dupes"],
     /* TTL bumped May 2026 v3 (300s → 1800s) for Fluid CPU relief.
        Dupes pool changes only on ingest, fine to cache 30min. */

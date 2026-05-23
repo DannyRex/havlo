@@ -184,7 +184,7 @@ export default async function LivePdpPage({ params, searchParams }: PageProps) {
      anchorPriceNgn=0 means "no ceiling, FTS similarity ranking."
      The visitor lands on a synthetic anchor + still gets the broader
      "look at these alternatives" view. */
-  const dupes = await pgFtsFindDupes(offer.title, 0, { limit: 20, strict: false });
+  const dupes = await pgFtsFindDupes(offer.title, 0, { limit: 30, strict: false });
 
   /* Country-filter the dupes' offers so a UK PDP doesn't surface
      Konga rows. Same shape as the regular PDP. */
