@@ -46,6 +46,43 @@ interface Props {
 export default function StoreFilter({ stores, selected, onChange, fillRow = false }: Props) {
   const [open, setOpen]     = useState(false);
   const [search, setSearch] = useState("");
+
+  /* Mobile-sheet swipe-to-dismiss. The grabber bar at the top of
+     the sheet was previously a visual signifier only — the user
+     could see it, expected it to be draggable, and tapping/dragging
+     it did nothing (a tap on the backdrop was the documented
+     close). This wires the actual gesture: pointer-down on the
+     handle/header area starts a drag, the panel follows the
+     vertical delta downward, and releasing past DISMISS_THRESHOLD
+     closes the sheet. Pointer events cover touch + mouse + pen
+     without separate handler sets. */
+  const DISMISS_THRESHOLD = 100;
+  const dragStartY = useRef<number | null>(null);
+  const [dragY, setDragY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const onDragPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    /* Don't hijack pointer-down that lands on an interactive child
+       (close button, etc.) — let the click flow normally. */
+    if ((e.target as HTMLElement).closest("button, a, input")) return;
+    dragStartY.current = e.clientY;
+    setIsDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onDragPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStartY.current === null) return;
+    const delta = e.clientY - dragStartY.current;
+    /* Only follow downward drags — pulling the sheet up past its
+       resting position would feel wrong. */
+    setDragY(delta > 0 ? delta : 0);
+  };
+  const onDragPointerEnd = () => {
+    if (dragStartY.current === null) return;
+    if (dragY > DISMISS_THRESHOLD) setOpen(false);
+    setDragY(0);
+    setIsDragging(false);
+    dragStartY.current = null;
+  };
   /* Both panel surfaces are portalled to document.body so they
      escape the parent filter bar's overflow-x-auto clipping
      context (which would otherwise crop the popover's lower half
@@ -347,24 +384,47 @@ export default function StoreFilter({ stores, selected, onChange, fillRow = fals
               role="listbox"
               aria-label="Filter by store"
               className="absolute left-0 right-0 bottom-0 rounded-t-2xl border-t border-border bg-bg shadow-2xl max-h-[85vh] flex flex-col"
+              style={{
+                transform: `translateY(${dragY}px)`,
+                /* Snap back smoothly on release, but follow the
+                   finger 1:1 while actively dragging. */
+                transition: isDragging ? "none" : "transform 0.2s ease-out",
+              }}
             >
-              {/* Drag-handle visual cue at the top of the sheet —
-                  signals 'this is a dismissable sheet, swipe down'
-                  even though we don't wire actual swipe gestures (a
-                  tap on the backdrop is the documented close). */}
-              <div className="flex justify-center pt-2 pb-1">
-                <div className="w-10 h-1 rounded-full bg-ink-3/40" aria-hidden="true" />
-              </div>
-              <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-                <p className="text-sm font-semibold text-ink">Filter by store</p>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  aria-label="Close"
-                  className="-mr-1 p-1 text-ink-3 hover:text-ink transition-colors"
-                >
-                  <X size={16} />
-                </button>
+              {/* Drag area — handle + title bar. The pointer-event
+                  handlers below implement swipe-to-dismiss (delta
+                  > DISMISS_THRESHOLD closes the sheet); the close
+                  button still functions because onDragPointerDown
+                  bails when the target is interactive.
+
+                  touch-action: none lets us own the gesture on this
+                  strip — without it the browser's default vertical-
+                  scroll handling competes and the drag stutters. The
+                  panelBody below keeps default touch-action so its
+                  internal scroll list still works. */}
+              <div
+                onPointerDown={onDragPointerDown}
+                onPointerMove={onDragPointerMove}
+                onPointerUp={onDragPointerEnd}
+                onPointerCancel={onDragPointerEnd}
+                style={{ touchAction: "none" }}
+              >
+                {/* Drag-handle visual cue — now backed by the actual
+                    swipe-to-dismiss gesture wrapping this row. */}
+                <div className="flex justify-center pt-2 pb-1">
+                  <div className="w-10 h-1 rounded-full bg-ink-3/40" aria-hidden="true" />
+                </div>
+                <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                  <p className="text-sm font-semibold text-ink">Filter by store</p>
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    aria-label="Close"
+                    className="-mr-1 p-1 text-ink-3 hover:text-ink transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
               {panelBody}
             </div>
