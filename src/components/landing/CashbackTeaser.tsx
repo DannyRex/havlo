@@ -56,12 +56,16 @@ export default function CashbackTeaser({ country }: { country: Country }) {
           {/* Headline — mirrors the /cashback hero so the language
               carries across surfaces. Anyone who sees this teaser and
               then clicks through reads the same promise reinforced,
-              not a slightly different second pitch. */}
+              not a slightly different second pitch. Pass 3 (May 2026)
+              moved both surfaces from concrete-destination ("lands
+              in your bank account") to concrete-frequency ("every
+              time you shop") because frequency is the stronger
+              emotional hook for a daily-shopping audience. */}
           <h2
             id="cashback-teaser-heading"
             className="text-[24px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight mb-3 sm:mb-4"
           >
-            Cashback that lands in your bank account.
+            Money back to your bank, every time you shop.
           </h2>
 
           {/* Body — concrete rate up front (teaser surface, the number

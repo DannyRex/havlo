@@ -25,7 +25,27 @@
    the rates this good" (less cryptic, same trade-off). The earlier
    pass kept PayPal off the page because PayPal-out is restricted
    in NG and most launch markets, bank transfer is the right
-   primary rail. */
+   primary rail.
+
+   Copy refresh pass 3 (May 2026): sharper, more confident voice
+   without losing the humility. H1 swapped from concrete-destination
+   ("Cashback that lands in your bank account.") to concrete-frequency
+   ("Money back to your bank, every time you shop."). Frequency is
+   the stronger emotional hook for a price-comparison audience that's
+   already shopping daily. Subhead leads with "Stores already pay
+   us": the word "already" signals an existing dynamic, not a future
+   promise, which earns the "coming soon" eyebrow. "How it works"
+   step 2 closes with "as you would anyway", the quiet emotional
+   hook of the whole pitch (this is found money, not behavior change).
+   Trust card 1 swapped enumerated denial ("We don't take a cut,
+   charge a withdrawal fee, or require...") for anaphora ("No cut.
+   No fee. No minimum.") because rhythm itself signals certainty.
+   FAQ Q3 now opens with "Two clocks have to tick first": picture
+   first, mechanics second. Waitlist H2 swapped cliché "Be first in
+   line" for concrete reward "Get your account on day one." JSON-LD
+   FAQ block updated to match visible copy verbatim (Google penalises
+   divergence). NO em-dashes anywhere in user-facing copy per brand
+   voice rule (they read AI-generated). */
 
 import type { Metadata } from "next";
 import Script from "next/script";
@@ -49,16 +69,20 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const country = getCountry(params.country);
   const url     = `${SITE_URL}/${country.code}/cashback`;
-  /* Title pattern carries the H1 hook into the SERP. ~50–60 chars
-     across all locales (longest is "Havlo South Africa" at 59). */
-  const title = `Cashback that lands in your bank account | Havlo ${country.name}`;
+  /* Title pattern carries the H1 hook into the SERP. ~50-60 chars
+     across all locales (longest is "Havlo South Africa" at 59).
+     Pass 3 swap: H1 moved to concrete-frequency ("every time you
+     shop"). Title keeps the destination ("paid to your bank") so
+     the SERP snippet leads with the keyword shoppers type. */
+  const title = `Cashback paid to your bank | Havlo ${country.name}`;
   /* Names the country for local-search relevance, ends with the
-     conversion ask (waitlist). Leads with "Cash back to your bank
-     account" — concrete destination, no binary-contrast tic (the
-     earlier "Not points, not store credit." read as AI). Surfaces
-     in Google SERPs + social-share previews so it counts as a
-     visible surface, not just SEO scaffolding. */
-  const description = `Cash back to your bank account when you shop through Havlo ${country.name}. Join the waitlist for the launch announcement and an early account.`;
+     conversion ask (waitlist). Leads with "Money back to your bank"
+     mirroring the new H1 voice. Frequency reframe ("every time you
+     shop") is the emotional hook for a price-comparison audience
+     that's already shopping daily. Surfaces in Google SERPs and
+     social-share previews so it counts as a visible surface, not
+     just SEO scaffolding. */
+  const description = `Get money back to your bank every time you shop through Havlo ${country.name}. Join the waitlist for the launch email and an account on day one.`;
   const ogImage = `${SITE_URL}/og/cashback.png`;
 
   return {
@@ -115,8 +139,8 @@ export default function CashbackPage({
         "@type": "WebPage",
         "@id":   `${SITE_URL}/${country.code}/cashback`,
         url:     `${SITE_URL}/${country.code}/cashback`,
-        name:    `Cashback that lands in your bank account | Havlo ${country.name}`,
-        description: `Cashback as a bank transfer when you shop through Havlo ${country.name}. Join the waitlist for the launch announcement.`,
+        name:    `Cashback paid to your bank | Havlo ${country.name}`,
+        description: `Money back to your bank every time you shop through Havlo ${country.name}. Join the waitlist for the launch email and an account on day one.`,
         inLanguage: "en",
         isPartOf: { "@type": "WebSite", url: SITE_URL, name: "Havlo" },
       },
@@ -136,7 +160,7 @@ export default function CashbackPage({
             name: "When will cashback launch?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "Phase 2 is in build now and we're aiming to launch in the coming weeks. We'd rather take an extra week than ship a broken payout flow on someone's first withdrawal. Waitlist signups get the launch email before anyone else.",
+              text: "Phase 2 is in build now. We're aiming for the coming weeks, but we'd rather take an extra week than ship a broken payout flow on someone's first withdrawal. Waitlist signups get the launch email first.",
             },
           },
           {
@@ -144,7 +168,7 @@ export default function CashbackPage({
             name: "Is there a catch?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "Yes. The catch is timing, not money. Stores hold commissions for weeks while they verify sales and handle returns. We pass that delay straight through to you instead of paying you upfront and quietly shrinking your rate. Once your balance is past the return window, it's yours. We don't take a cut.",
+              text: "Yes. The catch is timing, not money. Stores hold commissions for weeks while they verify sales and handle returns. We pass that delay through to you instead of fronting the cash and quietly shrinking your rate. Once your balance clears the return window, it's yours. We don't take a cut.",
             },
           },
           {
@@ -152,7 +176,7 @@ export default function CashbackPage({
             name: "Why the 60 to 90 day delay?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "Most stores hold commissions until their return window closes, typically 30 to 60 days, then pay us in their next monthly cycle. We could promise faster cashback by paying you upfront from our own pocket, but that shrinks the rate for everyone. The delay is what keeps the rates this good.",
+              text: "Two clocks have to tick first. The store waits 30 to 60 days for their return window to close, then pays us in their next monthly cycle. We could shorten that by fronting the cash ourselves, but the rates would drop for everyone. The delay is what keeps the rates this high.",
             },
           },
           {
@@ -160,7 +184,7 @@ export default function CashbackPage({
             name: "What about returns?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "Return an item and the cashback for that item is reversed in your balance. Partial returns reduce the cashback proportionally. Every change shows up in your transaction history. Nothing happens quietly.",
+              text: "Return an item and the cashback for it is reversed in your balance. Partial returns reduce the cashback proportionally. Every change shows up in your transaction history. Nothing happens quietly.",
             },
           },
         ],
@@ -190,19 +214,22 @@ export default function CashbackPage({
           </p>
           {/* H1 + subhead aligned with the founder-voice rules: no
               "Get paid to shop" genre cliché in the headline, no
-              binary-contrast tic in the body. The H1 names the
-              concrete destination ("bank account") so the shopper
-              knows exactly where the money lands; the subhead
-              closes with "in cash, paid out as a bank transfer"
-              (an earlier "Not points. Real money." coda was
-              removed after user feedback that it read as AI). */}
+              binary-contrast tic in the body. Pass 3 H1 swap from
+              concrete-destination ("Cashback that lands in your bank
+              account.") to concrete-frequency ("Money back to your
+              bank, every time you shop.") because frequency is the
+              stronger emotional hook for a price-comparison audience
+              that's already shopping daily. Subhead leads with
+              "Stores already pay us": the word "already" signals an
+              existing dynamic, not a future promise, which earns the
+              "coming soon" eyebrow. */}
           <h1 className="text-3xl sm:text-5xl font-bold text-ink tracking-[-0.025em] leading-[1.05] mb-5">
-            Cashback that lands in your bank account.
+            Money back to your bank, every time you shop.
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-lg leading-relaxed max-w-2xl">
-            When you click through Havlo to shop, partner stores pay us a
-            commission for sending you over. Once cashback launches, most of
-            that comes back to you in cash, paid out as a bank transfer.
+            Stores already pay us a commission when you shop through Havlo.
+            Once cashback launches, most of that comes back to you as a bank
+            transfer.
           </p>
         </header>
 
@@ -216,23 +243,22 @@ export default function CashbackPage({
               <span className="text-ink-3 font-mono shrink-0 mt-0.5">1</span>
               <span>
                 <strong className="text-ink">Sign up.</strong>{" "}
-                Drop your email below. We&apos;ll set up your account the day
-                we open.
+                Drop your email below. Your account opens the day we go live.
               </span>
             </li>
             <li className="flex gap-3">
               <span className="text-ink-3 font-mono shrink-0 mt-0.5">2</span>
               <span>
                 <strong className="text-ink">Click through.</strong>{" "}
-                Find a deal on Havlo, click through to the store, buy as you
-                normally would.
+                Find a deal on Havlo. Click through to the store and buy as
+                you would anyway.
               </span>
             </li>
             <li className="flex gap-3">
               <span className="text-ink-3 font-mono shrink-0 mt-0.5">3</span>
               <span>
                 <strong className="text-ink">Cashback tracks.</strong>{" "}
-                The store confirms your purchase. Your balance updates within
+                The store confirms your purchase. Your balance updates in
                 60 to 90 days.
               </span>
             </li>
@@ -240,7 +266,7 @@ export default function CashbackPage({
               <span className="text-ink-3 font-mono shrink-0 mt-0.5">4</span>
               <span>
                 <strong className="text-ink">Withdraw.</strong>{" "}
-                Cash out to your bank once your balance reaches {min.display}.
+                Cash out to your bank once your balance hits {min.display}.
               </span>
             </li>
           </ol>
@@ -252,11 +278,10 @@ export default function CashbackPage({
             Cashback rates
           </h2>
           <p className="text-ink-2 text-[15px] leading-relaxed mb-5">
-            Rates apply to the qualifying purchase amount, not the full order
+            Rates apply to the qualifying purchase amount, not the order
             total. Taxes, shipping, gift cards, and discounts stacked with a
-            separate coupon don&apos;t count. These are the launch rates. Most
-            will go up over time as we grow and partner stores offer us better
-            terms.
+            separate coupon don&apos;t count. These are launch rates. Most
+            will climb as we grow and stores offer us better terms.
           </p>
           <ul className="divide-y divide-border border border-border rounded-2xl overflow-hidden">
             {rates.map((r) => (
@@ -281,9 +306,9 @@ export default function CashbackPage({
             <Wallet size={20} className="text-success mb-3" />
             <h3 className="font-bold text-ink text-[15px] mb-2">No hidden fees</h3>
             <p className="text-ink-2 text-sm leading-relaxed">
-              Withdraw to your bank once your balance reaches {min.display}.
-              We don&apos;t take a cut of your balance, charge a withdrawal
-              fee, or require a monthly minimum to keep your account active.
+              Withdraw to your bank once your balance hits {min.display}.
+              No cut from your balance. No withdrawal fee. No monthly minimum
+              to keep your account active.
             </p>
           </div>
           <div className="p-5 rounded-2xl border border-border bg-surface">
@@ -292,8 +317,8 @@ export default function CashbackPage({
             <p className="text-ink-2 text-sm leading-relaxed">
               Cashback never changes the search order. The cheapest verified
               offer ranks first, even when the next one down pays us more. We
-              wrote this rule down on day one so we can&apos;t quietly change
-              our minds. Cashback is a bonus, not a bribe.
+              wrote that rule down on day one so we can&apos;t quietly change
+              our minds later. Cashback is a bonus, not a bribe.
             </p>
           </div>
         </section>
@@ -301,11 +326,11 @@ export default function CashbackPage({
         {/* ── Email capture ────────────────────────────────────── */}
         <section className="mb-12 p-6 sm:p-8 rounded-2xl border border-border-strong bg-surface-2">
           <h2 className="text-xl sm:text-2xl font-bold text-ink tracking-[-0.02em] mb-2">
-            Be first in line when we open.
+            Get your account on day one.
           </h2>
           <p className="text-ink-2 text-[15px] leading-relaxed mb-5">
-            Cashback ships in the coming weeks. Drop your email and we&apos;ll
-            have your account ready the day we go live in {country.name}.
+            Cashback ships in the coming weeks. Drop your email and your
+            account opens the day we go live in {country.name}.
           </p>
           <WaitlistForm country={country.code} />
         </section>
@@ -319,10 +344,10 @@ export default function CashbackPage({
             <div>
               <p className="font-semibold text-ink mb-1">When will cashback launch?</p>
               <p>
-                Phase 2 is in build now and we&apos;re aiming to launch in the
-                coming weeks. We&apos;d rather take an extra week than ship a
-                broken payout flow on someone&apos;s first withdrawal. Waitlist
-                signups get the launch email before anyone else.
+                Phase 2 is in build now. We&apos;re aiming for the coming
+                weeks, but we&apos;d rather take an extra week than ship a
+                broken payout flow on someone&apos;s first withdrawal.
+                Waitlist signups get the launch email first.
               </p>
             </div>
             <div>
@@ -330,29 +355,28 @@ export default function CashbackPage({
               <p>
                 Yes. The catch is timing, not money. Stores hold commissions
                 for weeks while they verify sales and handle returns. We pass
-                that delay straight through to you instead of paying you
-                upfront and quietly shrinking your rate. Once your balance is
-                past the return window, it&apos;s yours. We don&apos;t take a
-                cut.
+                that delay through to you instead of fronting the cash and
+                quietly shrinking your rate. Once your balance clears the
+                return window, it&apos;s yours. We don&apos;t take a cut.
               </p>
             </div>
             <div>
               <p className="font-semibold text-ink mb-1">Why the 60 to 90 day delay?</p>
               <p>
-                Most stores hold commissions until their return window closes,
-                typically 30 to 60 days, then pay us in their next monthly
-                cycle. We could promise faster cashback by paying you upfront
-                from our own pocket, but that shrinks the rate for everyone.
-                The delay is what keeps the rates this good.
+                Two clocks have to tick first. The store waits 30 to 60 days
+                for their return window to close, then pays us in their next
+                monthly cycle. We could shorten that by fronting the cash
+                ourselves, but the rates would drop for everyone. The delay
+                is what keeps the rates this high.
               </p>
             </div>
             <div>
               <p className="font-semibold text-ink mb-1">What about returns?</p>
               <p>
-                Return an item and the cashback for that item is reversed in
-                your balance. Partial returns reduce the cashback
-                proportionally. Every change shows up in your transaction
-                history. Nothing happens quietly.
+                Return an item and the cashback for it is reversed in your
+                balance. Partial returns reduce the cashback proportionally.
+                Every change shows up in your transaction history. Nothing
+                happens quietly.
               </p>
             </div>
           </div>
@@ -361,12 +385,12 @@ export default function CashbackPage({
         {/* ── Final CTA ────────────────────────────────────────── */}
         <section className="pt-8 border-t border-border">
           <h2 className="text-xl sm:text-2xl font-bold text-ink tracking-[-0.02em] mb-2">
-            Cashback ships soon. The deals are live now.
+            Cashback ships soon. The deals are live today.
           </h2>
           <p className="text-ink-2 text-[15px] leading-relaxed mb-5 max-w-2xl">
-            You don&apos;t have to wait for cashback to start saving. Browse
-            today&apos;s verified price drops, or paste any product link and
-            we&apos;ll find it cheaper.
+            No need to wait for cashback to start saving. Browse today&apos;s
+            verified price drops, or paste any product link and we&apos;ll
+            find it cheaper across stores.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
