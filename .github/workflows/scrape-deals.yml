@@ -370,6 +370,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Loud-fail guard. Without this, a missing secret silently skips
+      # the send step below (the `if:` evaluates false, step shows as
+      # "skipped" with a green check, and the job's overall conclusion
+      # is "success"). That masked a real bug from May 2026 onwards:
+      # RESEND_API_KEY was never added to repo secrets, so every
+      # scheduled run quietly skipped the digest. Now any missing
+      # secret prints a visible warning in the Actions log AND fails
+      # the job — the only way to be sure the next 2026 cron miss is
+      # surfaced immediately rather than discovered weeks later by a
+      # subscriber complaint.
+      - name: Verify newsletter secrets present
+        run: |
+          missing=""
+          [ -z "$SUPABASE_URL" ]              && missing="$missing SUPABASE_URL"
+          [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] && missing="$missing SUPABASE_SERVICE_ROLE_KEY"
+          [ -z "$RESEND_API_KEY" ]            && missing="$missing RESEND_API_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Newsletter send aborted — missing secrets:$missing"
+            echo "::error::Add the missing secret(s) at https://github.com/DannyRex/havlo/settings/secrets/actions"
+            exit 1
+          fi
+          echo "✓ All newsletter secrets present"
+
       - name: Send digest to active subscribers
-        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.RESEND_API_KEY != ''
         run: npm run newsletter:send
