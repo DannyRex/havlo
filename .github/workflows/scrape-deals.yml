@@ -2,23 +2,23 @@ name: Refresh data (scrape + ingest)
 
 on:
   schedule:
-    # Weekly (Thursday) — temporarily reduced from Mon+Thu on May 18
-    # 2026 when GitHub Actions monthly budget hit 90% (1,800 of 2,000
-    # free minutes used, 14 days remaining in cycle, ~50 billable
-    # minutes per full run including the parallel jobs).
+    # Twice-weekly (Mon + Thu). Restored May 2026 after two constraints
+    # that had forced a weekly Thu-only window were both lifted:
     #
-    # Math: 4 runs at twice-weekly would put us 200 min over budget
-    # by reset. Single weekly Thursday run = ~100 min total for the
-    # remaining window = comfortable headroom.
+    #   1. GitHub Actions minutes: repo went public, so Actions on
+    #      standard hosted runners is now unlimited (the 2,000 min/mo
+    #      cap is a private-repo constraint only).
+    #   2. SerpAPI: upgraded from Starter (1k credits/mo) to Developer
+    #      (5k credits/mo). Mon+Thu usage is now ~1,384 credits/month,
+    #      well under the new ceiling with plenty of room to grow
+    #      category coverage or add markets without bumping plan again.
     #
-    # Restore Mon+Thu by changing back to "0 5 * * 1,4" after the
-    # June 1 reset, OR consider self-hosted runner / paid Actions
-    # minutes if launch traffic justifies daily ingest.
-    #
-    # SerpAPI budget note (separate constraint): Starter ships 1,000
-    # credits/month; daily would blow that. Twice weekly used 60 × 8
-    # = 480/month. Weekly = 60 × 4 = 240/month — well under Starter.
-    - cron: "0 5 * * 4"
+    # If we ever want daily ingest, projected cost is ~4,144 credits/mo
+    # (still under Developer), and the Actions side is free. Newsletter
+    # cadence is now decoupled-ready: send-newsletter only needs the
+    # dedup job to succeed, so partial ingest failures don't block the
+    # digest. A faster cadence is just a cron change, no other rewiring.
+    - cron: "0 5 * * 1,4"
   workflow_dispatch:
     # Manual run from GitHub UI. Inputs let us refresh just the
     # free data sources (Playwright scrapers + AliExpress affiliate
@@ -243,14 +243,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Cost trim May 2026 v2 — Jumia ingest now runs ONLY on Thursdays
-      # (formerly Mon + Thu). Jumia inventory turnover is slow enough
-      # that weekly refresh keeps the catalog acceptably fresh, and
-      # the saving is ~17 calls × 4 weeks = ~68 SerpAPI calls/month.
-      # If Jumia inventory ever becomes time-sensitive (flash sales),
-      # widen back to Mon + Thu by removing the day-gate.
+      # May 2026: day-gate removed. The earlier "Thursday only" gate
+      # saved ~68 SerpAPI calls/month against the 1k Starter cap, but
+      # the upgrade to the 5k Developer plan made that saving noise.
+      # Jumia now refreshes on both Mon + Thu like every other ingest
+      # source, so NG catalog freshness matches the rest of the world.
       - name: Ingest Jumia deals (SerpAPI engine=jumia) → Supabase
-        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true && (github.event.schedule == null || contains(github.event.schedule, '4'))
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
         run: npm run ingest:jumia
 
   # ── Job 4: UK retailer-biased SerpAPI ingest. Standard ingest above
