@@ -329,14 +329,27 @@ jobs:
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
         run: npm run dedup
 
-  # ── Job 5: Send the twice-weekly newsletter digest. Runs after
-  #          everything else completes so the digest pulls the
-  #          freshly-deduped catalog, not a half-ingested snapshot.
-  #          Only fires when all upstream jobs succeeded — skipping
-  #          a digest is preferable to sending one built from
-  #          partial / failed data.
+  # ── Job 5: Send the weekly newsletter digest. Runs after dedup
+  #          completes so the digest pulls the freshly-deduped
+  #          catalog, not a half-ingested snapshot.
+  #
+  #          Dependency narrowed to `[dedup]` only (May 2026 fix).
+  #          Previously needs: included all 5 ingest jobs with
+  #          if: success(), which meant ANY single upstream failure
+  #          skipped the email — a SerpAPI timeout (common; the API
+  #          has been flaky around credit-reset boundaries) was
+  #          blocking the digest for the entire week. Now: dedup
+  #          itself depends on all 5 ingests with success()||failure(),
+  #          so it always runs and ALWAYS reflects whatever fresh
+  #          data the surviving ingests produced. If dedup itself
+  #          succeeds, the catalog is in a defensible state and
+  #          the digest can ship — even if one source failed, the
+  #          digest pool is still fresh from the other 4 sources +
+  #          the Playwright scrape. The only case we still skip is
+  #          when dedup itself failed (data layer broken) or the
+  #          workflow was cancelled (intentional kill). */
   send-newsletter:
-    needs: [scrape, ingest-aliexpress, ingest-serpapi, ingest-uk-retailers, ingest-jumia, dedup]
+    needs: [dedup]
     if: success()
     runs-on: ubuntu-latest
     timeout-minutes: 15
