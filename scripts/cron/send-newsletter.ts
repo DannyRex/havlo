@@ -64,9 +64,11 @@ function parseArgs(): Args {
 const SITE_URL = "https://havlo.io";
 
 /* Tunables — adjust if subscriber base or send budget changes. */
-const TOP_DEALS_OVERALL   = 8;   // cross-category digest
-const TOP_DEALS_CATEGORY  = 6;   // category-targeted digest
-const PACE_MS_BETWEEN     = 500; // ~2 emails/sec, safe under Resend free tier (1 req/s headline; bursts allowed)
+const TOP_DEALS_OVERALL   = 8;     // cross-category digest
+const TOP_DEALS_CATEGORY  = 6;     // category-targeted digest
+const LOCAL_QUOTA_RATIO   = 0.625; // ~5 of 8 local, 3 of 8 cross-border (or 4/2 for category digests)
+const PER_STORE_CAP       = 2;     // no single store dominates the digest
+const PACE_MS_BETWEEN     = 500;   // ~2 emails/sec, safe under Resend free tier (1 req/s headline; bursts allowed)
 
 interface SubscriberRow {
   email:    string;
@@ -93,12 +95,18 @@ async function buildDigestDeals(
   limit:       number,
 ): Promise<Array<Parameters<typeof newsletterDigest>[0]["deals"][number]>> {
   const country = getCountry(countryCode);
-  const isNG = country.code === "ng";
   const provider = await getActiveBrowseProvider();
 
-  /* Same path as /api/deals: origin='all', then filter by country
-     gate + (for non-NG) drop locals so the digest is cross-border
-     for non-NG markets where local catalog is thinner. */
+  /* Same path as /api/deals: origin='all', then split into local +
+     cross-border pools and fill each against a quota. The earlier
+     branch only gave NG users a mix; UK/US/DE/IN/AE/ZA were filtered
+     to cross-border ONLY on the assumption their local catalog was
+     too thin to digest. The UK retailer ingest (Argos, Currys, John
+     Lewis, ASOS, etc.) closed that gap, so every market now gets the
+     same balanced treatment: ~62.5% local picks (what you can buy
+     today) + ~37.5% cross-border (what's cheaper if you'll wait for
+     shipping). Mirrors the homepage TrendingDeals composition so the
+     digest reads like a familiar Havlo slice, not a different product. */
   const raw = await provider.fetchDeals({
     categorySlug: category ?? undefined,
     minDiscount:  10,                 // a small floor — the digest is "worth opening" content
@@ -112,21 +120,52 @@ async function buildDigestDeals(
     if (sc !== null) return sc.toLowerCase() === country.code.toLowerCase();
     return d.currency === country.currency;
   };
-  const effective = isNG
-    ? countryFiltered
-    : countryFiltered.filter((d) => !isLocalToUser(d));
 
-  /* Top N by discount, with a per-store cap so one store can't
-     dominate the digest. */
-  const perStoreSeen = new Map<string, number>();
-  const PER_STORE_CAP = 2;
-  const picks: Deal[] = [];
-  for (const d of effective) {
-    const sc = perStoreSeen.get(d.storeId) ?? 0;
-    if (sc >= PER_STORE_CAP) continue;
-    perStoreSeen.set(d.storeId, sc + 1);
-    picks.push(d);
-    if (picks.length >= limit) break;
+  const localPool       = countryFiltered.filter(isLocalToUser);
+  const crossBorderPool = countryFiltered.filter((d) => !isLocalToUser(d));
+
+  /* Quota math: round local UP so the digest leans local-first.
+     limit=8 -> 5 local + 3 cross-border. limit=6 -> 4 local + 2
+     cross-border. */
+  const localQuota       = Math.ceil(limit * LOCAL_QUOTA_RATIO);
+  const crossBorderQuota = limit - localQuota;
+
+  /* Pick from each pool with a per-store cap so no single retailer
+     dominates a slice (e.g. Konga can't take 5 of 5 local slots). */
+  function pickFromPool(pool: Deal[], target: number, excludeKeys: Set<string>): Deal[] {
+    const perStoreSeen = new Map<string, number>();
+    const picks: Deal[] = [];
+    for (const d of pool) {
+      const key = `${d.storeId}|${d.url}`;
+      if (excludeKeys.has(key)) continue;
+      const sc = perStoreSeen.get(d.storeId) ?? 0;
+      if (sc >= PER_STORE_CAP) continue;
+      perStoreSeen.set(d.storeId, sc + 1);
+      picks.push(d);
+      if (picks.length >= target) break;
+    }
+    return picks;
+  }
+
+  const seen = new Set<string>();
+  const localPicks       = pickFromPool(localPool,       localQuota,       seen);
+  localPicks.forEach((d) => seen.add(`${d.storeId}|${d.url}`));
+  const crossBorderPicks = pickFromPool(crossBorderPool, crossBorderQuota, seen);
+  crossBorderPicks.forEach((d) => seen.add(`${d.storeId}|${d.url}`));
+
+  const picks: Deal[] = [...localPicks, ...crossBorderPicks];
+
+  /* Backfill: if one bucket underfilled its quota (thin local
+     catalog for an emerging market, or zero cross-border for a
+     mature one), top up from the OTHER bucket so the digest ships
+     a full N deals. Better to send 8 deals (some imbalanced) than
+     6 deals (a clean split that visibly underdelivers). */
+  if (picks.length < limit) {
+    const backfillPool = localPicks.length < localQuota
+      ? crossBorderPool
+      : localPool;
+    const topUp = pickFromPool(backfillPool, limit - picks.length, seen);
+    picks.push(...topUp);
   }
 
   return picks.map((d) => {
