@@ -64,8 +64,18 @@ export function newsletterDigest({ country, category, categoryLabel, deals }: Ar
   const cc = (country ?? "ng").toLowerCase();
   const dealsUrl = `${SITE_URL}/${cc}/deals`;
 
+  /* Subjects are deliberately STRUCTURALLY DISTINCT (different
+     opening word, middle word, closing word) so Gmail's subject-
+     similarity threading heuristic can't bundle a subscriber's
+     overall digest and a category digest into a single conversation.
+     May 2026 user report: "I only got 6 fresh Phones deals, not the
+     overall one even though Resend says it was delivered." Both
+     emails WERE delivered, but Gmail collapsed the second one into
+     the first thread because both subjects shared "fresh ... deals
+     on Havlo today" and arrived 600ms apart. Distinct shapes fix
+     that without changing the value of either email. */
   const subject = category && categoryLabel
-    ? `${deals.length} fresh ${categoryLabel} deals on Havlo today`
+    ? `In ${categoryLabel} today: ${deals.length} new price drops`
     : `${deals.length} fresh deals on Havlo today`;
 
   const intro = opener(category ?? null);
