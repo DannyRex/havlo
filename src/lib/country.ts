@@ -596,6 +596,19 @@ interface DealLike {
   storeName:  string;
   currency:   string;
   tags:       string[];
+  /** DB-authoritative anchor country (stores.country). Optional
+      because curated Amazon entries and legacy paths don't carry it.
+      When present, filterDealsForCountry uses it as the PRIMARY
+      signal — preferred over the hardcoded JS COUNTRY_STORES roster
+      check. Critical for stores backfilled by migration 0037
+      (lookfantastic, a1-tech-deals, handysparkauf, refurbed-de, and
+      ~600 others) that aren't in the JS roster but ARE country-tagged
+      in the DB. Without this, ?stores=lookfantastic on /uk/deals shows
+      37 in the dropdown but 0 in the items grid because the JS roster
+      filter strips every Lookfantastic row before the post-filter
+      runs. Mirrors the same field on isOfferAllowedForCountry's
+      OfferLike — keep these two in sync. */
+  storeCountry?: string | null;
 }
 
 /* Per-country preferred Amazon marketplace(s). Drives the dedupe step
@@ -836,6 +849,48 @@ export function inferStoreCountry(storeId: string, storeName: string): string | 
     docstring for the full shape-contract notes. */
 export function filterDealsForCountry<T extends DealLike>(deals: T[], country: Country): T[] {
   const countryFiltered = deals.filter((d) => {
+    /* PRIMARY signal: DB-authoritative storeCountry when present.
+       The /deals 3-pass RPC populates this field on every row from
+       stores.country (migration 0038 wired it through, migration 0037
+       backfilled ~600 stores from offer.source_query). When set, it
+       is the authoritative anchor — preferred over the hardcoded JS
+       COUNTRY_STORES roster which only covers ~120 well-known stores
+       and missed the long tail (lookfantastic, a1-tech-deals,
+       handysparkauf, refurbed-de, fonezone, bigbasket, etc.).
+
+       Bug this fixes: /uk/deals?stores=lookfantastic showed "37"
+       in the dropdown (correct — list_country_stores_with_counts
+       reads store_country directly) but "0" in the items grid
+       because every Lookfantastic row reached this filter, none
+       were in COUNTRY_STORES.uk, none were cross-border for UK, and
+       the currency+inferred-null fallthrough dropped them. Same
+       pattern was reported across a1-tech-deals, asus-store-uk,
+       sweetwater, and the long tail of UK / DE / AE / IN / ZA
+       stores that DB tagging knows about but the JS roster doesn't.
+
+       Skip this short-circuit for NG: NG cross-border is the
+       strongest signal there (a US-tagged Amazon row IS shoppable
+       from NG via freight forwarders) and the NG path below handles
+       it explicitly with its own NG_STORES + COUNTRY_CROSS_BORDER.ng
+       blend.
+
+       Sibling: isOfferAllowedForCountry has the identical short-
+       circuit for /compare. Keep these two in sync — a divergence
+       will eventually show as "/deals lists Currys but /compare
+       doesn't" or vice-versa. */
+    if (d.storeCountry && country.code !== "ng") {
+      const storeCC = d.storeCountry.toLowerCase();
+      if (storeCC === country.code.toLowerCase()) return true;
+      /* storeCountry doesn't match — fall through to the legacy
+         roster / cross-border / tag checks below. We don't return
+         false here because the legacy path may still admit the row
+         via the cross-border allowlist (e.g. Amazon UK row with
+         storeCountry='UK' is also cross-border-shoppable for an IN
+         visitor via COUNTRY_CROSS_BORDER.in). Fall-through preserves
+         every existing pass condition; the short-circuit above only
+         OPENS the door for previously-missing DB-tagged matches. */
+    }
+
     /* NG path: keep all NG-anchored stores + only country-appropriate
        cross-border + Amazon. Drop foreign-country-anchored retailers
        that Nigerians can't actually use (Flipkart, Tata CLiQ, Walmart). */

@@ -175,6 +175,25 @@ export function getCuratedDeals(q: BrowseQuery): Deal[] {
         d.tags.some((t) => t.toLowerCase().includes(s)),
     );
   }
+  /* Store filter — when the user has ticked a specific store, drop
+     curated Amazon entries that don't match. Without this gate, a
+     filter like ?stores=lookfantastic still pulled in all 75+ curated
+     Amazon rows, blew up the post-filter pool (debug header showed
+     pool=112 when only ~37 real rows existed), and added wasted
+     work for the route's downstream sort + JS filter. Matches both
+     real storeId ("amazon-co-uk") and canonical display key
+     ("amazon uk") so the resolver's canonical-key URLs work. */
+  if (q.stores && q.stores.length > 0) {
+    const wantedSet = new Set(q.stores.map((s) => s.toLowerCase()));
+    result = result.filter((d) => {
+      const id = d.storeId.toLowerCase();
+      if (wantedSet.has(id)) return true;
+      /* Cheap canonical match — curated Amazon names are stable:
+         "Amazon", "Amazon UK", "Amazon Germany", etc. */
+      const canonical = d.storeName.toLowerCase();
+      return wantedSet.has(canonical);
+    });
+  }
   /* All curated entries are international (USD currency, Amazon
      marketplaces). When the request asks for local-only origin,
      return nothing. */
