@@ -651,44 +651,49 @@ export interface DropdownStoreRow {
    the dropdown count says >0. Phase 3 audit caught this on
    /uk/deals?stores=a1+tech+deals (dropdown count 1, items grid 0).
 
-   Building this map once per warm function and caching keeps the
-   translation O(1) at request time. Cached via unstable_cache with
-   a 1-hour revalidate window — the stores table is roughly insert-
-   only (new stores added on ingest; existing rows rarely renamed).
+   Plain Map<> cache (NOT Next.js unstable_cache): the latter
+   throws "incrementalCache missing" outside its narrow set of
+   supported contexts in this codebase — same reason the
+   fetchPoolCached above uses a plain Map. Per-instance cache with
+   a 1-hour TTL. Vercel reuses function instances for ~5 min after
+   each request so the lookup is effectively free on warm functions.
 
    Returned map is keyed by canonical-key (lowercased displayStoreName)
    -> array of real store_ids that collapse to that canonical form. */
-import { unstable_cache } from "next/cache";
 import { displayStoreName } from "@/lib/store-display";
 
-export const getStoreCanonicalMap = unstable_cache(
-  async (): Promise<Record<string, string[]>> => {
-    const supa = getSupabaseAdmin();
-    if (!supa) return {};
-    const rows: Array<{ id: string; name: string }> = [];
-    let from = 0;
-    while (true) {
-      const { data, error } = await supa
-        .from("stores")
-        .select("id, name")
-        .range(from, from + 999);
-      if (error || !data || data.length === 0) break;
-      rows.push(...(data as Array<{ id: string; name: string }>));
-      if (data.length < 1000) break;
-      from += 1000;
-    }
-    const out: Record<string, string[]> = {};
-    for (const r of rows) {
-      if (!r.name) continue;
-      const canonical = displayStoreName(r.name).toLowerCase();
-      if (!out[canonical]) out[canonical] = [];
-      out[canonical].push(r.id);
-    }
-    return out;
-  },
-  ["store-canonical-map-v1"],
-  { revalidate: 3600, tags: ["stores"] },
-);
+const STORE_CANONICAL_TTL_MS = 60 * 60 * 1000;
+let storeCanonicalCache: { data: Record<string, string[]>; expires: number } | null = null;
+
+export async function getStoreCanonicalMap(): Promise<Record<string, string[]>> {
+  const now = Date.now();
+  if (storeCanonicalCache && storeCanonicalCache.expires > now) {
+    return storeCanonicalCache.data;
+  }
+  const supa = getSupabaseAdmin();
+  if (!supa) return {};
+  const rows: Array<{ id: string; name: string }> = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supa
+      .from("stores")
+      .select("id, name")
+      .range(from, from + 999);
+    if (error || !data || data.length === 0) break;
+    rows.push(...(data as Array<{ id: string; name: string }>));
+    if (data.length < 1000) break;
+    from += 1000;
+  }
+  const out: Record<string, string[]> = {};
+  for (const r of rows) {
+    if (!r.name) continue;
+    const canonical = displayStoreName(r.name).toLowerCase();
+    if (!out[canonical]) out[canonical] = [];
+    out[canonical].push(r.id);
+  }
+  storeCanonicalCache = { data: out, expires: now + STORE_CANONICAL_TTL_MS };
+  return out;
+}
 
 /* Resolve a URL store filter list (canonical keys) to the real
    store_id list expected by browse_deals.p_store_ids. Unknown
