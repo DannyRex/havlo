@@ -18,7 +18,16 @@ import { RawDeal } from "./scrapers/types.js";
 import { scrapeJumia }      from "./scrapers/jumia.js";
 import { scrapeKonga }      from "./scrapers/konga.js";
 import { scrapeSlot }       from "./scrapers/slot.js";
-import { scrapeThreeChub }  from "./scrapers/threechub.js";
+/* scrapeThreeChub retired May 2026 — 3CHub now ingests via the
+   standalone scripts/ingest-ng-shopify.ts path (npm run ingest:ng-shopify).
+   That path hits the same Shopify /collections/all/products.json
+   endpoint but without the Playwright wrapper, so it doesn't compete
+   for the per-job time budget with the other scrapers in this
+   orchestrator. The standalone path produces 93 in-stock offers vs
+   this orchestrator's 73. Keeping the threechub.ts file itself in
+   the tree for now as documentation; the import + call site are
+   removed. */
+// import { scrapeThreeChub }  from "./scrapers/threechub.js";
 import { scrapeSpar }       from "./scrapers/spar.js";
 import { scrapeJiji }       from "./scrapers/jiji.js";
 import { scrapeAliExpress } from "./scrapers/aliexpress.js";
@@ -206,11 +215,14 @@ async function main() {
        scrapers/jumia.ts stays parked for if/when we want a free
        fallback (residential-proxy provider, affiliate API, etc.). */
     // { name: "Jumia",      probe: "https://www.jumia.com.ng/mlp-flash-sales/",     fn: () => scrapeJumia(page) },
-    /* 3C Hub — switched to Shopify JSON ingest in May 2026. Probe
-       points at www. host (the bare 3chub.com 404s on /search and
-       redirects oddly on /collections); the scraper itself uses
-       www.3chub.com via _shopify-json.ts. */
-    { name: "3C Hub",     probe: "https://www.3chub.com/",                        fn: () => scrapeThreeChub(page) },
+    /* 3C Hub retired from the Playwright orchestrator May 2026 —
+       its Shopify catalog is ingested standalone via
+       scripts/ingest-ng-shopify.ts on the same Mon+Thu cron, no
+       browser launch needed. Standalone path lands the full
+       /collections/all bucket (93 in-stock) where this orchestrator
+       capped at 73. Saves ~3s per cron run by skipping the redundant
+       browser launch. */
+    // { name: "3C Hub",     probe: "https://www.3chub.com/",                        fn: () => scrapeThreeChub(page) },
     { name: "Slot",       probe: "https://slot.ng/",                              fn: () => scrapeSlot(page) },
     { name: "Konga",      probe: "https://www.konga.com/category/phones-tablets-5261", fn: () => scrapeKonga(page) },
     { name: "Kara",       probe: "https://kara.com.ng/mobile-phones",             fn: () => scrapeKara(page) },
