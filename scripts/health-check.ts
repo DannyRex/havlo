@@ -39,6 +39,7 @@ try {
 
 import { getSupabaseAdmin } from "../src/lib/providers/db-client";
 import { sendEmail } from "../src/lib/email/send";
+import { shellMarketing, tokens, escapeHtml as esc, spacer } from "../src/lib/email/templates/_layout";
 
 const ALWAYS_EMAIL = process.argv.includes("--always-email");
 const DRY_RUN      = process.argv.includes("--dry-run");
@@ -343,51 +344,173 @@ function buildSubject(findings: Finding[]): string {
   return `⚠ Havlo data health: ${parts.join(", ")}`;
 }
 
-function buildEmailHtml(baseline: Baseline, findings: Finding[]): string {
-  const tone = findings.length === 0 ? "#10B981" : findings.some((f) => f.severity === "ERROR") ? "#DC2626" : "#F59E0B";
-  const findingRows = findings.length === 0
-    ? `<tr><td style="padding:16px;color:#10B981;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:14px;">All checks passed against current thresholds.</td></tr>`
-    : findings.map((f) => `
-        <tr>
-          <td style="padding:12px 16px;border-bottom:1px solid #E2E8F0;vertical-align:top;">
-            <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:11px;font-weight:600;color:${f.severity === "ERROR" ? "#DC2626" : "#F59E0B"};text-transform:uppercase;letter-spacing:0.05em;">${f.severity} · ${f.id}</div>
-            <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:15px;font-weight:600;color:#0F172A;margin-top:4px;">${escapeHtml(f.headline)}</div>
-            <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:13px;color:#475569;margin-top:6px;">measured: <b>${f.value.toLocaleString()}</b>${f.threshold !== undefined ? ` &nbsp;·&nbsp; threshold: ${f.threshold.toLocaleString()}` : ""}</div>
-            ${f.detail ? `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:13px;color:#475569;margin-top:6px;line-height:1.5;">${escapeHtml(f.detail)}</div>` : ""}
-          </td>
-        </tr>`).join("");
+/* Status tone — green when clean, red on error, amber on warn-only. */
+function statusTone(findings: Finding[]): { hex: string; label: string; bg: string } {
+  if (findings.length === 0)                                 return { hex: tokens.success, label: "All clear", bg: tokens.successBg };
+  if (findings.some((f) => f.severity === "ERROR"))          return { hex: "#DC2626", label: "Action needed", bg: "#FEF2F2" };
+  return                                                            { hex: "#D97706", label: "Worth a look",   bg: "#FFFBEB" };
+}
 
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"/></head>
-<body style="margin:0;padding:24px;background:#F7F8FA;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;">
-  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width:600px;margin:0 auto;background:#FFFFFF;border-radius:12px;overflow:hidden;border:1px solid #E2E8F0;">
+/* One metric tile, 2-per-row by table cell. Cell padding lives on the
+   wrapper <td> (16px) so adjacent tiles can't bleed into each other —
+   the bug Gmail mobile showed first time around was four 25%-wide
+   cells with zero padding rendering as a single unbroken "PRODUCTSOFFERS
+   IN-STOCK STORES" string. */
+function metricTile(label: string, value: number): string {
+  return `
+    <td width="50%" style="padding:8px;" valign="top">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:${tokens.surface};border:1px solid ${tokens.border};border-radius:10px;" class="bg-card border">
+        <tr>
+          <td style="padding:14px 16px;">
+            <div style="font-family:${tokens.fontFamily};font-size:10px;font-weight:600;color:${tokens.ink3};text-transform:uppercase;letter-spacing:0.1em;line-height:1.2;" class="text-ink-3">
+              ${esc(label)}
+            </div>
+            <div style="font-family:${tokens.fontFamily};font-size:22px;font-weight:700;color:${tokens.ink};letter-spacing:-0.01em;line-height:1.2;margin-top:6px;" class="text-ink">
+              ${value.toLocaleString()}
+            </div>
+          </td>
+        </tr>
+      </table>
+    </td>`;
+}
+
+/* One finding card. Inline color tone per severity stays legible in
+   both light + dark mode because the foreground colors are hand-picked
+   for sufficient contrast against the surface background. */
+function findingCard(f: Finding): string {
+  const sevHex = f.severity === "ERROR" ? "#DC2626" : "#D97706";
+  return `
     <tr>
-      <td style="padding:24px;border-bottom:4px solid ${tone};">
-        <div style="font-size:11px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.1em;">Havlo data health check</div>
-        <div style="font-size:22px;font-weight:700;color:#0F172A;margin-top:4px;">${escapeHtml(buildSubject(findings).replace(/^[⚠✓]\s/, ""))}</div>
-        <div style="font-size:13px;color:#475569;margin-top:6px;">${new Date().toUTCString()}</div>
-      </td>
-    </tr>
-    <tr>
-      <td style="padding:20px 24px;background:#F7F8FA;">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+      <td class="px-mobile" style="padding:0 32px 12px 32px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:${tokens.surface};border:1px solid ${tokens.border};border-radius:10px;" class="bg-card border">
           <tr>
-            <td width="25%"><div style="font-size:11px;color:#94A3B8;">PRODUCTS</div><div style="font-size:18px;font-weight:700;color:#0F172A;">${baseline.totalProducts.toLocaleString()}</div></td>
-            <td width="25%"><div style="font-size:11px;color:#94A3B8;">OFFERS</div><div style="font-size:18px;font-weight:700;color:#0F172A;">${baseline.totalOffers.toLocaleString()}</div></td>
-            <td width="25%"><div style="font-size:11px;color:#94A3B8;">IN-STOCK</div><div style="font-size:18px;font-weight:700;color:#0F172A;">${baseline.inStockOffers.toLocaleString()}</div></td>
-            <td width="25%"><div style="font-size:11px;color:#94A3B8;">STORES</div><div style="font-size:18px;font-weight:700;color:#0F172A;">${baseline.totalStores.toLocaleString()}</div></td>
+            <td style="padding:16px 18px;">
+              <div style="font-family:${tokens.fontFamily};font-size:10px;font-weight:700;color:${sevHex};text-transform:uppercase;letter-spacing:0.1em;line-height:1.2;">
+                ${esc(f.severity)} · ${esc(f.id)}
+              </div>
+              <div style="font-family:${tokens.fontFamily};font-size:15px;font-weight:600;color:${tokens.ink};margin-top:6px;line-height:1.35;" class="text-ink">
+                ${esc(f.headline)}
+              </div>
+              <div style="font-family:${tokens.fontFamily};font-size:13px;color:${tokens.ink2};margin-top:8px;line-height:1.5;" class="text-ink-2">
+                Measured <strong style="color:${tokens.ink};" class="text-ink">${f.value.toLocaleString()}</strong>${
+                  f.threshold !== undefined
+                    ? ` &nbsp;·&nbsp; Threshold ${f.threshold.toLocaleString()}`
+                    : ""
+                }
+              </div>
+              ${f.detail ? `
+                <div style="font-family:${tokens.fontFamily};font-size:13px;color:${tokens.ink2};margin-top:10px;line-height:1.55;" class="text-ink-2">
+                  ${esc(f.detail)}
+                </div>
+              ` : ""}
+            </td>
           </tr>
         </table>
       </td>
-    </tr>
-    ${findingRows}
+    </tr>`;
+}
+
+function buildEmailHtml(baseline: Baseline, findings: Finding[]): string {
+  const tone = statusTone(findings);
+  const headline = findings.length === 0
+    ? "All checks passed"
+    : `${findings.length} ${findings.length === 1 ? "finding" : "findings"} need${findings.length === 1 ? "s" : ""} attention`;
+
+  /* Status pill at the top — small, color-coded, sits above the H1. */
+  const statusPill = `
     <tr>
-      <td style="padding:16px 24px;background:#F7F8FA;border-top:1px solid #E2E8F0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:11px;color:#94A3B8;">
-        Run scripts/health-check.ts manually any time. Adjust thresholds in the same file.
+      <td class="px-mobile" style="padding:0 32px 8px 32px;">
+        <span style="display:inline-block;font-family:${tokens.fontFamily};font-size:11px;font-weight:600;color:${tone.hex};background-color:${tone.bg};padding:5px 10px;border-radius:999px;letter-spacing:0.05em;text-transform:uppercase;">
+          ${esc(tone.label)}
+        </span>
       </td>
-    </tr>
-  </table>
-</body></html>`;
+    </tr>`;
+
+  const heading = `
+    <tr>
+      <td class="px-mobile" style="padding:0 32px 8px 32px;">
+        <h1 class="h1-mobile text-ink" style="margin:0;font-family:${tokens.fontFamily};font-size:26px;line-height:1.2;font-weight:700;letter-spacing:-0.02em;color:${tokens.ink};">
+          ${esc(headline)}
+        </h1>
+      </td>
+    </tr>`;
+
+  const meta = `
+    <tr>
+      <td class="px-mobile" style="padding:0 32px 20px 32px;">
+        <p class="text-ink-2" style="margin:0;font-family:${tokens.fontFamily};font-size:13px;line-height:1.5;color:${tokens.ink2};">
+          Data health check · ${esc(new Date().toUTCString())}
+        </p>
+      </td>
+    </tr>`;
+
+  /* 2x2 grid of metric tiles. Each row is a separate table so spacing
+     between rows comes from the table-level margins, not from cells
+     that some clients collapse. */
+  const metrics = `
+    <tr>
+      <td class="px-mobile" style="padding:0 24px 4px 24px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+          <tr>
+            ${metricTile("Products",     baseline.totalProducts)}
+            ${metricTile("Offers",       baseline.totalOffers)}
+          </tr>
+          <tr>
+            ${metricTile("In-stock",     baseline.inStockOffers)}
+            ${metricTile("Stores",       baseline.totalStores)}
+          </tr>
+        </table>
+      </td>
+    </tr>`;
+
+  /* Findings section — only rendered when there's something to show.
+     When all-clear, we replace the findings block with a single
+     reassuring confirmation paragraph. */
+  const findingsSection = findings.length === 0
+    ? `
+      <tr>
+        <td class="px-mobile" style="padding:20px 32px 8px 32px;">
+          <p class="text-ink" style="margin:0;font-family:${tokens.fontFamily};font-size:15px;line-height:1.55;color:${tokens.ink};">
+            All eight integrity checks passed against current thresholds. Catalog is healthy.
+          </p>
+        </td>
+      </tr>`
+    : `
+      <tr>
+        <td class="px-mobile" style="padding:24px 32px 8px 32px;">
+          <h2 class="h2-mobile text-ink" style="margin:0;font-family:${tokens.fontFamily};font-size:18px;font-weight:700;color:${tokens.ink};letter-spacing:-0.015em;">
+            Findings
+          </h2>
+        </td>
+      </tr>
+      <tr><td style="font-size:0;line-height:0;height:10px;">&nbsp;</td></tr>
+      ${findings.map(findingCard).join("")}`;
+
+  const footnote = `
+    <tr>
+      <td class="px-mobile" style="padding:20px 32px 8px 32px;">
+        <p class="text-ink-3" style="margin:0;font-family:${tokens.fontFamily};font-size:12px;line-height:1.55;color:${tokens.ink3};">
+          Re-run any time: <code style="font-family:ui-monospace,SFMono-Regular,monospace;font-size:11.5px;color:${tokens.ink2};" class="text-ink-2">npm run health-check</code>. Thresholds + rationale live in <code style="font-family:ui-monospace,SFMono-Regular,monospace;font-size:11.5px;color:${tokens.ink2};" class="text-ink-2">scripts/health-check.ts</code>.
+        </p>
+      </td>
+    </tr>`;
+
+  const body =
+    statusPill +
+    heading +
+    meta +
+    metrics +
+    spacer(8) +
+    findingsSection +
+    spacer(8) +
+    footnote;
+
+  return shellMarketing({
+    preheader: findings.length === 0
+      ? `All eight integrity checks passed. ${baseline.totalProducts.toLocaleString()} products, ${baseline.inStockOffers.toLocaleString()} in-stock offers.`
+      : `${findings.length} finding${findings.length === 1 ? "" : "s"} in this week's health check — ${findings.filter((f) => f.severity === "ERROR").length} error, ${findings.filter((f) => f.severity === "WARN").length} warn.`,
+    body,
+  });
 }
 
 function buildEmailText(baseline: Baseline, findings: Finding[]): string {
@@ -415,11 +538,9 @@ function buildEmailText(baseline: Baseline, findings: Finding[]): string {
   return lines.join("\n");
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
+/* escapeHtml is now imported as `esc` from the email layout module
+   so the alert template shares the same escaper the newsletter +
+   waitlist + notify templates use. Local copy retired. */
 
 /* ── Main ───────────────────────────────────────────────────────── */
 
