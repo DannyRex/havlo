@@ -157,29 +157,28 @@ function shellDocument({ preheader, body, kind }: ShellOptions & { kind: "market
 ${escapeHtml(preheader)}
 </div>
 
-<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="bg-body" style="background-color:${tokens.bg};">
+<!-- TWO separate top-level tables: the white-band header lives
+     in its own width:100% table (no max-width container around
+     it), guaranteeing the band stretches to the email viewport's
+     true edges. Gmail mobile's "single email card" wrapper has
+     been observed to shrink-wrap nested tables when the outer
+     table is forced into a 600-px max via a CSS rule on a
+     sibling row — splitting into two top-level tables sidesteps
+     that. The body table below keeps its centered max-600
+     container so the deal cards retain the comfortable reading
+     width. -->
 
-  <!-- Full-bleed white header band. Placed in the OUTER table at
-       100% width so the white reaches the true left and right edges
-       of the email viewport, not just the 600px inner container.
-       Earlier the band sat inside the container which made it appear
-       as a small white box centered in the middle of the email body
-       (user feedback May 2026). The wordmark is centered within the
-       band via a 600px-max inner container for visual consistency
-       with the body's max-width. -->
+<!-- Header table (full bleed) -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="width:100%;background-color:#FFFFFF;" bgcolor="#FFFFFF">
   <tr>
-    <td align="center" class="header-band" style="background-color:#FFFFFF;padding:32px 16px;">
-      <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto;">
-        <tr>
-          <td align="center">
-            ${wordmark(kind)}
-          </td>
-        </tr>
-      </table>
+    <td align="center" class="header-band" bgcolor="#FFFFFF" style="background-color:#FFFFFF !important;padding:32px 16px;">
+      ${wordmark(kind)}
     </td>
   </tr>
+</table>
 
-  <!-- Body content lives in the centered max-600 container below. -->
+<!-- Body table (centered, max-width 600) -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="bg-body" style="width:100%;background-color:${tokens.bg};">
   <tr>
     <td align="center" style="padding:32px 16px;">
 
