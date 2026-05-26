@@ -201,37 +201,34 @@ ${escapeHtml(preheader)}
 </html>`;
 }
 
-/* Wordmark. Was originally an HTML text mark for image-blocking
-   client compatibility, but every client that matters does render
-   inline images from a trusted sender domain, and the official
-   brand logo (blue rounded-square mark + dark "havlo" word) is the
-   identity we want subscribers to recognize across surfaces.
+/* Wordmark (text-only, no h-mark). The earlier combined h-icon +
+   text logo rendered too small as a single image in Gmail's email
+   layout; the wordmark-only treatment reads as a single confident
+   brand piece in the header row. PNG sources live in /public:
+     - logo-email.png       (800x240, dark wordmark) — light-bg default
+     - logo-email-dark.png  (800x240, white wordmark) — dark-mode swap
 
-   Two PNG variants live in /public:
-     - logo-email.png       (400x112, dark wordmark) — light-bg default
-     - logo-email-dark.png  (400x112, white wordmark) — dark-mode swap
-
-   The dark variant is hidden by default (display:none in inline
-   style + the .logo-dark class). The dark-mode media query in the
-   shell <style> block flips visibility:
+   The dark variant is hidden by default (display:none) and revealed
+   in the dark-mode media query via the .logo-dark class swap:
      light-mode email clients         show logo-email.png
      dark-mode clients (Apple Mail,
        iOS Mail, Spark, Outlook.com
        webmail in dark theme)         show logo-email-dark.png
      Gmail mobile (strips <style>)    falls back to the default-
-                                      visible light PNG — acceptable
-                                      since Gmail's dark mode does
-                                      its own row-level invert
-                                      against the visible light asset.
+                                      visible light PNG. Gmail's own
+                                      row-level dark invert keeps the
+                                      contrast against the dark row.
 
-   Marketing shell renders at 100x28 display height; personal shell
-   at 88x25 (slightly smaller so the personal note doesn't lead with
-   a brand-loud header). Both sourced from the same 400x112 PNG
-   (2x retina), so the rendered pixel density is sharp on Retina
+   Wordmark aspect is 10:3 (200x60 source), rendered at:
+     marketing shell:  100x30 display
+     personal shell:    84x25 display (~16% smaller so a transactional
+                                       note doesn't lead with a
+                                       brand-loud header)
+   4x retina source keeps the rendered text crisp on high-DPI
    displays at either size. */
 function wordmark(kind: "marketing" | "personal"): string {
-  const displayWidth  = kind === "marketing" ? 100 : 88;
-  const displayHeight = kind === "marketing" ? 28  : 25;
+  const displayWidth  = kind === "marketing" ? 100 : 84;
+  const displayHeight = kind === "marketing" ? 30  : 25;
   const altText       = "Havlo";
   return `<a href="${SITE_URL}" style="text-decoration:none;border:0;display:inline-block;">
     <img src="${SITE_URL}/logo-email.png" alt="${altText}" width="${displayWidth}" height="${displayHeight}" class="logo-light" style="display:inline-block;border:0;outline:none;text-decoration:none;height:${displayHeight}px;width:${displayWidth}px;vertical-align:middle;" />
@@ -350,13 +347,25 @@ export function dealCard(d: DealCardData): string {
   const hasOriginal  = !!d.originalDisplay;
   const hasDiscount  = d.discountPercent > 0;
 
+  /* Price row. Was originally `current_price ~~original_price~~ N% off`
+     with the original price strikethrough; a user reported the strike
+     was hard to parse on Gmail mobile dark mode ("I see two prices
+     side by side and can't tell which is the deal"). New format leads
+     with the explicit "was" label so the relationship is unambiguous
+     in every email client regardless of how text-decoration renders.
+
+     "₦425,000  was ₦525,000  · 19% off"
+       │              │            │
+       │              │            └─ pill, success green
+       │              └─────────── ink-3 (subdued) with "was" prefix
+       └──────────────────────────── primary, ink, bold */
   const priceRow = `
     <span style="font-family:${tokens.fontFamily};font-size:18px;font-weight:700;color:${tokens.ink};letter-spacing:-0.01em;" class="text-ink">${escapeHtml(d.priceDisplay)}</span>
     ${hasOriginal
-      ? `<span style="font-family:${tokens.fontFamily};font-size:14px;color:${tokens.ink3};text-decoration:line-through;margin-left:8px;" class="text-ink-3">${escapeHtml(d.originalDisplay!)}</span>`
+      ? `<span style="font-family:${tokens.fontFamily};font-size:13px;color:${tokens.ink3};margin-left:10px;" class="text-ink-3">was ${escapeHtml(d.originalDisplay!)}</span>`
       : ""}
     ${hasDiscount
-      ? `<span style="display:inline-block;font-family:${tokens.fontFamily};font-size:12px;font-weight:600;color:${tokens.success};background-color:${tokens.successBg};padding:3px 8px;border-radius:999px;margin-left:8px;vertical-align:middle;">${d.discountPercent}% off</span>`
+      ? `<span style="display:inline-block;font-family:${tokens.fontFamily};font-size:12px;font-weight:600;color:${tokens.success};background-color:${tokens.successBg};padding:3px 8px;border-radius:999px;margin-left:10px;vertical-align:middle;">${d.discountPercent}% off</span>`
       : ""}`;
 
   return `<tr>
