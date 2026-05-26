@@ -651,26 +651,48 @@ export function isLikelySameProduct(
   if (!candidateHasAllVariants(anchor.title, cVariants)) return false;
 
   /* Numeric model markers (15 in iPhone 15, 24 in Galaxy S24).
-     Anchor-directional ONLY — candidate must contain every number
-     the anchor names, but candidate having EXTRA numbers (SKU codes,
-     clothing sizes, batch IDs, etc.) doesn't matter. Phase 2.4
-     audit caught two real cases the bidirectional version got wrong:
+     Anchor-directional in the common case — candidate must contain
+     every number the anchor names. Phase 2.4 audit caught two cases
+     the bidirectional version got wrong:
        "Nike Air Max 95"            vs "Nike Air Max 95 SKU-1234"
        "Nike Air Max 95 Men's"      vs "Nike Air Max 95 White size 10"
      In both, the candidate's extra number is descriptive — not an
      identity marker — yet the c->a check forced an anchor match
-     that wasn't present. Anchor-directional preserves the
-     "candidate must have anchor's generation number" intent while
-     dropping the over-strict reverse. */
+     that wasn't present.
+
+     BUT: when the ANCHOR has no numbers at all and the CANDIDATE
+     does, the candidate carries identity info the anchor lacks —
+     they're different products. Phase 6 audit caught this with the
+     LG French Door Refrigerator cluster: anchor "LG French Door
+     Refrigerator LFDS22520S" extracted [] (SKU is 10-char letter-
+     glued, exceeds the regex window); candidate "LG 28.6 cu ft
+     French Door Refrigerator lf29h8330s" extracted [28, 6]. The
+     anchor-directional check passed trivially, merging two different
+     fridges. Reject this asymmetric case: anchor=[] + candidate=non-[]
+     → FAIL. The reverse (anchor non-[] + candidate=[]) is still
+     accepted because that's "candidate lacks anchor's identity",
+     which the bidirectional fail above already covers via
+     candidateHasAllNumbers. */
   const aNumbers = extractRequiredNumbers(anchor.title);
+  const cNumbers = extractRequiredNumbers(candidate.title);
   if (!candidateHasAllNumbers(candidate.title, aNumbers)) return false;
+  if (aNumbers.length === 0 && cNumbers.length > 0) return false;
 
   /* Letter-glued model tokens (s24, 1000xm5, h2). Anchor-directional
      for the same reason — candidate's extra model tokens may be
      promotional codes / SKU fragments. The required identity comes
-     from the anchor's tokens. */
+     from the anchor's tokens.
+
+     Same asymmetric-tightening as the numeric check: anchor=[] +
+     candidate=non-[] = candidate has SKU info anchor doesn't, so
+     they're different products. LG fridge cluster #4 ("GV-B25FFGMB")
+     had b25ffgmb extracted; anchor-no-tokens variants didn't.
+     Without this rule, all four LG fridges merged into one cluster
+     because the no-tokens anchor passed everything. */
   const aModel = extractRequiredModelTokens(anchor.title);
+  const cModel = extractRequiredModelTokens(candidate.title);
   if (!candidateHasAllModelTokens(candidate.title, aModel)) return false;
+  if (aModel.length === 0 && cModel.length > 0) return false;
 
   /* Family-conditional size + price band. Family is detected from
      the anchor title (or passed in by the caller for cases where

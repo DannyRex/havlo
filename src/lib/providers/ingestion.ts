@@ -652,6 +652,12 @@ export async function ingestDeals(
       if (hit) existing = hit;
     }
 
+    /* Step 2c: FTS match runs as a post-loop pass below — it needs
+       network IO (RPC per deal) and we want all the in-memory
+       lookups to settle first so we only spend the FTS budget on
+       deals that legitimately need it. See the FTS pass after
+       this loop closes. */
+
     if (existing?.id) {
       offerWrites.push({ deal: d, productId: existing.id });
       if (!existing.image_url && d.imageUrl) {
@@ -659,6 +665,108 @@ export async function ingestDeals(
       }
     } else {
       newProducts.push({ deal: d, sigKey, canDedup });
+    }
+  }
+
+  /* ── Step 2c: FTS dedup pass on newProducts ──────────────────────
+     For each deal that fell through URL + signature + title_key
+     match, try one more lookup via search_products_fts. This catches
+     same-product-different-title across stores at INGEST time —
+     before the row enters the catalog as a new product_id. Without
+     this pass:
+       slot.ng → "PRE-OWNED APPLE IPHONE 15 PRO MAX 256GB - SLOT"
+                 ↓ FAILS signature (no canDedup on this title)
+                 ↓ FAILS title_key (different from konga's title)
+                 → INSERTS new product
+       konga →   "Apple iPhone 15 Pro Max 256GB Black Titanium"
+                 → already in catalog as product P1
+       → Two product_ids for the SAME phone, never merged unless
+         the offline cross-store dedup migration runs.
+
+     With this pass, the slot.ng deal lands an FTS match against
+     P1 (high title similarity, brand match, family match, price
+     within band), reuses P1's product_id, and the spectrum bar
+     immediately shows 2 stores.
+
+     Budget guard: bounded to FTS_LOOKUP_BUDGET per ingest run so a
+     thousand-deal run doesn't blow past the SerpAPI cron's 25-min
+     wall time. Most cron runs upload 50-500 deals per provider call
+     so the budget is generous in practice. Concurrency 8 keeps the
+     RPC pipeline busy without overwhelming Postgres. */
+  const FTS_LOOKUP_BUDGET = 300;
+  if (newProducts.length > 0) {
+    /* Only run FTS for "high-signal" new products — those with a
+       parsed brand. Without a brand, the FTS gate downstream can't
+       confidently confirm a match, so the call is wasted budget. */
+    const ftsCandidates = newProducts
+      .filter((np) => buildSignature(np.deal.title).brand !== null)
+      .slice(0, FTS_LOOKUP_BUDGET);
+
+    if (ftsCandidates.length > 0) {
+      /* Bounded-concurrency map over the candidates. supa.rpc returns
+         a Promise; running 8 in parallel keeps the RPC busy without
+         starving the Postgres connection pool. */
+      const CONCURRENCY = 8;
+      const ftsResults = new Map<Deal, { id: string; image_url: string | null }>();
+      for (let i = 0; i < ftsCandidates.length; i += CONCURRENCY) {
+        const slice = ftsCandidates.slice(i, i + CONCURRENCY);
+        await Promise.all(slice.map(async (np) => {
+          const dealTitle = np.deal.title;
+          const dealBrand = buildSignature(dealTitle).brand;
+          const { data } = await supa.rpc("search_products_fts", {
+            q: dealTitle,
+            max_results: 5,
+          });
+          const rows = (data ?? []) as Array<{ id: string; title: string; brand: string | null; image_url: string | null }>;
+          if (rows.length === 0) return;
+          /* STRICT same-product gate at ingest time:
+             1. Top-result brand must match the incoming deal's brand.
+                Without exact brand match the FTS hit is likely just
+                a token overlap on a different product line.
+             2. Top-result title must share most tokens with the
+                incoming title. 70% normalised-token overlap is the
+                threshold that empirically catches same-product
+                rephrasings while rejecting "iPhone 15 case" vs
+                "iPhone 15". */
+          const top = rows[0];
+          if (!top.brand || !dealBrand) return;
+          if (top.brand.toLowerCase() !== dealBrand.toLowerCase()) return;
+          const tokensA = new Set(dealTitle.toLowerCase().match(/[a-z0-9]+/g) ?? []);
+          const tokensB = new Set(top.title.toLowerCase().match(/[a-z0-9]+/g) ?? []);
+          if (tokensA.size === 0 || tokensB.size === 0) return;
+          let shared = 0;
+          /* forEach iteration to satisfy the es2017 target without
+             downlevelIteration (same pattern as the upsert helpers
+             in this file). */
+          tokensA.forEach((t) => { if (tokensB.has(t)) shared++; });
+          const overlap = shared / Math.min(tokensA.size, tokensB.size);
+          if (overlap < 0.7) return;
+          ftsResults.set(np.deal, { id: top.id, image_url: top.image_url });
+        }));
+      }
+
+      /* Promote matched FTS hits from newProducts → offerWrites,
+         exactly like the in-loop existing-match path did. */
+      if (ftsResults.size > 0) {
+        const remaining: typeof newProducts = [];
+        for (const np of newProducts) {
+          const match = ftsResults.get(np.deal);
+          if (match) {
+            offerWrites.push({ deal: np.deal, productId: match.id });
+            if (!match.image_url && np.deal.imageUrl) {
+              imageBackfills.push({ productId: match.id, imageUrl: np.deal.imageUrl });
+            }
+          } else {
+            remaining.push(np);
+          }
+        }
+        const ftsMatched = newProducts.length - remaining.length;
+        newProducts.length = 0;
+        newProducts.push(...remaining);
+        if (ftsMatched > 0) {
+          console.log(`[ingest] FTS dedup matched ${ftsMatched} of ${ftsCandidates.length} candidates (saved ${ftsMatched} duplicate product rows).`);
+        }
+      }
     }
   }
 

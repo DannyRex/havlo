@@ -250,7 +250,14 @@ export default function PriceComparisonBar({
 
   const otherStoresCount = Math.max(0, perStoreOffers.length - 1);
   const subtitleText = isSingleStore
-    ? "1 store · watching for more"
+    /* Single-store framing — was "1 store · watching for more".
+       Phase 6 audit user-test: that copy read as "weak comparison
+       data" instead of "we found this for you". Reframed to centre
+       the user — "Only seller we track right now" is conversational,
+       acknowledges the catalog reality, and primes the reader for
+       the bar's downstream "we'll add comparisons" message without
+       sounding apologetic. */
+    ? "Only seller we track right now"
     : allTiedPrices
       ? `across ${perStoreOffers.length} stores · same price`
       : `across ${perStoreOffers.length} stores`;
@@ -534,9 +541,13 @@ export default function PriceComparisonBar({
         <div className="flex items-center justify-between text-[11px] text-ink-3 tabular-nums mb-3">
           <span>
             {formatPriceForUser(thisPriceNgn, country)}
-            <span className="ml-1 opacity-70">only listing</span>
+            <span className="ml-1 opacity-70">listed here</span>
           </span>
-          <span className="opacity-60">no upper bound yet</span>
+          {/* Right-side label completes the framing — when comparisons
+             arrive (new ingest, new merchant added) the spectrum
+             populates automatically. Said proactively here so the
+             user understands the bar is empty by design, not broken. */}
+          <span className="opacity-60">we&apos;ll add more as sellers list it</span>
         </div>
       ) : allTiedPrices ? (
         /* Tied across all stores — single centred label. The
