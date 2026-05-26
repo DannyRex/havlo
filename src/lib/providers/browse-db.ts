@@ -357,15 +357,27 @@ export const dbBrowseProvider: BrowseProvider = {
     };
 
     /* Pass C — 0%-only local fallback. Surfaces pharmacy / grocery
-       feeds that ingest at retail price (discount_percent=0) and
-       would otherwise drop out of Pass A's discount-desc sort.
-       Conditional on sort being discount-biased + user allowing 0%. */
+       feeds that ingest at retail price (discount_percent=0 or NULL)
+       and would otherwise drop out of Pass A's discount-desc sort.
+       Conditional on sort being discount-biased + user allowing 0%.
+
+       Cap is 3x PASS_MAX because the NG-local catalog's zero/NULL-
+       discount tail is genuinely larger than 500 rows (HealthPlus 555
+       + Essenza 567 + Jumia 230 + MedPlus 200 = ~1550). At PASS_MAX,
+       Jumia + Essenza were getting squeezed out by the two pharmacy
+       chains' more-recent scraped_at timestamps (user report: "i see
+       jumia now but only 3 products"). Egress impact: Pass C adds
+       ~700KB more, total /api/deals call goes from ~1.5MB to ~2.2MB.
+       Pass A + Pass B stay at PASS_MAX because their discount-tail
+       isn't as long. */
+    const PASS_C_MAX = PASS_MAX * 3;
     const passCArgs = {
       ...passABase,
       p_origin:  "local",
       p_country: q.country ? q.country.toUpperCase() : null,
       p_zero_discount_only: true,
       p_min_discount: 0,
+      p_max_rows: PASS_C_MAX,
     };
     /* Pass C runs whenever the user's tier floor allows 0% rows.
        Previously gated behind `sortIsDiscountBiased` too, on the

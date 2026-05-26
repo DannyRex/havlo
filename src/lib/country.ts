@@ -251,6 +251,15 @@ const NG_STORES = [
   /* v3 NG addition: Bitmarte. */
   "bitmarte",
 
+  /* v4 NG addition: Essenza (perfume/cosmetics, ~567 products).
+     Was leaking out of /ng/deals because dealToStoreRow couldn't
+     resolve a country from inferStoreCountry; the country-tag
+     fallback didn't fire either (catalog rows came in via direct
+     scrape rather than the country-tagged SerpAPI path). Adding
+     to the roster means inferStoreCountry returns "NG" on every
+     ingest, so the upsert can't overwrite country=NG with NULL. */
+  "essenza", "essenza.com.ng",
+
   /* Additions — well-known NG-anchored retailers across pharmacies,
      groceries, classifieds, and second-tier electronics. Each is
      vetted for an actual online channel in NG (mail-order or
