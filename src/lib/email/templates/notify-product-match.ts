@@ -1,10 +1,11 @@
 /* Match-found email — sent when the notify-product cron finds
    catalog matches for a query in product_requests.
 
-   Voice: same founder tone as notify-product confirmation. Short,
-   first-person, no em-dashes, no marketing fluff. Lists up to 5
-   cheapest current offers with price + store + click-through link
-   so the user can act in one tap from the email.
+   Visual treatment: personal shell with a tight list of match rows
+   (price + title + store on a single bordered row each). Leaner
+   than the digest's dealCard because this is still a transactional
+   notification ("here's what surfaced for you") — Gmail Primary tab
+   placement matters more than card-grid polish.
 
    Triggered by: scripts/cron/match-product-requests.ts (Phase 2,
    not yet shipped). Cron should:
@@ -14,25 +15,24 @@
         with the top 5 offers
      4. UPDATE product_requests SET notified_at = now() to dedupe */
 
-interface Offer {
-  /** Product title, truncate-safe (caller may pass full or short). */
-  title:     string;
-  /** Display name of the store. */
-  storeName: string;
-  /** Pre-formatted price string with currency symbol. Examples:
-      "₦895,000" or "$129.99". Caller handles localization. */
-  price:     string;
-  /** Outbound URL, already wrapped via /api/go for affiliate
-      attribution + click logging. Direct in the email body. */
-  url:       string;
-}
+import {
+  shellPersonal,
+  paragraph,
+  signature,
+  spacer,
+  matchRow,
+  textLink,
+  escapeHtml,
+  plainTextShell,
+  type MatchRowData,
+} from "./_layout";
 
 interface Args {
   query:   string;
   /** ISO-2 country code from the request row. Defaults to 'ng'. */
   country: string | null;
   /** Cheapest 1-5 offers, ordered by price ascending. */
-  offers:  Offer[];
+  offers:  MatchRowData[];
 }
 
 interface Email {
@@ -47,69 +47,48 @@ export function notifyProductMatchFound({ query, country, offers }: Args): Email
   const cc = (country ?? "ng").toLowerCase();
   const compareUrl = `${SITE_URL}/${cc}/compare?q=${encodeURIComponent(query)}`;
 
-  /* Subject leans on the trigger event (we found it) without hyping
-     the count. Keep it singular even if there are multiple offers —
-     'we found "X"' reads as a personal update; 'we found 5 matches
-     for "X"' reads as a system notification. */
-  const subject = `We found "${query}"`;
+  /* Singular "we found" reads as a personal update; "we found 5
+     matches" reads as a system notification. Keep the human framing
+     in the subject even when offers.length > 1. */
+  const subject   = `We found "${query}"`;
+  const preheader = `${offers.length} ${offers.length === 1 ? "offer" : "offers"} surfaced on Havlo, cheapest first.`;
 
-  const offerLines = offers.slice(0, 5).map((o) =>
-    `${o.price}  ${o.title} (${o.storeName})\n${o.url}`,
+  /* ── HTML body ──────────────────────────────────────────────── */
+
+  const top = offers.slice(0, 5);
+  const rowsHtml = top.map((o, i) => matchRow(o, i === top.length - 1)).join("\n");
+
+  const body = `
+${paragraph("Hi,")}
+${paragraph(`Quick update on <strong style="font-weight:600;">${escapeHtml(query)}</strong>. Here's what surfaced on Havlo at meaningful discounts, cheapest first:`)}
+${rowsHtml}
+${spacer(20)}
+${paragraph(`${textLink({ url: compareUrl, label: "See all matches on Havlo" })}.`)}
+${signature("Daniel")}
+${spacer(8)}
+`;
+
+  const html = shellPersonal({ preheader, body });
+
+  /* ── Plain text body ────────────────────────────────────────── */
+
+  const offerLines = top.map((o) =>
+    `${o.priceDisplay}  ${o.title} (${o.storeName})\n${o.url}`,
   ).join("\n\n");
 
-  const text = [
-    `Hi,`,
-    ``,
-    `Quick update on "${query}". Here's what's surfaced on Havlo at meaningful discounts:`,
-    ``,
-    offerLines,
-    ``,
-    `See all matches: ${compareUrl}`,
-    ``,
-    `Daniel`,
-    `Havlo`,
-    ``,
-    `--`,
-    `Reply "remove" anytime to drop off the list.`,
-  ].join("\n");
-
-  /* HTML version: paragraphs + a list of offer rows. Each row is a
-     single line: price (bold), title, store. Anchor wraps the title
-     so the user taps once to land on the merchant. No buttons, no
-     tables, no brand-color blocks (deliverability). */
-  const offerRows = offers.slice(0, 5).map((o) => {
-    return `<p style="margin:0 0 14px 0;line-height:1.5;">
-<a href="${escapeAttr(o.url)}" style="color:#0057FF;text-decoration:none;font-weight:600;">${escapeHtml(o.title)}</a>
-<br/><span style="color:#1f2937;">${escapeHtml(o.price)}</span> <span style="color:#64748b;">- ${escapeHtml(o.storeName)}</span>
-</p>`;
-  }).join("\n");
-
-  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;">
-<p>Hi,</p>
-<p>Quick update on <strong>${escapeHtml(query)}</strong>. Here's what's surfaced on Havlo at meaningful discounts:</p>
-<div style="margin:18px 0 18px 0;padding:14px 16px;background:#f6f7f9;border-radius:10px;">
-${offerRows}
-</div>
-<p>See all matches: <a href="${escapeAttr(compareUrl)}" style="color:#0057FF;">havlo.io/${cc}/compare</a></p>
-<p>Daniel<br/><span style="color:#64748b;">Havlo</span></p>
-<p style="color:#94a3b8;font-size:13px;margin-top:24px;">Reply &ldquo;remove&rdquo; anytime to drop off the list.</p>
-</div>`;
+  const text = plainTextShell({
+    body: [
+      `Quick update on "${query}". Here's what's surfaced on Havlo at meaningful discounts, cheapest first:`,
+      ``,
+      offerLines,
+      ``,
+      `See all matches: ${compareUrl}`,
+    ],
+  });
 
   return { subject, text, html };
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-/* For attribute context (href) we additionally need to make sure the
-   value can't break out of the quoted attribute. The same five-char
-   set is sufficient since outbound URLs are URL-encoded upstream. */
-function escapeAttr(s: string): string {
-  return escapeHtml(s);
-}
+/* Re-export MatchRowData so the cron caller can type its payload
+   without depending on the layout module directly. */
+export type { MatchRowData };

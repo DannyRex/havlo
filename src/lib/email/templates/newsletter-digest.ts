@@ -1,45 +1,41 @@
-/* Twice-weekly deals digest - sent by scripts/cron/send-newsletter.ts
+/* Twice-weekly deals digest — sent by scripts/cron/send-newsletter.ts
    right after the Mon + Thurs scrape cron finishes ingesting fresh
    inventory.
 
-   Voice: founder-led, plain English. No em-dashes. Same structure
-   as newsletter-welcome / cashback-waitlist so the brand tone reads
-   consistent across every transactional touchpoint.
+   Visual treatment: marketing-shell (Havlo wordmark header, large
+   H1, deal cards with surface backgrounds, bulletproof CTA button,
+   branded footer). The digest IS marketing/content content, so it
+   belongs in Gmail's Promotions tab — the rich visual treatment
+   serves engagement, not deliverability.
 
-   Each subscriber gets country-local deals (their `country` column
-   on newsletter_subscribers drives the filtering). Category-targeted
-   subscribers (those who hit the "Get phones deals" widget on /deals)
-   get only their slug; nulls get the catch-all roundup. */
+   Voice: founder-led, plain English. No em-dashes. Same shared
+   _layout components as every other Havlo email so the inbox
+   renders as one suite. */
 
-interface DigestDeal {
-  /** Cleaned title - what shows on the card. */
-  title:           string;
-  /** Display price string already formatted in the user's country
-      currency (e.g. "₦425,000", "£249.99"). The template renders it
-      verbatim so we don't have to pull currency-format helpers into
-      this file. */
-  priceDisplay:    string;
-  /** Original price formatted the same way. Null when the merchant
-      doesn't publish a 'was' price. */
-  originalDisplay: string | null;
-  discountPercent: number;
-  storeName:       string;
-  /** Absolute outbound URL - already routed through /api/go so the
-      affiliate wrap fires on click. */
-  url:             string;
-}
+import {
+  shellMarketing,
+  heading1,
+  paragraph,
+  dealCard,
+  button,
+  signature,
+  spacer,
+  escapeHtml,
+  plainTextShell,
+  type DealCardData,
+} from "./_layout";
 
 interface Args {
   country: string | null;
-  /** Optional category filter - when set, the digest covers a single
+  /** Optional category filter — when set, the digest covers a single
       category (phones, audio, …) and the subject/headline call it
       out. Null = cross-category roundup. */
   category?: string | null;
   /** Display name of the category for the subject line (e.g. "Phones",
       "Audio"). Not used when category is null. */
   categoryLabel?: string;
-  /** The deals themselves - pre-filtered and ranked by the cron. */
-  deals: DigestDeal[];
+  /** The deals themselves — pre-filtered and ranked by the cron. */
+  deals: DealCardData[];
 }
 
 interface Email {
@@ -50,9 +46,10 @@ interface Email {
 
 const SITE_URL = "https://havlo.io";
 
-/* Founder voice opener varies slightly by category vs all to keep it
-   feeling fresh week to week. Same structure either way: one sentence
-   framing what's in this digest, then the list. */
+/* Founder-voice opener varies slightly by category vs all to keep
+   the digest from reading like the same email twice. Same structure
+   either way: one sentence framing what's in this digest, then
+   the list. */
 function opener(category: string | null): string {
   if (category) {
     return `Here's today's strongest drops in this category. We checked the local catalog plus a handful of cross-border partners.`;
@@ -64,90 +61,66 @@ export function newsletterDigest({ country, category, categoryLabel, deals }: Ar
   const cc = (country ?? "ng").toLowerCase();
   const dealsUrl = `${SITE_URL}/${cc}/deals`;
 
-  /* Subjects are deliberately STRUCTURALLY DISTINCT (different
-     opening word, middle word, closing word) so Gmail's subject-
-     similarity threading heuristic can't bundle a subscriber's
-     overall digest and a category digest into a single conversation.
-     May 2026 user report: "I only got 6 fresh Phones deals, not the
-     overall one even though Resend says it was delivered." Both
-     emails WERE delivered, but Gmail collapsed the second one into
-     the first thread because both subjects shared "fresh ... deals
-     on Havlo today" and arrived 600ms apart. Distinct shapes fix
-     that without changing the value of either email. */
+  /* Subjects are STRUCTURALLY DISTINCT so Gmail's subject-similarity
+     threading heuristic can't bundle a subscriber's overall digest
+     and a category digest into a single conversation. See May 2026
+     user report referenced in commit 1550e58 for context. */
   const subject = category && categoryLabel
     ? `In ${categoryLabel} today: ${deals.length} new price drops`
     : `${deals.length} fresh deals on Havlo today`;
 
-  const intro = opener(category ?? null);
+  /* Preheader — Gmail's inbox-list preview text. Should reinforce
+     the subject, not duplicate it. ~80-100 chars is the sweet spot. */
+  const preheader = category && categoryLabel
+    ? `${deals.length} ${categoryLabel.toLowerCase()} picks ranked by discount, with cross-border alternatives included.`
+    : `${deals.length} of today's biggest price drops across the stores you already shop.`;
 
-  /* Plain text version - readable in any email client, regardless of
-     HTML rendering. Each deal gets a short block: title, price, store,
-     direct link. */
+  const intro       = opener(category ?? null);
+  const headlineH1  = category && categoryLabel
+    ? `${categoryLabel} drops today`
+    : `Today's drops`;
+
+  /* ── HTML body ──────────────────────────────────────────────── */
+
+  const dealsHtml = deals.map(dealCard).join("\n");
+
+  const body = `
+${heading1(headlineH1)}
+${paragraph(escapeHtml(intro))}
+${spacer(16)}
+${dealsHtml}
+${spacer(8)}
+${button({ url: dealsUrl, label: `See all today's deals` })}
+${signature("Daniel")}
+${spacer(8)}
+`;
+
+  const html = shellMarketing({ preheader, body });
+
+  /* ── Plain text body ────────────────────────────────────────── */
+
   const dealLines: string[] = [];
   for (const d of deals) {
     dealLines.push(
-      `${d.title}`,
+      d.title,
       `  ${d.priceDisplay}${d.originalDisplay ? ` (was ${d.originalDisplay})` : ""}${d.discountPercent > 0 ? ` - ${d.discountPercent}% off` : ""} at ${d.storeName}`,
       `  ${d.url}`,
       ``,
     );
   }
 
-  const text = [
-    `Hi,`,
-    ``,
-    intro,
-    ``,
-    ...dealLines,
-    `See more: ${dealsUrl}`,
-    ``,
-    `Daniel`,
-    `Havlo`,
-    ``,
-    `--`,
-    `Reply "remove" anytime to drop off the list.`,
-  ].join("\n");
-
-  /* HTML version - same content, lightly styled. Inline styles only
-     (no <style> block) for max email-client compatibility. */
-  const dealsHtml = deals.map((d) => `
-<div style="border-top:1px solid #e2e8f0;padding:14px 0;">
-  <p style="margin:0 0 4px 0;font-size:15px;font-weight:600;color:#0f172a;">${escape(d.title)}</p>
-  <p style="margin:0 0 4px 0;font-size:14px;color:#1f2937;">
-    <span style="font-weight:700;">${escape(d.priceDisplay)}</span>${
-      d.originalDisplay
-        ? ` <span style="color:#94a3b8;text-decoration:line-through;font-size:13px;">${escape(d.originalDisplay)}</span>`
-        : ""
-    }${
-      d.discountPercent > 0
-        ? ` <span style="color:#16a34a;font-weight:600;font-size:13px;">${d.discountPercent}% off</span>`
-        : ""
-    }
-  </p>
-  <p style="margin:0 0 6px 0;font-size:13px;color:#64748b;">at ${escape(d.storeName)}</p>
-  <a href="${escape(d.url)}" style="display:inline-block;font-size:13px;color:#0057FF;text-decoration:none;">View deal &rarr;</a>
-</div>`).join("");
-
-  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;">
-<p>Hi,</p>
-<p>${escape(intro)}</p>
-${dealsHtml}
-<p style="margin-top:24px;">See more: <a href="${dealsUrl}" style="color:#0057FF;">havlo.io/${cc}/deals</a></p>
-<p>Daniel<br/><span style="color:#64748b;">Havlo</span></p>
-<p style="color:#94a3b8;font-size:13px;margin-top:24px;">Reply &ldquo;remove&rdquo; anytime to drop off the list.</p>
-</div>`;
+  const text = plainTextShell({
+    body: [
+      intro,
+      ``,
+      ...dealLines,
+      `See all: ${dealsUrl}`,
+    ],
+  });
 
   return { subject, text, html };
 }
 
-/* Minimal HTML escape - prevents merchant titles or URLs containing
-   ampersands / quotes / angle brackets from breaking the rendered
-   email or being interpreted as markup. */
-function escape(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+/* DealCardData type re-exported so callers (cron/send-newsletter)
+   don't have to know about the layout module to type their payload. */
+export type { DealCardData };

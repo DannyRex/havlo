@@ -1,9 +1,20 @@
 /* Confirmation email sent right after a user submits the cashback
    waitlist form on /[country]/cashback (Phase 1 — display-only).
 
-   Voice: founder-led, plain English. No em-dashes. The launch
-   announcement (Phase 2 — real accounts + payouts) is a separate
-   broadcast email sent to the whole waitlist on go-live day. */
+   Visual treatment: personal shell. Same paragraph-prose structure
+   as the newsletter welcome so the two confirmations feel like
+   siblings, not different products. The launch announcement
+   (Phase 2 — real accounts + payouts) is a separate broadcast
+   email and will use the marketing shell. */
+
+import {
+  shellPersonal,
+  paragraph,
+  signature,
+  spacer,
+  textLink,
+  plainTextShell,
+} from "./_layout";
 
 interface Args {
   country: string | null;
@@ -21,29 +32,30 @@ export function cashbackWaitlistConfirmation({ country }: Args): Email {
   const cc = (country ?? "ng").toLowerCase();
   const dealsUrl = `${SITE_URL}/${cc}/deals`;
 
-  const subject = "You're on the cashback list";
+  const subject   = "You're on the cashback list";
+  const preheader = "We'll email you the day cashback ships. Until then, nothing.";
 
-  const text = [
-    `Hi,`,
-    ``,
-    `You're in. We're a few weeks from launching cashback (actual accounts, actual payouts). When it ships, I'll email you here with what you've earned on qualifying stores, and how to withdraw.`,
-    ``,
-    `Until then, keep using Havlo to find and compare cheaper deals across the stores you already know: ${dealsUrl}`,
-    ``,
-    `Daniel`,
-    `Havlo`,
-    ``,
-    `--`,
-    `Reply "remove" anytime to drop off the list.`,
-  ].join("\n");
+  /* ── HTML body ──────────────────────────────────────────────── */
 
-  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;">
-<p>Hi,</p>
-<p>You're in. We're a few weeks from launching cashback (actual accounts, actual payouts). When it ships, I'll email you here with what you've earned on qualifying stores, and how to withdraw.</p>
-<p>Until then, keep using Havlo to find and compare cheaper deals across the stores you already know: <a href="${dealsUrl}" style="color:#0057FF;">havlo.io/${cc}/deals</a></p>
-<p>Daniel<br/><span style="color:#64748b;">Havlo</span></p>
-<p style="color:#94a3b8;font-size:13px;margin-top:24px;">Reply &ldquo;remove&rdquo; anytime to drop off the list.</p>
-</div>`;
+  const body = `
+${paragraph("Hi,")}
+${paragraph(`You're in. We're a few weeks from launching cashback (actual accounts, actual payouts). When it ships, I'll email you here with what you've earned on qualifying stores, and how to withdraw.`)}
+${paragraph(`Until then, keep using Havlo to ${textLink({ url: dealsUrl, label: "find cheaper deals across the stores you already know" })}.`)}
+${signature("Daniel")}
+${spacer(8)}
+`;
+
+  const html = shellPersonal({ preheader, body });
+
+  /* ── Plain text body ────────────────────────────────────────── */
+
+  const text = plainTextShell({
+    body: [
+      `You're in. We're a few weeks from launching cashback (actual accounts, actual payouts). When it ships, I'll email you here with what you've earned on qualifying stores, and how to withdraw.`,
+      ``,
+      `Until then, keep using Havlo to find cheaper deals across the stores you already know: ${dealsUrl}`,
+    ],
+  });
 
   return { subject, text, html };
 }
