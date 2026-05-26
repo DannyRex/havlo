@@ -199,18 +199,40 @@ export function candidateHasAllVariants(title: string, variants: string[]): bool
 /* ── Numeric model markers ─────────────────────────────────────────
    '15' from 'iPhone 15', '24' from 'Galaxy S24 Ultra' — but only
    whole-number tokens not glued to letters. extractRequiredModelTokens
-   below catches the letter-glued cases. */
+   below catches the letter-glued cases.
+
+   Stoplist filters out promotional/descriptive numbers that appear
+   in titles but aren't identity markers — primarily years (2024
+   Sale Edition, etc.) which were falsely diverging same-product
+   matches during the Phase 2 audit. */
+const NUMERIC_NOISE = new Set([
+  /* Recent and near-future years used in promo / "[year] Edition"
+     marketing. Range covers warranty / release dates without
+     overlapping with realistic model numbers (no phone is called
+     "iPhone 2024"). */
+  "2015", "2016", "2017", "2018", "2019", "2020",
+  "2021", "2022", "2023", "2024", "2025", "2026",
+  "2027", "2028", "2029", "2030",
+]);
 export function extractRequiredNumbers(query: string): string[] {
   const matches = Array.from(query.toLowerCase().matchAll(/(?<![a-z0-9])(\d{1,4})(?![a-z0-9])/g));
-  return matches.map((m) => m[1]);
+  return matches.map((m) => m[1]).filter((n) => !NUMERIC_NOISE.has(n));
 }
 
 export function candidateHasAllNumbers(title: string, numbers: string[]): boolean {
   if (numbers.length === 0) return true;
   const lc = title.toLowerCase();
   return numbers.every((n) => {
-    const re = new RegExp(`(^|[^a-z0-9])${n}([^a-z0-9]|$)`);
-    return re.test(lc);
+    /* Standalone numeric form: "iPhone 15", "Pegasus 41". */
+    const standalone = new RegExp(`(^|[^a-z0-9])${n}([^a-z0-9]|$)`);
+    if (standalone.test(lc)) return true;
+    /* Ordinal form: "AirPods Pro 2nd Gen", "iPhone 1st Gen". The
+       digit IS still semantically present, just spelled with an
+       ordinal suffix. Without this match-also rule, an anchor
+       formatted "Pro 2" rejects a candidate formatted "Pro 2nd Gen"
+       even though they're the same product. */
+    const ordinal = new RegExp(`(^|[^a-z0-9])${n}(?:st|nd|rd|th)(?:[^a-z0-9]|$)`);
+    return ordinal.test(lc);
   });
 }
 
@@ -228,6 +250,14 @@ const MODEL_TOKEN_STOPLIST = new Set([
   "m1", "m2", "m3", "m4", "m5",
   "h1", "h2", "h3",
   "4k", "8k",
+  /* Ordinal generation suffixes ("AirPods Pro 2nd Gen") — these
+     describe the generation already encoded by the numeric token
+     before them ("Pro 2" + "2nd"). Without stoplisting, the
+     candidate-has-all-tokens check requires the ANCHOR to also
+     have "2nd" — which a sibling title formatted "Pro 2" wouldn't. */
+  "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th",
+  "10th", "11th", "12th", "13th", "14th", "15th", "16th", "17th",
+  "18th", "19th", "20th",
 ]);
 
 export function extractRequiredModelTokens(query: string): string[] {
@@ -238,11 +268,45 @@ export function extractRequiredModelTokens(query: string): string[] {
   return tokens.filter((t) => !MODEL_TOKEN_STOPLIST.has(t));
 }
 
+/* Split an alphanumeric token into its run-length-encoded letter
+   and digit components. "1000xm5" -> ["1000", "xm5"]. Lets the
+   candidate-match regex tolerate optional whitespace / punctuation
+   between the runs ("WH-1000XM5" anchor matches "WH 1000 XM5" or
+   "WH-1000-XM5" candidate), which a single \b...\b regex misses. */
+function splitTokenRuns(tok: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let lastIsDigit: boolean | null = null;
+  for (const ch of tok) {
+    const isDigit = /\d/.test(ch);
+    if (lastIsDigit !== null && isDigit !== lastIsDigit && current.length > 0) {
+      parts.push(current);
+      current = "";
+    }
+    current += ch;
+    lastIsDigit = isDigit;
+  }
+  if (current) parts.push(current);
+  return parts;
+}
+
+function reEscape(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export function candidateHasAllModelTokens(title: string, tokens: string[]): boolean {
   if (tokens.length === 0) return true;
   const lc = title.toLowerCase();
   return tokens.every((tok) => {
-    const re = new RegExp(`(^|[^a-z0-9])${tok}([^a-z0-9]|$)`);
+    /* Multi-run tokens (digit+letter runs alternating) get an
+       optional-separator regex. "1000xm5" -> /(^|...)1000\W*xm5(...|$)/
+       so "1000 xm5" / "1000-xm5" / "1000xm5" all match. Single-run
+       or pure tokens fall through to the original exact-word check. */
+    const parts = splitTokenRuns(tok);
+    const middle = parts.length > 1
+      ? parts.map(reEscape).join("\\W*")
+      : reEscape(tok);
+    const re = new RegExp(`(^|[^a-z0-9])${middle}([^a-z0-9]|$)`);
     return re.test(lc);
   });
 }
@@ -457,6 +521,39 @@ const STOP_WORDS = new Set([
   "cream", "ivory", "khaki", "burgundy", "maroon", "light", "dark",
 ]);
 
+/* Generate cross-form matching variants for an alphanumeric token.
+   Adds the token itself plus prefix/suffix splits at every
+   digit<->letter transition. Designed so a compound anchor token
+   ("1000xm5") still intersects with the same product written as
+   separate runs in the candidate ("1000 xm5").
+
+     "1000xm5"   → {1000xm5, 1000, xm5}
+     "wf1000xm5" → {wf1000xm5, wf, 1000xm5, wf1000, xm5}
+     "ps5"       → {ps5, ps, 5}
+     "iphone"    → {iphone}                          (no transitions)
+     "15"        → {15}                              (no transitions)
+
+   Suffix from the FIRST transition is also the most useful
+   sub-token in practice (often the actual model identifier with
+   its number, e.g. "xm5" from "WH-1000XM5"). The length-3 filter
+   downstream removes 2-char prefixes/suffixes (wh, wf, ps) so the
+   set stays focused on meaningful identity hits. */
+function tokenSubparts(tok: string): string[] {
+  const transitions: number[] = [];
+  for (let i = 1; i < tok.length; i++) {
+    const prevIsDigit = /\d/.test(tok[i - 1]);
+    const currIsDigit = /\d/.test(tok[i]);
+    if (prevIsDigit !== currIsDigit) transitions.push(i);
+  }
+  if (transitions.length === 0) return [tok];
+  const out = new Set<string>([tok]);
+  for (const pos of transitions) {
+    out.add(tok.slice(0, pos));
+    out.add(tok.slice(pos));
+  }
+  return Array.from(out);
+}
+
 function significantTokens(title: string, brand: string | null): Set<string> {
   const out = new Set<string>();
   for (const raw of title.toLowerCase().replace(/[^a-z0-9]+/g, " ").split(/\s+/)) {
@@ -464,15 +561,28 @@ function significantTokens(title: string, brand: string | null): Set<string> {
     if (STOP_WORDS.has(raw)) continue;
     if (brand && brand.toLowerCase() === raw) continue;
     out.add(raw);
+    /* Also add letter/digit sub-runs of length >= 3 so "1000xm5" on
+       one side intersects with "1000" + "xm5" on the other. Phase 2.4
+       audit caught this for Sony WH-1000XM5 written with vs without
+       the hyphen — same product, no overlap detected pre-fix. */
+    const parts = tokenSubparts(raw);
+    if (parts.length > 1) {
+      for (const p of parts) {
+        if (p.length >= 3 && !STOP_WORDS.has(p)) out.add(p);
+      }
+    }
   }
   return out;
 }
 
-/** True when anchor and candidate share at least min(2, |anchor
-    tokens|) significant tokens. "Significant" = length >= 3, not in
-    STOP_WORDS, not the brand. The min() makes very short titles
-    (1-token anchors) require only 1 overlap so we don't reject
-    legitimate matches against unusually terse anchors. */
+/** True when anchor and candidate share at least min(2, |smaller
+    set|) significant tokens. "Significant" = length >= 3, not in
+    STOP_WORDS, not the brand. Compound tokens (e.g. "1000xm5") also
+    contribute their letter/digit sub-runs to the set so split-form
+    candidates still intersect. The min() over the SMALLER token set
+    (not just anchor) means terse "Sony WH-1000XM5 Black" candidates
+    qualify on a single model-token hit when the anchor's long
+    descriptor list would otherwise demand 2 overlaps. */
 export function shareSignificantTokens(
   anchorTitle: string,
   candidateTitle: string,
@@ -481,10 +591,10 @@ export function shareSignificantTokens(
   const aTokens = significantTokens(anchorTitle, brand);
   if (aTokens.size === 0) return true; // nothing meaningful to gate on
   const cTokens = significantTokens(candidateTitle, brand);
-  const required = Math.min(2, aTokens.size);
-  /* Array.from instead of for-of: tsconfig target is es2017 but
-     iteration over Set needs --downlevelIteration which we don't
-     ship. Same pattern used in StoreLogos.getStoreCountForCountry. */
+  if (cTokens.size === 0) return true;
+  /* min(2, smaller set) — if either side is a 1-token anchor or
+     1-token candidate, a single overlap on that token qualifies. */
+  const required = Math.min(2, Math.min(aTokens.size, cTokens.size));
   let overlap = 0;
   Array.from(aTokens).some((t) => {
     if (cTokens.has(t)) overlap++;
@@ -541,19 +651,26 @@ export function isLikelySameProduct(
   if (!candidateHasAllVariants(anchor.title, cVariants)) return false;
 
   /* Numeric model markers (15 in iPhone 15, 24 in Galaxy S24).
-     Bidirectional — same generation requirement. */
+     Anchor-directional ONLY — candidate must contain every number
+     the anchor names, but candidate having EXTRA numbers (SKU codes,
+     clothing sizes, batch IDs, etc.) doesn't matter. Phase 2.4
+     audit caught two real cases the bidirectional version got wrong:
+       "Nike Air Max 95"            vs "Nike Air Max 95 SKU-1234"
+       "Nike Air Max 95 Men's"      vs "Nike Air Max 95 White size 10"
+     In both, the candidate's extra number is descriptive — not an
+     identity marker — yet the c->a check forced an anchor match
+     that wasn't present. Anchor-directional preserves the
+     "candidate must have anchor's generation number" intent while
+     dropping the over-strict reverse. */
   const aNumbers = extractRequiredNumbers(anchor.title);
-  const cNumbers = extractRequiredNumbers(candidate.title);
   if (!candidateHasAllNumbers(candidate.title, aNumbers)) return false;
-  if (!candidateHasAllNumbers(anchor.title, cNumbers)) return false;
 
-  /* Letter-glued model tokens (s24, 1000xm5, h2). Bidirectional
-     so the candidate must share every model identifier the anchor
-     uses AND vice versa. */
+  /* Letter-glued model tokens (s24, 1000xm5, h2). Anchor-directional
+     for the same reason — candidate's extra model tokens may be
+     promotional codes / SKU fragments. The required identity comes
+     from the anchor's tokens. */
   const aModel = extractRequiredModelTokens(anchor.title);
-  const cModel = extractRequiredModelTokens(candidate.title);
   if (!candidateHasAllModelTokens(candidate.title, aModel)) return false;
-  if (!candidateHasAllModelTokens(anchor.title, cModel)) return false;
 
   /* Family-conditional size + price band. Family is detected from
      the anchor title (or passed in by the caller for cases where
