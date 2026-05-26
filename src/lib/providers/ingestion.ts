@@ -127,6 +127,23 @@ function cleanProductTitle(raw: string): string {
   return t.replace(/\s{2,}/g, " ");
 }
 
+/* Normalise a product title into a stable join key for cross-ingest
+   dedup. Lowercase, strip all non-alphanumeric, cap at 120 chars.
+   MUST match the SQL backfill in migration 0046 exactly so the
+   ingest-side and DB-side computations agree on what counts as a
+   duplicate.
+
+   Catches: same product re-ingested with different URL query params,
+   same product across stores when the signature parser couldn't
+   extract brand+model (~50% of titles), Jumia rows with the
+   "Generic " prefix stripped (cleanProductTitle runs first). */
+export function normaliseTitleKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(0, 120);
+}
+
 function dealToProductRow(d: Deal, signature: string) {
   /* Strip merchant-side brand placeholders ("Generic", "Unbranded",
      "No Brand") before any other title work — every downstream
@@ -169,6 +186,10 @@ function dealToProductRow(d: Deal, signature: string) {
     model: parsed.model,
     image_url: d.imageUrl ?? null,
     signature,
+    /* title_key — stored normalized form for fast dedup lookup.
+       See normaliseTitleKey() above + migration 0046 for the design
+       rationale. Must match the SQL backfill formula. */
+    title_key: normaliseTitleKey(cleanedTitle),
   };
 }
 
@@ -366,12 +387,19 @@ export async function ingestDeals(
      ~20-25m for the full job). */
 
   const sigs = deals.map((d) => buildSignature(d.title));
+  /* Pre-compute title_key for every deal so the cross-store dedup
+     pass (Step 2b below) can bulk-lookup existing products by
+     normalized title. cleanProductTitle is applied here too so the
+     "Generic " prefix and similar merchant-side placeholders are
+     stripped before normalization — matches what dealToProductRow
+     writes when inserting a new product. */
   const offerUrls = deals.map((d, i) => ({
     i,
-    storeId: d.storeId,
-    url: (d.url ?? "").trim(),
-    sigKey: sigs[i].key,
+    storeId:  d.storeId,
+    url:      (d.url ?? "").trim(),
+    sigKey:   sigs[i].key,
     canDedup: sigs[i].brand !== null && sigs[i].model !== null,
+    titleKey: normaliseTitleKey(cleanProductTitle(d.title)),
   }));
 
   /* Bulk lookup 1: existing offers by (store_id, url) — one row per
@@ -395,7 +423,8 @@ export async function ingestDeals(
 
   /* Bulk lookup 2: existing products by signature. Only signatures
      with parseable brand+model get a real lookup; the rest stay
-     null and will trigger fresh inserts below. */
+     null and will trigger the title_key fallback below or fresh
+     inserts. */
   const dedupKeys = Array.from(new Set(offerUrls.filter((o) => o.canDedup).map((o) => o.sigKey)));
   const sigHits = new Map<string, { id: string; image_url: string | null }>();
   if (dedupKeys.length > 0) {
@@ -405,6 +434,34 @@ export async function ingestDeals(
       .in("signature", dedupKeys);
     for (const r of (prodRows ?? []) as Array<{ id: string; image_url: string | null; signature: string }>) {
       sigHits.set(r.signature, { id: r.id, image_url: r.image_url });
+    }
+  }
+
+  /* Bulk lookup 2b: existing products by normalized title (title_key).
+     Phase 2 audit (May 2026) found that ~50% of titles fail the
+     brand+model signature extraction, so dedupKeys above misses them.
+     Result pre-fix: re-ingesting the same product creates a new
+     products.id row every cron (135 duplicates of one Beats earphone
+     cover, 4,810 normalized-title collisions catalog-wide).
+     title_key catches this: every title-identical product across
+     stores collapses to one product row going forward. */
+  const titleKeys = Array.from(new Set(
+    offerUrls.map((o) => o.titleKey).filter((k) => k.length > 0),
+  ));
+  const titleHits = new Map<string, { id: string; image_url: string | null }>();
+  if (titleKeys.length > 0) {
+    const { data: titleRows } = await supa
+      .from("products")
+      .select("id, image_url, title_key")
+      .in("title_key", titleKeys);
+    for (const r of (titleRows ?? []) as Array<{ id: string; image_url: string | null; title_key: string }>) {
+      /* If multiple existing products share a title_key (rare but
+         possible — see migration 0046 comment on non-unique index)
+         the first wins. The maint dedup pass merges true dupes via
+         scripts/dedup-products.ts. */
+      if (!titleHits.has(r.title_key)) {
+        titleHits.set(r.title_key, { id: r.id, image_url: r.image_url });
+      }
     }
   }
 
@@ -436,7 +493,7 @@ export async function ingestDeals(
 
   for (let i = 0; i < deals.length; i++) {
     const d = deals[i];
-    const { url, storeId, sigKey, canDedup } = offerUrls[i];
+    const { url, storeId, sigKey, canDedup, titleKey } = offerUrls[i];
 
     let existing: { id: string; image_url: string | null } | null = null;
 
@@ -446,9 +503,23 @@ export async function ingestDeals(
       if (pid) existing = hitProducts.get(pid) ?? null;
     }
 
-    /* Step 2: signature dedup (in-memory) */
+    /* Step 2: signature dedup (in-memory). Only fires when the
+       signature parser extracted BOTH brand and model — covers the
+       "high-confidence" half of the catalog. */
     if (!existing && canDedup) {
       const hit = sigHits.get(sigKey);
+      if (hit) existing = hit;
+    }
+
+    /* Step 2b: title_key dedup (in-memory). Catches the rest: same
+       product re-ingested with a slightly different URL, same
+       product across stores when the signature parser failed,
+       Generic-prefixed marketplace listings, etc. This is the pass
+       that prevents the 4,810-collision pile-up the Phase 2 audit
+       surfaced — without it, ingest creates a new products.id row
+       on every cron for ~50% of products. */
+    if (!existing && titleKey.length > 0) {
+      const hit = titleHits.get(titleKey);
       if (hit) existing = hit;
     }
 
@@ -463,27 +534,51 @@ export async function ingestDeals(
   }
 
   /* Step 3: bulk-insert new products with in-batch dedup.
-     When two canDedup=true deals share the same sigKey AND neither
-     matched an existing product, we insert ONE product row and have
-     both deals' offers point at it. This preserves the dedup
-     semantic the per-deal loop had — there, the first deal's INSERT
-     populated the products table, and the second deal's SELECT
-     found it. The batched version replicates that by grouping
-     up-front. Without this, the catalog grows duplicate products
-     on every cron and the dedup script has to merge them later. */
+     Two dedup buckets, applied in order:
+
+       (a) sigKey  — when two canDedup=true deals share the same
+                     signature, collapse into one row. Brand+model
+                     parsed both sides; high-confidence merge.
+
+       (b) titleKey — same-title deals collapse even when signature
+                      didn't extract. Catches the cross-store same-
+                      product case (Beats earphone cover ingested
+                      from 5 stores at once → ONE products.id row,
+                      not 5). Without this, a single ingest batch
+                      could leak 4,810-style title duplicates that
+                      the Step 2b lookup can't catch (because the
+                      lookup runs once before the loop, so two new
+                      deals with the same title in the same batch
+                      both look "novel" to it and would otherwise
+                      each insert a row).
+
+     Both groups preserve the dedup semantic the per-deal loop had:
+     first deal's INSERT populates products, subsequent deals' SELECT
+     finds it. The batched version replicates that by grouping
+     up-front. */
   if (newProducts.length > 0) {
     const insertList: Array<{ deal: Deal; sigKey: string }> = [];
-    const groupIndexBySigKey = new Map<string, number>();
-    const dealToInsertIndex = new Map<Deal, number>();
+    const groupIndexBySigKey   = new Map<string, number>();
+    const groupIndexByTitleKey = new Map<string, number>();
+    const dealToInsertIndex    = new Map<Deal, number>();
 
     for (const np of newProducts) {
+      /* Bucket (a): high-confidence sigKey match. */
       if (np.canDedup && groupIndexBySigKey.has(np.sigKey)) {
         dealToInsertIndex.set(np.deal, groupIndexBySigKey.get(np.sigKey)!);
+        continue;
+      }
+      /* Bucket (b): title_key match — same cleaned + normalized title,
+         even without signature confidence. */
+      const tk = normaliseTitleKey(cleanProductTitle(np.deal.title));
+      if (tk.length > 0 && groupIndexByTitleKey.has(tk)) {
+        dealToInsertIndex.set(np.deal, groupIndexByTitleKey.get(tk)!);
         continue;
       }
       const idx = insertList.length;
       insertList.push({ deal: np.deal, sigKey: np.sigKey });
       if (np.canDedup) groupIndexBySigKey.set(np.sigKey, idx);
+      if (tk.length > 0) groupIndexByTitleKey.set(tk, idx);
       dealToInsertIndex.set(np.deal, idx);
     }
 
