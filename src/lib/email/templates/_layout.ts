@@ -96,7 +96,8 @@ interface ShellOptions {
 /* The standard email-client-safe document shell. DOCTYPE + meta
    tags + dark-mode color-scheme hint + mobile media queries +
    Outlook conditional table fallback. */
-function shellDocument({ preheader, body, kind }: ShellOptions & { kind: "marketing" | "personal" }): string {
+/* eslint-disable-next-line @typescript-eslint/no-unused-vars */
+function shellDocument({ preheader, body, kind: _kind }: ShellOptions & { kind: "marketing" | "personal" }): string {
   return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
@@ -157,22 +158,32 @@ function shellDocument({ preheader, body, kind }: ShellOptions & { kind: "market
 ${escapeHtml(preheader)}
 </div>
 
-<!-- TWO separate top-level tables: the white-band header lives
-     in its own width:100% table (no max-width container around
-     it), guaranteeing the band stretches to the email viewport's
-     true edges. Gmail mobile's "single email card" wrapper has
-     been observed to shrink-wrap nested tables when the outer
-     table is forced into a 600-px max via a CSS rule on a
-     sibling row — splitting into two top-level tables sidesteps
-     that. The body table below keeps its centered max-600
-     container so the deal cards retain the comfortable reading
-     width. -->
+<!-- White-band header is a SINGLE PNG (logo-email-band.png) rendered
+     at width="100%". Three prior HTML approaches — outer table with
+     bgcolor, single-cell wrapper with !important inline white, and
+     two top-level tables for full-bleed — all failed in Gmail mobile
+     dark mode: the band rendered as a small centered box because
+     Gmail wraps every email in its own card and inverts free
+     background fills inside that card. A baked PNG sidesteps the
+     entire CSS-fight: the white pixels ARE the band, no background
+     property for Gmail's auto-invert to misinterpret, and at
+     width="100%" the image stretches to exactly the email viewport's
+     visible width — whatever that is on each client.
 
-<!-- Header table (full bleed) -->
-<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="width:100%;background-color:#FFFFFF;" bgcolor="#FFFFFF">
+     Source asset: public/logo-email-band.png (1200x180, RGB, solid
+     white bg, wordmark centered at 299x90 native). At 1200x180 the
+     aspect is ~6.67:1, so on a 360px Gmail mobile viewport the band
+     renders ~54px tall — same vertical weight as the prior padded
+     html band, no surprises. Inline width="600" + style:width:100%
+     keeps Outlook (which ignores style and uses width attribute)
+     from showing it stretched to the full 1200 native width. -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="width:100%;">
   <tr>
-    <td align="center" class="header-band" bgcolor="#FFFFFF" style="background-color:#FFFFFF !important;padding:32px 16px;">
-      ${wordmark(kind)}
+    <td style="padding:0;line-height:0;font-size:0;">
+      <a href="${SITE_URL}" style="text-decoration:none;border:0;display:block;">
+        <img src="${SITE_URL}/logo-email-band.png" alt="Havlo" width="600" height="90"
+             style="display:block;width:100%;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;" />
+      </a>
     </td>
   </tr>
 </table>
@@ -215,30 +226,13 @@ ${escapeHtml(preheader)}
 </html>`;
 }
 
-/* Wordmark (text-only, no h-mark). Now rides on a fixed white
-   header band — see shellDocument's header <td>. That removes the
-   need for a dark-mode logo variant: the dark-slate wordmark sits
-   on white in every client mode. Source PNG:
-     - logo-email.png   (266x80, dark-slate "havlo" on transparent)
-
-   Wordmark aspect is ~10:3, rendered at:
-     marketing shell:  140x42 display
-     personal shell:   118x35 display (~16% smaller so a transactional
-                                      note doesn't lead with a
-                                      brand-loud header)
-   2-3x downscale from the 266x80 source keeps the render crisp on
-   high-DPI displays at either size. Display dimensions bumped from
-   the earlier 100x30 / 84x25 because the white band now provides
-   the negative space — the logo can read at a more confident size
-   without competing with adjacent typography. */
-function wordmark(kind: "marketing" | "personal"): string {
-  const displayWidth  = kind === "marketing" ? 140 : 118;
-  const displayHeight = kind === "marketing" ? 42  : 35;
-  const altText       = "Havlo";
-  return `<a href="${SITE_URL}" style="text-decoration:none;border:0;display:inline-block;">
-    <img src="${SITE_URL}/logo-email.png" alt="${altText}" width="${displayWidth}" height="${displayHeight}" style="display:inline-block;border:0;outline:none;text-decoration:none;height:${displayHeight}px;width:${displayWidth}px;vertical-align:middle;" />
-  </a>`;
-}
+/* Wordmark function REMOVED — replaced by the full-bleed
+   logo-email-band.png rendered at width="100%" in shellDocument's
+   header table. The PNG bakes the white band INTO the image so
+   there's no CSS background-color for Gmail mobile dark-mode auto-
+   invert to misinterpret. The kind param (marketing vs personal)
+   is still threaded through shellDocument for any future per-shell
+   header treatment but isn't read today. */
 
 /* ── Public composers ──────────────────────────────────────────── */
 
