@@ -1,0 +1,84 @@
+name: Data health check
+
+# Weekly regression detector for the ingest-pipeline integrity issues
+# the Phase 3-6 audit surfaced. Runs scripts/health-check.ts against
+# the production Supabase, compares each metric to a documented
+# threshold, and emails the recipient on any finding.
+#
+# Why the cadence: 2h after the Sunday maintenance pass (Sun 04:00 UTC)
+# so signature-drift updates from resignature-products + the price-
+# history prune both settle before we measure. Catches any regression
+# the week's ingest runs introduced without competing with cleanup
+# operations for the DB connection pool.
+#
+# Why GitHub Actions (not a Vercel cron or a Supabase scheduled
+# function): Actions is free + unlimited on the public repo, the run
+# log is preserved by GitHub for historical trend analysis, and a
+# failed run is a notification you'll see in the GitHub UI even if
+# the alert email gets caught in spam.
+#
+# Failure mode: the script exits non-zero on any finding so the
+# workflow turns red in the UI. GitHub's built-in "failed workflow"
+# email notification (Settings → Notifications) fires too — a
+# second channel beyond the script's own alert send.
+
+on:
+  schedule:
+    # Sunday 06:00 UTC — 2 hours after maintenance.yml runs.
+    - cron: "0 6 * * 0"
+  workflow_dispatch:
+    # Manual trigger from the GitHub UI. Useful for spot-checking
+    # after deploys or for testing threshold changes.
+    inputs:
+      always_email:
+        description: "Send email even when all checks pass (useful for verifying the wire)"
+        type:        boolean
+        required:    false
+        default:     false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    # 10 minutes is plenty — the script finishes in 10-30s under
+    # normal catalog size; the headroom catches a DB hiccup or a
+    # bigger catalog later without an artificial timeout.
+    timeout-minutes: 10
+
+    env:
+      # Read-only access is enough — the script only SELECTs.
+      SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # Email plumbing — required for the alert to fire.
+      RESEND_API_KEY:             ${{ secrets.RESEND_API_KEY }}
+      # Where alerts go. Falls back to ADMIN_EMAIL if HEALTH_CHECK_RECIPIENT
+      # isn't set, so we can be DRY about admin contacts at the repo level.
+      HEALTH_CHECK_RECIPIENT:     ${{ vars.HEALTH_CHECK_RECIPIENT || secrets.HEALTH_CHECK_RECIPIENT }}
+      ADMIN_EMAIL:                ${{ vars.ADMIN_EMAIL || secrets.ADMIN_EMAIL }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run health checks
+        # The script's exit code reflects severity:
+        #   0 → all green (only emails when --always-email is on)
+        #   1 → at least one finding (emails + fails the workflow)
+        #   2 → script error (DB unreachable, etc.) (emails skipped, workflow fails)
+        run: |
+          if [ "${{ inputs.always_email }}" = "true" ]; then
+            npm run health-check -- --always-email
+          else
+            npm run health-check
+          fi
