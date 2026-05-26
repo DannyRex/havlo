@@ -144,9 +144,9 @@ function shellDocument({ preheader, body, kind }: ShellOptions & { kind: "market
     .border      { border-color: #333333 !important; }
     .border-top  { border-top-color: #333333 !important; }
     .text-brand  { color: #4A8BFF !important; }
-    /* Logo swap: hide the light-bg PNG, show the dark-bg PNG. */
-    .logo-light  { display: none !important; }
-    .logo-dark   { display: inline-block !important; }
+    /* Header band stays white in dark mode — the dark-slate
+       wordmark needs a stable light background to read against. */
+    .header-band { background-color: #FFFFFF !important; }
   }
 </style>
 </head>
@@ -163,12 +163,20 @@ ${escapeHtml(preheader)}
 
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="container" width="${MAX_WIDTH}" style="width:100%;max-width:${MAX_WIDTH}px;">
 
-        <!-- Header -->
+        <!-- Header: white band spanning the email canvas width with
+             padding around the logo. The white background is fixed
+             (not flipped under prefers-color-scheme dark) so the
+             official wordmark — which uses a dark slate fill on
+             transparent — stays legible across every client. Without
+             this band the wordmark rendered as a small dark blob on
+             Gmail mobile's auto-inverted background. -->
         <tr>
-          <td align="center" class="px-mobile" style="padding:0 32px 28px 32px;">
+          <td align="center" class="header-band" style="padding:32px 32px 32px 32px;background-color:#FFFFFF;">
             ${wordmark(kind)}
           </td>
         </tr>
+        <!-- Vertical space between header band and body content. -->
+        <tr><td style="font-size:0;line-height:0;height:28px;">&nbsp;</td></tr>
 
         <!-- Body -->
         ${body}
@@ -201,38 +209,28 @@ ${escapeHtml(preheader)}
 </html>`;
 }
 
-/* Wordmark (text-only, no h-mark). The earlier combined h-icon +
-   text logo rendered too small as a single image in Gmail's email
-   layout; the wordmark-only treatment reads as a single confident
-   brand piece in the header row. PNG sources live in /public:
-     - logo-email.png       (800x240, dark wordmark) — light-bg default
-     - logo-email-dark.png  (800x240, white wordmark) — dark-mode swap
+/* Wordmark (text-only, no h-mark). Now rides on a fixed white
+   header band — see shellDocument's header <td>. That removes the
+   need for a dark-mode logo variant: the dark-slate wordmark sits
+   on white in every client mode. Source PNG:
+     - logo-email.png   (266x80, dark-slate "havlo" on transparent)
 
-   The dark variant is hidden by default (display:none) and revealed
-   in the dark-mode media query via the .logo-dark class swap:
-     light-mode email clients         show logo-email.png
-     dark-mode clients (Apple Mail,
-       iOS Mail, Spark, Outlook.com
-       webmail in dark theme)         show logo-email-dark.png
-     Gmail mobile (strips <style>)    falls back to the default-
-                                      visible light PNG. Gmail's own
-                                      row-level dark invert keeps the
-                                      contrast against the dark row.
-
-   Wordmark aspect is 10:3 (200x60 source), rendered at:
-     marketing shell:  100x30 display
-     personal shell:    84x25 display (~16% smaller so a transactional
-                                       note doesn't lead with a
-                                       brand-loud header)
-   4x retina source keeps the rendered text crisp on high-DPI
-   displays at either size. */
+   Wordmark aspect is ~10:3, rendered at:
+     marketing shell:  140x42 display
+     personal shell:   118x35 display (~16% smaller so a transactional
+                                      note doesn't lead with a
+                                      brand-loud header)
+   2-3x downscale from the 266x80 source keeps the render crisp on
+   high-DPI displays at either size. Display dimensions bumped from
+   the earlier 100x30 / 84x25 because the white band now provides
+   the negative space — the logo can read at a more confident size
+   without competing with adjacent typography. */
 function wordmark(kind: "marketing" | "personal"): string {
-  const displayWidth  = kind === "marketing" ? 100 : 84;
-  const displayHeight = kind === "marketing" ? 30  : 25;
+  const displayWidth  = kind === "marketing" ? 140 : 118;
+  const displayHeight = kind === "marketing" ? 42  : 35;
   const altText       = "Havlo";
   return `<a href="${SITE_URL}" style="text-decoration:none;border:0;display:inline-block;">
-    <img src="${SITE_URL}/logo-email.png" alt="${altText}" width="${displayWidth}" height="${displayHeight}" class="logo-light" style="display:inline-block;border:0;outline:none;text-decoration:none;height:${displayHeight}px;width:${displayWidth}px;vertical-align:middle;" />
-    <img src="${SITE_URL}/logo-email-dark.png" alt="${altText}" width="${displayWidth}" height="${displayHeight}" class="logo-dark" style="display:none;border:0;outline:none;text-decoration:none;mso-hide:all;" />
+    <img src="${SITE_URL}/logo-email.png" alt="${altText}" width="${displayWidth}" height="${displayHeight}" style="display:inline-block;border:0;outline:none;text-decoration:none;height:${displayHeight}px;width:${displayWidth}px;vertical-align:middle;" />
   </a>`;
 }
 

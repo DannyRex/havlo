@@ -635,6 +635,92 @@ export interface DropdownStoreRow {
   qualifying_count: number;
 }
 
+/* Canonical → real store_id resolution.
+
+   The /api/deals URL exposes a CANONICAL key in the ?stores= filter
+   ("amazon", "walmart", "a1 tech deals") for human-readable
+   bookmarkable URLs. The real DB store_id can be different:
+     - hyphenated where the canonical key is space-delimited:
+         canonical "a1 tech deals" -> store_id "a1-tech-deals"
+     - one canonical key collapses MULTIPLE variants:
+         canonical "amazon"        -> ["amazon", "amazon-com",
+                                       "amazon-marketplace", ...]
+
+   browse_deals's p_store_ids accepts real store_ids only — passing
+   the canonical key matches nothing and yields 0 items even when
+   the dropdown count says >0. Phase 3 audit caught this on
+   /uk/deals?stores=a1+tech+deals (dropdown count 1, items grid 0).
+
+   Building this map once per warm function and caching keeps the
+   translation O(1) at request time. Cached via unstable_cache with
+   a 1-hour revalidate window — the stores table is roughly insert-
+   only (new stores added on ingest; existing rows rarely renamed).
+
+   Returned map is keyed by canonical-key (lowercased displayStoreName)
+   -> array of real store_ids that collapse to that canonical form. */
+import { unstable_cache } from "next/cache";
+import { displayStoreName } from "@/lib/store-display";
+
+export const getStoreCanonicalMap = unstable_cache(
+  async (): Promise<Record<string, string[]>> => {
+    const supa = getSupabaseAdmin();
+    if (!supa) return {};
+    const rows: Array<{ id: string; name: string }> = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await supa
+        .from("stores")
+        .select("id, name")
+        .range(from, from + 999);
+      if (error || !data || data.length === 0) break;
+      rows.push(...(data as Array<{ id: string; name: string }>));
+      if (data.length < 1000) break;
+      from += 1000;
+    }
+    const out: Record<string, string[]> = {};
+    for (const r of rows) {
+      if (!r.name) continue;
+      const canonical = displayStoreName(r.name).toLowerCase();
+      if (!out[canonical]) out[canonical] = [];
+      out[canonical].push(r.id);
+    }
+    return out;
+  },
+  ["store-canonical-map-v1"],
+  { revalidate: 3600, tags: ["stores"] },
+);
+
+/* Resolve a URL store filter list (canonical keys) to the real
+   store_id list expected by browse_deals.p_store_ids. Unknown
+   canonicals (typo, deleted store) pass through unchanged — they
+   simply match zero rows in the RPC, which is the safe default.
+   Real store_ids passed in (older clients / shared links pre-
+   canonicalisation) are preserved as-is via the same fallback. */
+export async function resolveCanonicalStoreFilter(
+  canonicalKeys: string[] | null | undefined,
+): Promise<string[] | null> {
+  if (!canonicalKeys || canonicalKeys.length === 0) return null;
+  const map = await getStoreCanonicalMap();
+  const out: string[] = [];
+  for (const k of canonicalKeys) {
+    const real = map[k];
+    if (real && real.length > 0) {
+      out.push(...real);
+    } else {
+      /* Pass-through for unrecognised keys — safer than dropping
+         silently. Two reasons to land here:
+           1. Shared/old links from before canonicalisation that pass
+              the real storeId directly ("?stores=amazon-com").
+           2. A store that was removed after the URL was shared.
+         In case 1 the RPC matches the real ID fine. In case 2 it
+         matches nothing and the user sees an empty filtered grid,
+         which is the correct UX. */
+      out.push(k);
+    }
+  }
+  return out;
+}
+
 export async function listCountryStoresWithCounts(opts: {
   country:     string;
   category?:   string | null;

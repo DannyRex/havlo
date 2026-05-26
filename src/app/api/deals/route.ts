@@ -6,7 +6,7 @@ import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore
 import { isStoreSearchUrl } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import { fetchSearchSuggestions } from "@/lib/search/suggestions";
-import { listCountryStoresWithCounts } from "@/lib/providers/browse-db";
+import { listCountryStoresWithCounts, resolveCanonicalStoreFilter } from "@/lib/providers/browse-db";
 import type { Deal, OriginFilter, SortOption } from "@/types";
 
 /* Cached pool fetch — the heaviest part of /api/deals.
@@ -95,12 +95,24 @@ async function fetchPoolCached(params: {
   sort:          SortOption;
   search?:       string;
   country?:      string;
+  /* REAL store_ids (already resolved from URL canonical via
+     resolveCanonicalStoreFilter). When set, the underlying RPC
+     filters to these stores so even niche stores with only one
+     product still surface — fixes the May 2026 case where
+     /uk/deals?stores=a1+tech+deals showed 0 results because
+     A1 Tech Deals' single offer was below the 500-row global
+     pool cap. Cache key includes this so per-store-filter views
+     get their own warm pool. */
+  stores?:       string[] | null;
 }): Promise<Deal[]> {
   /* Stable key — JSON.stringify omits undefined fields so absent
      category/search produces the same key as explicitly-undefined.
      Sort is always defined (server defaults to "relevance"). The
-     POOL_CACHE_VERSION prefix invalidates pre-refactor entries. */
-  const key = `${POOL_CACHE_VERSION}:${JSON.stringify(params)}`;
+     POOL_CACHE_VERSION prefix invalidates pre-refactor entries.
+     Stores sorted for stable key regardless of URL order. */
+  const stableStores = params.stores ? [...params.stores].sort() : undefined;
+  const keyParams = { ...params, stores: stableStores };
+  const key = `${POOL_CACHE_VERSION}:${JSON.stringify(keyParams)}`;
   const now = Date.now();
 
   const cached = POOL_CACHE.get(key);
@@ -116,6 +128,7 @@ async function fetchPoolCached(params: {
     search:       params.search,
     origin:       "all",
     country:      params.country,
+    stores:       params.stores ?? undefined,
   });
 
   /* Health-aware caching — don't lock users into a degraded view.
@@ -314,6 +327,17 @@ export async function GET(req: NextRequest) {
        dropdown was missing 90% of stores in non-NG countries (the
        May 2026 cross-country audit found Amazon + noon absent from
        AE and Takealot absent from ZA). */
+    /* Translate the URL's CANONICAL store filter ("amazon", "walmart",
+       "a1 tech deals") into the REAL store_ids the RPC's p_store_ids
+       parameter expects ("amazon-com", "walmart-marketplace",
+       "a1-tech-deals"). One canonical key can expand to multiple
+       real ids (Amazon's seller variants). Without this translation,
+       the pool RPC matches nothing and the items grid returns zero
+       even when the dropdown count shows >0. Resolution is cached
+       via unstable_cache (1-hour TTL) so this is effectively free
+       on warm functions. */
+    const realStoreIds = await resolveCanonicalStoreFilter(stores);
+
     /* Three independent fetches fire in parallel:
          1. items pool (capped 3-pass fan-out, drives the grid)
          2. dropdown store list (cap-free RPC, drives the filter panel)
@@ -327,6 +351,7 @@ export async function GET(req: NextRequest) {
         sort,
         search,
         country: country.code,
+        stores: realStoreIds,
       }),
       listCountryStoresWithCounts({
         country:     country.code,
@@ -344,7 +369,10 @@ export async function GET(req: NextRequest) {
         categorySlug: category,
         minDiscount:  userMinDiscount,
         search:       search,
-        stores:       stores,
+        /* Real store_ids for the RPC (resolved from URL canonical
+           above) — matches the items pool's filter so the tab pill
+           counts stay in sync with what the grid renders. */
+        stores:       realStoreIds ?? undefined,
         country:      country.code,
       }).catch(() => null),
     ]);
