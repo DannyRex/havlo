@@ -158,25 +158,32 @@ ${escapeHtml(preheader)}
 </div>
 
 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="bg-body" style="background-color:${tokens.bg};">
+
+  <!-- Full-bleed white header band. Placed in the OUTER table at
+       100% width so the white reaches the true left and right edges
+       of the email viewport, not just the 600px inner container.
+       Earlier the band sat inside the container which made it appear
+       as a small white box centered in the middle of the email body
+       (user feedback May 2026). The wordmark is centered within the
+       band via a 600px-max inner container for visual consistency
+       with the body's max-width. -->
+  <tr>
+    <td align="center" class="header-band" style="background-color:#FFFFFF;padding:32px 16px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto;">
+        <tr>
+          <td align="center">
+            ${wordmark(kind)}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Body content lives in the centered max-600 container below. -->
   <tr>
     <td align="center" style="padding:32px 16px;">
 
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="container" width="${MAX_WIDTH}" style="width:100%;max-width:${MAX_WIDTH}px;">
-
-        <!-- Header: white band spanning the email canvas width with
-             padding around the logo. The white background is fixed
-             (not flipped under prefers-color-scheme dark) so the
-             official wordmark — which uses a dark slate fill on
-             transparent — stays legible across every client. Without
-             this band the wordmark rendered as a small dark blob on
-             Gmail mobile's auto-inverted background. -->
-        <tr>
-          <td align="center" class="header-band" style="padding:32px 32px 32px 32px;background-color:#FFFFFF;">
-            ${wordmark(kind)}
-          </td>
-        </tr>
-        <!-- Vertical space between header band and body content. -->
-        <tr><td style="font-size:0;line-height:0;height:28px;">&nbsp;</td></tr>
 
         <!-- Body -->
         ${body}
