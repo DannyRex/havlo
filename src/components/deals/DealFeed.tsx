@@ -989,26 +989,31 @@ export default function DealFeed({
 
       {/* Initial skeletons — same single-render approach as the
           loaded grid. 12 placeholder tiles is enough to fill the
-          fold across all viewport sizes. */}
+          fold across all viewport sizes. Same responsive layout
+          switch: row-major grid on mobile, column-major masonry
+          from sm: up. */}
       {loading && (
-        <div className="columns-2 sm:columns-3 lg:columns-4 gap-2 sm:gap-3 lg:gap-4 [column-fill:_balance]">
+        <div className="grid grid-cols-2 gap-2 sm:block sm:columns-3 lg:columns-4 sm:gap-3 lg:gap-4 sm:[column-fill:_balance]">
           {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="break-inside-avoid mb-2 sm:mb-3 lg:mb-4">
+            <div key={i} className="break-inside-avoid sm:mb-3 lg:mb-4">
               <SkeletonTile aspect={MASONRY_ASPECTS[i % MASONRY_ASPECTS.length]} />
             </div>
           ))}
         </div>
       )}
 
-      {/* Single CSS-columns render — addresses Bucket 1#24 from QA
-          audit. Previously rendered three full DOM copies (mobile /
-          tablet / desktop) CSS-hidden via media queries; each card's
-          <img> still fetched even when the parent was display:none,
-          so the tab made 3× the network requests. Now: one DOM tree
-          with responsive `columns-2 sm:columns-3 lg:columns-4`.
-          break-inside-avoid keeps each card intact across columns.
-          Mobile list-view stays separate because a list is always
-          one column with different per-row layout. */}
+      {/* Responsive two-mode layout in a single DOM tree:
+            - mobile (<sm):  `grid grid-cols-2`   → row-major fill
+                             (item 0 top-left, item 1 top-right,
+                             item 2 second row left, ...)
+            - sm+ desktop:   `block` + `columns-3` / `columns-4` →
+                             column-major masonry (existing behaviour,
+                             variable card heights pack tightly).
+          One DOM tree avoids the 3x image-fetch tax we saw when
+          mobile/tablet/desktop were separate display:none copies.
+          The `sm:block` override at sm+ defeats `grid`, letting
+          `sm:columns-N` activate. Mobile list-view stays separate
+          (always 1-column, different per-row layout). */}
       {!loading && items.length > 0 && (
         <>
           {viewMode === "list" && (
@@ -1022,12 +1027,12 @@ export default function DealFeed({
           )}
           <div
             className={cn(
-              "columns-2 sm:columns-3 lg:columns-4 gap-2 sm:gap-3 lg:gap-4 [column-fill:_balance]",
+              "grid grid-cols-2 gap-2 sm:block sm:columns-3 lg:columns-4 sm:gap-3 lg:gap-4 sm:[column-fill:_balance]",
               viewMode === "list" && "hidden sm:block",
             )}
           >
             {items.map((d, i) => (
-              <div key={d.id} className="break-inside-avoid mb-2 sm:mb-3 lg:mb-4">
+              <div key={d.id} className="break-inside-avoid sm:mb-3 lg:mb-4">
                 <AnimateIn delay={Math.min(i, 6) * 50}>
                   <MasonryCard
                     deal={d}
