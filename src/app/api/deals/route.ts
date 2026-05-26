@@ -326,6 +326,12 @@ export async function GET(req: NextRequest) {
         category:    category,
         minDiscount: minDiscount ? parseInt(minDiscount, 10) : 0,
         search:      search ?? null,
+        /* Origin-scoped dropdown: "Local" tab shows only country-
+           anchored stores, "Cross-border" shows only intl, "All"
+           shows the union. Avoids dead-end UX where the user picks
+           AliExpress from the Local tab and the items grid returns
+           zero results because the local filter excludes intl rows. */
+        origin:      origin,
       }),
     ]);
 

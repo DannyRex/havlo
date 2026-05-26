@@ -790,9 +790,17 @@ export default function DealFeed({
         </div>
       )}
 
-      {/* Origin toggle */}
+      {/* Origin toggle. onChange also clears selectedStores because
+          the store dropdown is now origin-scoped (migration 0044) —
+          a local-tab selection like "Konga" doesn't apply on the
+          cross-border tab, and silently keeping it would leave the
+          items grid filtered to a non-existent intersection. */}
       <div className="mb-4">
-        <OriginToggle active={origin} onChange={setOrigin} counts={originCounts} />
+        <OriginToggle
+          active={origin}
+          onChange={(next) => { setOrigin(next); setSelectedStores(new Set()); }}
+          counts={originCounts}
+        />
         {origin === "intl" && (
           /* Copy reflects the May 2026 currency-localisation pass:
              cards now show the user's local currency as the PRIMARY
@@ -1080,6 +1088,7 @@ export default function DealFeed({
                 setCategory("all"); setTier("all");
                 setSearchInput(""); setSearchDebounced("");
                 setOrigin("all");
+                setSelectedStores(new Set());
               }}
               className="btn-secondary"
             >

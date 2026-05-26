@@ -640,6 +640,12 @@ export async function listCountryStoresWithCounts(opts: {
   category?:   string | null;
   minDiscount?: number;
   search?:     string | null;
+  /** "all" (default) returns country-anchored + cross-border. "local"
+      returns only stores anchored in the user's country. "intl"
+      returns only cross-border stores. Mirrors the origin tab on
+      /[country]/deals so the dropdown shows a coherent slice of
+      what the items grid is actually rendering. */
+  origin?:     "all" | "local" | "intl";
 }): Promise<DropdownStoreRow[]> {
   const supa = getSupabaseAdmin();
   if (!supa) return [];
@@ -648,6 +654,7 @@ export async function listCountryStoresWithCounts(opts: {
     p_category:     (opts.category && opts.category !== "all") ? opts.category : null,
     p_min_discount: opts.minDiscount ?? 0,
     p_search:       opts.search?.trim() || null,
+    p_origin:       opts.origin ?? "all",
   });
   if (error) {
     console.warn("[browse-db] list_country_stores_with_counts RPC error:", error.message);
