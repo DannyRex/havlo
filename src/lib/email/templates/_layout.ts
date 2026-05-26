@@ -120,7 +120,7 @@ function shellDocument({ preheader, body, kind }: ShellOptions & { kind: "market
   body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
   .container { max-width: ${MAX_WIDTH}px; }
 
-  /* Mobile overrides — clients that respect <style>. */
+  /* Mobile overrides (clients that respect <style>). */
   @media only screen and (max-width: 600px) {
     .container { width: 100% !important; }
     .px-mobile { padding-left: 24px !important; padding-right: 24px !important; }
@@ -131,8 +131,8 @@ function shellDocument({ preheader, body, kind }: ShellOptions & { kind: "market
 
   /* Dark-mode overrides for clients that honour prefers-color-scheme
      (Apple Mail, iOS Mail, Outlook.com webmail, Spark). Gmail's
-     dark mode does its own invert and ignores these, which is fine —
-     our inline light-mode colors stay legible against Gmail's grey
+     dark mode does its own invert and ignores these, which is fine.
+     Our inline light-mode colors stay legible against Gmail's grey
      auto-inverted backgrounds. */
   @media (prefers-color-scheme: dark) {
     .bg-body     { background-color: #0A0A0A !important; }
@@ -143,8 +143,10 @@ function shellDocument({ preheader, body, kind }: ShellOptions & { kind: "market
     .text-ink-3  { color: #6B6B6B !important; }
     .border      { border-color: #333333 !important; }
     .border-top  { border-top-color: #333333 !important; }
-    .wordmark    { color: #F5F5F5 !important; }
     .text-brand  { color: #4A8BFF !important; }
+    /* Logo swap: hide the light-bg PNG, show the dark-bg PNG. */
+    .logo-light  { display: none !important; }
+    .logo-dark   { display: inline-block !important; }
   }
 </style>
 </head>
@@ -178,7 +180,7 @@ ${escapeHtml(preheader)}
               <tr>
                 <td style="padding:24px 0 8px 0;">
                   <p class="text-ink-3" style="margin:0 0 6px 0;font-family:${tokens.fontFamily};font-size:13px;line-height:1.55;color:${tokens.ink3};">
-                    You're getting this because you signed up at <a href="${SITE_URL}" class="text-ink-3" style="color:${tokens.ink3};text-decoration:underline;">havlo.io</a>. Reply <strong style="color:${tokens.ink3};">remove</strong> and we'll take you off the list — same day, no follow-up.
+                    You're getting this because you signed up at <a href="${SITE_URL}" class="text-ink-3" style="color:${tokens.ink3};text-decoration:underline;">havlo.io</a>. Reply <strong style="color:${tokens.ink3};">remove</strong> and we'll take you off the list. Same day, no follow-up.
                   </p>
                   <p class="text-ink-3" style="margin:0;font-family:${tokens.fontFamily};font-size:12px;line-height:1.5;color:${tokens.ink3};">
                     Havlo · havlo.io · Independent price comparison
@@ -199,15 +201,41 @@ ${escapeHtml(preheader)}
 </html>`;
 }
 
-/* Wordmark — text-based (no image needed, image-blocking clients
-   still render the brand). Marketing shells use a 22px wordmark with
-   a small brand-color dot accent; personal shells use a smaller 16px
-   wordmark to read as a sender mark rather than a hero. */
+/* Wordmark. Was originally an HTML text mark for image-blocking
+   client compatibility, but every client that matters does render
+   inline images from a trusted sender domain, and the official
+   brand logo (blue rounded-square mark + dark "havlo" word) is the
+   identity we want subscribers to recognize across surfaces.
+
+   Two PNG variants live in /public:
+     - logo-email.png       (400x112, dark wordmark) — light-bg default
+     - logo-email-dark.png  (400x112, white wordmark) — dark-mode swap
+
+   The dark variant is hidden by default (display:none in inline
+   style + the .logo-dark class). The dark-mode media query in the
+   shell <style> block flips visibility:
+     light-mode email clients         show logo-email.png
+     dark-mode clients (Apple Mail,
+       iOS Mail, Spark, Outlook.com
+       webmail in dark theme)         show logo-email-dark.png
+     Gmail mobile (strips <style>)    falls back to the default-
+                                      visible light PNG — acceptable
+                                      since Gmail's dark mode does
+                                      its own row-level invert
+                                      against the visible light asset.
+
+   Marketing shell renders at 100x28 display height; personal shell
+   at 88x25 (slightly smaller so the personal note doesn't lead with
+   a brand-loud header). Both sourced from the same 400x112 PNG
+   (2x retina), so the rendered pixel density is sharp on Retina
+   displays at either size. */
 function wordmark(kind: "marketing" | "personal"): string {
-  const size = kind === "marketing" ? 24 : 17;
-  const dotSize = kind === "marketing" ? 8 : 6;
-  return `<a href="${SITE_URL}" style="text-decoration:none;color:${tokens.ink};">
-    <span class="wordmark" style="display:inline-block;font-family:${tokens.fontFamily};font-size:${size}px;font-weight:800;letter-spacing:-0.02em;color:${tokens.ink};">Havlo</span><span style="display:inline-block;width:${dotSize}px;height:${dotSize}px;background-color:${tokens.brand};border-radius:50%;margin-left:4px;vertical-align:${kind === "marketing" ? "middle" : "baseline"};"></span>
+  const displayWidth  = kind === "marketing" ? 100 : 88;
+  const displayHeight = kind === "marketing" ? 28  : 25;
+  const altText       = "Havlo";
+  return `<a href="${SITE_URL}" style="text-decoration:none;border:0;display:inline-block;">
+    <img src="${SITE_URL}/logo-email.png" alt="${altText}" width="${displayWidth}" height="${displayHeight}" class="logo-light" style="display:inline-block;border:0;outline:none;text-decoration:none;height:${displayHeight}px;width:${displayWidth}px;vertical-align:middle;" />
+    <img src="${SITE_URL}/logo-email-dark.png" alt="${altText}" width="${displayWidth}" height="${displayHeight}" class="logo-dark" style="display:none;border:0;outline:none;text-decoration:none;mso-hide:all;" />
   </a>`;
 }
 
