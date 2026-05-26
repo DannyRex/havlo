@@ -95,7 +95,45 @@ function dealToStoreRow(d: Deal): StoreRow {
   };
 }
 
+/* Strip merchant-side "brand placeholders" from listing titles.
+
+   Why: many marketplaces (Jumia, Walmart, Amazon Marketplace, Ubuy)
+   require every listing to have a brand field. When the seller has
+   no brand to list (white-label / unbranded goods, generic parts,
+   knock-off accessories), they pick "Generic", "Unbranded", or
+   "No Brand" from a dropdown. SerpAPI returns those titles verbatim:
+   "Generic Universal Headphone Headband Cover for Sony WH-1000XM5"
+   reads like a knock-off when really the product is just unbranded.
+
+   May 2026 user audit: 24 of 280 Jumia products (~9%) had a
+   leading "Generic " prefix. Walmart, Amazon UK, Ubuy, Ninja UAE
+   each had isolated cases. Strip all three placeholder prefixes
+   at the ingestion boundary so every store benefits uniformly.
+
+   We DON'T touch "OEM" (legitimate signal: original-equipment-
+   manufacturer parts) or brand-like uppercase tokens we don't
+   recognise (avoid false positives that mangle real brands). */
+const TITLE_PLACEHOLDER_BRANDS = /^(generic|unbranded|no\s*brand)\s*[-:|]?\s*/i;
+function cleanProductTitle(raw: string): string {
+  let t = raw.trim();
+  /* Iterate so "Generic Unbranded X" → "X". Cap iterations to 3 so a
+     pathologically chained title can't cause a runaway. */
+  for (let i = 0; i < 3; i++) {
+    const next = t.replace(TITLE_PLACEHOLDER_BRANDS, "").trim();
+    if (next === t) break;
+    t = next;
+  }
+  /* Collapse runs of internal whitespace introduced by the strip. */
+  return t.replace(/\s{2,}/g, " ");
+}
+
 function dealToProductRow(d: Deal, signature: string) {
+  /* Strip merchant-side brand placeholders ("Generic", "Unbranded",
+     "No Brand") before any other title work — every downstream
+     consumer (signature/dedup, search FTS, category inference, card
+     render, email digest) sees the cleaned form. */
+  const cleanedTitle = cleanProductTitle(d.title);
+
   /* Auto-correct mistagged categories at ingest time.
 
      Why: ingest-providers.ts tags every result from a 'phones' query
@@ -109,7 +147,7 @@ function dealToProductRow(d: Deal, signature: string) {
      OVERRIDE to the inferred slug. If inference returns null
      (unrecognised), keep the source slug — better to over-tag than
      to lose the data. */
-  const { disagrees, inferred } = categoryDisagreesWithTitle(d.categorySlug, d.title);
+  const { disagrees, inferred } = categoryDisagreesWithTitle(d.categorySlug, cleanedTitle);
   const correctedSlug = disagrees && inferred ? inferred : d.categorySlug;
   const correctedCategory = disagrees && inferred
     ? (categories.find((c) => c.slug === inferred)?.name ?? d.category)
@@ -120,10 +158,10 @@ function dealToProductRow(d: Deal, signature: string) {
      extracted them — an old TODO that nullified the variant-gate's
      brand-equality guard (both sides null → no-op check). May 2026
      fix: persist what the parser found. */
-  const parsed = buildSignature(d.title);
+  const parsed = buildSignature(cleanedTitle);
 
   return {
-    title: d.title,
+    title: cleanedTitle,
     description: d.description ?? null,
     category: correctedCategory,
     category_slug: correctedSlug,
@@ -161,15 +199,38 @@ function dealToOfferRow(
     store_id: d.storeId,
     url: d.url,
     current_price: d.salePrice,
-    original_price: d.originalPrice ?? null,
-    discount_percent: d.discountPercent ?? null,
+    /* Store NULL for original_price when there's no actual markdown.
+       Many providers (Jumia, AliExpress raw, sparse Walmart feeds)
+       have no MSRP signal — they pass originalPrice === salePrice to
+       satisfy the Deal type's `number` field. Storing that equality
+       in the DB is dishonest: it claims we observed a "was" price
+       when we never did. Null is the right semantic for "no markdown
+       known"; price-history and the discount-badge renderer already
+       short-circuit on null without rendering a fake "0% OFF" pill.
+
+       A genuine markdown (original > sale) preserves the original
+       value as before. */
+    original_price: (d.originalPrice && d.originalPrice > d.salePrice) ? d.originalPrice : null,
+    discount_percent: (d.discountPercent ?? 0) > 0 ? d.discountPercent : null,
     currency: d.currency,
-    /* is_deal — explicit boolean derived from discount_percent.
-       Pairs with migration 0028-offers-is-deal.sql which adds the
-       column and backfills existing rows. Future brand DTC scrapes
-       will deliberately set discountPercent=0 (selling at MSRP),
-       which naturally lands them as is_deal=false. */
-    is_deal: (d.discountPercent ?? 0) > 0,
+    /* is_deal — relaxed (May 2026 audit). Was: "true only when
+       discountPercent > 0" → quietly hid 38% of the catalog from
+       /deals (7,632 in-stock offers): all of Jumia, all of HealthPlus,
+       all of MedPlus, all of DHgate, 95% of ASOS, 28% of AliExpress
+       — every store whose ingest path doesn't surface an MSRP. The
+       store filter dropdown on /deals also relied on is_deal=true,
+       so those stores never appeared as filter options either.
+
+       New semantic: "this offer is a valid, in-stock, ready-to-show
+       row in the deals catalog." discount_percent is the actual
+       deal-ness signal; sort-by-discount still floats real markdowns
+       to the top, and the discount badge only renders when % > 0
+       (no fake "0% OFF" badges anywhere).
+
+       Rows where salePrice isn't a real positive number (broken
+       scrape, free placeholder, malformed feed) still get
+       is_deal=false so they stay hidden. */
+    is_deal: (d.salePrice ?? 0) > 0,
     /* Always (re)mark as in_stock on a successful upsert. The
        staleness sweep below flips offers that DIDN'T get touched
        this run, so re-stamping here is the "I saw this URL this

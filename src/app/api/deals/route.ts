@@ -87,7 +87,7 @@ const SEARCH_POOL_MIN_CACHEABLE = 24;
    user report: "NG intl back to 15 (Amazon-only) hours after the
    3-pass deploy" — caused by an old instance that kept refreshing
    the default-sort NG cache entry. */
-const POOL_CACHE_VERSION = "v3-3pass";
+const POOL_CACHE_VERSION = "v4-may2026-is-deal-backfill";
 
 async function fetchPoolCached(params: {
   categorySlug?: string;
