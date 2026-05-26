@@ -823,6 +823,14 @@ export async function GET(req: NextRequest) {
           /* Diagnostic header so we can grep nginx / Vercel logs for
              fallback hits and know when to investigate the RPC. */
           "X-Havlo-Degraded": looksLikeCuratedFallback ? "curated-fallback" : "ok",
+          /* Phase-3 store-filter debug header. When the URL carries
+             a stores filter, surface the resolved real-store-id list
+             so we can grep for canonical-vs-real mismatches in prod
+             without spelunking Vercel logs. Drop this header after
+             the audit run lands. */
+          "X-Havlo-Resolved-Stores": stores && stores.length > 0
+            ? JSON.stringify({ canonical: stores, real: realStoreIds, pool: allRawAcrossOrigins.length })
+            : "none",
         },
       },
     );
