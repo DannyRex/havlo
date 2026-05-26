@@ -305,18 +305,31 @@ export function spacer(px: number): string {
 }
 
 /* Bulletproof CTA button — table-based for Outlook compatibility.
-   Rounded corners (8px). Brand color background, white text, weighted
-   600. Falls back gracefully when CSS is stripped (still tappable
-   text link). */
+
+   First-shipped pattern put `padding` on the inner <a> with
+   `display:inline-block`. User reported (May 2026) the button
+   collapsing to a tight purple pill in Gmail mobile — turns out
+   Gmail's mobile renderer strips `display:inline-block` from
+   anchors, which made the padding ineffective and the link rendered
+   as a regular tappable text link with the user-agent highlight
+   colour. The fix below moves the visual padding onto the <td>
+   itself, where it's not stripped, so the anchor can stay a plain
+   `text-decoration:none` link. Now:
+     - <td> carries: background-color, border-radius, padding,
+                     mso-padding-alt (Outlook backup)
+     - <a> carries:  font-family, font-size, font-weight, color,
+                     text-decoration:none
+   Both colors are explicit so Gmail's link-color override (which
+   defaults to its theme link blue) can't override the white text. */
 export function button(opts: { url: string; label: string; align?: "left" | "center" }): string {
   const align = opts.align ?? "center";
   return `<tr>
     <td class="px-mobile" align="${align}" style="padding:8px 32px 24px 32px;">
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse:separate;">
         <tr>
-          <td align="center" style="background-color:${tokens.brand};border-radius:8px;mso-padding-alt:14px 28px;">
-            <a href="${escapeAttr(opts.url)}" style="display:inline-block;padding:14px 28px;font-family:${tokens.fontFamily};font-size:15px;font-weight:600;line-height:1;color:#FFFFFF;text-decoration:none;border-radius:8px;background-color:${tokens.brand};">
-              ${escapeHtml(opts.label)}
+          <td align="center" bgcolor="${tokens.brand}" style="background-color:${tokens.brand};border-radius:8px;padding:14px 28px;mso-padding-alt:14px 28px;">
+            <a href="${escapeAttr(opts.url)}" style="font-family:${tokens.fontFamily};font-size:15px;font-weight:600;line-height:1;color:#FFFFFF;text-decoration:none;">
+              <span style="color:#FFFFFF;text-decoration:none;">${escapeHtml(opts.label)}</span>
             </a>
           </td>
         </tr>
