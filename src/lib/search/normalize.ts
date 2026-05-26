@@ -265,7 +265,168 @@ const MODEL_HINTS: Record<string, RegExp[]> = {
     /\b(mx\s*(?:master|keys|anywhere|ergo|mechanical)(?:\s*[0-9s]+)?)\b/i,
     /\b(g\s*(?:pro|hub|cloud|703|915|x))\b/i,
   ],
+
+  /* Phase 2.3 — model-line additions for the top brand|? collision
+     buckets surfaced by the May 2026 audit (~837 products that had
+     brand extracted but model=null). Each regex is rooted in a
+     brand-specific line name so cross-brand false matches are
+     impossible. */
+
+  /* Nike: 346 products. Sneaker/apparel line names with optional
+     numeric model suffix. Air Force/Max/Jordan/Pegasus/Zoom/etc. */
+  nike: [
+    /\b(air\s*max\s*\w+(?:\s*\d+)?)\b/i,
+    /\b(air\s*force\s*\d+)\b/i,
+    /\b(air\s*jordan\s*\d+(?:\s*[a-z]+)?)\b/i,
+    /\b(dunk\s*(?:low|high|mid)(?:\s*\w+)?)\b/i,
+    /\b(blazer\s*(?:low|mid|high)(?:\s*\w+)?)\b/i,
+    /\b(pegasus\s*\d+(?:\s*\w+)?)\b/i,
+    /\b(zoom\s*(?:vomero|fly|pegasus|rival|streak)\s*\w*)\b/i,
+    /\b(vaporfly(?:\s*next)?(?:\s*\d)?)\b/i,
+    /\b(alphafly(?:\s*\d)?)\b/i,
+    /\b(react\s*(?:infinity|miler|element)(?:\s*\w+)?)\b/i,
+    /\b(free\s*run(?:\s*\d+)?)\b/i,
+    /\b(cortez(?:\s*\w+)?)\b/i,
+    /\b(metcon\s*\d+)\b/i,
+    /\b(tech\s*(?:fleece|knit))\b/i,
+  ],
+
+  /* Adidas: 144 products. Heritage + performance lines. yeezy
+     kept here even though the brand split out to Adidas Originals
+     post-2022 — the historical inventory still tags as adidas. */
+  adidas: [
+    /\b(ultraboost(?:\s*(?:light|dna|22|23|5))?)\b/i,
+    /\b(stan\s*smith)\b/i,
+    /\b(superstar(?:\s*\w+)?)\b/i,
+    /\b(samba(?:\s*\w+)?)\b/i,
+    /\b(gazelle(?:\s*\w+)?)\b/i,
+    /\b(nmd(?:\s*[a-z]\d+)?)\b/i,
+    /\b(forum(?:\s*(?:low|mid|hi))?)\b/i,
+    /\b(yeezy\s*\w+(?:\s*\d+)?)\b/i,
+    /\b(campus\s*\d{2})\b/i,
+    /\b(handball\s*spezial)\b/i,
+    /\b(originals\s*\w+(?:\s*\d+)?)\b/i,
+    /\b(predator\s*\w+)\b/i,
+    /\b(copa\s*\w+)\b/i,
+  ],
+
+  /* Apple additions: iMac + Mac mini + iPad mini lines that the
+     existing macbook-pattern didn't cover. ipad-mini handled
+     separately from the ipad-pro/ipad-air pattern to keep
+     generation numbers explicit. */
+  apple_extra: [
+    /\b(imac(?:\s*\d{2})?(?:\s*m[1-5])?)\b/i,
+    /\b(mac\s*mini(?:\s*m[1-5](?:\s*(?:pro|max|ultra))?)?)\b/i,
+    /\b(ipad\s*mini(?:\s*\d)?)\b/i,
+    /\b(homepod(?:\s*mini)?)\b/i,
+    /\b(apple\s*tv(?:\s*4k)?)\b/i,
+  ],
+
+  /* Samsung additions: Z Fold/Flip when the title omits "Galaxy"
+     prefix (Samsung-Z Fold7-Asda Mobile, etc.). 73 products affected. */
+  samsung_extra: [
+    /\b(z\s*(?:flip|fold)\s*\d?(?:\s*[a-z]+)?)\b/i,
+    /\b(bespoke\s*\w+)\b/i,
+    /\b(crystal\s*uhd)\b/i,
+  ],
+
+  /* Google: Pixel phones + Nest smart home + Chromecast. 40 products. */
+  google: [
+    /\b(pixel\s*\d+(?:\s*(?:pro|xl|a|fold))?)\b/i,
+    /\b(pixel\s*(?:buds|watch|tablet)(?:\s*\w+)?)\b/i,
+    /\b(nest\s*(?:mini|hub|audio|cam|wifi|doorbell|protect|thermostat)(?:\s*\w+)?)\b/i,
+    /\b(chromecast(?:\s*(?:ultra|with\s*google\s*tv))?)\b/i,
+  ],
+
+  /* Dell: Inspiron / XPS / OptiPlex / Latitude / Precision / Vostro
+     / Alienware (still sold under Dell brand). 35 products. */
+  dell: [
+    /\b(inspiron(?:\s*\d{4})?)\b/i,
+    /\b(xps\s*\d{2})\b/i,
+    /\b(optiplex(?:\s*\d{4})?)\b/i,
+    /\b(latitude(?:\s*\d{4})?)\b/i,
+    /\b(precision(?:\s*\d{4})?)\b/i,
+    /\b(vostro(?:\s*\d{4})?)\b/i,
+    /\b(alienware\s*\w+)\b/i,
+    /\b(ultrasharp(?:\s*\w+)?)\b/i,
+    /\b(slim\s*desktop)\b/i,
+    /\b(pro\s*(?:tower|slim|micro))\b/i,
+  ],
+
+  /* HP: Pavilion / Omen / Spectre / EliteBook / ProBook / Envy /
+     OmniDesk / All-in-One. 31 products. */
+  hp: [
+    /\b(pavilion(?:\s*\w+)?)\b/i,
+    /\b(omen(?:\s*\d+(?:\s*\w+)?)?)\b/i,
+    /\b(spectre(?:\s*x\d+)?)\b/i,
+    /\b(elitebook(?:\s*\d{3,4})?)\b/i,
+    /\b(probook(?:\s*\d{3,4})?)\b/i,
+    /\b(envy(?:\s*x\d+)?)\b/i,
+    /\b(omnidesk(?:\s*\w+)?)\b/i,
+    /\b(all\s*in\s*one)\b/i,
+    /\b(zbook(?:\s*\w+)?)\b/i,
+    /\b(victus(?:\s*\d+)?)\b/i,
+  ],
+
+  /* Lenovo: IdeaCentre / IdeaPad / ThinkPad / Yoga / Legion. 29. */
+  lenovo: [
+    /\b(ideacentre(?:\s*\w+)?)\b/i,
+    /\b(ideapad(?:\s*\w+)?)\b/i,
+    /\b(thinkpad(?:\s*[a-z]\d+)?)\b/i,
+    /\b(thinkbook(?:\s*\d+)?)\b/i,
+    /\b(yoga(?:\s*\w+)?)\b/i,
+    /\b(legion(?:\s*\w+)?)\b/i,
+    /\b(tab\s*\w+)\b/i,
+    /\b(idea\s*tab)\b/i,
+  ],
+
+  /* Nintendo: Switch family is the main consumer line. 31 products. */
+  nintendo: [
+    /\b(switch\s*oled)\b/i,
+    /\b(switch\s*lite)\b/i,
+    /\b(switch\s*sports)\b/i,
+    /\b(switch(?:\s*\d)?)\b/i,
+    /\b(metroid\s*prime\s*\d?)\b/i,
+    /\b(legend\s*of\s*zelda(?:\s*\w+)?)\b/i,
+    /\b(super\s*mario(?:\s*\w+)?)\b/i,
+  ],
+
+  /* LG additions: audio / appliances / laptops. 40 products. The
+     pre-existing `lg` array (TVs only) gets extended via MERGE_HINTS
+     at the bottom of the file so both regex sets fire on the same
+     match attempt. */
+  lg_extra: [
+    /\b(xboom(?:\s*\w+(?:\s*\w+)?)?)\b/i,
+    /\b(gram(?:\s*\d+)?)\b/i,
+    /\b(velvet)\b/i,
+    /\b(side\s*by\s*side(?:\s*door)?)\b/i,
+    /\b(washtower)\b/i,
+    /\b(styler)\b/i,
+  ],
+
+  /* Instant brand (formerly Instant Pot). 34 products. */
+  instant: [
+    /\b(pot\s*(?:pro|duo|max|classic|ultra|nova|lux|plus)(?:\s*\d+)?)\b/i,
+    /\b(pot(?:\s*\d+)?)\b/i,
+    /\b(vortex(?:\s*\w+)?)\b/i,
+    /\b(omni(?:\s*\w+)?)\b/i,
+    /\b(zest)\b/i,
+  ],
 };
+
+/* Apple/Samsung extras are appended to the main entries via the
+   findModel helper — keeps the per-brand arrays focused. */
+const MERGE_HINTS = (target: string, source: string) => {
+  const existing = MODEL_HINTS[target] ?? [];
+  const extra = MODEL_HINTS[source] ?? [];
+  if (extra.length > 0) MODEL_HINTS[target] = [...existing, ...extra];
+};
+MERGE_HINTS("apple",   "apple_extra");
+MERGE_HINTS("samsung", "samsung_extra");
+MERGE_HINTS("lg",      "lg_extra");
+delete MODEL_HINTS.apple_extra;
+delete MODEL_HINTS.samsung_extra;
+delete MODEL_HINTS.lg_extra;
 
 // Words that look like model tokens but are actually descriptors / fluff —
 // must NOT be picked as a fallback model.
