@@ -252,6 +252,20 @@ jobs:
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
         run: npm run ingest:jumia
 
+      # NG long-tail retailers via SerpAPI site:domain queries.
+      # Replaces the broken/silent Playwright scrapers for Slot + Kara
+      # (and future merchants added to NG_MERCHANT_CONFIGS). Same job
+      # as Jumia so dedup's `needs` chain doesn't have to widen, and
+      # both jobs share the same SerpAPI credit pool.
+      # Cost: ~22 credits per run today (Slot 12 + Kara 10). Twice-
+      # weekly cron = ~176 credits/month, well under the Developer
+      # plan ceiling. Grows linearly with merchants added to the
+      # config — each new merchant adds its query-list count to the
+      # per-run cost.
+      - name: Ingest NG long-tail merchants (SerpAPI site-filter) → Supabase
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
+        run: npm run ingest:ng-serpapi
+
   # ── Job 4: UK retailer-biased SerpAPI ingest. Standard ingest above
   #          uses category names ("Phones", "Laptops") which Google
   #          Shopping UK ranks Amazon-first for, leaving the UK pool
