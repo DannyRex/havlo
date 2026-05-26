@@ -614,3 +614,44 @@ export async function dbHasProducts(): Promise<boolean> {
   if (error) return false;
   return (count ?? 0) > 0;
 }
+
+/* ── Dropdown store list — cap-free aggregate ────────────────────────
+   Returns every store in the country catalog (visible-to-country =
+   country-anchored OR cross-border) with its count at the user's
+   current filter. Sourced from list_country_stores_with_counts RPC
+   (migration 0043) which runs a single GROUP BY over the FULL
+   product_best_offers view — not bounded by the items-pool caps.
+
+   Why this exists separately from the 3-pass fan-out: the items
+   pool's per-pass row caps (PASS_MAX, PASS_C_MAX) were squeezing
+   80-90% of stores out of the dropdown for UK/US/DE/AE/IN/ZA — the
+   May 2026 cross-country audit found Amazon + noon missing from AE
+   and Takealot missing from ZA. The dropdown is a small payload
+   (~100 rows × ~80 bytes ≈ 8KB) so it can afford to be complete. */
+export interface DropdownStoreRow {
+  store_id:         string;
+  store_name:       string;
+  store_logo_url:   string | null;
+  qualifying_count: number;
+}
+
+export async function listCountryStoresWithCounts(opts: {
+  country:     string;
+  category?:   string | null;
+  minDiscount?: number;
+  search?:     string | null;
+}): Promise<DropdownStoreRow[]> {
+  const supa = getSupabaseAdmin();
+  if (!supa) return [];
+  const { data, error } = await supa.rpc("list_country_stores_with_counts", {
+    p_country:      opts.country.toUpperCase(),
+    p_category:     (opts.category && opts.category !== "all") ? opts.category : null,
+    p_min_discount: opts.minDiscount ?? 0,
+    p_search:       opts.search?.trim() || null,
+  });
+  if (error) {
+    console.warn("[browse-db] list_country_stores_with_counts RPC error:", error.message);
+    return [];
+  }
+  return (data ?? []) as DropdownStoreRow[];
+}

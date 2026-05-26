@@ -6,6 +6,7 @@ import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore
 import { isStoreSearchUrl } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import { fetchSearchSuggestions } from "@/lib/search/suggestions";
+import { listCountryStoresWithCounts } from "@/lib/providers/browse-db";
 import type { Deal, OriginFilter, SortOption } from "@/types";
 
 /* Cached pool fetch — the heaviest part of /api/deals.
@@ -305,12 +306,28 @@ export async function GET(req: NextRequest) {
        Post-cache: page 2+ is ~50ms (memory hit). The country filter +
        origin bucketing + storesAggregate below run per request because
        those are visitor-specific concerns. */
-    const allRawAcrossOrigins = await fetchPoolCached({
-      categorySlug: category,
-      sort,
-      search,
-      country: country.code,
-    });
+    /* Items pool + dropdown source fire in parallel. The dropdown
+       RPC (list_country_stores_with_counts, migration 0043) reads
+       all visible-to-country stores from product_best_offers in a
+       single GROUP BY — NOT bounded by the 3-pass per-pass row caps
+       that constrain the items pool. Without this parallel call the
+       dropdown was missing 90% of stores in non-NG countries (the
+       May 2026 cross-country audit found Amazon + noon absent from
+       AE and Takealot absent from ZA). */
+    const [allRawAcrossOrigins, dropdownStoresRaw] = await Promise.all([
+      fetchPoolCached({
+        categorySlug: category,
+        sort,
+        search,
+        country: country.code,
+      }),
+      listCountryStoresWithCounts({
+        country:     country.code,
+        category:    category,
+        minDiscount: minDiscount ? parseInt(minDiscount, 10) : 0,
+        search:      search ?? null,
+      }),
+    ]);
 
     /* Country store filter — pure-function, runs over Deal[] */
     const broadCountryFiltered = filterDealsForCountry(allRawAcrossOrigins, country);
@@ -561,33 +578,34 @@ export async function GET(req: NextRequest) {
        every underlying variant. */
     const canonicalKey = (storeName: string) => displayStoreName(storeName).toLowerCase();
 
+    /* Build the dropdown from the cap-free RPC result (NOT the items
+       pool). The RPC ALREADY applies the user's category / discount /
+       search filters server-side, so the qualifying_count it returns
+       is authoritative. JS layer's only job is to apply the canonical
+       display-name dedup (Walmart variants → "Walmart", Amazon variants
+       → "Amazon UK" / "Amazon US", etc.). Pre-RPC the dropdown was
+       sourced from the items pool, which has per-pass row caps; 80-90%
+       of stores were getting squeezed out for non-NG countries. */
     const storesAggregate = (() => {
-      /* First pass: qualifying-pool counts grouped by canonical
-         display name. */
-      const qualifyingCounts = new Map<string, number>();
-      for (const d of qualifyingByOrigin) {
-        if (!d.storeId) continue;
-        const key = canonicalKey(d.storeName);
-        qualifyingCounts.set(key, (qualifyingCounts.get(key) ?? 0) + 1);
-      }
-      /* Second pass: walk the broad pool to collect the store list
-         (so 0%-only stores still appear) and stamp each with its
-         qualifying count (0 when the store has no items at the
-         user's current tier). Keyed on canonical name; the entry's
-         `id` IS that canonical key so the URL stays human-readable
-         ("?stores=walmart" rather than a UUID). */
       const map = new Map<string, { id: string; name: string; count: number }>();
-      for (const d of broadByOrigin) {
-        if (!d.storeId) continue;
-        const key  = canonicalKey(d.storeName);
-        if (map.has(key)) continue;
-        const name = displayStoreName(d.storeName);
-        map.set(key, { id: key, name, count: qualifyingCounts.get(key) ?? 0 });
+      for (const row of dropdownStoresRaw) {
+        const key  = canonicalKey(row.store_name);
+        const name = displayStoreName(row.store_name);
+        const existing = map.get(key);
+        if (existing) {
+          /* Variant collapse: sum the underlying variants' counts
+             into the canonical entry (Walmart-seller-A + Walmart-
+             seller-B → "Walmart" with the combined count). */
+          existing.count += row.qualifying_count;
+        } else {
+          map.set(key, { id: key, name, count: row.qualifying_count });
+        }
       }
-      /* Sort by qualifying count DESC so the stores with the most
-         actionable inventory at the current tier float to the top
-         of the dropdown. Stores with count=0 (visible but empty)
-         settle at the bottom. */
+      /* Sort by qualifying count DESC so stores with the most
+         actionable inventory at the current tier float to the top.
+         Stores with count=0 (visible but no qualifying rows) settle
+         at the bottom — they still appear because the user can clear
+         their tier filter to see them. */
       return Array.from(map.values()).sort((a, b) => b.count - a.count);
     })();
 
