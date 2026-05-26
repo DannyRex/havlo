@@ -266,6 +266,16 @@ jobs:
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
         run: npm run ingest:ng-serpapi
 
+      # NG Shopify-based retailers via /collections/all/products.json
+      # public JSON endpoint — pure node-fetch, no Playwright, no
+      # SerpAPI credits. Wire here so 3C Hub (and future NG Shopify
+      # stores) get a guaranteed clean ingest independent of the
+      # browser orchestrator's per-job time budget. Runs even when
+      # SerpAPI is skipped because no credits are required.
+      - name: Ingest NG Shopify-based retailers → Supabase
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: npm run ingest:ng-shopify
+
   # ── Job 4: UK retailer-biased SerpAPI ingest. Standard ingest above
   #          uses category names ("Phones", "Laptops") which Google
   #          Shopping UK ranks Amazon-first for, leaving the UK pool

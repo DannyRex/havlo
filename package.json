@@ -23,6 +23,7 @@
     "ingest:uk-retailers": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-uk-retailers.ts",
     "ingest:jumia": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-jumia.ts",
     "ingest:ng-serpapi": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-ng-serpapi.ts",
+    "ingest:ng-shopify": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-ng-shopify.ts",
     "dedup": "tsx --tsconfig tsconfig.scripts.json scripts/dedup-products.ts",
     "newsletter:send": "tsx --tsconfig tsconfig.scripts.json scripts/cron/send-newsletter.ts",
     "newsletter:dry-run": "tsx --tsconfig tsconfig.scripts.json scripts/cron/send-newsletter.ts --dry-run",
