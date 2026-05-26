@@ -246,6 +246,11 @@ const QUERIES: JumiaQuery[] = [
 interface CliArgs {
   queryTokens?: string[];
   country?:     string;
+  /** Skip the curated-query scrape and run ONLY the image-backfill
+      pass against existing Jumia products with null image_url. Use
+      to top up images without burning the ~17 credits a full ingest
+      costs. Typical backfill batch: 5-30 products = $0.025-$0.15. */
+  imagesOnly?:  boolean;
 }
 
 function parseArgs(): CliArgs {
@@ -255,6 +260,8 @@ function parseArgs(): CliArgs {
       args.queryTokens = arg.slice("--queries=".length).split(",").map((s) => s.trim().toLowerCase());
     } else if (arg.startsWith("--country=")) {
       args.country = arg.slice("--country=".length).toLowerCase();
+    } else if (arg === "--images-only") {
+      args.imagesOnly = true;
     }
   }
   return args;
@@ -269,6 +276,19 @@ async function main(): Promise<void> {
   if (!jumiaSerpapiProvider.isActive()) {
     console.error("✗ Jumia SerpAPI provider inactive. Set SERPAPI_KEY in env (and ensure SERPAPI_DISABLED isn't set to true).");
     process.exit(1);
+  }
+
+  /* --images-only: skip the scrape, only run the backfill pass.
+     Useful for cheaply topping up the 3-5% of Jumia products that
+     persistently don't match the broad google_images call during a
+     normal ingest. Falls through to the backfill block below. */
+  if (args.imagesOnly) {
+    const apiKey = process.env.SERPAPI_KEY?.trim();
+    if (!apiKey) { console.error("✗ SERPAPI_KEY not set"); process.exit(1); }
+    console.log("▶ Jumia images-only backfill (skipping scrape)\n");
+    const stats = await backfillJumiaImages(apiKey);
+    console.log(`\n✓ Done — scanned=${stats.scanned} filled=${stats.filled} errors=${stats.errors}`);
+    return;
   }
 
   /* Filter queries against --queries=... CLI arg. Token match is
