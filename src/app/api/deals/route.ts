@@ -314,7 +314,14 @@ export async function GET(req: NextRequest) {
        dropdown was missing 90% of stores in non-NG countries (the
        May 2026 cross-country audit found Amazon + noon absent from
        AE and Takealot absent from ZA). */
-    const [allRawAcrossOrigins, dropdownStoresRaw] = await Promise.all([
+    /* Three independent fetches fire in parallel:
+         1. items pool (capped 3-pass fan-out, drives the grid)
+         2. dropdown store list (cap-free RPC, drives the filter panel)
+         3. originCounts head-count (drives the local/intl tab pills)
+       Pre-perf-pass #3 was sequential AFTER #1+#2 finished, adding
+       ~200-500ms to every /api/deals call. Now all three resolve
+       together so total latency = max(individual) instead of sum. */
+    const [allRawAcrossOrigins, dropdownStoresRaw, headOriginCounts] = await Promise.all([
       fetchPoolCached({
         categorySlug: category,
         sort,
@@ -324,7 +331,7 @@ export async function GET(req: NextRequest) {
       listCountryStoresWithCounts({
         country:     country.code,
         category:    category,
-        minDiscount: minDiscount ? parseInt(minDiscount, 10) : 0,
+        minDiscount: userMinDiscount,
         search:      search ?? null,
         /* Origin-scoped dropdown: "Local" tab shows only country-
            anchored stores, "Cross-border" shows only intl, "All"
@@ -333,6 +340,13 @@ export async function GET(req: NextRequest) {
            zero results because the local filter excludes intl rows. */
         origin:      origin,
       }),
+      provider.getOriginCounts({
+        categorySlug: category,
+        minDiscount:  userMinDiscount,
+        search:       search,
+        stores:       stores,
+        country:      country.code,
+      }).catch(() => null),
     ]);
 
     /* Country store filter — pure-function, runs over Deal[] */
@@ -412,14 +426,13 @@ export async function GET(req: NextRequest) {
        bigger than what's paginatable today.
 
        Country-aware when present — see browse-db.ts getOriginCounts
-       for the local/intl partition. */
-    const headOriginCounts = await provider.getOriginCounts({
-      categorySlug: category,
-      minDiscount:  userMinDiscount,
-      search:       search,
-      stores:       stores,
-      country:      country.code,
-    }).catch(() => null);
+       for the local/intl partition.
+
+       NOTE: headOriginCounts is resolved upstream in the same
+       Promise.all that fetches the items pool + dropdown — see the
+       earlier perf comment. The variable is captured there so the
+       three independent network calls complete in parallel rather
+       than serialising. */
 
     /* When a search query is present, ALWAYS derive originCounts from
        the in-memory filtered pool rather than the head-count RPC.
