@@ -69,6 +69,78 @@ export function isGoogleRelay(u: string): boolean {
   }
 }
 
+/* Tracking-only query parameters that vary across scrapes for the
+   same logical product. Stripping these at ingest time keeps the
+   (store_id, url) uniqueness constraint from creating new offer rows
+   every cron just because the tracking suffix rotated.
+
+   Inclusion criteria for each entry:
+     1. Carries no functional information (removing it lands the user
+        on the SAME product page, not a different one).
+     2. Observed to rotate across our scrapes (verified case-by-case
+        before adding).
+     3. Universal across merchants OR namespaced to a specific known-
+        tracking class (Shopify pagination, UTM, common ad networks).
+
+   Phase 3 audit (May 2026) found:
+     - threechub stored 27 offers for one Infinix phone because every
+       cron yielded different ?_pos=&_fid=&_ss= values
+     - konga stored 25 offers per PS4 controller because ?cid= varied
+     - currys / many SerpAPI ingest rows had different ?utm_* sources
+   All driven by the same root cause. */
+const STRIP_QUERY_PARAMS = new Set<string>([
+  /* Shopify pagination + collection-position tracking */
+  "_pos", "_fid", "_ss", "_psq", "_sid", "_pos_search",
+  /* Universal UTM family */
+  "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+  "utm_id", "utm_brand",
+  /* Google Ads / Analytics click ids */
+  "gclid", "gclsrc", "dclid", "wbraid", "gbraid",
+  /* Facebook + Instagram click ids */
+  "fbclid",
+  /* Microsoft Ads */
+  "msclkid",
+  /* TikTok */
+  "ttclid",
+  /* Konga campaign id (rotates per ingest, not a product variant) */
+  "cid",
+  /* General affiliate / ref vectors */
+  "ref", "ref_", "referrer", "refsrc", "refid", "ref_url",
+  /* Mailchimp / email click tracking */
+  "mc_eid", "mc_cid",
+  /* Amazon affiliate tag — re-applied at click time via /api/go,
+     not used for product identity */
+  "tag", "linkCode", "psc", "ascsubtag",
+  /* Trackonomics / impactRadius / rakuten-style affiliate ids */
+  "irgwc", "irclickid", "rakuten_subid",
+  /* SerpAPI source-of-traffic markers */
+  "spm",
+]);
+
+/** Drop tracking-only query parameters from a URL. Preserves the path,
+    hash, and any non-tracking params (which we assume carry product
+    state). On parse failure (malformed URL, internal path like
+    `/api/go?url=…`) returns the input unchanged — better to keep the
+    original than risk mangling it.
+
+    Pure function, idempotent, safe to call on already-canonical URLs. */
+export function canonicaliseOfferUrl(raw: string): string {
+  if (!raw) return raw;
+  /* Don't touch internal /api/go wrappers — those need their query
+     intact to route the click. */
+  if (raw.startsWith("/api/go")) return raw;
+  let parsed: URL;
+  try { parsed = new URL(raw); } catch { return raw; }
+  /* Iterate keys and delete those in the strip list (case-insensitive). */
+  const toDelete: string[] = [];
+  parsed.searchParams.forEach((_value, key) => {
+    if (STRIP_QUERY_PARAMS.has(key.toLowerCase())) toDelete.push(key);
+  });
+  for (const k of toDelete) parsed.searchParams.delete(k);
+  /* Drop trailing '?' if the strip emptied the query string entirely. */
+  return parsed.toString().replace(/\?$/, "");
+}
+
 export function isUsableMerchantUrl(url: string): boolean {
   /* Internal /api/go wrapper — always keep. Resolver handles
      relay URLs at click time. */

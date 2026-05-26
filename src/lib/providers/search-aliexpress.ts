@@ -170,10 +170,27 @@ function looksLikeJunkAliExpressTitle(title: string): boolean {
 
 function mapToDeal(p: AliexProduct, i: number, country: string): Deal | null {
   const title = p.product_title?.trim();
-  /* Prefer the pre-tracked promotion_link when AliExpress includes it
-     in the response; falls back to the bare product URL which our
-     /api/go path will wrap via the URL converter. */
-  const url = p.promotion_link?.trim() || p.product_detail_url?.trim();
+  /* Store the STABLE product URL (product_detail_url), NOT the
+     rotating promotion_link.
+
+     Why: AliExpress's affiliate API generates a fresh promotion_link
+     on every call — even for the same product. The opaque token
+     inside `s.click.aliexpress.com/s/{token}` rotates per call, so
+     (store_id, url) uniqueness sees every cron run's offer as
+     "new" and inserts a row instead of updating the existing one.
+     Phase 3 audit (May 2026) found this caused 8,095 surplus offer
+     rows across 1,870 (product, store) pairs — one product alone
+     had 176 offers, all pointing at the same underlying SKU at the
+     same price (~$0.67), distinguished only by their rotating
+     tracking tokens.
+
+     product_detail_url is the canonical `aliexpress.com/item/{id}.html`
+     form — stable per product. Storing this dedups correctly.
+
+     At click time, /api/go calls aliexpress-converter to wrap the
+     stable URL in a fresh tracking link (cached in resolved_clicks
+     for 30 days, so the conversion cost amortises across users). */
+  const url = p.product_detail_url?.trim() || p.promotion_link?.trim();
   if (!title || !url) return null;
 
   /* Junk-title gate. Drops the SEO-stuffed wholesale spam that the

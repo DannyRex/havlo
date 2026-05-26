@@ -13,6 +13,7 @@ import { buildSignature } from "@/lib/search/normalize";
 import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { categoryDisagreesWithTitle } from "@/lib/categorize";
 import { categories } from "@/lib/data/categories";
+import { canonicaliseOfferUrl } from "@/lib/url-helpers";
 
 /* Secret-scrubber leakage guard. The upstream provider chain has a
    middleware that replaces detected secrets (JWTs, API keys, OAuth
@@ -146,8 +147,25 @@ function dealToStoreRow(d: Deal, sourceQuery: string): StoreRow {
    manufacturer parts) or brand-like uppercase tokens we don't
    recognise (avoid false positives that mangle real brands). */
 const TITLE_PLACEHOLDER_BRANDS = /^(generic|unbranded|no\s*brand)\s*[-:|]?\s*/i;
+/* Match any HTML tag — AliExpress's affiliate API wraps matched search
+   keywords in <strong>...</strong> for inline highlighting. They land
+   in our DB verbatim and render as literal "<strong>shoes</strong>"
+   text on cards because the JSX layer renders titles as plain strings
+   (no innerHTML). Phase 3 audit (May 2026) found 71 such products
+   showing the raw markup to users. Stripping at ingest fixes this
+   for new rows; a backfill closes the gap on existing ones.
+
+   The regex matches both `<tag>` and `</tag>` forms and is non-greedy
+   so it doesn't gobble across multiple tags. We DON'T decode entities
+   here (no &amp; → &) because that's a separate concern and entities
+   in titles are far rarer; the title-content invariant is "no markup
+   tokens, plain text only". */
+const HTML_TAG = /<\/?[a-z][^>]*>/gi;
 function cleanProductTitle(raw: string): string {
-  let t = raw.trim();
+  /* HTML strip runs FIRST so any "Generic <strong>X</strong>" gets
+     "<strong>" stripped to "Generic X", then the brand-placeholder
+     pass below can recognise and remove "Generic". */
+  let t = raw.trim().replace(HTML_TAG, "");
   /* Iterate so "Generic Unbranded X" → "X". Cap iterations to 3 so a
      pathologically chained title can't cause a runaway. */
   for (let i = 0; i < 3; i++) {
@@ -250,7 +268,14 @@ function dealToOfferRow(
   return {
     product_id: productId,
     store_id: d.storeId,
-    url: d.url,
+    /* Canonicalised URL — strips tracking-only query params (utm_*,
+       gclid, fbclid, msclkid, Shopify _pos/_fid/_ss, Konga cid, etc.)
+       so the (store_id, url) uniqueness constraint sees the same
+       stable URL across cron runs. Without this, threechub stored
+       27 offers for one phone (rotating ?_pos=&_fid=&_ss=), konga
+       stored 25 per PS4 controller (rotating ?cid=). After this
+       fix, every subsequent scrape upserts the same row instead. */
+    url: canonicaliseOfferUrl(d.url),
     current_price: d.salePrice,
     /* Store NULL for original_price when there's no actual markdown.
        Many providers (Jumia, AliExpress raw, sparse Walmart feeds)
@@ -486,11 +511,21 @@ export async function ingestDeals(
      normalized title. cleanProductTitle is applied here too so the
      "Generic " prefix and similar merchant-side placeholders are
      stripped before normalization — matches what dealToProductRow
-     writes when inserting a new product. */
+     writes when inserting a new product.
+
+     The URL is canonicalised UP-FRONT (not just at write time) so
+     every downstream step — Bulk lookup 1 (existing offers by URL),
+     the offer upsert's conflict key, and the WHERE clause that
+     keeps a single row per (store_id, url) — sees the same stable
+     URL. Without this, an incoming raw URL with a fresh tracking
+     suffix would miss the lookup against the previously-canonicalised
+     stored form, fall through to the title_key path (which works,
+     but at extra cost), and only land on the existing row at the
+     final upsert via the (store_id, url) constraint. */
   const offerUrls = deals.map((d, i) => ({
     i,
     storeId:  d.storeId,
-    url:      (d.url ?? "").trim(),
+    url:      canonicaliseOfferUrl((d.url ?? "").trim()),
     sigKey:   sigs[i].key,
     canDedup: sigs[i].brand !== null && sigs[i].model !== null,
     titleKey: normaliseTitleKey(cleanProductTitle(d.title)),
