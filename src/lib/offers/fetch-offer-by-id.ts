@@ -27,6 +27,7 @@
    or fall through to a different anchor source (/api/compare's
    FTS path). */
 
+import { cache } from "react";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 
@@ -69,7 +70,19 @@ export interface OfferRow {
   store_country?:   string | null;
 }
 
-export async function fetchOfferById(offerId: string): Promise<OfferRow | null> {
+/* Per-request memoisation via React.cache. The PDP route calls this
+   TWICE per visit — once from generateMetadata (for the page title +
+   OG image) and once from the page body (for the hero data + dupe
+   anchor). React.cache dedupes those calls within the same request so
+   we pay one DB round trip instead of two for every PDP load.
+
+   Note: React.cache is per-request only — it doesn't cross-request
+   share. unstable_cache would do cross-request, but the PDP page is
+   already ISR-cached at 6h via `export const revalidate = 21600`, so
+   the page-level cache absorbs the cross-request layer. Per-request
+   dedup is the missing piece, and React.cache is the right tool for
+   it. */
+export const fetchOfferById = cache(async function fetchOfferByIdImpl(offerId: string): Promise<OfferRow | null> {
   if (!offerId) return null;
 
   const supa = getSupabaseAdmin();
@@ -185,4 +198,4 @@ export async function fetchOfferById(offerId: string): Promise<OfferRow | null> 
   }
 
   return null;
-}
+});

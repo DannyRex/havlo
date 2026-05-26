@@ -1,9 +1,55 @@
 import Link from "next/link";
+import { unstable_cache } from "next/cache";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { filterDealsForCountry, type Country } from "@/lib/country";
 import { classifyDeal } from "@/lib/providers/curated-helper";
-import type { Deal } from "@/types";
+import type { Deal, OriginFilter, SortOption } from "@/types";
 import TrendingDealsGrid, { type TrendingBuckets } from "@/components/landing/TrendingDealsGrid";
+
+/* Shared pool cache across ISR builds.
+
+   Each composeBuckets pool requires 2–4 calls to provider.fetchDeals.
+   Each call fans out to a 3-pass RPC (Pass A/B/C in browse-db.ts) so
+   the homepage cold SSR was firing 6–12 RPCs every revalidate window.
+
+   /api/deals had its own in-memory POOL_CACHE for the same fetch
+   pipeline (Map+TTL, per Vercel instance). The homepage's TrendingDeals
+   was *separate*, so it never shared a hit even when a visitor had just
+   loaded /deals on the same instance.
+
+   unstable_cache here gives:
+     • Cross-build caching (the Next 14 data cache persists across ISR
+       revalidations, so the 15-min revalidate window doesn't trigger
+       a cold DB hit every time).
+     • Cross-route sharing (if /api/deals later switches to
+       unstable_cache too they'd share the same data cache).
+     • Tag-based invalidation (`trending-pool`) so an ingest cron can
+       call revalidateTag('trending-pool') to bust everything at once
+       after a fresh scrape.
+
+   TTL: 30 minutes. Same shape as the rest of the PDP data caches and
+   half the homepage's revalidate window, so the pool can't drift more
+   than half an ISR cycle behind. */
+const fetchPoolCached = unstable_cache(
+  async (params: {
+    sort:        SortOption;
+    minDiscount: number;
+    origin:      OriginFilter;
+    country:     string;
+    stores?:     string[];
+  }): Promise<Deal[]> => {
+    const provider = await getActiveBrowseProvider();
+    return provider.fetchDeals({
+      sort:         params.sort,
+      minDiscount:  params.minDiscount,
+      origin:       params.origin,
+      country:      params.country,
+      stores:       params.stores,
+    });
+  },
+  ["trending-pool-v1"],
+  { revalidate: 1800, tags: ["trending-pool"] },
+);
 
 /* ── Trending pool composition ──────────────────────────────────────
    Builds the balanced multi-bucket POOL the homepage trending grid
@@ -85,10 +131,6 @@ function composeBuckets(pool: Deal[], isNG: boolean): TrendingBuckets {
    statically renderable per /[country]/. Removing the cookies() read
    here was part of the May 2026 perf fix that unlocked ISR caching. */
 export default async function TrendingDeals({ country }: { country: Country }) {
-  /* Pull from whichever browse provider is active (DB when populated,
-     static fallback otherwise). */
-  const provider = await getActiveBrowseProvider();
-
   const isNG = country.code === "ng";
 
   const qualityFilter = (d: Deal) =>
@@ -109,12 +151,17 @@ export default async function TrendingDeals({ country }: { country: Country }) {
      excludes every row with discountPercent=0. The fourth NG pool is
      a Jumia-only direct pull as a backstop so Jumia inventory is
      always available even when localFresh's merged result is
-     Konga/Ajebomarket-heavy. */
+     Konga/Ajebomarket-heavy.
+
+     Every fetch routes through fetchPoolCached (defined above) so
+     repeat ISR builds within the 30-min TTL hit the data cache
+     instead of re-firing 3 RPCs per pool. Country is part of the
+     cache key so per-market shards stay isolated. */
   let pool: Deal[];
   if (!isNG) {
     const [discountPool, freshPool] = await Promise.all([
-      provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "intl" }),
-      provider.fetchDeals({ sort: "newest",   minDiscount: 0,  origin: "intl" }),
+      fetchPoolCached({ sort: "discount", minDiscount: 15, origin: "intl", country: country.code }),
+      fetchPoolCached({ sort: "newest",   minDiscount: 0,  origin: "intl", country: country.code }),
     ]);
     pool = filterDealsForCountry(
       [...discountPool, ...freshPool].filter(qualityFilter),
@@ -122,10 +169,10 @@ export default async function TrendingDeals({ country }: { country: Country }) {
     );
   } else {
     const [localPool, intlPool, localFreshPool, jumiaOnlyPool] = await Promise.all([
-      provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "local" }),
-      provider.fetchDeals({ sort: "discount", minDiscount: 15, origin: "intl" }),
-      provider.fetchDeals({ sort: "newest",   minDiscount: 0,  origin: "local" }),
-      provider.fetchDeals({ sort: "newest",   minDiscount: 0,  origin: "local", stores: ["jumia"] }),
+      fetchPoolCached({ sort: "discount", minDiscount: 15, origin: "local", country: country.code }),
+      fetchPoolCached({ sort: "discount", minDiscount: 15, origin: "intl",  country: country.code }),
+      fetchPoolCached({ sort: "newest",   minDiscount: 0,  origin: "local", country: country.code }),
+      fetchPoolCached({ sort: "newest",   minDiscount: 0,  origin: "local", country: country.code, stores: ["jumia"] }),
     ]);
     pool = [
       ...localPool.filter(qualityFilter),
