@@ -8,7 +8,6 @@ import OriginToggle from "./OriginToggle";
 import ListCard from "./ListCard";
 import MasonryCard from "./MasonryCard";
 import StoreFilter, { type StoreOption } from "./StoreFilter";
-import { MASONRY_ASPECTS } from "./masonry-layout";
 import AnimateIn from "@/components/ui/AnimateIn";
 import EmptySearchState from "@/components/empty/EmptySearchState";
 import CategorySubscribe from "./CategorySubscribe";
@@ -995,33 +994,40 @@ export default function DealFeed({
         </div>
       </div>
 
-      {/* Initial skeletons — same single-render approach as the
-          loaded grid. 12 placeholder tiles is enough to fill the
-          fold across all viewport sizes. Same responsive layout
-          switch: row-major grid on mobile, column-major masonry
-          from sm: up. */}
+      {/* Initial skeletons — match the loaded grid shape exactly so
+          there's zero layout shift when items resolve. CSS Grid at
+          every breakpoint (NOT CSS columns) so the visible fill is
+          row-major: tile 0 col-1 row-1, tile 1 col-2 row-1, tile 2
+          col-1 row-2, etc. Uniform aspect-[4/5] keeps every row's
+          height predictable, eliminating the whitespace-gap visual
+          that earlier multi-column masonry produced on mobile. */}
       {loading && (
-        <div className="grid grid-cols-2 gap-2 sm:block sm:columns-3 lg:columns-4 sm:gap-3 lg:gap-4 sm:[column-fill:_balance]">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
           {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="break-inside-avoid sm:mb-3 lg:mb-4">
-              <SkeletonTile aspect={MASONRY_ASPECTS[i % MASONRY_ASPECTS.length]} />
+            <div key={i}>
+              <SkeletonTile aspect="aspect-[4/5]" />
             </div>
           ))}
         </div>
       )}
 
-      {/* Responsive two-mode layout in a single DOM tree:
-            - mobile (<sm):  `grid grid-cols-2`   → row-major fill
-                             (item 0 top-left, item 1 top-right,
-                             item 2 second row left, ...)
-            - sm+ desktop:   `block` + `columns-3` / `columns-4` →
-                             column-major masonry (existing behaviour,
-                             variable card heights pack tightly).
-          One DOM tree avoids the 3x image-fetch tax we saw when
-          mobile/tablet/desktop were separate display:none copies.
-          The `sm:block` override at sm+ defeats `grid`, letting
-          `sm:columns-N` activate. Mobile list-view stays separate
-          (always 1-column, different per-row layout). */}
+      {/* Row-major CSS Grid at every breakpoint.
+          May 2026 user report: "on mobile, the deals grid is split
+          in two but the sort is column 1 vertically and then column 2
+          sorted vertically. The results should come row by row."
+          Cause: previous layout used `sm:columns-N` (CSS multi-column,
+          column-major fill — items 0,1,2 go down col 1, then 3,4,5
+          down col 2). Variable aspect ratios across MASONRY_ASPECTS
+          also produced whitespace gaps below shorter cards on mobile
+          `grid grid-cols-2`, which read as column-major to users.
+          Fix: switch to CSS Grid at every breakpoint AND force a
+          uniform aspect ratio on every card so each row's height is
+          predictable. Trade-off: loses the masonry pack-tightly
+          visual, but row-major sortability matters more for catalog
+          browsing than visual variance.
+          Homepage TrendingDealsGrid still uses multi-column masonry —
+          variance there is part of the brand visual, not a sort-
+          ability concern. */}
       {!loading && items.length > 0 && (
         <>
           {viewMode === "list" && (
@@ -1035,16 +1041,16 @@ export default function DealFeed({
           )}
           <div
             className={cn(
-              "grid grid-cols-2 gap-2 sm:block sm:columns-3 lg:columns-4 sm:gap-3 lg:gap-4 sm:[column-fill:_balance]",
-              viewMode === "list" && "hidden sm:block",
+              "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4",
+              viewMode === "list" && "hidden sm:grid",
             )}
           >
             {items.map((d, i) => (
-              <div key={d.id} className="break-inside-avoid sm:mb-3 lg:mb-4">
+              <div key={d.id}>
                 <AnimateIn delay={Math.min(i, 6) * 50}>
                   <MasonryCard
                     deal={d}
-                    aspect={MASONRY_ASPECTS[i % MASONRY_ASPECTS.length]}
+                    aspect="aspect-[4/5]"
                   />
                 </AnimateIn>
               </div>
