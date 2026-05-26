@@ -43,32 +43,43 @@ interface StoreRow {
   trusted: boolean;
 }
 
-function dealToStoreRow(d: Deal): StoreRow {
+function dealToStoreRow(d: Deal, sourceQuery: string): StoreRow {
   /* `is_international` retains its original currency-based heuristic
      (USD = international price tag) since downstream filters lean on
      it as a proxy for 'has cross-border price'.
 
-     `country` uses a two-layer resolution:
+     `country` uses a THREE-layer resolution (May 2026 phase-3 audit
+     widened it from two layers — the third catches ~110 stores that
+     were leaking through as NULL-country in production):
+
        1. inferStoreCountry — JS-roster match (most reliable when the
           store IS in COUNTRY_STORES). Returns canonical country code.
-       2. Country-tag fallback — SerpAPI ingest writes a `country:xx`
-          tag on every Deal indicating which country's query surfaced
-          it. For stores not in any JS roster, this tag is the best
-          available signal that the store IS reachable from that
-          market (Google Shopping returned it via google.co.za / etc.).
+
+       2. Country-tag fallback — SerpAPI / curated providers write a
+          `country:xx` tag on every Deal indicating which country's
+          query surfaced it. Most reliable signal for stores not in
+          any JS roster.
+
+       3. sourceQuery trailing `:xx` parse — the ingest CLI's query
+          conventions encode the country in the trailing two-letter
+          suffix (`phones:us`, `health:de`, `audio:uk`, `curated:iPhone
+          15 Pro Max:us`, etc.). When the upstream provider DIDN'T set
+          a `country:` tag on the Deal but the caller knew which country
+          this batch was for, we can still recover. Critical for the
+          live-search persist path which doesn't always carry country
+          tags but does encode them in the source_query.
 
      Truly global cross-border stores (AliExpress / DHGate / Shein /
      Temu) appear in MULTIPLE countries' tags AND aren't in any
-     country roster — they stay NULL via this path. But the layer-2
-     fallback handles single-country leaf stores like Pepperfry-from-
-     ZA-query that would otherwise be orphaned with NULL country.
+     country roster — they stay NULL via this path because the
+     `isGlobalIntlStore` short-circuit prevents the fallbacks.
 
-     Added May 2026 launch-readiness re-audit: 188 ZA SerpAPI upserts
-     landed on NULL-country stores → only 4 showed in /za/deals
-     because the local-tab filter relies on store_country tagging.
-     The country-tag fallback ensures new ingests get tagged
-     correctly going forward; migration 0037 cleaned the existing
-     backlog of NULL-country single-source-query stores. */
+     Added May 2026 phase-3 audit: 68 stores in production (B&H Photo,
+     Holland & Barrett, BigBasket, Trendyol, Boohoo, Galaxus, etc.)
+     had NULL country despite all their offers agreeing on a single
+     source_country — they were invisible to the /local-tab filter
+     even though store_country in their offer rows said otherwise.
+     Layer 3 closes that gap for any future ingest. */
   const isIntl = d.currency === "USD";
   let country = inferStoreCountry(d.storeId, d.storeName);
   if (!country && !isGlobalIntlStore(d.storeId, d.storeName)) {
@@ -81,6 +92,27 @@ function dealToStoreRow(d: Deal): StoreRow {
       const cc = countryTag.slice("country:".length).toUpperCase();
       if (/^(NG|UK|US|DE|AE|IN|ZA)$/.test(cc)) {
         country = cc;
+      }
+    }
+    /* Layer 3: source_query trailing `:xx` parse. Same regex as
+       `inferSourceCountry` for the offer row so the store country
+       agrees with the offer's source_country. Only fires when:
+         a. inferStoreCountry returned null (not in JS roster), AND
+         b. Deal.tags lacks a `country:` tag, AND
+         c. The store isn't a known global cross-border merchant.
+       That intersection is exactly the case the production audit
+       found — a real long-tail retailer with no roster entry, no
+       tag, but a sourceQuery the ingest CLI wrote with the country
+       suffix. NOTE: leading `country:` prefixes like `ng:Apple…`
+       are visitor-market markers, not store anchors — we only
+       parse the TRAILING `:xx` to avoid that confusion. */
+    if (!country && sourceQuery) {
+      const m = sourceQuery.match(/:([a-z]{2})$/i);
+      if (m) {
+        const cc = m[1].toUpperCase();
+        if (/^(NG|UK|US|DE|AE|IN|ZA)$/.test(cc)) {
+          country = cc;
+        }
       }
     }
   }
@@ -359,12 +391,74 @@ export async function ingestDeals(
   }
 
   // 1. Upsert stores
+  /* Two-pass write so the `country` column is non-destructive:
+       Pass A — upsert every store row WITHOUT the country field, so
+                existing country values on conflicting rows are
+                preserved (Supabase PostgREST honours field-level
+                inclusion: omitting `country` keeps the existing
+                value on UPDATE rather than writing NULL).
+       Pass B — for rows that DID infer a country, run a
+                country-only UPDATE filtered to `country IS NULL`,
+                so we only fill blanks. Never overwrites an
+                already-set country with a different value.
+
+     Why this matters: an earlier code path could create a store
+     with country='US' (Deal had country:us tag), then a later ingest
+     where that tag was absent would call upsert with country=null
+     and silently destroy the tag. Production audit found 110 stores
+     in this state. Layer 3 fallback above prevents NEW gaps; this
+     two-pass shape stops the upsert from CLOBBERING good data. */
   const uniqueStores = new Map<string, StoreRow>();
-  for (const d of deals) uniqueStores.set(d.storeId, dealToStoreRow(d));
+  for (const d of deals) uniqueStores.set(d.storeId, dealToStoreRow(d, sourceQuery));
+  const allRows = Array.from(uniqueStores.values());
+
+  /* Pass A: write everything except `country`. */
+  type StoreRowNoCountry = Omit<StoreRow, "country">;
+  const passARows: StoreRowNoCountry[] = allRows.map((r) => {
+    /* Build the object explicitly so we never send `country: null`
+       and inadvertently overwrite an existing value. */
+    return {
+      id:               r.id,
+      name:             r.name,
+      url:              r.url,
+      logo_url:         r.logo_url,
+      is_international: r.is_international,
+      trusted:          r.trusted,
+    };
+  });
   const { error: storeErr } = await supa
     .from("stores")
-    .upsert(Array.from(uniqueStores.values()), { onConflict: "id" });
+    .upsert(passARows, { onConflict: "id" });
   if (storeErr) result.errors.push(`Store upsert: ${storeErr.message}`);
+
+  /* Pass B: backfill country only where it's currently NULL. */
+  const withCountry = allRows.filter((r) => r.country !== null);
+  if (withCountry.length > 0) {
+    /* One UPDATE per inferred country bucket — fewer round trips than
+       per-row updates, and the filter is the same (country IS NULL +
+       id IN (…)) so a bucket is naturally one query.
+
+       forEach iteration (not for-of) so the project's es2017 target
+       doesn't choke on Map iterators without downlevelIteration. */
+    const byCountry = new Map<string, string[]>();
+    for (const r of withCountry) {
+      const cc = r.country!;
+      if (!byCountry.has(cc)) byCountry.set(cc, []);
+      byCountry.get(cc)!.push(r.id);
+    }
+    const buckets: Array<[string, string[]]> = [];
+    byCountry.forEach((ids, cc) => buckets.push([cc, ids]));
+    for (const [cc, ids] of buckets) {
+      const { error: backfillErr } = await supa
+        .from("stores")
+        .update({ country: cc })
+        .in("id", ids)
+        .is("country", null);
+      if (backfillErr) {
+        result.errors.push(`Store country backfill (${cc}, ${ids.length} ids): ${backfillErr.message}`);
+      }
+    }
+  }
 
   /* ── 2. Batched dedup + upsert (May 2026 perf refactor) ─────────
      The previous per-deal loop did 3-5 sequential round trips per
