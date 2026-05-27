@@ -86,7 +86,39 @@ const HOST_REFERER: Record<string, string> = {
      even though the source returned 200 → users saw the Havlo H
      fallback on every affected PDP. May 2026 v3. */
   "serpapi.com":                      "",
+  /* Kara (kara.com.ng) — special case. Kara serves EVERY product
+     image from Cloudflare R2 with a 7-day pre-signed URL. There is
+     NO permanent image URL anywhere on the site. Storing the
+     signed URL at ingest worked for a week then 403'd for users.
+     Solution: store the product PAGE URL as image_url, allow the
+     proxy to fetch the page (kara.com.ng) and the resolved R2
+     CDN (cloudflarestorage.com) here, and let the og:image
+     resolution path below extract a fresh signed URL on every
+     cache miss. With the proxy's 30-day cache TTL the practical
+     cost is ~1 page fetch per product per day at peak. */
+  "kara.com.ng":                      "",
+  /* Cloudflare R2 — Kara's image CDN (resolved via og:image from
+     a kara.com.ng product page). Whitelist needed because the
+     redirect / og:image follow-fetch re-validates the resolved
+     hostname against the allowlist. Open access, no Referer
+     enforcement once you have a valid signed URL. */
+  "r2.cloudflarestorage.com":         "",
 };
+
+/* Hosts whose URLs are HTML product pages (not direct image URLs).
+   For these, the proxy fetches the page, extracts the og:image
+   meta tag, then fetches THAT URL for the actual bytes. Used for
+   merchants like Kara whose images live behind expiring signed URLs
+   and have no permanent CDN URL we could store at ingest time.
+
+   Detection runs BEFORE the host allowlist check (above) is used
+   as the actual upstream — the proxy fetches the page (with the
+   page host's referer policy), parses og:image, then re-validates
+   the resolved image host against the same allowlist before
+   fetching the bytes. */
+const HTML_PAGE_HOSTS = new Set<string>([
+  "kara.com.ng",
+]);
 
 /* Reasonable upper bound for cache lifetime. Product images don't
    change often; if a retailer rotates a CDN URL, our DB ingest will
@@ -126,6 +158,74 @@ export async function GET(req: NextRequest) {
   if (referer === null) {
     return new NextResponse(`Host not allowed: ${target.hostname}`, { status: 403 });
   }
+
+  /* HTML-page resolution. For hosts in HTML_PAGE_HOSTS (Kara today),
+     the stored "image URL" is actually a product PAGE URL. We fetch
+     the page, extract og:image (with twitter:image fallback), then
+     re-target the fetch at that resolved image URL. The resolved
+     host is re-validated against the same allowlist below so SSRF
+     posture stays the same.
+
+     Decoding: og:image values come straight out of HTML so they may
+     be entity-encoded (`&amp;` instead of `&`). Decode the basic
+     five before constructing the URL — Kara's R2 URLs have query-
+     string ampersands that arrive as `&amp;`, and a raw new URL()
+     would interpret those as literal characters.
+
+     Cost: 1 extra fetch per cache miss (~100-200KB HTML). Edge cache
+     amortizes this away after the first hit — typical Kara product
+     page → 1 HTML fetch + 1 R2 fetch on cold cache, 0 fetches on
+     warm cache for the next 30 days. */
+  if (HTML_PAGE_HOSTS.has(target.hostname)) {
+    let pageHtml = "";
+    try {
+      const pageRes = await fetch(target.toString(), {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+          "Accept": "text/html,application/xhtml+xml",
+        },
+        redirect: "follow",
+      });
+      if (!pageRes.ok) {
+        return new NextResponse(`Page fetch ${pageRes.status}`, { status: 502 });
+      }
+      pageHtml = await pageRes.text();
+    } catch {
+      return new NextResponse("Page fetch failed", { status: 502 });
+    }
+
+    /* Try og:image first (the spec-correct path), twitter:image as a
+       fallback (some pages set one but not the other). Both regex
+       variants handle the meta-attribute order swap that some
+       templates emit. */
+    const ogM = pageHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+             ?? pageHtml.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
+             ?? pageHtml.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+    if (!ogM || !ogM[1]) {
+      return new NextResponse("No og:image on page", { status: 404 });
+    }
+    const decoded = ogM[1]
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+    try {
+      target = new URL(decoded);
+    } catch {
+      return new NextResponse("Invalid og:image URL", { status: 502 });
+    }
+    if (target.protocol !== "https:" && target.protocol !== "http:") {
+      return new NextResponse("Unsupported og:image scheme", { status: 400 });
+    }
+    /* Re-validate the resolved host against the same allowlist so
+       og:image can't be an SSRF escape hatch. */
+    const resolvedReferer = findRefererForHost(target.hostname);
+    if (resolvedReferer === null) {
+      return new NextResponse(`Resolved og:image host not allowed: ${target.hostname}`, { status: 403 });
+    }
+  }
+
   const headers: HeadersInit = {
     /* Use a real-browser UA. Some CDNs short-circuit on Bot/Lib UAs. */
     "User-Agent":
@@ -133,7 +233,11 @@ export async function GET(req: NextRequest) {
       "(KHTML, like Gecko) Version/17.0 Safari/605.1.15",
     "Accept": "image/avif,image/webp,image/png,image/jpeg,image/*,*/*;q=0.8",
   };
-  if (referer) headers.Referer = referer;
+  /* Use the resolved host's referer rule (which may differ from the
+     original target's — e.g. og:image resolved to r2.cloudflarestorage.com
+     uses that host's referer policy, not kara.com.ng's). */
+  const resolvedReferer = findRefererForHost(target.hostname);
+  if (resolvedReferer) headers.Referer = resolvedReferer;
 
   /* Fetch with redirect:"manual" and re-validate every hop. An
      allowlisted host (e.g. any *.amazonaws.com S3 bucket) could
