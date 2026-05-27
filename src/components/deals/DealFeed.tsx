@@ -832,7 +832,19 @@ export default function DealFeed({
           The sort dropdown JSX is inlined twice rather than extracted
           to a helper — duplication is small (~10 lines), avoids the
           render overhead of a tiny client subcomponent. */}
-      <div className="sticky top-16 z-30 -mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg/85 backdrop-blur-xl border-b border-border">
+      {/* Sticky filter row sits at top-16 (right under the navbar).
+          History: previously had bg-bg/85 + backdrop-blur-xl, which
+          flickered during scroll for the same reason the original
+          navbar fix had to drop frosted glass — backdrop-filter on a
+          position:sticky element re-samples and re-blurs the
+          background every frame, so content visibly strobes through.
+          User reported the regression: "flickering is back when
+          scrolling, affecting the navbar" — read as the navbar
+          flicker because the two bars sit visually adjacent.
+          Switched to solid bg-bg + no blur, matching Navbar.tsx's
+          treatment. A solid filter row reads as one continuous
+          surface with the navbar above it. */}
+      <div className="sticky top-16 z-30 -mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg border-b border-border">
         {/* Row 1 — CategoryNav (always full-width). The previous
             attempt to inline the mobile sort here overlapped the
             rightmost chip even with `overflow-hidden` because

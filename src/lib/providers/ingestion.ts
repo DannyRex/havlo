@@ -717,7 +717,14 @@ export async function ingestDeals(
             q: dealTitle,
             max_results: 5,
           });
-          const rows = (data ?? []) as Array<{ id: string; title: string; brand: string | null; image_url: string | null }>;
+          /* search_products_fts RETURNS product_id (not id) — that's
+             the column name in the RPC's RETURNS TABLE definition.
+             The first version of this code read top.id and ended up
+             with undefined product_id on every FTS-matched offer,
+             which broke ingest for Kara (user-reported May 2026:
+             "null value in column product_id violates not-null
+             constraint"). */
+          const rows = (data ?? []) as Array<{ product_id: string; title: string; brand: string | null; image_url: string | null }>;
           if (rows.length === 0) return;
           /* STRICT same-product gate at ingest time:
              1. Top-result brand must match the incoming deal's brand.
@@ -729,6 +736,7 @@ export async function ingestDeals(
                 rephrasings while rejecting "iPhone 15 case" vs
                 "iPhone 15". */
           const top = rows[0];
+          if (!top.product_id) return;
           if (!top.brand || !dealBrand) return;
           if (top.brand.toLowerCase() !== dealBrand.toLowerCase()) return;
           const tokensA = new Set(dealTitle.toLowerCase().match(/[a-z0-9]+/g) ?? []);
@@ -741,7 +749,7 @@ export async function ingestDeals(
           tokensA.forEach((t) => { if (tokensB.has(t)) shared++; });
           const overlap = shared / Math.min(tokensA.size, tokensB.size);
           if (overlap < 0.7) return;
-          ftsResults.set(np.deal, { id: top.id, image_url: top.image_url });
+          ftsResults.set(np.deal, { id: top.product_id, image_url: top.image_url });
         }));
       }
 

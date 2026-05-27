@@ -44,8 +44,11 @@ export default function DealsLoading() {
       </div>
       <div className="skeleton h-3 w-1/2 max-w-md rounded mb-4 ml-4" />
 
-      {/* Sticky filter bar */}
-      <div className="sticky top-16 z-30 -mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg/85 backdrop-blur-xl border-b border-border">
+      {/* Sticky filter bar — solid bg-bg (no backdrop-blur) so the
+          skeleton matches the live layout's flicker-fix. Without this
+          parity, the loading state would blur the scroll then snap
+          to solid when content hydrates, creating its own visual jolt. */}
+      <div className="sticky top-16 z-30 -mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg border-b border-border">
         {/* Row 1 — Category nav (horizontal scroll chips) */}
         <div className="flex items-center gap-2 overflow-hidden">
           {Array.from({ length: 8 }).map((_, i) => (

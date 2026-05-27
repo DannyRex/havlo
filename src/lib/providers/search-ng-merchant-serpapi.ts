@@ -136,9 +136,30 @@ interface GoogleSearchResponse {
   error?:           string;
 }
 
+/* google_images sub-engine returns image_results[] with .link (the
+   destination page URL on the merchant site) and .original (the
+   direct CDN image URL). We match by canonical merchant URL so each
+   product row picks up its real photo. Mirrors the Jumia ingest
+   path which has been stable in production since Q1 2026. */
+interface GoogleImagesResult {
+  link?:     string;
+  original?: string;
+  thumbnail?: string;
+}
+
+interface GoogleImagesResponse {
+  images_results?: GoogleImagesResult[];
+  error?:          string;
+}
+
 /* ── Map an organic result → Deal under a merchant config ───────── */
 
-function mapToDeal(r: GoogleOrganicResult, idx: number, config: MerchantConfig): Deal | null {
+function mapToDeal(
+  r: GoogleOrganicResult,
+  idx: number,
+  config: MerchantConfig,
+  imageByUrl: Map<string, string>,
+): Deal | null {
   const url   = r.link;
   const title = r.title?.trim();
   if (!url || !title) return null;
@@ -171,6 +192,14 @@ function mapToDeal(r: GoogleOrganicResult, idx: number, config: MerchantConfig):
   const stockText = exts.join(" ").toLowerCase();
   if (stockText.includes("out of stock") || stockText.includes("sold out")) return null;
 
+  /* Image — look up by canonicalised merchant URL (the same canonical
+     form the google_images results were keyed by). Falls back to the
+     organic result's thumbnail or undefined when no image was found.
+     The UI degrades gracefully to the category-gradient + emoji
+     placeholder when imageUrl is absent. */
+  const canonicalUrl = canonicaliseMerchantUrl(url);
+  const imageUrl = imageByUrl.get(canonicalUrl) ?? r.thumbnail;
+
   return {
     id:              `serp-${config.storeId}-${Date.now().toString(36)}-${idx}`,
     title,
@@ -183,12 +212,8 @@ function mapToDeal(r: GoogleOrganicResult, idx: number, config: MerchantConfig):
     salePrice:       sale,
     discountPercent: 0,
     currency:        "NGN",
-    /* Google organic-results doesn't carry images via this engine.
-       UI falls back to category gradient + emoji. A future enhancement
-       could fire a parallel google_images call (Jumia ingest does this);
-       skipped here to keep per-run credit cost ~half. */
-    imageUrl:        undefined,
-    url:             canonicaliseMerchantUrl(url),
+    imageUrl,
+    url:             canonicalUrl,
     expiresAt:       null,
     isHot:           false,
     isFeatured:      false,
@@ -213,15 +238,43 @@ export async function fetchMerchantDealsViaSerpapi(
   if (!trimmed) return [];
 
   const siteFilteredQuery = `${trimmed} site:${config.domain}`;
-  const url = new URL(SERPAPI_ENDPOINT);
-  url.searchParams.set("engine", "google");
-  url.searchParams.set("q",      siteFilteredQuery);
-  url.searchParams.set("gl",     "ng");
-  url.searchParams.set("hl",     "en");
-  url.searchParams.set("num",    "30");
-  url.searchParams.set("api_key", apiKey);
 
-  const res = await fetch(url.toString());
+  /* TWO SerpAPI calls per query, fired in parallel:
+       google         → product URLs + prices via rich_snippet
+       google_images  → image URLs we match back by canonical URL
+     Same pattern Jumia ingest uses. Doubles per-query credit cost
+     (24 → 48 credits per Slot run, 20 → 40 for Kara) but the card
+     UI is essentially blank without images. The user reported
+     "Slot and Kara products have no pictures" — the cost is worth
+     it for shareable cards. Wrapped in Promise.allSettled so an
+     images failure degrades to imageless rows instead of killing
+     the whole query. */
+  const googleUrl = new URL(SERPAPI_ENDPOINT);
+  googleUrl.searchParams.set("engine", "google");
+  googleUrl.searchParams.set("q",      siteFilteredQuery);
+  googleUrl.searchParams.set("gl",     "ng");
+  googleUrl.searchParams.set("hl",     "en");
+  googleUrl.searchParams.set("num",    "30");
+  googleUrl.searchParams.set("api_key", apiKey);
+
+  const imagesUrl = new URL(SERPAPI_ENDPOINT);
+  imagesUrl.searchParams.set("engine", "google_images");
+  imagesUrl.searchParams.set("q",      siteFilteredQuery);
+  imagesUrl.searchParams.set("gl",     "ng");
+  imagesUrl.searchParams.set("hl",     "en");
+  imagesUrl.searchParams.set("api_key", apiKey);
+
+  const [googleSettled, imagesSettled] = await Promise.allSettled([
+    fetch(googleUrl.toString()),
+    fetch(imagesUrl.toString()),
+  ]);
+
+  /* Organic results — required. Throw on hard failure so the
+     orchestrator can surface the error. */
+  if (googleSettled.status === "rejected") {
+    throw new Error(`Network error contacting SerpAPI for ${config.storeId}: ${googleSettled.reason}`);
+  }
+  const res = googleSettled.value;
   if (!res.ok) {
     const body = await res.text().catch(() => "<no body>");
     throw new Error(`SerpAPI HTTP ${res.status} for ${config.storeId}/${trimmed.slice(0, 30)}: ${body.slice(0, 200)}`);
@@ -231,10 +284,30 @@ export async function fetchMerchantDealsViaSerpapi(
     if (/hasn't returned any results/i.test(data.error)) return [];
     throw new Error(`SerpAPI error for ${config.storeId}: ${data.error}`);
   }
+
+  /* Images — opportunistic. Build URL → image_src map keyed by
+     canonical merchant URL so mapToDeal can look up each product's
+     photo. Failures here are non-fatal — cards just render the
+     gradient placeholder instead. */
+  const imageByUrl = new Map<string, string>();
+  if (imagesSettled.status === "fulfilled" && imagesSettled.value.ok) {
+    try {
+      const imagesJson = await imagesSettled.value.json() as GoogleImagesResponse;
+      for (const img of imagesJson.images_results ?? []) {
+        if (!img.link || !img.original) continue;
+        const canon = canonicaliseMerchantUrl(img.link);
+        /* First image wins — google_images often returns multiple
+           variants per product page; the primary listing photo is
+           usually first in the response. */
+        if (!imageByUrl.has(canon)) imageByUrl.set(canon, img.original);
+      }
+    } catch { /* silent — imageless fallback is fine */ }
+  }
+
   const results = data.organic_results ?? [];
   const deals: Deal[] = [];
   for (let i = 0; i < results.length; i++) {
-    const d = mapToDeal(results[i], i, config);
+    const d = mapToDeal(results[i], i, config, imageByUrl);
     if (d) deals.push(d);
   }
   return deals;
