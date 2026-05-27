@@ -84,14 +84,34 @@ export function usdToLocal(usd: number, country: Country): number {
   return Math.round(usd * USD_FX[country.currency]);
 }
 
-/** Format a value already in the country's currency. */
+/** Format a value already in the country's currency.
+
+    Uses the country's `symbol` field directly (₦/$/£/€/د.إ/₹/R) rather
+    than Intl.NumberFormat's currency-style output. Two reasons:
+
+    1. `Intl.NumberFormat("en", { style: "currency", currency: "NGN" })`
+       returns "NGN 5,000" (ISO code) on most engines, not "₦5,000".
+       Same problem for AED ("AED 5,000" instead of "د.إ"). The
+       English locale's CLDR data omits narrow symbols for many
+       non-Latin-symbol currencies. Hand-rolling guarantees the
+       symbol from our COUNTRIES table renders.
+
+    2. Consistency — every price in the UI should show the symbol,
+       regardless of currency. User report (May 2026): "the prices
+       on /us/deals show '$' but /ng/deals shows 'NGN'" — that's
+       the Intl-engine fallback path. Bypass it.
+
+    USD keeps 2dp (cents), other currencies round to integer NGN/AED/etc.
+    Number formatting uses 'en' separators (commas) so it reads
+    naturally to our English-language users in all markets. */
 export function formatLocal(amount: number, country: Country): string {
-  return new Intl.NumberFormat("en", {
-    style: "currency",
-    currency: country.currency,
-    minimumFractionDigits: country.currency === "USD" ? 2 : 0,
-    maximumFractionDigits: country.currency === "USD" ? 2 : 0,
+  const isUsd = country.currency === "USD";
+  const body = new Intl.NumberFormat("en", {
+    style:                 "decimal",
+    minimumFractionDigits: isUsd ? 2 : 0,
+    maximumFractionDigits: isUsd ? 2 : 0,
   }).format(amount);
+  return `${country.symbol}${body}`;
 }
 
 /* ── Per-country store filtering ────────────────────────────────────

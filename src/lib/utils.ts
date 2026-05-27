@@ -346,12 +346,16 @@ export function proxiedImageUrl(rawUrl: string | null | undefined): string {
 }
 
 export function formatNaira(amount: number): string {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
+  /* Always prefix with the literal ₦ symbol. Was using
+     `Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" })`
+     which on some Node/browser engines (Vercel runtime among them)
+     returns "NGN 5,000" instead of "₦5,000" because en-NG CLDR data
+     doesn't always carry the narrow symbol. Hand-rolling makes the
+     symbol deterministic across environments. */
+  return `₦${new Intl.NumberFormat("en-NG", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(amount)}`;
 }
 
 /** Approximate NGN per 1 USD — update periodically */
