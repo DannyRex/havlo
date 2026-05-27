@@ -612,6 +612,9 @@ export function isLikelySameProduct(
     gtin?:             string | null;
     mpn?:              string | null;
     googleShoppingId?: string | null;
+    /* 64-bit signed dHash of the product image (Phase 2). NULL when
+       the product had no fetchable image at backfill time. */
+    imagePhash?:       bigint | null;
   },
   candidate: {
     title:             string;
@@ -620,6 +623,7 @@ export function isLikelySameProduct(
     gtin?:             string | null;
     mpn?:              string | null;
     googleShoppingId?: string | null;
+    imagePhash?:       bigint | null;
   },
 ): boolean {
   /* ── Structured-identifier fast-path (Phase 1 product-match upgrade)
@@ -648,6 +652,31 @@ export function isLikelySameProduct(
     const aBrandRaw = anchor.brand?.toLowerCase().trim();
     const cBrandRaw = candidate.brand?.toLowerCase().trim();
     if (aBrandRaw && cBrandRaw && aBrandRaw === cBrandRaw) return true;
+  }
+
+  /* ── Image perceptual-hash fast-path (Phase 2 product-match upgrade)
+     ─────────────────────────────────────────────────────────────
+     When both sides have a precomputed dHash and they're within
+     PHASH_SAME_PRODUCT_THRESHOLD (6) bits of each other, the same
+     product photo is in use — almost certainly the manufacturer's
+     stock image rebroadcast by both retailers. That's a same-
+     product signal with virtually no false positives in product
+     photography.
+
+     Conservative band: <= 6 of 64 bits differ (~10% pixel pattern
+     divergence). Below this we admit the candidate without running
+     the lexical gates; above it we let the gates decide on their
+     own evidence.
+
+     Imported lazily to avoid pulling the sharp dependency into the
+     query-understanding module's edge-runtime callers — the hash
+     comparison itself is pure-JS bigint math, no native deps. */
+  if (anchor.imagePhash != null && candidate.imagePhash != null) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { hammingDistance, PHASH_SAME_PRODUCT_THRESHOLD } = require("./phash") as typeof import("./phash");
+    if (hammingDistance(anchor.imagePhash, candidate.imagePhash) <= PHASH_SAME_PRODUCT_THRESHOLD) {
+      return true;
+    }
   }
 
   /* Brand: when both sides have explicit brand info, they must
