@@ -45,16 +45,40 @@ async function main() {
     .select("*", { count: "exact", head: true })
     .or("gtin.not.is.null,mpn.not.is.null,google_shopping_id.not.is.null");
 
+  /* Phase 2 (image perceptual hash) and Phase 3 (title embedding)
+     coverage — these are NOT counted toward the "ANY structured
+     identifier" total because they're fundamentally different
+     signals (semantic similarity vs definitive same-product code).
+     But they ARE inputs to isLikelySameProduct's fast-path stack,
+     so we report them alongside for full match-signal visibility. */
+  const { count: phashCount } = await supa
+    .from("products")
+    .select("*", { count: "exact", head: true })
+    .not("image_phash", "is", null);
+  const { count: embedCount } = await supa
+    .from("products")
+    .select("*", { count: "exact", head: true })
+    .not("title_embedding", "is", null);
+  const { count: anySignal } = await supa
+    .from("products")
+    .select("*", { count: "exact", head: true })
+    .or("gtin.not.is.null,mpn.not.is.null,google_shopping_id.not.is.null,image_phash.not.is.null,title_embedding.not.is.null");
+
   const total = totalProducts ?? 0;
   const pct = (n: number | null | undefined) =>
     total === 0 ? "0%" : `${(((n ?? 0) / total) * 100).toFixed(1)}%`;
 
-  console.log("\n── Overall identifier coverage ──");
+  console.log("\n── Structured identifiers (Phase 1 / 1.5) ──");
   console.log(`Total products:           ${total.toLocaleString()}`);
   console.log(`GTIN coverage:            ${pct(gtinCount)}  (${gtinCount?.toLocaleString() ?? 0})`);
   console.log(`MPN coverage:             ${pct(mpnCount)}  (${mpnCount?.toLocaleString() ?? 0})`);
   console.log(`Google Shopping ID:       ${pct(gshCount)}  (${gshCount?.toLocaleString() ?? 0})`);
-  console.log(`ANY identifier:           ${pct(anyIdCount)}  (${anyIdCount?.toLocaleString() ?? 0})`);
+  console.log(`ANY structured ID:        ${pct(anyIdCount)}  (${anyIdCount?.toLocaleString() ?? 0})`);
+  console.log("\n── Similarity signals (Phase 2 / 3) ──");
+  console.log(`Image phash coverage:     ${pct(phashCount)}  (${phashCount?.toLocaleString() ?? 0})`);
+  console.log(`Title embedding coverage: ${pct(embedCount)}  (${embedCount?.toLocaleString() ?? 0})`);
+  console.log("\n── Combined match-signal coverage ──");
+  console.log(`ANY signal (ID/phash/embed): ${pct(anySignal)}  (${anySignal?.toLocaleString() ?? 0})`);
 
   /* Coverage by store (only show top 20 with ≥ 20 products to filter noise).
      LEFT JOIN via the offers table since products doesn't have store_id
