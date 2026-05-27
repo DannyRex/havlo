@@ -288,18 +288,90 @@ export async function fetchMerchantDealsViaSerpapi(
   /* Images — opportunistic. Build URL → image_src map keyed by
      canonical merchant URL so mapToDeal can look up each product's
      photo. Failures here are non-fatal — cards just render the
-     gradient placeholder instead. */
+     gradient placeholder instead.
+
+     Image-source selection is non-trivial:
+
+     (a) `original` is the merchant's own CDN URL. PREFERRED when
+         it's a clean public URL. BUT some merchants serve images
+         from S3-style signed URLs (Kara uses Cloudflare R2 with
+         X-Amz-Signature pre-signs that expire after 7 days) — those
+         work the day of ingest, then return 403 a week later when
+         the user actually loads the page. User reported this as
+         "no pictures showing for Kara at all" — the URLs were in
+         the DB but dead by the time the UI fetched them.
+
+     (b) `thumbnail` is Google's encrypted-tbn0.gstatic.com proxy
+         URL. Permanent + free to hotlink + small (~150px). Lower
+         res but card surfaces render at 250-400px so it's
+         acceptable. FALLBACK when (a) is signed / expiring.
+
+     Also reject obvious-logo matches (image URL ending in
+     /Logo.png or /logo.webp etc.) — google_images sometimes
+     returns the merchant's site logo for a product page when no
+     better match exists, and "Philips Iron" with Kara's logo as
+     the photo is worse UX than a clean placeholder. */
+  /* Filter helpers — reject URLs that won't survive in production:
+
+     (1) Signed S3/R2 URLs — Kara's CDN pre-signs every image with
+         X-Amz-Signature and a 7-day expiry. The URL works the day
+         of ingest and 403s a week later.
+     (2) Logo URLs — google_images sometimes returns the merchant's
+         site logo for a product page when no better photo exists.
+         "Philips Iron" with kara.com.ng/Logo.webp is worse UX than
+         a clean placeholder.
+     (3) SerpAPI proxy URLs — serpapi.com/searches/.../images/...
+         is SerpAPI's cache; verified to 404 after a short window.
+         Worse than useless because the card UI loads them then
+         fails silently.
+
+     We only accept:
+       · Google's permanent thumbnail CDN (encrypted-tbn0.gstatic.com /
+         encrypted-tbn[N].gstatic.com) — guaranteed permanent, free
+         to hotlink, ~150-300px (acceptable for card surfaces).
+       · img.original IF it passes (1), (2), (3) filters — typical
+         clean merchant CDN URLs (jumia.is, shopify cdn, etc). */
+  const isSignedUrl = (u: string) =>
+    /X-Amz-Signature|X-Amz-Credential|X-Goog-Signature|X-Goog-Credential/i.test(u);
+  const isLogoUrl = (u: string) =>
+    /\/logo(?:[-_]\w+)?\.(png|jpg|jpeg|webp|svg)(\?|$)/i.test(u);
+  const isSerpapiProxy = (u: string) =>
+    /^https?:\/\/serpapi\.com\/searches\//i.test(u);
+  const isPermanentGoogleThumbnail = (u: string) =>
+    /^https?:\/\/encrypted-tbn\d+\.gstatic\.com\//i.test(u);
+
+  function pickImage(img: GoogleImagesResult): string | null {
+    /* PREFERRED: encrypted-tbn0 (or n) — permanent + free to hotlink. */
+    if (img.thumbnail && isPermanentGoogleThumbnail(img.thumbnail)) {
+      return img.thumbnail;
+    }
+    /* SECONDARY: clean original (real merchant CDN, no signed
+       params, not a logo, not a SerpAPI proxy). */
+    if (img.original && !isSignedUrl(img.original) && !isLogoUrl(img.original) && !isSerpapiProxy(img.original)) {
+      return img.original;
+    }
+    /* TERTIARY: even non-google thumbnail if it's not the SerpAPI
+       proxy — some merchants serve their thumbs from real CDNs
+       that thumbnails sometimes point at. */
+    if (img.thumbnail && !isSerpapiProxy(img.thumbnail) && !isSignedUrl(img.thumbnail)) {
+      return img.thumbnail;
+    }
+    return null;
+  }
+
   const imageByUrl = new Map<string, string>();
   if (imagesSettled.status === "fulfilled" && imagesSettled.value.ok) {
     try {
       const imagesJson = await imagesSettled.value.json() as GoogleImagesResponse;
       for (const img of imagesJson.images_results ?? []) {
-        if (!img.link || !img.original) continue;
+        if (!img.link) continue;
+        const src = pickImage(img);
+        if (!src) continue;
         const canon = canonicaliseMerchantUrl(img.link);
-        /* First image wins — google_images often returns multiple
-           variants per product page; the primary listing photo is
-           usually first in the response. */
-        if (!imageByUrl.has(canon)) imageByUrl.set(canon, img.original);
+        /* First valid image wins — google_images often returns
+           multiple variants per product page; the primary listing
+           photo is usually first. */
+        if (!imageByUrl.has(canon)) imageByUrl.set(canon, src);
       }
     } catch { /* silent — imageless fallback is fine */ }
   }
