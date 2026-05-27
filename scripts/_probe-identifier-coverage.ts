@@ -14,10 +14,15 @@
 
    Usage: tsx scripts/_probe-identifier-coverage.ts */
 
+try { process.loadEnvFile?.(".env.local"); } catch { /* env may be set externally */ }
 import { getSupabaseAdmin } from "../src/lib/providers/db-client";
 
 async function main() {
   const supa = getSupabaseAdmin();
+  if (!supa) {
+    console.error("Missing Supabase env (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)");
+    process.exit(1);
+  }
 
   /* Overall counts */
   const { count: totalProducts } = await supa
