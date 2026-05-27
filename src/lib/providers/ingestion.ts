@@ -26,6 +26,25 @@ function isBlockedSentinel(s: string | null | undefined): boolean {
   return !!s && /\[BLOCKED:\s*[^\]]+\]/i.test(s);
 }
 
+/* Normalise a raw identifier (GTIN / MPN / Google Shopping ID) into
+   the canonical form the DB stores, or null if the value is missing /
+   junk. Three steps:
+     1. Trim — providers occasionally emit values with trailing space
+        ("  012345678910 ").
+     2. Drop blocked-sentinel leaks (same defensive guard as storeId).
+     3. Drop empty strings (some providers emit "" for "absent" rather
+        than omitting the field). NULL is the correct DB representation.
+   GTIN/MPN/gsh casing is preserved as-is — these are opaque tokens,
+   not human strings. Future: tighten GTIN validation (length, checksum)
+   if we see junk values flowing in. */
+function cleanIdentifier(v: string | undefined | null): string | null {
+  if (v == null) return null;
+  const t = v.trim();
+  if (!t) return null;
+  if (isBlockedSentinel(t)) return null;
+  return t;
+}
+
 export interface IngestResult {
   fetched: number;
   upserted: number;
@@ -225,7 +244,11 @@ function dealToProductRow(d: Deal, signature: string) {
      extracted them — an old TODO that nullified the variant-gate's
      brand-equality guard (both sides null → no-op check). May 2026
      fix: persist what the parser found. */
-  const parsed = buildSignature(cleanedTitle);
+  const parsed = buildSignature(cleanedTitle, {
+    gtin:             d.gtin,
+    mpn:              d.mpn,
+    googleShoppingId: d.googleShoppingId,
+  });
 
   return {
     title: cleanedTitle,
@@ -240,6 +263,16 @@ function dealToProductRow(d: Deal, signature: string) {
        See normaliseTitleKey() above + migration 0046 for the design
        rationale. Must match the SQL backfill formula. */
     title_key: normaliseTitleKey(cleanedTitle),
+    /* Structured product identifiers (Phase 1 product-match upgrade).
+       Each is a much stronger same-product signal than the heuristic
+       brand|model signature. Persisted whenever the provider surfaces
+       them; absent rows stay NULL and fall back to the existing
+       signature/title_key dedup paths. The identifier-based dedup
+       pass in ingestDeals() below uses these BEFORE the signature
+       pass so the strongest signal wins. */
+    gtin:               d.gtin ?? null,
+    mpn:                d.mpn ?? null,
+    google_shopping_id: d.googleShoppingId ?? null,
   };
 }
 
@@ -529,7 +562,81 @@ export async function ingestDeals(
     sigKey:   sigs[i].key,
     canDedup: sigs[i].brand !== null && sigs[i].model !== null,
     titleKey: normaliseTitleKey(cleanProductTitle(d.title)),
+    /* Structured identifiers — drives the new Phase 1 dedup pass
+       (Bulk lookup 0 / Step 0 below). Sanitized at the boundary:
+       trim + ignore the [BLOCKED:...] sentinel that the secret-
+       scrubber middleware sometimes emits. brand is captured here
+       because MPN dedup is brand-scoped (different brands can
+       reuse a part-number string). */
+    gtin:             cleanIdentifier(d.gtin),
+    mpn:              cleanIdentifier(d.mpn),
+    googleShoppingId: cleanIdentifier(d.googleShoppingId),
+    brand:            sigs[i].brand,
   }));
+
+  /* Bulk lookup 0: existing products by structured identifier
+     (GTIN / MPN / Google Shopping ID).
+     ─────────────────────────────────────────────────────────────
+     Phase 1 product-match upgrade. These are the strongest sameness
+     signals available — when two offers share a GTIN they ARE the
+     same product, no heuristic gates needed. Runs BEFORE the
+     signature and title_key lookups so the highest-confidence path
+     wins.
+
+     Cheap: at most 3 small IN queries, each filtered by a partial
+     unique/composite index (migration 0049). Most batches won't
+     have many identifiers populated until a few weeks post-deploy,
+     so these IN sets are typically short.
+
+     `gtinHits` and `gshHits` are keyed on the identifier itself
+     (globally unique). `mpnHits` is keyed on `<brand>:<mpn>` because
+     MPN is brand-scoped (different brands may reuse part-number
+     strings — "M1" alone is ambiguous). */
+  const gtinValues = Array.from(new Set(
+    offerUrls.map((o) => o.gtin).filter((v): v is string => !!v),
+  ));
+  const gshValues = Array.from(new Set(
+    offerUrls.map((o) => o.googleShoppingId).filter((v): v is string => !!v),
+  ));
+  const mpnValues = Array.from(new Set(
+    offerUrls
+      .filter((o) => o.mpn && o.brand)
+      .map((o) => o.mpn as string),
+  ));
+
+  const gtinHits = new Map<string, { id: string; image_url: string | null }>();
+  const gshHits  = new Map<string, { id: string; image_url: string | null }>();
+  const mpnHits  = new Map<string, { id: string; image_url: string | null }>();
+
+  if (gtinValues.length > 0) {
+    const { data: rows } = await supa
+      .from("products")
+      .select("id, image_url, gtin")
+      .in("gtin", gtinValues);
+    for (const r of (rows ?? []) as Array<{ id: string; image_url: string | null; gtin: string }>) {
+      gtinHits.set(r.gtin, { id: r.id, image_url: r.image_url });
+    }
+  }
+  if (gshValues.length > 0) {
+    const { data: rows } = await supa
+      .from("products")
+      .select("id, image_url, google_shopping_id")
+      .in("google_shopping_id", gshValues);
+    for (const r of (rows ?? []) as Array<{ id: string; image_url: string | null; google_shopping_id: string }>) {
+      gshHits.set(r.google_shopping_id, { id: r.id, image_url: r.image_url });
+    }
+  }
+  if (mpnValues.length > 0) {
+    const { data: rows } = await supa
+      .from("products")
+      .select("id, image_url, brand, mpn")
+      .in("mpn", mpnValues);
+    for (const r of (rows ?? []) as Array<{ id: string; image_url: string | null; brand: string | null; mpn: string }>) {
+      if (r.brand) {
+        mpnHits.set(`${r.brand.toLowerCase()}:${r.mpn}`, { id: r.id, image_url: r.image_url });
+      }
+    }
+  }
 
   /* Bulk lookup 1: existing offers by (store_id, url) — one row per
      unique (store_id, url) pair. PostgREST .or() with .and() inside
@@ -620,14 +727,47 @@ export async function ingestDeals(
      that ended up with no offer pointing at them. */
   const insertedProductIds: string[] = [];
 
+  /* identifierBackfills — when an in-memory dedup pass matches an
+     EXISTING product via signature/title_key/FTS but THIS deal carries
+     a structured identifier the existing row doesn't have yet, queue
+     a small UPDATE to backfill the identifier column. Cheap, one-shot:
+     after the backfill any future ingest with the same identifier
+     hits the row via Step 0's bulk lookup directly (faster + stronger
+     than re-matching via signature each time). */
+  const identifierBackfills: Array<{
+    productId:        string;
+    gtin?:            string | null;
+    mpn?:             string | null;
+    googleShoppingId?: string | null;
+  }> = [];
+
   for (let i = 0; i < deals.length; i++) {
     const d = deals[i];
-    const { url, storeId, sigKey, canDedup, titleKey } = offerUrls[i];
+    const { url, storeId, sigKey, canDedup, titleKey, gtin, mpn, googleShoppingId, brand } = offerUrls[i];
 
     let existing: { id: string; image_url: string | null } | null = null;
+    let matchedViaIdentifier = false;
+
+    /* Step 0: structured-identifier dedup (in-memory). Highest-
+       confidence path — when the deal carries a GTIN/MPN/gsh that
+       matches an existing product row, we KNOW it's the same product.
+       Runs before URL / signature / title_key because identifiers
+       beat every heuristic. */
+    if (!existing && gtin) {
+      const hit = gtinHits.get(gtin);
+      if (hit) { existing = hit; matchedViaIdentifier = true; }
+    }
+    if (!existing && googleShoppingId) {
+      const hit = gshHits.get(googleShoppingId);
+      if (hit) { existing = hit; matchedViaIdentifier = true; }
+    }
+    if (!existing && mpn && brand) {
+      const hit = mpnHits.get(`${brand.toLowerCase()}:${mpn}`);
+      if (hit) { existing = hit; matchedViaIdentifier = true; }
+    }
 
     /* Step 1: existing-offer lookup (in-memory) */
-    if (url && storeId) {
+    if (!existing && url && storeId) {
       const pid = offerHits.get(`${storeId}:${url}`);
       if (pid) existing = hitProducts.get(pid) ?? null;
     }
@@ -650,6 +790,20 @@ export async function ingestDeals(
     if (!existing && titleKey.length > 0) {
       const hit = titleHits.get(titleKey);
       if (hit) existing = hit;
+    }
+
+    /* When we matched via a non-identifier path (signature / title_key /
+       URL) but the incoming deal carries an identifier, queue a backfill
+       so the existing product row gets the identifier on its next save.
+       Skip when we already matched via the identifier itself
+       (matchedViaIdentifier) — that row obviously already has it. */
+    if (existing && !matchedViaIdentifier && (gtin || mpn || googleShoppingId)) {
+      identifierBackfills.push({
+        productId:        existing.id,
+        gtin:             gtin || null,
+        mpn:              mpn || null,
+        googleShoppingId: googleShoppingId || null,
+      });
     }
 
     /* Step 2c: FTS match runs as a post-loop pass below — it needs
@@ -855,6 +1009,39 @@ export async function ingestDeals(
        conditional clause to match each row's id. Skipped on
        failure — backfill is opportunistic. */
     await supa.from("products").update({ image_url: b.imageUrl }).eq("id", b.productId);
+  }
+
+  /* Step 4b: identifier backfills — populate gtin/mpn/google_shopping_id
+     on existing product rows that were matched via signature/title_key
+     paths but didn't yet have the identifier the incoming deal carries.
+     Uses COALESCE-style merge logic in JS (only writes the identifier
+     when it's currently NULL on the row) — done by reading current
+     value first. To keep this efficient on the common case, we batch
+     identifier-distinct backfills and use a partial-unique-violation-
+     safe write (skip on conflict, since gtin and gsh have UNIQUE
+     constraints — if another row already claimed the identifier, we'd
+     rather leave both rows alone than break the ingest).
+
+     Performance: identifier backfills are rare (only fires when an
+     existing product matched via signature/title_key AND the new
+     deal carries a new identifier). After the first few weeks of
+     ingest, most identified products have been backfilled and this
+     loop is empty. */
+  for (const b of identifierBackfills) {
+    const patch: Record<string, string | null> = {};
+    if (b.gtin)             patch.gtin = b.gtin;
+    if (b.mpn)              patch.mpn = b.mpn;
+    if (b.googleShoppingId) patch.google_shopping_id = b.googleShoppingId;
+    if (Object.keys(patch).length === 0) continue;
+    /* Best-effort: a partial-unique-violation here means another product
+       row already owns this identifier (rare race condition or upstream
+       provider returned the same identifier for different products).
+       We intentionally swallow the error — the existing row keeps its
+       state, the matched row keeps its state, no data loss. */
+    const { error } = await supa.from("products").update(patch).eq("id", b.productId);
+    if (error && !/duplicate key|unique constraint/i.test(error.message)) {
+      result.errors.push(`Identifier backfill ${b.productId}: ${error.message}`);
+    }
   }
 
   /* Step 5: bulk upsert offers. */

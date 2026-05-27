@@ -111,6 +111,27 @@ export interface ProductSignature {
   key: string;
   // Original normalized title
   norm: string;
+  /* Structured identifiers passed in by the caller (when known
+     from the provider response or DB row). These don't influence
+     `key` — the signature key stays a heuristic-only fingerprint
+     so existing dedup paths (signature column on products) are
+     stable across ingests with/without identifiers. Identifiers
+     live alongside `key` so isLikelySameProduct can use them as a
+     fast-path BEFORE running its 8 lexical gates. */
+  gtin?: string | null;
+  mpn?: string | null;
+  googleShoppingId?: string | null;
+}
+
+/** Optional bag of structured identifiers passed to buildSignature
+    when the caller has them (from SerpAPI's product_id, scraped
+    Schema.org JSON-LD, retailer feed, etc.). All fields optional;
+    omitted ones get null. Used downstream by isLikelySameProduct
+    as a high-confidence same-product signal. */
+export interface ProductIdentifiers {
+  gtin?: string | null;
+  mpn?: string | null;
+  googleShoppingId?: string | null;
 }
 
 const COLOR_RE = /\b(black|white|silver|gold|rose\s*gold|blue|red|green|grey|gray|pink|purple|yellow|orange|graphite|titanium|midnight|starlight|ocean|mint|cream)\b/i;
@@ -521,7 +542,10 @@ function tokensOf(s: string): string[] {
     .filter((w) => w.length > 1 && !STOP.has(w));
 }
 
-export function buildSignature(title: string): ProductSignature {
+export function buildSignature(
+  title: string,
+  identifiers?: ProductIdentifiers,
+): ProductSignature {
   const norm = stripPunct(title);
 
   const brand = findBrand(norm);
@@ -541,6 +565,17 @@ export function buildSignature(title: string): ProductSignature {
   // and varies in title formatting between retailers ("6.1 inch" on Amazon
   // vs no inch on Konga), which previously shattered iPhone 15 listings
   // across product_ids despite having the exact same brand+model.
+  //
+  // NOTE: structured identifiers (gtin/mpn/googleShoppingId) are NOT
+  // folded into the key. The signature column on `products` must be
+  // stable across re-ingests that may or may not have identifier data —
+  // if we keyed on GTIN, a first ingest without GTIN would land on
+  // `apple|iphone 15` and a later ingest WITH GTIN would land on
+  // `gtin:0194...`, creating duplicate product rows. Instead, the
+  // ingestion writer's identifier-dedup pass (bulk lookup against
+  // products.gtin / .google_shopping_id / (.brand,.mpn)) runs BEFORE
+  // the signature/title_key passes — see ingestion.ts. Identifiers
+  // also serve as a fast-path in isLikelySameProduct at query time.
   const inchesIsProductIdentity =
     inches != null && (
       inches >= 19   // 19"+ → TV / monitor / large laptop. Phones are
@@ -553,7 +588,12 @@ export function buildSignature(title: string): ProductSignature {
   ].filter(Boolean);
   const key = parts.join("|");
 
-  return { brand, model, storageGb, ramGb, inches, color, tokens, key, norm };
+  return {
+    brand, model, storageGb, ramGb, inches, color, tokens, key, norm,
+    gtin:             identifiers?.gtin ?? null,
+    mpn:              identifiers?.mpn ?? null,
+    googleShoppingId: identifiers?.googleShoppingId ?? null,
+  };
 }
 
 /* ── Chip / label display helpers ─────────────────────────────────

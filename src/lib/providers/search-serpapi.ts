@@ -371,6 +371,14 @@ function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | nu
     saves: 0,
     clicks: 0,
     postedAt: new Date().toISOString().slice(0, 10),
+    /* Google Shopping's cross-merchant product_id. Comes free with
+       every shopping-search response — was previously discarded,
+       now flowed through to ingestion so two stores selling the
+       same Google-canonicalised product collapse to one
+       products.id without needing to agree on the title (huge win
+       for cross-store comparison recall — see
+       isLikelySameProduct's identifier fast-path). */
+    googleShoppingId: r.product_id || undefined,
   };
 }
 

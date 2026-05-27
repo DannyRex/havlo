@@ -55,6 +55,31 @@ export interface Deal {
   saves: number;
   clicks: number;
   postedAt: string;
+
+  /* ── Structured product identifiers (Phase 1 product-match upgrade)
+     ─────────────────────────────────────────────────────────────
+     Each is OPTIONAL — providers that don't surface the field leave
+     it undefined and ingestion falls back to the heuristic title-
+     based signature. When ANY of these is present at ingest time,
+     it's persisted to products and used as a high-confidence
+     same-product signal (see isLikelySameProduct's fast-path and
+     ingestion's identifier-based dedup pass). */
+
+  /** GTIN / EAN / UPC (8/12/13/14 digits). Globally unique per
+      physical product — two offers sharing a GTIN are the same
+      product, period. String form preserves leading zeros. */
+  gtin?: string;
+
+  /** Manufacturer Part Number. Brand-scoped — equivalence key is
+      (brand, mpn), since different brands can reuse part-number
+      strings (e.g. "M1" means very different things across vendors). */
+  mpn?: string;
+
+  /** Google Shopping internal product_id from SerpAPI. Strong cross-
+      merchant identifier returned for free with every shopping-
+      search response — survives across stores when Google has
+      canonicalised the listing. Populated by serpapi-search providers. */
+  googleShoppingId?: string;
 }
 
 export interface PriceResult {

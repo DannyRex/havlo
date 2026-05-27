@@ -604,9 +604,52 @@ export function shareSignificantTokens(
 }
 
 export function isLikelySameProduct(
-  anchor: { title: string; brand?: string | null; priceNgn?: number; family?: string | null },
-  candidate: { title: string; brand?: string | null; priceNgn?: number },
+  anchor: {
+    title:             string;
+    brand?:            string | null;
+    priceNgn?:         number;
+    family?:           string | null;
+    gtin?:             string | null;
+    mpn?:              string | null;
+    googleShoppingId?: string | null;
+  },
+  candidate: {
+    title:             string;
+    brand?:            string | null;
+    priceNgn?:         number;
+    gtin?:             string | null;
+    mpn?:              string | null;
+    googleShoppingId?: string | null;
+  },
 ): boolean {
+  /* ── Structured-identifier fast-path (Phase 1 product-match upgrade)
+     ─────────────────────────────────────────────────────────────
+     When both sides carry the same structured identifier (GTIN,
+     Google Shopping product_id, or (brand, MPN)), they ARE the same
+     product, full stop. Skip the 8 lexical gates below — they exist
+     to approximate this exact equality from title text and can only
+     hurt accuracy when we already know the answer.
+
+     GTIN: globally unique per physical product. Hard match.
+     Google Shopping ID: globally unique per Google-canonicalised
+       listing. Effectively as strong as GTIN for cross-merchant
+       equivalence, and we get it for free from SerpAPI.
+     MPN: brand-scoped — the equivalence key is (brand, mpn) because
+       different brands may reuse part-number strings. Only fires
+       when both brands are known and equal. */
+  if (anchor.gtin && candidate.gtin && anchor.gtin === candidate.gtin) {
+    return true;
+  }
+  if (anchor.googleShoppingId && candidate.googleShoppingId &&
+      anchor.googleShoppingId === candidate.googleShoppingId) {
+    return true;
+  }
+  if (anchor.mpn && candidate.mpn && anchor.mpn === candidate.mpn) {
+    const aBrandRaw = anchor.brand?.toLowerCase().trim();
+    const cBrandRaw = candidate.brand?.toLowerCase().trim();
+    if (aBrandRaw && cBrandRaw && aBrandRaw === cBrandRaw) return true;
+  }
+
   /* Brand: when both sides have explicit brand info, they must
      match. When either side is missing (parser miss / unbranded
      listing), defer to the other gates. */
