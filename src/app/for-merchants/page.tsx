@@ -33,7 +33,7 @@ const SITE_URL = "https://havlo.io";
 export const metadata: Metadata = {
   title: "For merchants · List your store on Havlo",
   description:
-    "Send your products to high-intent shoppers comparing prices across stores. Submit a product feed and reach buyers in seven markets — free during launch.",
+    "Send your products to high-intent shoppers comparing prices across stores. Submit a product feed and reach buyers in seven markets. Free during launch.",
   alternates: { canonical: "/for-merchants" },
   openGraph: {
     title: "For merchants · Havlo",
@@ -48,12 +48,12 @@ const STEPS = [
   {
     icon: FileCode,
     title: "Send us a product feed",
-    body: "Standard Google Shopping XML or CSV. If you already have one for Google Merchant Center, you're done — point us at the same URL.",
+    body: "Standard Google Shopping XML or CSV. If you already have a feed for Google Merchant Center, point us at the same URL.",
   },
   {
     icon: CheckCircle2,
     title: "We vet + ingest",
-    body: "We check the feed for completeness and category fit, then index your products into the comparison engine. Most stores go live within 3 business days.",
+    body: "We check the feed for completeness and category fit, then index your products into Havlo. Most stores go live within 3 business days.",
   },
   {
     icon: Sparkles,
@@ -80,7 +80,7 @@ const FAQ = [
   },
   {
     q: "What about returns, customer support, or fraud?",
-    a: "Havlo never holds payment or ships goods. Every transaction is between the shopper and you — you handle returns, support, fraud, and warranty exactly the way you do today. We're a discovery + comparison layer, nothing more.",
+    a: "Havlo never holds payment or ships goods. Every transaction is between the shopper and you. You handle returns, support, fraud, and warranty the same way you do today. We're a discovery and comparison layer, nothing more.",
   },
   {
     q: "How often do prices refresh?",
@@ -88,7 +88,7 @@ const FAQ = [
   },
   {
     q: "Which markets will my products appear in?",
-    a: "Nigeria, UK, US, India, UAE, and South Africa today. Germany is in deferred launch. We country-target based on your store's shipping reach — if you only ship within Nigeria, Havlo only surfaces your products on /ng.",
+    a: "Nigeria, UK, US, India, UAE, and South Africa today. Germany is in deferred launch. We country-target based on your store's shipping reach. If you only ship within Nigeria, your products only appear on /ng.",
   },
 ];
 
@@ -106,10 +106,10 @@ export default function ForMerchantsPage() {
             Reach shoppers who are ready to buy.
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-lg leading-relaxed">
-            Havlo helps shoppers in seven markets find the best price across
-            local + cross-border stores. Send us a product feed; we surface
-            your products to people actively comparing prices. You handle the
-            sale.
+            Havlo helps shoppers in seven markets compare prices across local
+            stores and cross-border options. Send us a product feed and we
+            surface your products to people who are already deciding what to
+            buy. You handle the sale.
           </p>
         </header>
 
@@ -164,9 +164,8 @@ export default function ForMerchantsPage() {
             What we accept
           </h2>
           <p className="text-ink-2 text-[15px] leading-relaxed mb-4">
-            We try to make integration painless. If your store already
-            advertises on Google Shopping, you almost certainly already have
-            what we need.
+            Integration is short. If your store already advertises on Google
+            Shopping, you have what we need.
           </p>
           <ul className="space-y-2.5">
             {ACCEPTED_FORMATS.map((line) => (

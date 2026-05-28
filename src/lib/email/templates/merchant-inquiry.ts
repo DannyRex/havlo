@@ -30,8 +30,8 @@ export function merchantInquiryConfirmation({ storeName }: Args): Email {
 
   const body = `
 ${paragraph("Hi,")}
-${paragraph(`Thanks for your interest in listing <strong style="font-weight:600;">${escapeHtml(storeName)}</strong> on Havlo.`)}
-${paragraph("I'll review the application in the next two business days and reply with next steps. Usually that's either a quick request for the product feed URL (if you didn't include it), or a green light to start ingestion.")}
+${paragraph(`Thanks for applying to list <strong style="font-weight:600;">${escapeHtml(storeName)}</strong> on Havlo.`)}
+${paragraph("I'll review it in the next two business days and reply with next steps. Usually that's either a quick request for the product feed URL (if you didn't include it), or a green light to start ingestion.")}
 ${paragraph("Most partners go live within three business days after sign-off.")}
 ${signature("Danny")}
 ${spacer(8)}
@@ -41,9 +41,9 @@ ${spacer(8)}
 
   const text = plainTextShell({
     body: [
-      `Thanks for your interest in listing "${storeName}" on Havlo.`,
+      `Thanks for applying to list "${storeName}" on Havlo.`,
       ``,
-      `I'll review the application in the next two business days and reply with next steps. Usually that's either a quick request for the product feed URL (if you didn't include it), or a green light to start ingestion.`,
+      `I'll review it in the next two business days and reply with next steps. Usually that's either a quick request for the product feed URL (if you didn't include it), or a green light to start ingestion.`,
       ``,
       `Most partners go live within three business days after sign-off.`,
     ],

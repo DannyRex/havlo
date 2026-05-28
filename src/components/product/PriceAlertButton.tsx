@@ -27,7 +27,7 @@
    email only and the privacy policy already discloses this use. Same
    posture as /api/notify-product. */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Bell, BellRing, Check, X } from "lucide-react";
 import type { Country } from "@/lib/country";
 import { USD_FX } from "@/lib/country";
@@ -45,12 +45,16 @@ const UUID_RE  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
 export default function PriceAlertButton({ productId, productTitle, currentPriceNgn, country }: Props) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
+  const targetInputRef = useRef<HTMLInputElement>(null);
   /* Pre-fill target with a 10% discount on current price — most
      shoppers want a meaningful discount, not a 1% improvement.
      Rounded for readability. */
   const defaultTargetNgn = Math.round(currentPriceNgn * 0.9 / 100) * 100;
   const defaultTargetDisplay = Math.round(ngnToDisplay(defaultTargetNgn, country));
-  const [target, setTarget] = useState(String(defaultTargetDisplay));
+  /* Store formatted display string. Raw value for submission is
+     parsed back on handleSubmit. Pre-format the default so the
+     initial render is consistent with the typing experience. */
+  const [target, setTarget] = useState(formatTargetInput(String(defaultTargetDisplay)));
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -171,11 +175,43 @@ export default function PriceAlertButton({ productId, productTitle, currentPrice
           {country.symbol}
         </span>
         <input
+          ref={targetInputRef}
           type="text"
           inputMode="decimal"
           value={target}
-          onChange={(e) => setTarget(e.target.value)}
-          className="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-surface text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+          onChange={(e) => {
+            /* Format-while-typing with thousands separators.
+               Counts the number of digit/decimal characters BEFORE
+               the cursor in the user's raw input, then restores the
+               cursor to the same significant-char position in the
+               formatted string. Without this, the cursor jumps to
+               the end on every keystroke after a comma reflow. */
+            const input = e.currentTarget;
+            const raw = input.value;
+            const cursorPre = input.selectionStart ?? raw.length;
+            const sigCharsBefore = raw.slice(0, cursorPre).replace(/[^0-9.]/g, "").length;
+
+            const formatted = formatTargetInput(raw);
+            setTarget(formatted);
+
+            /* Restore cursor after React commits. requestAnimationFrame
+               lands AFTER the controlled-input value update so
+               setSelectionRange operates on the right string. */
+            requestAnimationFrame(() => {
+              const el = targetInputRef.current;
+              if (!el) return;
+              let seen = 0;
+              let pos = 0;
+              for (let i = 0; i < formatted.length; i++) {
+                if (seen >= sigCharsBefore) break;
+                if (/[0-9.]/.test(formatted[i])) seen++;
+                pos = i + 1;
+              }
+              el.setSelectionRange(pos, pos);
+            });
+          }}
+          className="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-surface text-sm text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-ink/20"
+          aria-label={`Target price in ${country.currency}`}
         />
       </div>
 
@@ -218,4 +254,49 @@ function displayToNgn(displayAmount: number, country: Country): number {
   const rate = USD_FX[country.currency as keyof typeof USD_FX] ?? 1;
   const usd = displayAmount / rate;
   return usd * USD_FX.NGN;
+}
+
+/* Format a raw target-price input string into a display string with
+   thousand separators. Strips disallowed characters, normalises to
+   a single decimal point, and caps fractional digits at 2.
+
+   Examples:
+     "12500"      → "12,500"
+     "12,500.5"   → "12,500.5"
+     "12.50.30"   → "12.50"      (extra dots collapsed)
+     "abc1,234x5" → "12,345"     (non-digits stripped)
+     ""           → ""
+     "."          → "."          (allow lone decimal during typing)
+     ".5"         → ".5"
+   The submit path runs Number(target.replace(/[^0-9.]/g, "")) which
+   parses any well-formed display value back to a number cleanly. */
+function formatTargetInput(raw: string): string {
+  /* Step 1: strip everything except digits + decimal points. */
+  let cleaned = raw.replace(/[^0-9.]/g, "");
+
+  /* Step 2: collapse multiple decimal points to the first one. */
+  const firstDot = cleaned.indexOf(".");
+  if (firstDot !== -1) {
+    cleaned =
+      cleaned.slice(0, firstDot + 1) +
+      cleaned.slice(firstDot + 1).replace(/\./g, "");
+  }
+
+  /* Step 3: cap fractional digits at 2 (matches the precision the
+     DB stores prices at — numeric(12,2)). */
+  if (firstDot !== -1 && cleaned.length > firstDot + 3) {
+    cleaned = cleaned.slice(0, firstDot + 3);
+  }
+
+  /* Step 4: split, format integer part with thousand separators,
+     reattach decimal. Empty string stays empty so a cleared field
+     doesn't render as "0". */
+  if (cleaned === "") return "";
+  const [intPart, decPart] = cleaned.split(".");
+  /* Normalise leading zeros on the integer part — "007500" → "7500".
+     Empty intPart (e.g. user typed ".5") stays empty so leading dot
+     is preserved. */
+  const intNormalised = intPart === "" ? "" : String(parseInt(intPart, 10));
+  const intGrouped = intNormalised.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return decPart !== undefined ? `${intGrouped}.${decPart}` : intGrouped;
 }

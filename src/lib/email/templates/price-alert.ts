@@ -98,12 +98,12 @@ export function priceAlertTriggered({
   const preheader = `Below your target of ${targetPriceFmt}. View the offer at ${storeName}.`;
 
   const body = `
-${paragraph("Good news -")}
+${paragraph("Quick heads-up.")}
 ${paragraph(`<strong style="font-weight:600;">${escapeHtml(productTitle)}</strong> just dropped to <strong style="font-weight:600;">${escapeHtml(cheapestPriceFmt)}</strong> at ${escapeHtml(storeName)}.`)}
-${paragraph(`That's below your target of ${escapeHtml(targetPriceFmt)}.`)}
+${paragraph(`That's below the target you set (${escapeHtml(targetPriceFmt)}).`)}
 ${button({ url: productUrl, label: `View at ${storeName}`, align: "left" })}
 ${spacer(16)}
-${paragraph(`Prices change fast at this level. If you want it, grab it now.`)}
+${paragraph(`Prices at this level usually don't hold for long, so it's worth checking soon if you've been waiting.`)}
 ${signature("Danny")}
 ${spacer(8)}
 ${paragraph(`<span style="font-size:12px;color:#9ca3af;">${textLink({ url: unsubUrl, label: "Stop tracking this product" })}.</span>`)}
@@ -113,14 +113,14 @@ ${paragraph(`<span style="font-size:12px;color:#9ca3af;">${textLink({ url: unsub
 
   const text = plainTextShell({
     body: [
-      `Good news -`,
+      `Quick heads-up.`,
       ``,
       `"${productTitle}" just dropped to ${cheapestPriceFmt} at ${storeName}.`,
-      `That's below your target of ${targetPriceFmt}.`,
+      `That's below the target you set (${targetPriceFmt}).`,
       ``,
       `View at ${storeName}: ${productUrl}`,
       ``,
-      `Prices change fast at this level. If you want it, grab it now.`,
+      `Prices at this level usually don't hold for long, so it's worth checking soon if you've been waiting.`,
       ``,
       `Stop tracking this product: ${unsubUrl}`,
     ],

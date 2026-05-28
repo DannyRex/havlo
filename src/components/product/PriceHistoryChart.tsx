@@ -211,7 +211,7 @@ export default function PriceHistoryChart({
       <section
         ref={containerRef}
         className="rounded-2xl border border-border bg-surface-2/40 px-5 py-8 text-center"
-        aria-label="Price history — no data yet"
+        aria-label="Price history. No data yet"
       >
         <Calendar size={20} className="mx-auto text-ink-3 mb-2" aria-hidden="true" />
         <p className="text-sm text-ink-2">No price activity yet</p>

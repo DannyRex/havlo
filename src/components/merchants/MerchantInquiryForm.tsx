@@ -99,8 +99,8 @@ export default function MerchantInquiryForm() {
         </div>
         <p className="text-sm text-ink-2 leading-relaxed">
           We respond to merchant inquiries within two business days. Look out
-          for an email from <strong>hello@havlo.io</strong> — sometimes
-          it lands in Promotions, so check there too.
+          for an email from <strong>hello@havlo.io</strong>. Sometimes it
+          lands in Promotions, so check there too.
         </p>
       </div>
     );
@@ -150,7 +150,7 @@ export default function MerchantInquiryForm() {
         />
       </Field>
 
-      <Field label="Product feed URL" hint="Google Shopping XML, CSV, or Shopify /products.json. Optional — we can help set this up.">
+      <Field label="Product feed URL" hint="Google Shopping XML, CSV, or Shopify /products.json. Optional. We can help set this up.">
         <input
           type="url"
           value={form.feedUrl}
