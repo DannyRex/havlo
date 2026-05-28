@@ -47,7 +47,7 @@ const sections = [
       "Keyboard-only navigation - every interactive element must be reachable with Tab and operable with Enter/Space.",
       "Screen readers - primary flows tested with VoiceOver (macOS, iOS) and NVDA (Windows). Product cards, filters, and the compare grid have proper ARIA labels.",
       "Color contrast - body text 4.5:1 minimum, large text 3:1 minimum (WCAG AA thresholds). Brand color (#0057FF) passes against the white surface.",
-      "Zoom + responsive layout - content remains usable up to 200% browser zoom on a 320px-wide viewport.",
+      "Zoom and responsive layout - content remains usable up to 200% browser zoom on a 320px-wide viewport.",
       "Form labels and errors - every input has an associated label; validation errors announce to assistive tech.",
       "Motion preferences - animations respect prefers-reduced-motion; no auto-playing video.",
     ],
@@ -71,7 +71,7 @@ const sections = [
     bullets: [
       "Screen readers: VoiceOver (macOS 14+, iOS 17+), NVDA 2024.x, JAWS 2024",
       "Browsers: Chrome 120+, Safari 17+, Firefox 121+, Edge 120+",
-      "OS magnification + high-contrast modes on macOS, Windows, iOS, and Android",
+      "OS magnification and high-contrast modes on macOS, Windows, iOS, and Android",
     ],
   },
   {

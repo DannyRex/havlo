@@ -109,7 +109,7 @@ export default function DSAContactPage() {
   return (
     <LegalPage
       eyebrow="EU Digital Services Act"
-      title="DSA contact + content reports"
+      title="DSA contact and content reports"
       description="Single point of contact for EU authorities and users, plus the notice-and-action mechanism for reporting illegal content surfaced on Havlo."
       lastUpdated="28 May 2026"
       sections={sections}

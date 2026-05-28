@@ -597,7 +597,7 @@ export const posts: BlogPost[] = [
   {
     slug:        "playstation-5-uk-deals-2026",
     title:       "Best PlayStation 5 Deals in the UK 2026",
-    description: "PS5 Slim pricing across Argos, Currys, Amazon UK, John Lewis, and Game. Plus the bundle math that beats buying console + games separately.",
+    description: "PS5 Slim pricing across Argos, Currys, Amazon UK, John Lewis, and Game. Plus the bundle math that beats buying console and games separately.",
     publishedAt: "2026-05-06",
     readMinutes: 5,
     tags:        ["gaming", "uk", "buying-guide"],

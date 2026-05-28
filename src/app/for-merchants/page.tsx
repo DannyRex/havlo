@@ -33,12 +33,12 @@ const SITE_URL = "https://havlo.io";
 export const metadata: Metadata = {
   title: "For merchants · List your store on Havlo",
   description:
-    "Send your products to high-intent shoppers comparing prices across stores. Submit a product feed and reach buyers in seven markets. Free during launch.",
+    "Send your products to high-intent shoppers comparing prices across stores. Submit a product feed and reach buyers in six markets. Free during launch.",
   alternates: { canonical: "/for-merchants" },
   openGraph: {
     title: "For merchants · Havlo",
     description:
-      "Reach buying-intent shoppers comparing prices across stores. Submit a feed, get listed in seven markets.",
+      "Reach buying-intent shoppers comparing prices across stores. Submit a feed, get listed in six markets.",
     url: `${SITE_URL}/for-merchants`,
     type: "website",
   },
@@ -52,7 +52,7 @@ const STEPS = [
   },
   {
     icon: CheckCircle2,
-    title: "We vet + ingest",
+    title: "We vet and ingest",
     body: "We check the feed for completeness and category fit, then index your products into Havlo. Most stores go live within 3 business days.",
   },
   {
@@ -106,7 +106,7 @@ export default function ForMerchantsPage() {
             Reach shoppers who are ready to buy.
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-lg leading-relaxed">
-            Havlo helps shoppers in seven markets compare prices across local
+            Havlo helps shoppers in six markets compare prices across local
             stores and cross-border options. Send us a product feed and we
             surface your products to people who are already deciding what to
             buy. You handle the sale.

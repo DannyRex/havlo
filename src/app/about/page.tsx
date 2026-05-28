@@ -22,12 +22,12 @@ const SITE_URL = "https://havlo.io";
 export const metadata: Metadata = {
   title: "About",
   description:
-    "Havlo is an independent price comparison platform helping shoppers in seven countries find similar products for less. Local stores plus the cross-border options that ship to you.",
+    "Havlo is an independent price comparison platform helping shoppers in six countries find similar products for less. Local stores plus the cross-border options that ship to you.",
   alternates: { canonical: "/about" },
   openGraph: {
     title: "About · Havlo",
     description:
-      "Independent price comparison across seven markets. The story behind Havlo.",
+      "Independent price comparison across six markets. The story behind Havlo.",
     url: `${SITE_URL}/about`,
     type: "website",
   },
@@ -63,7 +63,7 @@ export default function AboutPage() {
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-lg leading-relaxed">
             Havlo is an independent price comparison platform for emerging
-            markets. Today we&apos;re live in seven
+            markets. Today we&apos;re live in six
             countries across Africa, Europe, the Middle East, North America,
             and Asia. Paste a link or search anything. We find cheaper
             alternatives across the stores you already know.
@@ -150,7 +150,7 @@ export default function AboutPage() {
             Where we operate
           </h2>
           <p className="text-ink-2 text-[15px] leading-relaxed mb-4">
-            Live in seven countries today. Each gets its own catalog of local
+            Live in six countries today. Each gets its own catalog of local
             retailers plus the cross-border stores those shoppers actually
             use:
           </p>
