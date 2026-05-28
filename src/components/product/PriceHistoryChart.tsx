@@ -142,8 +142,8 @@ export default function PriceHistoryChart({
      currentNgn flows through because the reference-line Y position
      depends on it. */
   const geom = useMemo(
-    () => computeGeometryFull(sliced, width, currentNgn),
-    [sliced, width, currentNgn],
+    () => computeGeometryFull(sliced, width, currentNgn, range.days),
+    [sliced, width, currentNgn, range.days],
   );
 
   /* Hover + pin state. `pinned` keeps the tooltip visible after a
@@ -821,7 +821,7 @@ function buildMonotonePath(xs: number[], ys: number[]): string {
   return parts.join(" ");
 }
 
-function computeGeometry(points: PriceHistoryPoint[], width: number): Geometry {
+function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: number): Geometry {
   if (points.length === 0) {
     return {
       pathD: "", areaD: "", xs: [], ys: [],
@@ -856,15 +856,30 @@ function computeGeometry(points: PriceHistoryPoint[], width: number): Geometry {
   const chartH      = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
   const usableW     = width - PAD_LEFT - PAD_RIGHT;
 
-  const xForI = (i: number) =>
-    points.length === 1
-      /* Single-point: anchor the dot to the RIGHT edge so it reads
-         as "latest reading, today". The flat-hold path drawn below
-         then extends from the chart's left edge across to this dot,
-         visually communicating "we've observed this price; we'll
-         start showing change once a second reading lands". */
-      ? PAD_LEFT + usableW
-      : PAD_LEFT + (i / (points.length - 1)) * usableW;
+  /* X axis is DATE-based, not point-index-based (May 2026 fix).
+     Previous index projection made the rightmost dot whatever the
+     last data point was (e.g. "May 1" perpetually showed at the
+     bottom-right tick even when "today" is May 28), because the
+     chart had no concept of "now". Now:
+       xDomainEnd   = today (epoch ms)
+       xDomainStart = rangeDays-back from today, OR the earliest
+                      point's day for the "All" toggle (so we don't
+                      slice valuable history)
+       xForDay(d)   = PAD_LEFT + ((d_ms - start) / span) * usableW
+     The path is drawn through points at their true date positions,
+     then extends horizontally from the last point to today so the
+     chart visually reads "no change since the last reading". */
+  const today        = Date.now();
+  const firstDayMs   = new Date(points[0].day).getTime();
+  const xDomainStart = rangeDays >= 365
+    ? Math.min(firstDayMs, today - rangeDays * 86_400_000)
+    : today - rangeDays * 86_400_000;
+  const xDomainEnd   = today;
+  const dateSpanMs   = Math.max(1, xDomainEnd - xDomainStart);
+  const xForDay = (dayStr: string) => {
+    const dayMs = new Date(dayStr).getTime();
+    return PAD_LEFT + ((dayMs - xDomainStart) / dateSpanMs) * usableW;
+  };
   const yForP = (p: number) =>
     PAD_TOP + ((yMax - p) / (yMax - yMin)) * chartH;
 
@@ -872,9 +887,10 @@ function computeGeometry(points: PriceHistoryPoint[], width: number): Geometry {
   const xs: number[] = [];
   const ys: number[] = [];
   for (let i = 0; i < points.length; i++) {
-    xs.push(xForI(i));
+    xs.push(xForDay(points[i].day));
     ys.push(yForP(points[i].minPriceNgn));
   }
+  const todayX = PAD_LEFT + usableW;
 
   /* Monotone cubic Hermite spline (the "curveMonotoneX" curve from
      D3, attributable to Fritsch–Carlson 1980).
@@ -899,58 +915,54 @@ function computeGeometry(points: PriceHistoryPoint[], width: number): Geometry {
      band of the surrounding data because of the monotonicity
      guarantee. Net: cleaner reading, no real signal lost.
 
+     Path now extends from the last data point horizontally to TODAY
+     at the right edge whenever the latest reading is older than now
+     — communicates "no change since the last reading" while keeping
+     the right edge anchored on a meaningful date (today). The
+     extension is a simple L segment; no curve interpolation, so we
+     never claim a price we haven't observed.
+
      Single-point path: flat horizontal line at the price level from
-     the chart's left edge to the dot at the right edge. Honest — no
-     trajectory claimed, just a steady-hold at the observed price.
-     A bare dot felt unfinished; an ascending curve from zero would
-     falsely imply the price climbed from £0 to its current value.
-     Flat line says "this is where it sits" without making a claim
-     about how it got there. */
+     the chart's left edge through the dot at its actual date X, then
+     extending to today on the right. The dot sits where its date
+     belongs; the hold-line carries it visually across the window
+     until "now". */
+  const lastPointX = xs[xs.length - 1];
+  const lastPointY = ys[ys.length - 1];
+  const todayExtension = lastPointX < todayX
+    ? ` L ${todayX.toFixed(2)} ${lastPointY.toFixed(2)}`
+    : "";
+
   const pathD = points.length === 1
-    ? `M ${PAD_LEFT.toFixed(2)} ${ys[0].toFixed(2)} L ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}`
-    : buildMonotonePath(xs, ys);
+    ? `M ${PAD_LEFT.toFixed(2)} ${ys[0].toFixed(2)} L ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}${todayExtension}`
+    : buildMonotonePath(xs, ys) + todayExtension;
 
   const areaBottom = CHART_HEIGHT - PAD_BOTTOM;
-  /* Single-point area: a rectangle under the flat hold-line, from
-     the left edge to the dot's X position. Gives the chart visual
-     weight without claiming a trajectory. */
+  const areaRightX = Math.max(lastPointX, todayX);
+  /* Single-point area: rectangle from the left edge across to the
+     today extension's right edge, dropped to the baseline. */
   const areaD = points.length === 1
-    ? `M ${PAD_LEFT.toFixed(2)} ${ys[0].toFixed(2)} L ${xs[0].toFixed(2)} ${ys[0].toFixed(2)} L ${xs[0].toFixed(2)} ${areaBottom} L ${PAD_LEFT.toFixed(2)} ${areaBottom} Z`
-    : `${pathD} L ${xs[xs.length - 1].toFixed(2)} ${areaBottom} L ${xs[0].toFixed(2)} ${areaBottom} Z`;
+    ? `M ${PAD_LEFT.toFixed(2)} ${ys[0].toFixed(2)} L ${areaRightX.toFixed(2)} ${ys[0].toFixed(2)} L ${areaRightX.toFixed(2)} ${areaBottom} L ${PAD_LEFT.toFixed(2)} ${areaBottom} Z`
+    : `${pathD} L ${areaRightX.toFixed(2)} ${areaBottom} L ${xs[0].toFixed(2)} ${areaBottom} Z`;
 
-  /* Axis ticks — up to 4 dates evenly spaced across the window.
-
-     Sparse-data gotcha (May 2026 mobile screenshot): when the
-     point count is below the tick count, the even-spacing formula
-     produces DUPLICATE indices. Example with points.length=2 and
-     tickCount=3: indices come out [0, round(0.5), round(1.0)] →
-     [0, 1, 1] because Math.round breaks ties toward positive
-     infinity. The last two ticks then land at the same x with
-     different textAnchor values ("middle" + "end"), rendering as
-     overlapping date labels like "MayMay 27" on the right edge.
-
-     Dedup by index handles every degenerate case:
-       N=1 → [0]                              (one tick)
-       N=2 → [0, 1]                            (two ticks, first + last)
-       N=3 → [0, 1, 2]                         (three unique)
-       N≥4 with tickCount=3 → 3 unique well-spaced
-       N≥30 with tickCount=4 → 4 unique well-spaced
-
-     Iterates the same evenly-spaced indices as before, but skips
-     any that already appeared. The remaining axisTicks array has
-     at most `tickCount` entries, all at distinct x positions. */
+  /* Axis ticks — up to 4 dates evenly spaced across the X DOMAIN
+     (start → today), independent of how many data points exist.
+     Previously ticks were drawn at point indices, which made the
+     rightmost label the LAST DATA POINT's date — a perpetual "May 1"
+     on the right edge even when the user opened the chart on May 28.
+     Now the rightmost tick always reads today's date because we
+     spread by date fraction, not point index. */
   const fmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
   const axisTicks: { x: number; label: string }[] = [];
-  const seenIdx = new Set<number>();
-  const tickCount = points.length >= 30 ? 4 : 3;
+  const totalDays = Math.round(dateSpanMs / 86_400_000);
+  const tickCount = totalDays >= 30 ? 4 : 3;
   for (let t = 0; t < tickCount; t++) {
     const denom = Math.max(tickCount - 1, 1);
-    const idx = Math.round((t / denom) * (points.length - 1));
-    if (seenIdx.has(idx)) continue;
-    seenIdx.add(idx);
+    const fraction = t / denom;
+    const dayMs = xDomainStart + fraction * dateSpanMs;
     axisTicks.push({
-      x:     xs[idx],
-      label: fmt.format(new Date(points[idx].day)),
+      x:     PAD_LEFT + fraction * usableW,
+      label: fmt.format(new Date(dayMs)),
     });
   }
 
@@ -978,8 +990,9 @@ function computeGeometryFull(
   points: PriceHistoryPoint[],
   width: number,
   currentNgn: number,
+  rangeDays: number,
 ): Geometry {
-  const g = computeGeometry(points, width);
+  const g = computeGeometry(points, width, rangeDays);
   if (points.length === 0) return g;
   const rangeRaw = g.highestNgn - g.lowestNgn;
   const range    = rangeRaw === 0 ? Math.max(g.highestNgn * 0.1, 100) : rangeRaw;
@@ -1175,9 +1188,14 @@ function computeVerdict(
 
 function sliceToLastNDays(points: PriceHistoryPoint[], days: number): PriceHistoryPoint[] {
   if (points.length === 0) return points;
-  const last = new Date(points[points.length - 1].day).getTime();
-  const threshold = last - days * 86_400_000;
-  /* Binary search would be overkill — 365 elements max. */
+  /* Anchor at TODAY, not at the last data point. A user browsing on
+     May 28 with the latest history row recorded May 1 expects to see
+     "May 28" on the right edge of the chart — anchoring on the last
+     data point would have made the right-edge label "May 1" instead.
+     The chart geometry extends the line horizontally from the last
+     point to today's X position so the right edge stays meaningful. */
+  const today = Date.now();
+  const threshold = today - days * 86_400_000;
   let firstIdx = 0;
   for (let i = points.length - 1; i >= 0; i--) {
     if (new Date(points[i].day).getTime() < threshold) {
