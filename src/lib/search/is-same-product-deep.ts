@@ -167,16 +167,39 @@ function deepMatchVeto(anchor: DeepMatchProduct, candidate: DeepMatchProduct): b
   const cModUniq = cMod.filter((m) => !aMod.includes(m));
   if (aModUniq.length > 0 && cModUniq.length > 0) return true;
 
-  /* Variant token disagreement (Pro / Max / Ultra / Plus / Mini / SE).
-     Both sides have variant tokens AND none overlap → different
-     SKUs (iPhone 15 Pro vs iPhone 15 Ultra would not exist; iPhone
-     15 Pro vs iPhone 15 Plus IS a real product difference). */
+  /* Variant token asymmetry.
+     ─────────────────────────────────────────────────────────────
+     VARIANT_TOKENS list (in query-understanding.ts) includes Pro,
+     Max, Ultra, Plus, Mini, SE, plus chip identifiers (m1-m5).
+     These are STRONG identity discriminators inside a product line.
+
+     Original veto (May 2026 v1) only fired when BOTH sides had
+     variant tokens AND none overlapped — too weak. It missed
+     "MacBook Pro M4" [pro, m4] vs "MacBook Pro M3" [pro, m3] because
+     "pro" overlapped, even though m4 vs m3 is a clear chip mismatch.
+
+     Now: BIDIRECTIONAL exhaustive check (matches the sync gate's
+     candidateHasAllVariants behaviour). If anchor has ANY variant
+     token the candidate lacks, OR candidate has ANY token the anchor
+     lacks, veto. This catches:
+       - MacBook Pro M4 vs MacBook Pro M3 (m4 ∉ candidate)
+       - MacBook Pro M4 vs MacBook Air M4 (pro ∉ candidate)
+       - iPhone 15 Pro vs iPhone 15 (pro ∉ candidate)
+       - Galaxy S24 Ultra vs Galaxy S24 (ultra ∉ candidate)
+     while still admitting:
+       - "AirPods 4" ↔ "Apple AirPods 4th generation" (both have
+         no variant tokens; the "4" is captured as a number, not
+         variant, and matches via the number check above)
+       - exact-SKU title paraphrasing (Brand-X / Brand X / Brand_X)
+         where the variant token list is identical on both sides.
+
+     If neither side has any variant tokens we don't veto — fall
+     through to the embedding / judge stages. */
   const aVar = extractVariantTokens(anchor.title);
   const cVar = extractVariantTokens(candidate.title);
-  if (aVar.length > 0 && cVar.length > 0) {
-    const overlap = aVar.some((v) => cVar.includes(v));
-    if (!overlap) return true;
-  }
+  const aVarUnique = aVar.filter((v) => !cVar.includes(v));
+  const cVarUnique = cVar.filter((v) => !aVar.includes(v));
+  if (aVarUnique.length > 0 || cVarUnique.length > 0) return true;
 
   return false;
 }
