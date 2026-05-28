@@ -1052,28 +1052,30 @@ function computeVerdict(
   /* Below mean: still a good time to buy, just not the floor. */
   if (currentNgn <= meanNgn) {
     const pctAboveLow = Math.round(((currentNgn - lowestNgn) / lowestNgn) * 100);
+    const pctFmt = pctAboveLow.toLocaleString("en-US");
     return {
-      copy:        `${pctAboveLow}% above lowest`,
+      copy:        `${pctFmt}% above lowest`,
       tone:        "neutral",
       icon:        "flat",
-      tileCaption: `${pctAboveLow}% above floor`,
+      tileCaption: `${pctFmt}% above floor`,
     };
   }
   /* Above mean: warn signal. */
   const pctAboveLow = Math.round(((currentNgn - lowestNgn) / lowestNgn) * 100);
+  const pctFmt = pctAboveLow.toLocaleString("en-US");
   if (pctAboveLow >= 20) {
     return {
       copy:        `Higher than usual`,
       tone:        "warn",
       icon:        "up",
-      tileCaption: `${pctAboveLow}% above floor`,
+      tileCaption: `${pctFmt}% above floor`,
     };
   }
   return {
-    copy:        `${pctAboveLow}% above lowest`,
+    copy:        `${pctFmt}% above lowest`,
     tone:        "warn",
     icon:        "up",
-    tileCaption: `${pctAboveLow}% above floor`,
+    tileCaption: `${pctFmt}% above floor`,
   };
 }
 
