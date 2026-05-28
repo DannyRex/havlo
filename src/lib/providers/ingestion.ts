@@ -1044,11 +1044,42 @@ export async function ingestDeals(
     }
   }
 
-  /* Step 5: bulk upsert offers. */
-  if (offerWrites.length > 0) {
-    const offerRows = offerWrites.map(({ deal, productId }) =>
-      dealToOfferRow(deal, productId, sourceProvider, sourceQuery, runStartedAt),
-    );
+  /* Step 5: bulk upsert offers.
+
+     Before the upsert: capture which product_ids are about to lose
+     their (store_id, url) anchor to a different product. The orphan
+     check below (Step 5b) needs to know these so it can clean up
+     the previous owners — see comment there. */
+  const offerRows = offerWrites.map(({ deal, productId }) =>
+    dealToOfferRow(deal, productId, sourceProvider, sourceQuery, runStartedAt),
+  );
+  const displacedProductIds = new Set<string>();
+  if (offerRows.length > 0) {
+    const storeIds = Array.from(new Set(offerRows.map((r) => r.store_id)));
+    const urls     = Array.from(new Set(offerRows.map((r) => r.url)));
+    /* Two .in() filters AND-combine in PostgREST, so the result is a
+       superset of the actual (store_id, url) tuples we care about —
+       we narrow to exact tuple matches in the loop below. */
+    const { data: existing, error: existingErr } = await supa
+      .from("offers")
+      .select("product_id, store_id, url")
+      .in("store_id", storeIds)
+      .in("url", urls);
+    if (existingErr) {
+      result.errors.push(`Displaced-offer probe: ${existingErr.message}`);
+    } else {
+      const existingMap = new Map<string, string>();
+      for (const o of (existing ?? []) as Array<{ product_id: string; store_id: string; url: string }>) {
+        existingMap.set(`${o.store_id} ${o.url}`, o.product_id);
+      }
+      for (const row of offerRows) {
+        const prevPid = existingMap.get(`${row.store_id} ${row.url}`);
+        if (prevPid && prevPid !== row.product_id) {
+          displacedProductIds.add(prevPid);
+        }
+      }
+    }
+
     const { error: offerErr } = await supa
       .from("offers")
       .upsert(offerRows, { onConflict: "store_id,url" });
@@ -1063,40 +1094,60 @@ export async function ingestDeals(
      orphan-proof. A product is only reachable if an offer points at
      it (product_best_offers inner-joins offers, so an offer-less
      product is invisible to every search surface). The split above
-     (insert products, THEN upsert offers) has a window where a
+     (insert products, THEN upsert offers) has TWO windows where a
      product can be left with no offer:
 
-       • The offer upsert is keyed on (store_id, url). If a concurrent
-         run already wrote that offer, this run's upsert UPDATEs the
-         existing row and re-points it — the product we just inserted
-         gets nothing.
-       • A partial offer-upsert failure leaves inserted products with
-         no offer.
+       1. INSERTED-RUN ORPHANS — the offer upsert is keyed on
+          (store_id, url). If a concurrent run already wrote that
+          offer, this run's upsert UPDATEs the existing row and
+          re-points it — the product we just inserted gets nothing.
+          A partial offer-upsert failure has the same effect.
 
-     Either way the freshly-inserted product becomes a permanent
-     orphan. A May 2026 audit found 63% of the catalog orphaned this
-     way, almost all from the /api/live-search persist path double-
-     firing. The fix: after the offer write, delete any product THIS
-     run inserted that ended up with zero offers. Strictly scoped to
-     insertedProductIds so it can never touch pre-existing rows. */
-  if (insertedProductIds.length > 0) {
+       2. DISPLACED PRE-EXISTING ORPHANS (May 2026 fix) — when the
+          upsert re-points an existing (store_id, url) offer onto a
+          NEW product_id, the previous owner of that offer loses its
+          one and only anchor and becomes a permanent orphan unless
+          it has other offers. The original orphan-reconciliation
+          only checked insertedProductIds — completely missing this
+          path, so every PayPorte/3CHub re-ingest where a product's
+          signature drifted created an orphan version that piled up
+          forever (audit found 2,940 such products = 16.7% of catalog
+          on May 28, 2026, all created in the last month — exactly
+          the daily-Shopify-JSON ingest pattern).
+
+     The fix: take the union of insertedProductIds AND
+     displacedProductIds; query offers for ALL of them; delete any
+     whose offer count came out zero. A pre-existing product with
+     OTHER offers (not just the displaced one) is safely retained
+     because the post-upsert offer probe still finds those. */
+  /* Union via Set then materialise as Array — keeps both sources
+     deduped if a product was both inserted this run AND displaced. */
+  const candidateOrphanSet = new Set<string>(insertedProductIds);
+  displacedProductIds.forEach((id) => candidateOrphanSet.add(id));
+  const candidateOrphanIds = Array.from(candidateOrphanSet);
+  if (candidateOrphanIds.length > 0) {
     const { data: withOffers, error: probeErr } = await supa
       .from("offers")
       .select("product_id")
-      .in("product_id", insertedProductIds);
+      .in("product_id", candidateOrphanIds);
     if (probeErr) {
       result.errors.push(`Orphan-reconciliation probe: ${probeErr.message}`);
     } else {
       const haveOffer = new Set(
         (withOffers ?? []).map((r) => (r as { product_id: string }).product_id),
       );
-      const orphanIds = insertedProductIds.filter((id) => !haveOffer.has(id));
+      const orphanIds = candidateOrphanIds.filter((id) => !haveOffer.has(id));
       if (orphanIds.length > 0) {
         const { error: delErr } = await supa.from("products").delete().in("id", orphanIds);
         if (delErr) {
           result.errors.push(`Orphan reconciliation delete (${orphanIds.length}): ${delErr.message}`);
         } else {
-          console.log(`[ingest] orphan reconciliation: removed ${orphanIds.length} offer-less product(s) created this run.`);
+          const insertedCount  = orphanIds.filter((id) => insertedProductIds.includes(id)).length;
+          const displacedCount = orphanIds.length - insertedCount;
+          console.log(
+            `[ingest] orphan reconciliation: removed ${orphanIds.length} offer-less product(s) ` +
+            `(${insertedCount} from this run + ${displacedCount} displaced pre-existing).`,
+          );
         }
       }
     }
