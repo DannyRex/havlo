@@ -13,6 +13,7 @@ import JsonLd from "@/components/seo/JsonLd";
 import DealUnavailableBanner from "@/components/feedback/DealUnavailableBanner";
 import { COUNTRIES, getCountry } from "@/lib/country";
 import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList } from "@/lib/seo";
+import { getPopularPlaceholderExamples } from "@/lib/popular-placeholder-examples";
 
 /* Revalidate this page server-side every 30 min. Was 300s (5 min);
    pushed out to 1800s on May 2026 after PSI flagged "Document request
@@ -144,7 +145,7 @@ function CategoryGridSkeleton() {
   );
 }
 
-export default function HomePage({ params }: { params: { country: string } }) {
+export default async function HomePage({ params }: { params: { country: string } }) {
   const country = getCountry(params.country);
   if (!COUNTRIES.some((c) => c.code === country.code)) notFound();
 
@@ -176,6 +177,15 @@ export default function HomePage({ params }: { params: { country: string } }) {
      to a DB query — keeps a single source of truth. */
   const storeCount = getStoreCountForCountry(country.code);
 
+  /* Dynamic placeholder examples — pulled from the live catalog via
+     suggest_diverse_popular_products RPC. One popular multi-store
+     product per category, country-aware. 30-min unstable_cache so
+     the SSR DB cost amortises across page renders. Falls back to a
+     hardcoded per-country list inside Hero if the RPC isn't
+     migrated or returns thin data — Hero handles either shape
+     transparently. */
+  const placeholderExamples = await getPopularPlaceholderExamples(country.code);
+
   return (
     <>
       <JsonLd data={breadcrumb} />
@@ -187,7 +197,7 @@ export default function HomePage({ params }: { params: { country: string } }) {
       <Suspense fallback={null}>
         <DealUnavailableBanner />
       </Suspense>
-      <Hero storeCount={storeCount} countryCode={country.code} countryName={country.name} />
+      <Hero storeCount={storeCount} countryCode={country.code} countryName={country.name} placeholderExamples={placeholderExamples} />
       {/* TrendingDeals + CategoryGrid both fan out to several DB
           queries to assemble their content (3-10 parallel reads
           each). Wrapping them in Suspense lets the page shell +

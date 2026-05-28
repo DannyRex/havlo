@@ -48,6 +48,13 @@ const CATEGORIES: CatItem[] = [
 ];
 
 interface Props {
+  /** Rotating placeholder examples for the search box. Sourced from
+      the live catalog via getPopularPlaceholderExamples (one popular
+      multi-store product per category, country-aware). Empty/missing
+      falls back to a static gadgets-heavy default that we keep for
+      pre-migration / DB-down resilience — see Hero's internal logic
+      for the fallback list. Length 4-8 is typical. */
+  placeholderExamples?: string[];
   /** Number of stores in the user's country marquee. Drives the trust
       pill copy so the displayed count matches the marquee below
       instead of being a hardcoded "12+" guess. */
@@ -75,7 +82,7 @@ function countryPhrase(code: string, fullName: string): string {
   }
 }
 
-export default function Hero({ storeCount, countryCode, countryName }: Props) {
+export default function Hero({ storeCount, countryCode, countryName, placeholderExamples: placeholderExamplesProp }: Props) {
   const router = useRouter();
   const { country } = useCountry();
   const [query, setQuery] = useState("");
@@ -110,42 +117,40 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
 
      The placeholder rotates through concrete example queries (3.5s
      each) so it doubles as an idea-spark instead of repeating the
-     subhead. Examples deliberately SPAN CATEGORIES — electronics,
-     fashion, beauty, home, sports, appliances, health — so the
-     site doesn't appear to be gadgets-only. User report (May 2026):
-     "regarding the placeholders, it looks like the site is for
-     gadgets only" → this list was rebuilt for category breadth.
+     subhead.
 
-     Per-country: each list mixes products that are POPULAR in that
-     market and ACTUALLY PRESENT in our catalog (so the suggestion
-     dropdown will return real results when a curious user copies
-     the placeholder). AFNAN is huge on NG (Essenza); Charlotte
-     Tilbury on UK; boAt on IN; etc.
+     Primary source: placeholderExamplesProp — server-fetched from
+     getPopularPlaceholderExamples (src/lib/popular-placeholder-
+     examples.ts) which calls the suggest_diverse_popular_products
+     RPC. One product per category from the LIVE catalog, biased
+     for cross-store popularity. Stays fresh as the catalog grows;
+     30-min edge cache so the homepage SSR cost is bounded.
+
+     Fallback list (when the prop is empty / undefined / too thin):
+     hardcoded per-country category-spanning examples so the
+     rotation works pre-migration and during DB outages. Same
+     intent as the dynamic list — span phones / fashion / beauty /
+     home / appliances / health rather than gadgets-only.
 
      Hydration-safe: the index starts at 0 (so SSR + first client
      render show the same first example) and only rotates after
      mount via the useEffect below. Suspended while the user is
      focused/typing so the placeholder doesn't shift mid-input. */
-  const placeholderExamples = (() => {
+  const fallbackExamples = (() => {
     switch (countryCode) {
-      /* NG — electronics, fashion, beauty (perfume is huge),
-         home/drinkware, appliance, health (pharmacy chains). */
       case "ng": return ["iPhone 15 Pro", "Air Force 1", "AFNAN perfume", "Stanley Quencher", "Dyson V12", "Accu-Chek glucose meter"];
-      /* UK — electronics, appliance, home, fashion, beauty, sports. */
       case "uk": return ["AirPods 4", "Dyson Airwrap", "Le Creuset Dutch oven", "Air Max 95", "Charlotte Tilbury", "Garmin Forerunner"];
-      /* US — drinkware/lifestyle is enormous in US catalog. */
       case "us": return ["Stanley Quencher", "Yeti Rambler", "Dyson Airwrap", "Air Force 1", "Owala FreeSip", "AirPods 4"];
-      /* DE — DACH-popular brands first. */
       case "de": return ["Bose QuietComfort", "Adidas Samba", "Le Creuset", "Dyson V12", "Garmin Fenix", "AirPods 4"];
-      /* IN — boAt + OnePlus are India-native heavyweights. */
       case "in": return ["OnePlus Nord", "boAt earbuds", "Nike Air Max", "Lakme foundation", "Stanley Quencher", "Apple Watch SE"];
-      /* AE — Dubai shoppers heavy on luxury fragrance + premium tech. */
       case "ae": return ["iPhone 15 Pro", "AFNAN perfume", "Dyson Airwrap", "Air Max 95", "Apple Watch Ultra", "Le Creuset"];
-      /* ZA — outdoor + drinkware + classic global brands. */
       case "za": return ["Yeti Rambler", "Adidas Samba", "Garmin Forerunner", "AirPods 4", "Le Creuset", "Air Force 1"];
       default:   return ["AirPods 4", "Air Force 1", "Dyson Airwrap", "Stanley Quencher", "Le Creuset", "Garmin Forerunner"];
     }
   })();
+  const placeholderExamples = (placeholderExamplesProp && placeholderExamplesProp.length >= 4)
+    ? placeholderExamplesProp
+    : fallbackExamples;
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
   useEffect(() => {
     /* Suspend rotation when the user has the box focused or has typed
