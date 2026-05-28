@@ -105,19 +105,31 @@ export default function PriceComparisonBar({
      opens a small popover above the spectrum with store name +
      price + cross-border flag. Tapping another dot moves the
      popover; tapping outside closes it. Works on both mobile and
-     desktop with a single interaction model. */
-  const [activeDotStoreId, setActiveDotStoreId] = useState<string | null>(null);
+     desktop with a single interaction model.
+
+     KEYED BY offerId (May 2026 fix), not storeId. pdp-stats's
+     dedupAnchorOffers dedups by storeId+price-bucket, so the same
+     store with multiple variants at different prices (e.g. MacPro-LA
+     at ₦650K, ₦655K, ₦660K) survives as three distinct PerStoreOffer
+     rows that share a storeId but differ by offerId. Keying the
+     popover by storeId collapsed those three dots into one
+     addressable identity: hovering any of them activated all three,
+     and `perStoreOffers.find(r => r.storeId === activeId)` returned
+     the FIRST match so the popover anchored to the wrong dot's
+     position + price. Switching to offerId makes every dot
+     independently addressable. */
+  const [activeDotOfferId, setActiveDotOfferId] = useState<string | null>(null);
   const barWrapperRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!activeDotStoreId) return;
+    if (!activeDotOfferId) return;
     const onPointerDown = (e: PointerEvent) => {
       if (!barWrapperRef.current?.contains(e.target as Node)) {
-        setActiveDotStoreId(null);
+        setActiveDotOfferId(null);
       }
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [activeDotStoreId]);
+  }, [activeDotOfferId]);
 
   /* Out-of-stock takes priority over price comparison — there's no
      point ranking the price of an unavailable item. */
@@ -164,16 +176,41 @@ export default function PriceComparisonBar({
      MIN_GAP_PCT to the left). The base row (0) is the centerline;
      1 = below the bar; -1 = above; 2 = further below; etc.
 
-     dotRowByStoreId maps storeId → row index (0, ±1, ±2, …) so
-     the render loop downstream can shift each dot's Y position
-     by row * ROW_OFFSET_PX. */
-  const MIN_GAP_PCT    = 3.5;   // ~21px on a 600px-wide bar (matches the 28px button width)
+     dotRowByOfferId maps offerId → row index (0, ±1, ±2, …) so the
+     render loop downstream can shift each dot's Y position by
+     row * ROW_OFFSET_PX. Keyed by offerId (not storeId) so that
+     same-store multi-variant rows each get their own slot — keying
+     by storeId let a Map.set overwrite collapse three MacPro-LA
+     offers into one final row value, stacking the dots at the same
+     Y even though the placement algorithm thought it had separated
+     them. */
+  /* Sizing chosen so every dot has a real, non-overlapping hit zone
+     on BOTH mobile (~330px-wide bar) and desktop. The earlier
+     numbers (MIN_GAP_PCT=3.5, OFFSET=14, 28-px hit zone) were tuned
+     for desktop spacing and silently failed on mobile: 3.5% of 330px
+     is only ~12px, but the button hit zone is 28px wide, so two
+     dots at adjacent prices still overlapped horizontally despite
+     being assigned to different rows. The vertical offset of 14px
+     was likewise half the button's 28px height, so rows 0 and 1
+     overlapped vertically by 14px. Net effect on a phone: tapping
+     "MacPro-LA at ₦1.7M" landed on the Bajaj-Markets dot rendered
+     0.5% to the right because both hit zones covered that pixel.
+
+       MIN_GAP_PCT 7.5 + 24-px hit zone (w-6 h-6 below): 7.5% of a
+       330px mobile bar is ~25px, just over the 24-px hit width, so
+       same-row dots never overlap horizontally. On a 600-px desktop
+       bar 7.5% is 45px — generous, but the algorithm only fans to
+       another row when needed, so isolated dots still sit on the
+       centerline.
+       DOT_ROW_OFFSET_PX 24 matches the hit zone height, so rows ±1
+       are exactly stacked with no vertical overlap. */
+  const MIN_GAP_PCT    = 7.5;
   const ROW_CANDIDATES = [0, 1, -1, 2, -2, 3, -3, 4, -4];
-  const dotRowByStoreId = new Map<string, number>();
+  const dotRowByOfferId = new Map<string, number>();
   {
     const dotsByX = perStoreOffers
       .filter((row) => row.storeId !== thisStoreId)
-      .map((row) => ({ id: row.storeId, left: (lowestPriceNgn === highestPriceNgn
+      .map((row) => ({ id: row.offerId, left: (lowestPriceNgn === highestPriceNgn
                                                 ? 50
                                                 : ((row.effectiveNgn - lowestPriceNgn) /
                                                    (highestPriceNgn - lowestPriceNgn) * 100)) }))
@@ -186,11 +223,11 @@ export default function PriceComparisonBar({
         usedRows.add(placed[i].row);
       }
       const row = ROW_CANDIDATES.find((r) => !usedRows.has(r)) ?? 0;
-      dotRowByStoreId.set(id, row);
+      dotRowByOfferId.set(id, row);
       placed.push({ left, row });
     }
   }
-  const DOT_ROW_OFFSET_PX = 14;
+  const DOT_ROW_OFFSET_PX = 24;
 
   /* Two distinct collapse cases, NOT folded together:
        isSingleStore — only one store carries the product. The bar
@@ -443,24 +480,24 @@ export default function PriceComparisonBar({
             if (row.storeId === thisStoreId) return null;
             const pos = positionOf(row.effectiveNgn);
             const left = Math.max(DOT_INSET_PCT, Math.min(100 - DOT_INSET_PCT, pos * 100));
-            const isCheapestDot = row.storeId === cheapest?.storeId;
-            const isActive      = activeDotStoreId === row.storeId;
-            /* Vertical row offset — see dotRowByStoreId construction
+            const isCheapestDot = row.offerId === cheapest?.offerId;
+            const isActive      = activeDotOfferId === row.offerId;
+            /* Vertical row offset — see dotRowByOfferId construction
                above. Row 0 = bar centerline; ±1 = directly above/below;
                ±2 = further; etc. Combined with the -translate-y-1/2
                baseline this puts the dot at (50% + row * 14px) from
                the bar top. Each row's hit zone is then disjoint from
                its neighbours so mouseenter / click events route
                unambiguously to the dot under the cursor. */
-            const dotRow = dotRowByStoreId.get(row.storeId) ?? 0;
+            const dotRow = dotRowByOfferId.get(row.offerId) ?? 0;
             return (
               <button
-                key={row.storeId}
+                key={row.offerId}
                 type="button"
                 /* Desktop: hover reveals the popover (mouse-driven
                    discovery, no click needed). Mobile / touch: tap
                    toggles since hover doesn't exist on touch devices.
-                   Both paths converge on setActiveDotStoreId — the
+                   Both paths converge on setActiveDotOfferId — the
                    popover state machine is identical, only the
                    trigger event differs.
 
@@ -468,13 +505,18 @@ export default function PriceComparisonBar({
                    onClick stays as the mobile fallback. onTouchStart
                    on touch devices fires BEFORE onMouseEnter so the
                    activation order is deterministic. */
-                onMouseEnter={() => setActiveDotStoreId(row.storeId)}
-                onMouseLeave={() => setActiveDotStoreId((current) => (current === row.storeId ? null : current))}
+                onMouseEnter={() => setActiveDotOfferId(row.offerId)}
+                onMouseLeave={() => setActiveDotOfferId((current) => (current === row.offerId ? null : current))}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setActiveDotStoreId(isActive ? null : row.storeId);
+                  setActiveDotOfferId(isActive ? null : row.offerId);
                 }}
-                className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center pointer-events-auto z-10 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                /* 24×24 (w-6 h-6) hit zone sized to match MIN_GAP_PCT
+                   so no two dots share pixels. Smaller than Apple's
+                   44-pt HIG ideal but the bar margin extends the
+                   practical hit area, and the visible 8-px dot still
+                   centers in the button so users can aim at it. */
+                className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center pointer-events-auto z-10 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 style={{
                   left:      `${left}%`,
                   /* Composes with the -translate-y-1/2 in className.
@@ -515,8 +557,8 @@ export default function PriceComparisonBar({
               auto-centers; clamping the position at extremes
               (3-97%) keeps the popover on-screen even at the
               ends of the bar. */}
-          {!isSingleStore && activeDotStoreId && (() => {
-            const row = perStoreOffers.find((r) => r.storeId === activeDotStoreId);
+          {!isSingleStore && activeDotOfferId && (() => {
+            const row = perStoreOffers.find((r) => r.offerId === activeDotOfferId);
             if (!row || row.storeId === thisStoreId) return null;
             const pos = positionOf(row.effectiveNgn);
             const left = Math.max(DOT_INSET_PCT, Math.min(100 - DOT_INSET_PCT, pos * 100));
@@ -526,7 +568,7 @@ export default function PriceComparisonBar({
                visual link "this popover belongs to that dot" clear
                when overlap-jitter has pushed the dot above or below
                the bar. */
-            const activeDotRow = dotRowByStoreId.get(row.storeId) ?? 0;
+            const activeDotRow = dotRowByOfferId.get(row.offerId) ?? 0;
             /* Edge-aware horizontal anchor — was always -translate-x-1/2
                (center on dot), which clipped on small viewports when
                the dot sat at the bar's extreme left/right. User
