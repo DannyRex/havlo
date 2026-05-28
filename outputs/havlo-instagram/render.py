@@ -94,7 +94,7 @@ def post_1():
     pad = 64 * SS
     draw_havlo_wordmark(d, pad, pad)
 
-    flags = "NG  ·  UK  ·  US  ·  DE  ·  AE  ·  IN  ·  ZA"
+    flags = "NG  ·  UK  ·  US  ·  AE  ·  IN  ·  ZA"
     fw = text_w(d, flags, F_MONO_S)
     d.text((W - pad - fw, pad + 6 * SS), flags, fill=INK3, font=F_MONO_S)
 
@@ -399,7 +399,7 @@ def post_4():
     out.save(OUT_DIR / "04-comparison-template.png", "PNG", optimize=True)
     print(f"✓ wrote 04-comparison-template.png")
 
-# ── POST 5 — Free. No signup. 7 countries. ────────────────────────
+# ── POST 5 — Free. No signup. 6 countries. ────────────────────────
 def post_5():
     img = Image.new("RGB", (W, H), BRAND_BLUE)
     d = ImageDraw.Draw(img)
@@ -413,7 +413,7 @@ def post_5():
     head_top = int(H * 0.24)
     line_h = 132 * SS
 
-    lines = ["Free.", "No signup.", "7 countries."]
+    lines = ["Free.", "No signup.", "6 countries."]
     for i, line in enumerate(lines):
         d.text((pad, head_top + i * line_h), line, fill=BG_WHITE, font=F_HEAD_XL)
 
@@ -425,7 +425,7 @@ def post_5():
     d.text((pad, sub_y + 50 * SS), sub2, fill=BG_WHITE, font=F_SUB_L)
 
     # Bottom — country flags row + URL
-    flags = "NG  ·  UK  ·  US  ·  DE  ·  AE  ·  IN  ·  ZA"
+    flags = "NG  ·  UK  ·  US  ·  AE  ·  IN  ·  ZA"
     fw = text_w(d, flags, F_MONO)
     url = "havlo.io"
     uw = text_w(d, url, F_BODY)
