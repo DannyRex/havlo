@@ -613,12 +613,25 @@ export const dbBrowseProvider: BrowseProvider = {
            anchored retailers that don't realistically ship to
            the visitor's market. */
         baseFilter(supa.from("product_best_offers")).eq("is_international", true).is("store_country", null),
-        /* Deal-only sub-counts via the new is_deal column. When the
-           migration hasn't been applied yet, PostgREST returns an
-           error which we coerce to null below; the UI then skips
-           the parenthetical and shows only the totals. */
-        baseFilter(supa.from("product_best_offers")).eq("store_country", userCountry).eq("is_deal", true),
-        baseFilter(supa.from("product_best_offers")).eq("is_international", true).is("store_country", null).eq("is_deal", true),
+        /* Sub-count: rows with a real positive discount.
+
+           Was previously `.eq("is_deal", true)`, but the May 2026
+           is_deal semantic relaxation (see ingestion.ts:344)
+           re-defined that column as "valid in-stock catalog row"
+           rather than "has a markdown". Counting is_deal=true and
+           labelling it "on sale" produced (deals == total) for
+           every browse — user-visible as "All 4,469 products are
+           on sale right now" which is plainly false.
+
+           discount_percent is the actual markdown signal. The
+           ingest pipeline writes `discount_percent = NULL` when no
+           MSRP was surfaced (Jumia rich snippets, pharmacy feeds,
+           Shopify-no-compare-at-price), and a positive integer
+           when there's a real reduction. Postgres `> 0` against
+           NULL is NULL (not TRUE) so the NULL rows correctly
+           drop out — only genuine markdowns are counted. */
+        baseFilter(supa.from("product_best_offers")).eq("store_country", userCountry).gt("discount_percent", 0),
+        baseFilter(supa.from("product_best_offers")).eq("is_international", true).is("store_country", null).gt("discount_percent", 0),
       ]);
       const local = localRes.count ?? 0;
       const intl  = intlRes.count  ?? 0;
@@ -632,9 +645,12 @@ export const dbBrowseProvider: BrowseProvider = {
       baseFilter(supa.from("product_best_offers")),
       baseFilter(supa.from("product_best_offers")).eq("is_international", false),
       baseFilter(supa.from("product_best_offers")).eq("is_international", true),
-      baseFilter(supa.from("product_best_offers")).eq("is_deal", true),
-      baseFilter(supa.from("product_best_offers")).eq("is_international", false).eq("is_deal", true),
-      baseFilter(supa.from("product_best_offers")).eq("is_international", true).eq("is_deal", true),
+      /* Discount sub-counts via `discount_percent > 0` rather than
+         is_deal=true — see the country-aware branch above for the
+         full rationale (May 2026 audit). */
+      baseFilter(supa.from("product_best_offers")).gt("discount_percent", 0),
+      baseFilter(supa.from("product_best_offers")).eq("is_international", false).gt("discount_percent", 0),
+      baseFilter(supa.from("product_best_offers")).eq("is_international", true).gt("discount_percent", 0),
     ]);
 
     return {

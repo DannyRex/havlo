@@ -931,27 +931,32 @@ export default async function ProductPage({ params }: PageProps) {
             have no history rows). The component itself handles its
             own empty state for products that DO have a product_id but
             haven't seen a price change yet. */}
-        {/* Render whenever the fetch returned ANY result (including an
-            empty array) — the chart owns its own empty state. We only
-            hide entirely when priceTimeseries is null, which means
-            the product_id failed the UUID gate (synthetic anchors from
-            the curated catalog / live-search) or the RPC errored.
+        {/* The price-history section ALWAYS renders. The chart owns
+            its own empty state — the page just hands it whatever
+            points it has (could be a full year of data, an empty
+            array for valid-UUID-but-unhistoried products, or null
+            for synthetic-id anchors like the curated Amazon catalog
+            and live-search).
 
-            Previously the gate was `length > 0`, which silently hid
-            the section for valid-UUID products that had been ingested
-            but hadn't yet seen a price change — the chart's empty
-            state ("Once the price changes at any store, you'll see
-            the full timeline here") was unreachable. */}
-        {priceTimeseries !== null && (
-          <div className="mt-6 sm:mt-8">
-            <PriceHistoryChart
-              points={priceTimeseries}
-              currentNgn={anchorPriceNgn}
-              country={country}
-              visitingStoreName={offer.store_name}
-            />
-          </div>
-        )}
+            Why we render unconditionally now (May 2026 follow-up):
+              • Bucket 1 — valid UUID + ≥ 1 history row: full chart.
+              • Bucket 2 — valid UUID + 0 history rows: the chart
+                renders its "No price activity yet" empty state.
+              • Bucket 3 — synthetic id (curated / live-search):
+                priceTimeseries is null, the chart treats it as []
+                and shows the same empty state. The section is no
+                longer silently missing from the page layout for
+                this PDP shape, which used to make the page feel
+                inconsistent ("why does this PDP have a chart and
+                that one doesn't?"). */}
+        <div className="mt-6 sm:mt-8">
+          <PriceHistoryChart
+            points={priceTimeseries ?? []}
+            currentNgn={anchorPriceNgn}
+            country={country}
+            visitingStoreName={offer.store_name}
+          />
+        </div>
 
         {dupesForRail.length > 0 ? (
           /* Cheaper alternatives section — moved ABOVE the sibling

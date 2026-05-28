@@ -697,12 +697,24 @@ export default function DealFeed({
              other: total catalog size, then "of which N are
              discounted". Handles the degenerate edge cases (deals=0
              and deals=total) so the copy never lies. */
+          /* Copy semantics (May 2026 audit):
+               - Lead with the total. The page is "Browse deals +
+                 new arrivals" — total reflects the full catalog
+                 the user is browsing, including non-discounted feeds.
+               - Mention the discounted subset only when it's a real
+                 subset (strictly less than total AND > 0). The
+                 "all on sale" branch was overclaiming because the
+                 prior count used is_deal=true, which the May 2026
+                 audit relaxed to mean "valid catalog row" — making
+                 deals == total a normal browse state, not a
+                 "today's a great day" signal.
+               - When the subset isn't meaningful (0 or equal to
+                 total), just show the total without an
+                 interpretation. Honest framing over filler claims. */
           <p className="text-xs sm:text-sm text-ink-3 mt-2 tabular-nums">
-            {activeCounts.deals === 0
-              ? `Browsing ${activeCounts.total.toLocaleString()} products. Nothing currently on sale here.`
-              : activeCounts.deals >= activeCounts.total
-                ? `All ${activeCounts.total.toLocaleString()} products are on sale right now.`
-                : <>Browsing {activeCounts.total.toLocaleString()} products · {activeCounts.deals.toLocaleString()} on sale right now.</>}
+            {activeCounts.deals === undefined || activeCounts.deals === 0 || activeCounts.deals >= activeCounts.total
+              ? `Browsing ${activeCounts.total.toLocaleString()} products today.`
+              : <>Browsing {activeCounts.total.toLocaleString()} products · {activeCounts.deals.toLocaleString()} on sale right now.</>}
           </p>
         )}
       </div>

@@ -62,12 +62,19 @@ export default function OriginToggle({ active, onChange, counts }: Props) {
                     ? "bg-bg/20 text-bg"
                     : "bg-surface-2 text-ink-2",
                 )}
-                /* Title shows the deal sub-count on hover/tap. The
-                   pill stays compact (showing only the total) but
-                   the secondary signal is discoverable without
-                   crowding the layout. */
+                /* Title shows the discount sub-count on hover/tap
+                   ONLY when it's a real subset — strictly less than
+                   total AND > 0. Same May 2026 audit reason as the
+                   DealFeed header copy: the underlying head-count
+                   used is_deal=true which was redefined to mean
+                   "valid catalog row", making (deals == total) a
+                   normal browse state rather than a meaningful
+                   "everything is on sale" signal. The post-fix
+                   count uses discount_percent > 0 so the subset is
+                   now real; we still gate the framing in the UI as
+                   defence-in-depth against future schema drift. */
                 title={
-                  typeof dealCount === "number"
+                  typeof dealCount === "number" && dealCount > 0 && dealCount < count
                     ? `${count.toLocaleString()} products · ${dealCount.toLocaleString()} on sale`
                     : `${count.toLocaleString()} products`
                 }
