@@ -33,14 +33,17 @@ export const metadata: Metadata = {
   },
 };
 
-/* code uses our internal scheme (uk for Great Britain) — the
-   <CountryFlag> component maps to the right CDN slug downstream. */
+/* code uses our internal scheme (uk for Great Britain) - the
+   <CountryFlag> component maps to the right CDN slug downstream.
+   Germany (de) is intentionally OMITTED from the active coverage
+   list while DE launch is deferred (Impressum pending). Re-add the
+   { code: "de", name: "Germany" } entry once the German legal
+   page ships - same swap to undo as middleware DEFERRED_LAUNCH. */
 const COVERAGE = [
   { code: "ng", name: "Nigeria" },
   { code: "uk", name: "United Kingdom" },
   { code: "us", name: "United States" },
   { code: "ae", name: "United Arab Emirates" },
-  { code: "de", name: "Germany" },
   { code: "in", name: "India" },
   { code: "za", name: "South Africa" },
 ];

@@ -71,6 +71,16 @@ export const COUNTRIES: Country[] = [
   { code: "us", name: "United States",  flag: "🇺🇸", currency: "USD", symbol: "$", serpGl: "us" },
 ];
 
+/* Active (non-deferred) markets — everything we're CURRENTLY serving
+   on the live site. Use this list for any USER-VISIBLE surface that
+   enumerates markets (country picker, sitemap, hreflang, About-page
+   coverage list, root meta description). Internal/backend code that
+   needs every country code (middleware route matching, getCountry()
+   resolution for direct URL access) keeps using COUNTRIES so a
+   deferred /de/ visit still resolves the country object before the
+   middleware redirect kicks in. */
+export const ACTIVE_COUNTRIES: Country[] = COUNTRIES.filter((c) => !c.deferredLaunch);
+
 const COUNTRY_BY_CODE = new Map(COUNTRIES.map((c) => [c.code, c]));
 
 export function getCountry(code: string | undefined | null): Country {

@@ -4,7 +4,7 @@
    WebSite / BreadcrumbList tags don't drift between pages.
    ────────────────────────────────────────────────────────────────── */
 
-import { COUNTRIES } from "./country";
+import { ACTIVE_COUNTRIES } from "./country";
 
 export const SITE_URL  = "https://havlo.io";
 export const SITE_NAME = "Havlo";
@@ -26,8 +26,14 @@ export function buildHreflangAlternates(pathBelowCountry: string = ""): Record<s
     uk: "GB",
   };
 
-  for (const c of COUNTRIES) {
-    /* Use language-region tag (en-NG, en-US, en-GB, en-AE, de-DE, en-IN, en-ZA)
+  /* Iterate active markets only — emitting hreflang alternates for
+     a deferred-launch country (e.g. /de/) when the middleware redirects
+     /de/ to /uk/ tells Google "this URL is the German variant" while
+     simultaneously redirecting it, which surfaces as Duplicate Content
+     or "Crawled - currently not indexed" in Search Console. Drop the
+     alternative until DE actually launches. */
+  for (const c of ACTIVE_COUNTRIES) {
+    /* Use language-region tag (en-NG, en-US, en-GB, en-AE, en-IN, en-ZA)
        so Google can route the right variant to the right audience. */
     const region = HREFLANG_REGION[c.code] ?? c.code.toUpperCase();
     const lang = c.code === "de" ? "de-DE" : `en-${region}`;

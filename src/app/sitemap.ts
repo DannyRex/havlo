@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { COUNTRIES } from "@/lib/country";
+import { ACTIVE_COUNTRIES } from "@/lib/country";
 import { SITE_URL, buildHreflangAlternates } from "@/lib/seo";
 import { posts } from "@/lib/blog/posts";
 
@@ -22,7 +22,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
      hreflang alternates pointing at sibling country versions. Lets
      Google route the right variant to the right audience instead of
      surfacing /us/deals to a Nigerian searcher. */
-  const homepages: MetadataRoute.Sitemap = COUNTRIES.map((c) => ({
+  const homepages: MetadataRoute.Sitemap = ACTIVE_COUNTRIES.map((c) => ({
     url:            `${SITE_URL}/${c.code}`,
     priority:       1.0,
     changeFrequency: "weekly",
@@ -30,7 +30,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     alternates:     { languages: buildHreflangAlternates("") },
   }));
 
-  const dealsPages: MetadataRoute.Sitemap = COUNTRIES.map((c) => ({
+  const dealsPages: MetadataRoute.Sitemap = ACTIVE_COUNTRIES.map((c) => ({
     url:            `${SITE_URL}/${c.code}/deals`,
     priority:       0.9,
     changeFrequency: "hourly",
@@ -38,7 +38,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     alternates:     { languages: buildHreflangAlternates("deals") },
   }));
 
-  const comparePages: MetadataRoute.Sitemap = COUNTRIES.map((c) => ({
+  const comparePages: MetadataRoute.Sitemap = ACTIVE_COUNTRIES.map((c) => ({
     url:            `${SITE_URL}/${c.code}/compare`,
     priority:       0.9,
     changeFrequency: "weekly",
@@ -65,7 +65,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   /* Per-country blog index. Each country's /[country]/blog gets its
      own sitemap entry with hreflang alternates pointing at sibling
      country variants. */
-  const blogIndexRoutes: MetadataRoute.Sitemap = COUNTRIES.map((c) => ({
+  const blogIndexRoutes: MetadataRoute.Sitemap = ACTIVE_COUNTRIES.map((c) => ({
     url:             `${SITE_URL}/${c.code}/blog`,
     priority:        0.7,
     changeFrequency: "weekly",

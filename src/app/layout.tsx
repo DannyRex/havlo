@@ -64,7 +64,7 @@ export const metadata: Metadata = {
      the SERP doesn't read one thing while the page reads another.
      Geographic keywords preserved for country-targeted SEO. */
   description:
-    "Before you buy it, find it for less. Independent price comparison across the stores you already shop in Nigeria, US, UK, UAE, Germany, India, and South Africa.",
+    "Before you buy it, find it for less. Independent price comparison across the stores you already shop in Nigeria, US, UK, UAE, India, and South Africa.",
   keywords: [
     "price comparison", "find alternatives", "dupes", "find similar products",
     "deals", "discount finder", "shopping search", "cheap alternatives",
