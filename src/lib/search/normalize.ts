@@ -148,11 +148,100 @@ function stripPunct(s: string): string {
     .trim();
 }
 
+/* Multi-word fashion + beauty brands surfaced from the May 2026
+   signature-leak audit. These ride on the same BRANDS pipeline but
+   need to be tried BEFORE single-word substrings (e.g. "fashion
+   nova" before bare "fashion") — getSortedBrands() length-sorts
+   so longer matches always win. The list is intentionally short:
+   anchored on brands we saw repeatedly in the catalog (PayPorte,
+   Slot, beauty SKUs) rather than a speculative blanket coverage.
+   Add new entries as a follow-up when you spot a brand showing up
+   in 20+ "?|?" products in the diagnose-signature-leaks output. */
+const FASHION_BEAUTY_BRANDS: string[] = [
+  /* Fashion houses */
+  "fashion nova", "vero moda", "jack jones", "calvin klein",
+  "ralph lauren", "tommy hilfiger", "tommy jeans",
+  "gina tricot", "victoria secret",
+  "inc international concepts", "akkriti pantaloons",
+  "carolina herrera", "louis vuitton", "ray ban",
+  /* Beauty */
+  "fenty beauty", "fenty skin",
+  "soap glory", "soap and glory",
+  /* Single-word adds */
+  "dkny", "akkriti", "ecru", "pantaloons", "lume",
+  "bedoyecta", "clarins", "nivea", "remy",
+];
+
+const ALL_BRANDS = [...BRANDS, ...FASHION_BEAUTY_BRANDS];
+/* Length-sorted so multi-word brand strings match before any of
+   their single-word substrings ("fashion nova" before "fashion",
+   "calvin klein" before "calvin", etc.). Sorted once at module
+   load. */
+const BRANDS_BY_LENGTH = ALL_BRANDS.slice().sort((a, b) => b.length - a.length);
+
 function findBrand(norm: string): string | null {
-  // Sort brands by length descending so multi-word ones win
-  for (const b of BRANDS) {
+  for (const b of BRANDS_BY_LENGTH) {
     const re = new RegExp(`\\b${b.replace(/&/g, "\\&")}\\b`, "i");
-    if (re.test(norm)) return BRAND_ALIAS[b.toLowerCase()] ?? b.toLowerCase();
+    if (re.test(norm)) {
+      const canonical = BRAND_ALIAS[b.toLowerCase()] ?? b.toLowerCase();
+      /* Normalise multi-word brands to a no-space token so the
+         signature key stays a stable single-segment slug — i.e.
+         "fashion nova" → "fashionnova". This keeps the brand|model
+         signature parseable downstream without ambiguity. */
+      return canonical.replace(/\s+/g, "");
+    }
+  }
+  return null;
+}
+
+/* PRODUCT_TYPES — anchors a "model" signal for Fashion / Beauty /
+   Personal-care SKUs where there's no parseable model code. With a
+   known brand, the signature becomes brand|type (e.g.
+   "fashionnova|dress", "maybelline|mascara") which clusters
+   meaningfully: same brand + same product type → "you may also like"
+   rails surface other items from that brand's line.
+
+   Trade-off: this is COARSER than brand+model. "Maybelline Lash
+   Sensational" and "Maybelline Sky High" both end up as
+   "maybelline|mascara", so the cluster groups all Maybelline
+   mascaras together. That's still useful UX (better than no
+   cluster), and the compare-anchor pool layers a separate price-
+   proximity gate that protects against direct comparison drift.
+   If the coarseness becomes a problem, refine by adding the next
+   distinguishing token (e.g. "lashsensational" / "skyhigh") into
+   the model phrase. */
+const PRODUCT_TYPES: string[] = [
+  /* Fashion — apparel */
+  "dress", "skirt", "shirt", "blouse", "pants", "trousers", "jeans",
+  "shorts", "jacket", "blazer", "coat", "sweater", "hoodie",
+  "tshirt", "tank", "top", "bodysuit", "jumpsuit", "playsuit",
+  "suit", "lingerie", "swimsuit", "bikini", "bra",
+  /* Fashion — footwear */
+  "sneakers", "shoes", "boots", "heels", "sandals", "slippers",
+  "loafers", "flats", "wedges", "trainers",
+  /* Fashion — accessories */
+  "bag", "handbag", "purse", "wallet", "backpack", "tote", "clutch",
+  "hat", "scarf", "gloves", "belt", "sunglasses", "watch",
+  /* Beauty — colour cosmetics */
+  "mascara", "lipstick", "foundation", "concealer", "eyeliner",
+  "primer", "blush", "bronzer", "highlighter", "eyeshadow",
+  "lipgloss", "lipbalm",
+  /* Beauty — skincare */
+  "moisturizer", "moisturiser", "serum", "cream", "lotion", "mask",
+  "cleanser", "toner", "sunscreen", "exfoliant", "essence",
+  /* Personal care */
+  "perfume", "cologne", "deodorant", "soap", "bodywash", "shampoo",
+  "conditioner", "razor", "trimmer", "toothpaste", "toothbrush",
+];
+const PRODUCT_TYPES_BY_LENGTH = PRODUCT_TYPES.slice().sort((a, b) => b.length - a.length);
+
+function findProductType(norm: string): string | null {
+  /* Some titles concatenate words ("mini skirt" → "miniskirt"). The
+     normalised string has spaces preserved, so we match on word
+     boundaries to stay robust to drift. Add common compound types
+     as their own entries above when seen in the catalog. */
+  for (const t of PRODUCT_TYPES_BY_LENGTH) {
+    if (new RegExp(`\\b${t}\\b`, "i").test(norm)) return t;
   }
   return null;
 }
@@ -495,8 +584,18 @@ function findModel(brand: string | null, norm: string): string | null {
       }
     }
   }
-  // Fall back to "<brand> <next-distinctive-token-with-digit>"
-  return fallbackModel(brand, norm);
+  /* SKU-style fallback first ("Hisense 50A6K" → "50a6k") because
+     it's the most discriminating signal when present. */
+  const skuModel = fallbackModel(brand, norm);
+  if (skuModel) return skuModel;
+
+  /* Fashion / Beauty fallback (May 2026): when the brand-specific
+     hints + numeric SKU fallback both miss, use the product TYPE
+     (dress, mascara, sneakers, etc.) as the model. Lets us still
+     produce a useful brand|type signature for the long tail of
+     descriptive Fashion / Beauty titles that don't follow a
+     model-code grammar. See PRODUCT_TYPES + findProductType above. */
+  return findProductType(norm);
 }
 
 function findStorage(norm: string): number | null {
