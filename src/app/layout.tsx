@@ -7,9 +7,7 @@ import ThemeProvider from "@/components/ui/ThemeProvider";
 import { CountryProvider } from "@/components/providers/CountryProvider";
 import { getRequestCountry } from "@/lib/country-server";
 import JsonLd from "@/components/seo/JsonLd";
-import GoogleAnalytics from "@/components/seo/GoogleAnalytics";
-import Skimlinks from "@/components/seo/Skimlinks";
-import CookieConsent from "@/components/seo/CookieConsent";
+import DeferredConsentStack from "@/components/seo/DeferredConsentStack";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/seo";
 
 const inter = Inter({
@@ -193,16 +191,13 @@ export default function RootLayout({
             <Footer />
           </CountryProvider>
         </ThemeProvider>
-        {/* GA4 — no-op until NEXT_PUBLIC_GA_ID is set in env AND the
-            visitor accepts cookies via the consent banner below */}
-        <GoogleAnalytics />
-        {/* Skimlinks affiliate auto-monetization — no-op until
-            NEXT_PUBLIC_SKIMLINKS_ID is set in env AND the visitor
-            accepts cookies */}
-        <Skimlinks />
-        {/* Cookie consent banner — renders only on first visit (or
-            after localStorage is cleared). Gates GA4 + Skimlinks. */}
-        <CookieConsent />
+        {/* Post-paint stack: GA4, Skimlinks, CookieConsent.
+            All three are lazy-loaded from a small client wrapper so
+            they don't sit in the root-layout's shared JS chunk. Each
+            is no-op until consent + env-var conditions are met; the
+            cookie banner only renders on first visit. See
+            DeferredConsentStack for the dynamic-import details. */}
+        <DeferredConsentStack />
       </body>
     </html>
   );

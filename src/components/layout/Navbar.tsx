@@ -7,8 +7,18 @@ import { Home, Tag, Search, Info, Coins, BookOpen, Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import Logo from "@/components/ui/Logo";
-import CountrySelect from "@/components/layout/CountrySelect";
 import { useCountry } from "@/components/providers/CountryProvider";
+import dynamic from "next/dynamic";
+
+/* CountrySelect (143 lines incl. flag list + dropdown machinery) is
+   the heaviest single import in this Navbar. Most visitors never
+   open the dropdown — they land on the country the URL or middleware
+   already picked. Lazy-load the body so the JS only fetches when
+   the trigger is interacted with.
+
+   ssr: true (default) keeps the trigger's HTML for SEO + CLS
+   protection; only the dropdown body's client JS waits. */
+const CountrySelect = dynamic(() => import("@/components/layout/CountrySelect"));
 
 /* Helper: prepend /{country} to a bare href so client-side
    navigation lands on the right country variant immediately,
