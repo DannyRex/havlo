@@ -2,23 +2,28 @@ name: Refresh data (scrape + ingest)
 
 on:
   schedule:
-    # Twice-weekly (Mon + Thu). Restored May 2026 after two constraints
-    # that had forced a weekly Thu-only window were both lifted:
+    # Daily at 05:00 UTC. Bumped from twice-weekly (Mon + Thu) to
+    # daily May 2026 to accelerate price-history accumulation — the
+    # PDP chart only writes a point when the offer's price changes,
+    # so a 2×/week cadence means even an active product takes weeks
+    # to populate the 30D / 90D toggles. Daily compresses that to
+    # 30 / 90 days exactly, matching what the toggles promise.
     #
-    #   1. GitHub Actions minutes: repo went public, so Actions on
-    #      standard hosted runners is now unlimited (the 2,000 min/mo
-    #      cap is a private-repo constraint only).
-    #   2. SerpAPI: upgraded from Starter (1k credits/mo) to Developer
-    #      (5k credits/mo). Mon+Thu usage is now ~1,384 credits/month,
-    #      well under the new ceiling with plenty of room to grow
-    #      category coverage or add markets without bumping plan again.
+    # Cost picture (post-bump):
+    #   1. GitHub Actions: repo is public → unlimited standard
+    #      runner minutes, no constraint at 7×/week.
+    #   2. SerpAPI: was ~1,384 credits/month at Mon+Thu; daily
+    #      projects to ~4,144 credits/month — under the 5k-credit
+    #      Developer plan ceiling with ~17% headroom.
+    #   3. Supabase writes: the offers-table trigger only inserts
+    #      a price_history row when current_price actually changes,
+    #      so write volume scales with real price churn, not scrape
+    #      frequency. Modest increase.
     #
-    # If we ever want daily ingest, projected cost is ~4,144 credits/mo
-    # (still under Developer), and the Actions side is free. Newsletter
-    # cadence is now decoupled-ready: send-newsletter only needs the
-    # dedup job to succeed, so partial ingest failures don't block the
-    # digest. A faster cadence is just a cron change, no other rewiring.
-    - cron: "0 5 * * 1,4"
+    # Newsletter cadence stays decoupled — send-newsletter only
+    # depends on the dedup job succeeding, so partial ingest
+    # failures on any given day don't block the weekly digest.
+    - cron: "0 5 * * *"
   workflow_dispatch:
     # Manual run from GitHub UI. Inputs let us refresh just the
     # free data sources (Playwright scrapers + AliExpress affiliate

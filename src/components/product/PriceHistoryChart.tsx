@@ -10,8 +10,8 @@
      • Range toggle: 30D / 90D / All. Client-side slice so switching
        is instant (server fetch is now 365d, see page.tsx).
      • Verdict header: dynamic copy + colour that answers "is this
-       a good price right now?" — "Lowest in 30 days" (success),
-       "X% above lowest" (warn), "Highest in window" (danger).
+       a good price right now?" — "Cheapest in 30 days" (success),
+       "X% above the cheapest" (warn), "Higher than usual" (danger).
      • Tooltip rendered at the hovered point as an HTML overlay
        (not below the chart). Smart-flips to avoid overflow.
      • X-axis date ticks — 3-4 evenly spaced labels.
@@ -529,8 +529,8 @@ export default function PriceHistoryChart({
                      comment. The user is comparing close values and a
                      ≥ 1M adaptive form would collapse small deltas to
                      "+₦0.0M". */
-                  ? `+${formatPriceForUserExact(hover.deltaFromLow, country)} above lowest`
-                  : "Lowest in window"}
+                  ? `+${formatPriceForUserExact(hover.deltaFromLow, country)} above the cheapest`
+                  : "Cheapest day shown"}
               </div>
             )}
           </div>
@@ -540,7 +540,7 @@ export default function PriceHistoryChart({
       {/* ── Tiles strip ─────────────────────────────────────── */}
       <div className="mt-3 sm:mt-4 grid grid-cols-3 gap-2">
         <Tile
-          label="Lowest"
+          label="Cheapest"
           value={formatPriceForUser(geom.lowestNgn, country)}
           caption={lowestDate}
           tone="success"
@@ -548,7 +548,10 @@ export default function PriceHistoryChart({
         <Tile
           label="Highest"
           value={formatPriceForUser(geom.highestNgn, country)}
-          caption={`in ${range.label === "All" ? "this window" : range.label.toLowerCase()}`}
+          /* "this view" reads as the user's current selection — the
+             range toggle is right above this tile so there's no
+             ambiguity about what "this view" refers to. */
+          caption={`in ${range.label === "All" ? "this view" : range.label.toLowerCase()}`}
         />
         <Tile
           label="Right now"
@@ -1096,7 +1099,11 @@ function computeVerdict(
   rangeDays:  number,
   pointCount: number = 2,
 ): Verdict {
-  const rangeLabel = rangeDays >= 365 ? "this window"
+  /* Range label is woven into the verdict copy ("Cheapest in 30 days").
+     For the "All" toggle (365d), "this window" was engineering-speak
+     and overpromised — we don't have data from before tracking began,
+     so "since tracking started" is the honest framing. */
+  const rangeLabel = rangeDays >= 365 ? "since tracking started"
                   : `${rangeDays} days`;
 
   /* Single-observation case — we can't claim "lowest" or
@@ -1111,13 +1118,17 @@ function computeVerdict(
     };
   }
 
-  /* At-floor: 1% tolerance for FX + rounding drift. */
+  /* At-floor: 1% tolerance for FX + rounding drift.
+     "Cheapest in 30 days" beats "Lowest in 30 days" — it's the verb
+     a shopper actually uses ("is this the cheapest?"), and it primes
+     the buy action. "Lowest" is database-noun; "Cheapest" is
+     shopper-adjective. */
   if (currentNgn <= lowestNgn * 1.01) {
     return {
-      copy:        `Lowest in ${rangeLabel}`,
+      copy:        `Cheapest in ${rangeLabel}`,
       tone:        "success",
       icon:        "down",
-      tileCaption: "At lowest",
+      tileCaption: "At the cheapest",
     };
   }
   /* Below mean: still a good time to buy, just not the floor. */
@@ -1125,10 +1136,10 @@ function computeVerdict(
     const pctAboveLow = Math.round(((currentNgn - lowestNgn) / lowestNgn) * 100);
     const pctFmt = pctAboveLow.toLocaleString("en-US");
     return {
-      copy:        `${pctFmt}% above lowest`,
+      copy:        `${pctFmt}% above the cheapest`,
       tone:        "neutral",
       icon:        "flat",
-      tileCaption: `${pctFmt}% above floor`,
+      tileCaption: `${pctFmt}% above the cheapest`,
     };
   }
   /* Above mean: warn signal. */
@@ -1139,14 +1150,14 @@ function computeVerdict(
       copy:        `Higher than usual`,
       tone:        "warn",
       icon:        "up",
-      tileCaption: `${pctFmt}% above floor`,
+      tileCaption: `${pctFmt}% above the cheapest`,
     };
   }
   return {
-    copy:        `${pctFmt}% above lowest`,
+    copy:        `${pctFmt}% above the cheapest`,
     tone:        "warn",
     icon:        "up",
-    tileCaption: `${pctFmt}% above floor`,
+    tileCaption: `${pctFmt}% above the cheapest`,
   };
 }
 
