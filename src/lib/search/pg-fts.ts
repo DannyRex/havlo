@@ -1126,9 +1126,53 @@ export async function pgFtsFindByProductId(
         { title: anchor.title, brand: anchor.brand, priceNgn: anchor.bestPrice },
         broadDupes,
       );
+  /* Belt-and-braces re-veto on every variant offer before folding into
+     the anchor pool. The deep partition's isLikelySameProductDeep
+     SHOULD have rejected cross-generation / cross-tier variants via
+     its Stage 2.5 veto — but post-deploy testing kept surfacing
+     MacBook M3/M5 and M4-Pro/M4-base leaks despite the deep veto
+     being in place. Whatever the upstream cause (function-instance
+     code drift? cached deep verdict from before veto landed?
+     unexplained call path?), the FINAL gate here gives us a
+     guaranteed clean output regardless of upstream behaviour.
+
+     Checks the same three signals as deepMatchVeto:
+       - numeric model markers (16 vs 14, 15 vs 17)
+       - letter-glued model tokens (s24 vs s25)
+       - variant tokens (m4 vs m5, Pro vs Air)
+     Applied to anchor.title vs offer.productTitle (the variant's
+     own title, set by variantOffers from the DupeResult). When the
+     productTitle equals the anchor title (no variant pooling — same
+     product re-titled to anchor), the check trivially passes.
+     Same applied to anchor.offers in case any sibling-pooled offer
+     carries a divergent productTitle. */
+  const aNum = extractRequiredNumbers(anchor.title);
+  const aMod = extractRequiredModelTokens(anchor.title);
+  const aVar = extractVariantTokens(anchor.title);
+  const passesFinalVeto = (offerTitle: string): boolean => {
+    if (!offerTitle || offerTitle === anchor.title) return true;
+    const cNum = extractRequiredNumbers(offerTitle);
+    const cMod = extractRequiredModelTokens(offerTitle);
+    const cVar = extractVariantTokens(offerTitle);
+    /* Number-based veto: BOTH must have unique-to-themselves numbers. */
+    if (aNum.filter((n) => !cNum.includes(n)).length > 0 &&
+        cNum.filter((n) => !aNum.includes(n)).length > 0) return false;
+    /* Model-token-based veto: BOTH must have unique-to-themselves model tokens. */
+    if (aMod.filter((m) => !cMod.includes(m)).length > 0 &&
+        cMod.filter((m) => !aMod.includes(m)).length > 0) return false;
+    /* Variant-token-based veto: bidirectional exhaustive — any asymmetry vetoes. */
+    if (aVar.some((v) => !cVar.includes(v)) ||
+        cVar.some((v) => !aVar.includes(v))) return false;
+    return true;
+  };
+  const filteredAnchorOffers = anchor.offers.filter((o) =>
+    passesFinalVeto(o.productTitle ?? anchor.title),
+  );
+  const filteredVariantOffers = variantOffers(partition.likelyVariants)
+    .filter((o) => passesFinalVeto(o.productTitle ?? anchor.title));
   const augmentedOffers = [
-    ...anchor.offers,
-    ...variantOffers(partition.likelyVariants),
+    ...filteredAnchorOffers,
+    ...filteredVariantOffers,
   ];
   const augmentedAnchor: ProductGroup = {
     ...anchor,
