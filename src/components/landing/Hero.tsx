@@ -106,14 +106,21 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
      The subhead above the composer already says "Paste a link or
      search any product. Havlo finds it cheaper in <country>." —
      the placeholder used to say "Search or paste a product link…"
-     which was an exact echo of the same instruction. User report:
-     "the placeholders in the homepage search box seem duplicated".
+     which was an exact echo of the same instruction.
 
-     The placeholder now ROTATES through concrete example queries
-     (3.5s each) so it doubles as an idea-spark instead of repeating
-     the subhead. Examples are country-aware — picking products
-     that are realistic in the local market (Tecno Spark feels at
-     home in NG, less so in DE; Galaxus is DE-specific; etc.).
+     The placeholder rotates through concrete example queries (3.5s
+     each) so it doubles as an idea-spark instead of repeating the
+     subhead. Examples deliberately SPAN CATEGORIES — electronics,
+     fashion, beauty, home, sports, appliances, health — so the
+     site doesn't appear to be gadgets-only. User report (May 2026):
+     "regarding the placeholders, it looks like the site is for
+     gadgets only" → this list was rebuilt for category breadth.
+
+     Per-country: each list mixes products that are POPULAR in that
+     market and ACTUALLY PRESENT in our catalog (so the suggestion
+     dropdown will return real results when a curious user copies
+     the placeholder). AFNAN is huge on NG (Essenza); Charlotte
+     Tilbury on UK; boAt on IN; etc.
 
      Hydration-safe: the index starts at 0 (so SSR + first client
      render show the same first example) and only rotates after
@@ -121,14 +128,22 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
      focused/typing so the placeholder doesn't shift mid-input. */
   const placeholderExamples = (() => {
     switch (countryCode) {
-      case "ng": return ["iPhone 15 Pro", "Tecno Spark 20", "Stanley Quencher", "Oraimo earbuds", "AirPods 4"];
-      case "uk": return ["AirPods 4", "Nintendo Switch 2", "Dyson V12", "Apple Watch Ultra", "Le Creuset Dutch oven"];
-      case "us": return ["AirPods 4", "Nintendo Switch 2", "Dyson Airwrap", "Stanley Quencher", "Apple Watch Ultra"];
-      case "de": return ["AirPods 4", "Bose QuietComfort", "Nintendo Switch 2", "Dyson Airwrap", "Sony WH-1000XM5"];
-      case "in": return ["OnePlus Nord", "boAt earphones", "Stanley Quencher", "Apple Watch SE", "Samsung Galaxy A06"];
-      case "ae": return ["iPhone 15 Pro", "Apple Watch Ultra", "Dyson Airwrap", "Nintendo Switch 2", "Sony WH-1000XM5"];
-      case "za": return ["AirPods 4", "Apple Watch SE", "Samsung Galaxy S24", "Nintendo Switch 2", "Sony WH-1000XM5"];
-      default:   return ["iPhone 15 Pro", "AirPods 4", "Nintendo Switch 2", "Dyson V12", "Stanley Quencher"];
+      /* NG — electronics, fashion, beauty (perfume is huge),
+         home/drinkware, appliance, health (pharmacy chains). */
+      case "ng": return ["iPhone 15 Pro", "Air Force 1", "AFNAN perfume", "Stanley Quencher", "Dyson V12", "Accu-Chek glucose meter"];
+      /* UK — electronics, appliance, home, fashion, beauty, sports. */
+      case "uk": return ["AirPods 4", "Dyson Airwrap", "Le Creuset Dutch oven", "Air Max 95", "Charlotte Tilbury", "Garmin Forerunner"];
+      /* US — drinkware/lifestyle is enormous in US catalog. */
+      case "us": return ["Stanley Quencher", "Yeti Rambler", "Dyson Airwrap", "Air Force 1", "Owala FreeSip", "AirPods 4"];
+      /* DE — DACH-popular brands first. */
+      case "de": return ["Bose QuietComfort", "Adidas Samba", "Le Creuset", "Dyson V12", "Garmin Fenix", "AirPods 4"];
+      /* IN — boAt + OnePlus are India-native heavyweights. */
+      case "in": return ["OnePlus Nord", "boAt earbuds", "Nike Air Max", "Lakme foundation", "Stanley Quencher", "Apple Watch SE"];
+      /* AE — Dubai shoppers heavy on luxury fragrance + premium tech. */
+      case "ae": return ["iPhone 15 Pro", "AFNAN perfume", "Dyson Airwrap", "Air Max 95", "Apple Watch Ultra", "Le Creuset"];
+      /* ZA — outdoor + drinkware + classic global brands. */
+      case "za": return ["Yeti Rambler", "Adidas Samba", "Garmin Forerunner", "AirPods 4", "Le Creuset", "Air Force 1"];
+      default:   return ["AirPods 4", "Air Force 1", "Dyson Airwrap", "Stanley Quencher", "Le Creuset", "Garmin Forerunner"];
     }
   })();
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
