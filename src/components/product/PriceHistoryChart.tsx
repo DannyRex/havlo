@@ -871,8 +871,16 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
      chart visually reads "no change since the last reading". */
   const today        = Date.now();
   const firstDayMs   = new Date(points[0].day).getTime();
+  /* "All" range — tightly fit the X domain to the actual data span
+     rather than forcing a full 365-day window. The earlier fixed-
+     365-day approach left ~95% of the chart empty when a product
+     only had a week or two of history, surfacing as the "tiny line
+     in the bottom-right corner" UX bug. A 7-day visual floor
+     guarantees the chart looks proportional even when data is
+     truly sparse (1-2 days). */
+  const ALL_MIN_DOMAIN_DAYS = 7;
   const xDomainStart = rangeDays >= 365
-    ? Math.min(firstDayMs, today - rangeDays * 86_400_000)
+    ? Math.min(firstDayMs, today - ALL_MIN_DOMAIN_DAYS * 86_400_000)
     : today - rangeDays * 86_400_000;
   const xDomainEnd   = today;
   const dateSpanMs   = Math.max(1, xDomainEnd - xDomainStart);
@@ -1122,12 +1130,15 @@ function computeVerdict(
   rangeDays:  number,
   pointCount: number = 2,
 ): Verdict {
-  /* Range label is woven into the verdict copy ("Cheapest in 30 days").
-     For the "All" toggle (365d), "this window" was engineering-speak
-     and overpromised — we don't have data from before tracking began,
-     so "since tracking started" is the honest framing. */
-  const rangeLabel = rangeDays >= 365 ? "since tracking started"
-                  : `${rangeDays} days`;
+  /* Range label is woven into the verdict copy. Two variants because
+     the days form takes a preposition ("in 30 days") and the All form
+     doesn't ("since tracking started" — no leading "in"). The bug
+     this fixes: prior code did `Cheapest in ${rangeLabel}` for both,
+     which produced "Cheapest in since tracking started" — sentence
+     fragment, reads broken. */
+  const verdictPhrase = rangeDays >= 365
+    ? "since tracking started"
+    : `in ${rangeDays} days`;
 
   /* Single-observation case — we can't claim "lowest" or
      "above usual" with just one data point. Honest framing: the
@@ -1148,7 +1159,7 @@ function computeVerdict(
      shopper-adjective. */
   if (currentNgn <= lowestNgn * 1.01) {
     return {
-      copy:        `Cheapest in ${rangeLabel}`,
+      copy:        `Cheapest ${verdictPhrase}`,
       tone:        "success",
       icon:        "down",
       tileCaption: "At the cheapest",
