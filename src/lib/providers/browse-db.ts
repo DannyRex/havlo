@@ -11,6 +11,7 @@ import { isUsableMerchantUrl } from "@/lib/url-helpers";
 import { getPopularityRecord, type PopularityRecord } from "@/lib/popularity";
 import { searchCandidates } from "@/lib/search/query-expand";
 import { fetchOffersAt30dLow } from "@/lib/search/price-history";
+import { withTimeout } from "@/lib/promise-timeout";
 
 interface BestOfferRow {
   product_id: string;
@@ -405,12 +406,34 @@ export const dbBrowseProvider: BrowseProvider = {
        still surface. ~500-1000 extra unique rows after dedup. */
     const runPassC = userFloorAllowsZero;
 
-    /* All three RPC calls in parallel, plus the popularity record. */
+    /* All three RPC calls in parallel, plus the popularity record.
+
+       withTimeout wrapper added May 2026 audit: during a Supabase
+       incident (slow or unresponsive RPC), the prior code waited
+       indefinitely until Vercel's 30s function timeout fired, then
+       returned a 504. With the wrapper, a hung RPC short-circuits
+       at 2.5s with an empty-result fallback, and the route degrades
+       to whatever the surviving passes + curated catalog can
+       provide. 2.5s budget is comfortably above the p95 healthy
+       latency (~300ms) but well below the 30s ceiling. */
+    type RpcResp = { data: unknown; error: { message: string } | null };
+    const TIMEOUT_MS = 2500;
+    const TIMEOUT_FALLBACK: RpcResp = { data: null, error: { message: "timeout" } };
     const [passAResult, passBResult, passCResult, popularity] = await Promise.all([
-      supa.rpc("browse_deals", passAArgs),
-      supa.rpc("browse_deals", passBArgs),
-      runPassC ? supa.rpc("browse_deals", passCArgs) : Promise.resolve({ data: null, error: null }),
-      getPopularityRecord().catch(() => ({} as Record<string, number>)),
+      withTimeout(supa.rpc("browse_deals", passAArgs) as unknown as Promise<RpcResp>, TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(local)"),
+      withTimeout(supa.rpc("browse_deals", passBArgs) as unknown as Promise<RpcResp>, TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(intl)"),
+      runPassC
+        ? withTimeout(supa.rpc("browse_deals", passCArgs) as unknown as Promise<RpcResp>, TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(zero-disc)")
+        : Promise.resolve(TIMEOUT_FALLBACK),
+      /* Popularity already has its own .catch fallback path; just
+         add the timeout so a slow query can't push the parallel
+         wave past TIMEOUT_MS either. */
+      withTimeout(
+        getPopularityRecord().catch(() => ({} as Record<string, number>)),
+        TIMEOUT_MS,
+        {} as Record<string, number>,
+        "getPopularityRecord",
+      ),
     ]);
 
     /* Stop on Pass A error (most critical). Pass B/C errors are

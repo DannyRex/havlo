@@ -19,6 +19,7 @@
    current-prices-only spectrum in that case. */
 
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
+import { withTimeout } from "@/lib/promise-timeout";
 
 export interface PriceHistoryRow {
   storeId:      string;
@@ -251,9 +252,17 @@ export async function fetchOffersAt30dLow(
   if (!supa) return result;
 
   try {
-    const { data, error } = await supa.rpc("offers_at_30d_low", {
-      p_offer_ids: toQuery,
-    });
+    /* withTimeout: this RPC runs on the user-blocking /deals SSR
+       path. A hung query can't be allowed to stall the page render
+       past 1.5s. Fallback returns empty data which the calling
+       code interprets as "no offers flagged" — badges silently
+       hide, page still renders. */
+    const { data, error } = await withTimeout(
+      supa.rpc("offers_at_30d_low", { p_offer_ids: toQuery }) as unknown as Promise<{ data: Array<{ offer_id: string }> | null; error: { message: string } | null }>,
+      1500,
+      { data: null, error: { message: "timeout" } },
+      "offers_at_30d_low",
+    );
     if (error || !data) return result;
     /* Build a fresh hit-set from the response so we can record BOTH
        at-floor and not-at-floor verdicts in the cache. */
