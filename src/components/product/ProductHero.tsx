@@ -520,7 +520,12 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             Mounted after the secondary CTA so the visual progression
             stays "buy now → compare → track for later" — three
             intents at decreasing immediacy. */}
-        <div className="mb-4">
+        {/* Right-aligned so it reads as a tertiary affordance
+            visually separated from the left-stack of primary
+            actions. The popover expands rightward from the link
+            (max-w-sm cap inside PriceAlertButton keeps it from
+            ballooning past the column). */}
+        <div className="mb-4 flex justify-end">
           <PriceAlertButton
             productId={offer.productId}
             productTitle={offer.title}

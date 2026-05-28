@@ -48,12 +48,22 @@ import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import { getClickThroughUrl } from "@/lib/utils";
 import { appendSignature } from "@/lib/go-signing";
-import SimilarProducts from "@/components/product/SimilarProducts";
-import FallbackCategoryRail from "@/components/product/FallbackCategoryRail";
 import PdpBackLink from "@/components/product/PdpBackLink";
-import PriceHistoryChart from "@/components/product/PriceHistoryChart";
 import { ArrowDown } from "lucide-react";
 import type { Deal } from "@/types";
+import dynamic from "next/dynamic";
+
+/* Below-the-fold rails — code-split via next/dynamic so their JS
+   isn't parsed during the PDP's initial paint (May 2026 perf pass).
+   All three render BELOW the ProductHero, so deferring their bundle
+   shaves ~30-50 kB of parse work off LCP without changing what the
+   first paint looks like.
+
+   ssr: true (default) keeps the HTML server-rendered for SEO + CLS
+   protection — only the client JS chunk loads lazily. */
+const SimilarProducts     = dynamic(() => import("@/components/product/SimilarProducts"));
+const FallbackCategoryRail = dynamic(() => import("@/components/product/FallbackCategoryRail"));
+const PriceHistoryChart    = dynamic(() => import("@/components/product/PriceHistoryChart"));
 
 /* Offers churn frequently (every ingest cycle adds + retires rows).
    ISR revalidate keeps the cached HTML fresh without re-rendering
@@ -273,9 +283,42 @@ export default async function ProductPage({ params }: PageProps) {
     /* TTL bumped May 2026 v3 (300s → 1800s) for Fluid CPU relief. */
     { revalidate: 1800, tags: ["pdp-anchor-offers"] },
   );
-  const [dupes, anchorOffers] = await Promise.all([
+  /* Price-history reads moved UP here (May 2026 perf pass) so they
+     parallelise with dupes + anchorOffers in a single Promise.all
+     wave. Previously they ran AFTER the deep-partition step which
+     itself runs after dupes — a 3-stage waterfall that serialised
+     ~200-400ms of independent Supabase round trips for no reason
+     (both reads only depend on offer.product_id, which we already
+     have from offer above).
+
+     Cache wrappers are now declared in this block so the
+     `unstable_cache` factory call is co-located with its invocation
+     in the Promise.all — keeps the dependency graph readable.
+
+     fetchProductPriceHistory returns null when the migration hasn't
+     been applied or the product has no history rows yet (curated
+     synthetic-ids). In both cases the bar / chart fall back to the
+     current-prices-only spectrum / empty state gracefully. */
+  const fetchPriceHistoryCached = unstable_cache(
+    async (productId: string) => fetchProductPriceHistory(productId, 90),
+    ["pdp-price-history"],
+    { revalidate: 1800, tags: ["pdp-price-history"] },
+  );
+  /* Time-series for the PriceHistoryChart. Separate RPC from the
+     rollup above — same offer_price_history table but bucketed
+     by day with min-across-stores per bucket. 365-day window so
+     the client-side range toggle (30D / 90D / All) is instant
+     without refetching. */
+  const fetchPriceTimeseriesCached = unstable_cache(
+    async (productId: string) => fetchProductPriceTimeseries(productId, 365),
+    ["pdp-price-timeseries-v2"],
+    { revalidate: 1800, tags: ["pdp-price-timeseries"] },
+  );
+  const [dupes, anchorOffers, priceHistoryRows, priceTimeseries] = await Promise.all([
     fetchDupesCached(offer.title),
     fetchAnchorOffersCached(offer.product_id),
+    offer.product_id ? fetchPriceHistoryCached(offer.product_id) : Promise.resolve(null),
+    offer.product_id ? fetchPriceTimeseriesCached(offer.product_id) : Promise.resolve(null),
   ]);
 
   /* ── Anchor country-relevance guard ───────────────────────────────
@@ -750,41 +793,9 @@ export default async function ProductPage({ params }: PageProps) {
     partition.siblingVariants.some((s) => s.key === d.key),
   );
 
-  /* Price-history rollup for the new bar's "lowest tracked / at
-     this store: £X" callouts. Cached at 5min — same window as the
-     dupes + anchor caches so the spectrum doesn't drift further
-     than the rest of the page.
-
-     fetchProductPriceHistory returns null when the migration
-     hasn't been applied or the product has no history rows yet
-     (curated synthetic-ids). In both cases the bar falls back to
-     the current-prices-only spectrum gracefully. */
-  const fetchPriceHistoryCached = unstable_cache(
-    async (productId: string) => fetchProductPriceHistory(productId, 90),
-    ["pdp-price-history"],
-    { revalidate: 1800, tags: ["pdp-price-history"] },
-  );
-  /* Time-series for the PriceHistoryChart. Separate RPC from the
-     rollup above — same offer_price_history table but bucketed
-     by day with min-across-stores per bucket, which is what the
-     line chart needs to plot.
-
-     Window bumped 90 → 365 days (May 2026 chart v2 rewrite). The
-     chart now has client-side 30/90/All toggles; fetching the
-     full year server-side means range switches are instant (no
-     refetch) and the cost is bounded — daily buckets cap the
-     return payload at 365 rows regardless of how chatty the
-     product's price stream is. Cache key bumped to v2 to skip
-     stale 90d-only entries from the prior revalidate window. */
-  const fetchPriceTimeseriesCached = unstable_cache(
-    async (productId: string) => fetchProductPriceTimeseries(productId, 365),
-    ["pdp-price-timeseries-v2"],
-    { revalidate: 1800, tags: ["pdp-price-timeseries"] },
-  );
-  const [priceHistoryRows, priceTimeseries] = await Promise.all([
-    offer.product_id ? fetchPriceHistoryCached(offer.product_id) : Promise.resolve(null),
-    offer.product_id ? fetchPriceTimeseriesCached(offer.product_id) : Promise.resolve(null),
-  ]);
+  /* priceHistoryRows + priceTimeseries are now fetched UP TOP in
+     the same Promise.all as dupes + anchorOffers — see the May 2026
+     perf comment above. Only the JS-side rollup happens here. */
   const priceHistorySummary = priceHistoryRows
     ? rollupPriceHistory(priceHistoryRows, offer.store_id, usdToNgn) ?? undefined
     : undefined;

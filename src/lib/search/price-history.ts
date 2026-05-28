@@ -176,34 +176,87 @@ export function deriveLowestInWindow(
 
    Defensive: returns an empty set when the RPC isn't applied yet or
    the DB is unreachable. Deal cards then never render the badge —
-   safe-degrade. */
+   safe-degrade.
+
+   ── In-memory per-id cache (May 2026 perf pass) ────────────────────
+   The deals feed renders 60 cards SSR + lazy-loads more on scroll;
+   most sessions hit /api/deals 3-5 times with overlapping offer_id
+   sets. Module-level Map keeps a per-offer "at-floor" verdict (or
+   "not-at-floor") with a 5-minute TTL so repeated hits within the
+   window skip the RPC entirely.
+
+   Why per-id not per-request: a request with [A,B,C] and a later
+   request with [B,C,D] should reuse the cached verdicts for B+C
+   and only query for the unknown ones. Per-request hashing would
+   miss that. Tradeoff: a tiny bit more bookkeeping for a much
+   higher hit rate.
+
+   Memory ceiling: each entry is ~100 bytes (id + bool + timestamp);
+   at 10K entries we're at ~1MB. eviction-on-expiry keeps that
+   roughly stable in steady state. */
+type CacheEntry = { atFloor: boolean; expiresAt: number };
+const at30dLowCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000;  // 5 minutes — matches the page-level ISR cadence
+
 export async function fetchOffersAt30dLow(
   offerIds: string[],
 ): Promise<Set<string>> {
   if (offerIds.length === 0) return new Set();
-  const supa = getSupabaseAdmin();
-  if (!supa) return new Set();
 
   /* Strip non-UUID-shaped ids before sending to the RPC. Curated
      offers carry synthetic string ids (e.g. "curated:amazon-ng-...");
      pushing them through the RPC would no-op (no matching row) but
      wastes payload — pre-filter on the client. */
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const candidates = offerIds.filter((id) => UUID_RE.test(id));
-  if (candidates.length === 0) return new Set();
+
+  const now = Date.now();
+  const result = new Set<string>();
+  const toQuery: string[] = [];
+  for (const id of offerIds) {
+    if (!UUID_RE.test(id)) continue;
+    const cached = at30dLowCache.get(id);
+    if (cached && cached.expiresAt > now) {
+      if (cached.atFloor) result.add(id);
+      /* else: known-not-at-floor; skip the query and don't add to set. */
+    } else {
+      toQuery.push(id);
+    }
+  }
+  if (toQuery.length === 0) return result;
+
+  const supa = getSupabaseAdmin();
+  if (!supa) return result;
 
   try {
     const { data, error } = await supa.rpc("offers_at_30d_low", {
-      p_offer_ids: candidates,
+      p_offer_ids: toQuery,
     });
-    if (error || !data) return new Set();
-    const set = new Set<string>();
+    if (error || !data) return result;
+    /* Build a fresh hit-set from the response so we can record BOTH
+       at-floor and not-at-floor verdicts in the cache. */
+    const hits = new Set<string>();
     for (const row of data as Array<{ offer_id: string }>) {
-      set.add(row.offer_id);
+      hits.add(row.offer_id);
     }
-    return set;
+    const expiresAt = now + CACHE_TTL_MS;
+    for (const id of toQuery) {
+      const atFloor = hits.has(id);
+      at30dLowCache.set(id, { atFloor, expiresAt });
+      if (atFloor) result.add(id);
+    }
+    /* Opportunistic eviction — if the cache has grown large,
+       drop expired entries. Uses .forEach to avoid downlevel-
+       iteration restrictions on the project's tsconfig target. */
+    if (at30dLowCache.size > 20_000) {
+      const expired: string[] = [];
+      at30dLowCache.forEach((v, k) => {
+        if (v.expiresAt <= now) expired.push(k);
+      });
+      for (const k of expired) at30dLowCache.delete(k);
+    }
+    return result;
   } catch {
-    return new Set();
+    return result;
   }
 }
 
