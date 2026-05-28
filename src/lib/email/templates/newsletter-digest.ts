@@ -91,7 +91,7 @@ ${spacer(16)}
 ${dealsHtml}
 ${spacer(8)}
 ${button({ url: dealsUrl, label: `See all today's deals` })}
-${signature("Daniel")}
+${signature("Danny")}
 ${spacer(8)}
 `;
 

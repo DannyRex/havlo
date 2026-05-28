@@ -45,7 +45,7 @@ ${paragraph("Hi,")}
 ${paragraph("Thanks for joining the Havlo deals digest.")}
 ${paragraph(`Twice a week (Monday and Thursday morning), you'll get one email from this address with the strongest deals we found that day. We don't email on the other days. If there's nothing new worth opening, we don't send anything.`)}
 ${paragraph(`Until the first one ships, ${textLink({ url: dealsUrl, label: `browse what's hot today` })}.`)}
-${signature("Daniel")}
+${signature("Danny")}
 ${spacer(8)}
 `;
 

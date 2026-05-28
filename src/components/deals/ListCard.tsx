@@ -215,6 +215,16 @@ export default function ListCard({ deal, linkHref }: Props) {
           <p className="text-[10px] text-ink-3 mt-0.5">{ngnEquivStr}</p>
         )}
 
+        {/* "Lowest in 30 days" badge — mirror of MasonryCard's badge.
+            Same offers_at_30d_low signal, same visual treatment so
+            list + grid views stay consistent. */}
+        {deal.at30DayLow && (
+          <p className="text-[10px] text-success font-semibold mt-1 inline-flex items-center gap-1">
+            <span className="inline-block w-1 h-1 rounded-full bg-success" aria-hidden="true" />
+            Lowest price in 30 days
+          </p>
+        )}
+
         {landedNgnStr && (
           <p className="text-[10px] text-ink-3 mt-0.5 flex items-center gap-1">
             <span>{landedNgnStr}</span>

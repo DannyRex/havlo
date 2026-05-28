@@ -60,6 +60,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
        is a real surface shoppers click into, not just a
        compliance checkbox. */
     { url: `${SITE_URL}/how-we-make-money`, priority: 0.4, changeFrequency: "monthly", lastModified: now },
+    /* /for-merchants — public partnership landing page (F4 build).
+       Country-independent; one canonical URL for all retailer
+       prospects. Higher priority than legal pages because
+       partner acquisition is a real funnel surface, not a
+       compliance checkbox. */
+    { url: `${SITE_URL}/for-merchants`, priority: 0.5, changeFrequency: "monthly", lastModified: now },
+    /* /scan — barcode scanner entry point (F5 build). Country-
+       independent (the client island reads country from
+       middleware at request time for the redirect URL). Low
+       priority because it's a utility surface, not a primary
+       SEO target — most arrivals will be direct or PWA shortcut. */
+    { url: `${SITE_URL}/scan`,          priority: 0.4, changeFrequency: "monthly", lastModified: now },
   ];
 
   /* Per-country blog index. Each country's /[country]/blog gets its

@@ -36,7 +36,7 @@ import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { pgFtsFindDupes, pgFtsAnchorOffersByProductId } from "@/lib/search/pg-fts";
 import { isOfferAllowedForCountry, filterDealsForCountry } from "@/lib/country";
 import { computeAnchorStats } from "@/lib/pdp-stats";
-import { fetchProductPriceHistory, rollupPriceHistory } from "@/lib/search/price-history";
+import { fetchProductPriceHistory, rollupPriceHistory, fetchProductPriceTimeseries } from "@/lib/search/price-history";
 import { partitionDupesByVariantMatch, variantOffers } from "@/lib/search/variant-pooling";
 import { partitionDupesByVariantMatchDeep } from "@/lib/search/variant-pooling-deep";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
@@ -51,6 +51,7 @@ import { appendSignature } from "@/lib/go-signing";
 import SimilarProducts from "@/components/product/SimilarProducts";
 import FallbackCategoryRail from "@/components/product/FallbackCategoryRail";
 import PdpBackLink from "@/components/product/PdpBackLink";
+import PriceHistoryChart from "@/components/product/PriceHistoryChart";
 import { ArrowDown } from "lucide-react";
 import type { Deal } from "@/types";
 
@@ -763,9 +764,20 @@ export default async function ProductPage({ params }: PageProps) {
     ["pdp-price-history"],
     { revalidate: 1800, tags: ["pdp-price-history"] },
   );
-  const priceHistoryRows = offer.product_id
-    ? await fetchPriceHistoryCached(offer.product_id)
-    : null;
+  /* Time-series for the new PriceHistoryChart. Separate RPC from
+     the rollup above — same underlying offer_price_history table
+     but bucketed by day with min-across-stores per bucket, which
+     is what the line chart needs to plot. Both reads parallelise
+     since they hit different RPCs. */
+  const fetchPriceTimeseriesCached = unstable_cache(
+    async (productId: string) => fetchProductPriceTimeseries(productId, 90),
+    ["pdp-price-timeseries"],
+    { revalidate: 1800, tags: ["pdp-price-timeseries"] },
+  );
+  const [priceHistoryRows, priceTimeseries] = await Promise.all([
+    offer.product_id ? fetchPriceHistoryCached(offer.product_id) : Promise.resolve(null),
+    offer.product_id ? fetchPriceTimeseriesCached(offer.product_id) : Promise.resolve(null),
+  ]);
   const priceHistorySummary = priceHistoryRows
     ? rollupPriceHistory(priceHistoryRows, offer.store_id, usdToNgn) ?? undefined
     : undefined;
@@ -843,6 +855,22 @@ export default async function ProductPage({ params }: PageProps) {
           isLocallyShoppable={isLocallyShoppable}
           localAlternative={localAlternative}
         />
+
+        {/* Price history chart — only renders for products with a real
+            product_id (curated synthetic-id PDPs and live-search PDPs
+            have no history rows). The component itself handles its
+            own empty state for products that DO have a product_id but
+            haven't seen a price change yet. */}
+        {priceTimeseries && priceTimeseries.length > 0 && (
+          <div className="mt-6 sm:mt-8">
+            <PriceHistoryChart
+              points={priceTimeseries}
+              currentNgn={anchorPriceNgn}
+              country={country}
+              windowDays={90}
+            />
+          </div>
+        )}
 
         {dupesForRail.length > 0 ? (
           /* Cheaper alternatives section — moved ABOVE the sibling

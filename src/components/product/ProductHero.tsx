@@ -24,6 +24,7 @@ import {
 } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import PriceComparisonBar from "@/components/product/PriceComparisonBar";
+import PriceAlertButton from "@/components/product/PriceAlertButton";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import InfoTip from "@/components/ui/InfoTip";
 import type { PerStoreOffer } from "@/lib/pdp-stats";
@@ -507,6 +508,26 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             ? <>Compare prices across {totalStores} stores</>
             : <>Compare prices across stores</>}
         </Link>
+
+        {/* Tertiary CTA — set a price alert. Tucked below the
+            compare CTA as a quiet text link with a bell icon so it
+            doesn't compete with the primary "Visit" / secondary
+            "Compare" affordances. Expands inline to a popover form
+            on click. Persists to /api/alerts + fires a confirmation
+            email; the cron (/scripts/cron/check-price-alerts.ts)
+            fires the trigger email when conditions match.
+
+            Mounted after the secondary CTA so the visual progression
+            stays "buy now → compare → track for later" — three
+            intents at decreasing immediacy. */}
+        <div className="mb-4">
+          <PriceAlertButton
+            productId={offer.productId}
+            productTitle={offer.title}
+            currentPriceNgn={anchorPriceNgn}
+            country={country}
+          />
+        </div>
 
         {/* Price-vs-market visual signal. Replaces the previous
             "Last checked / Store country" tiles + the standalone

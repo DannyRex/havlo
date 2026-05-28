@@ -401,6 +401,22 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
           <p className="text-[10px] text-ink-3 mt-0.5">{secondaryStr}</p>
         )}
 
+        {/* "Lowest in 30 days" badge — surfaces when the offers_at_30d_low
+            RPC has flagged this offer as at the 30-day price floor for
+            its underlying product (across stores). Quiet emerald
+            treatment so it complements the existing discount badge
+            instead of competing with it: the discount badge says
+            "this is cheaper than original price", the 30d badge says
+            "this is the cheapest it's been recently anywhere". Both
+            can fire on the same card; the visual hierarchy keeps the
+            discount badge dominant since it's the primary CTA. */}
+        {deal.at30DayLow && (
+          <p className="text-[10px] text-success font-semibold mt-1 inline-flex items-center gap-1">
+            <span className="inline-block w-1 h-1 rounded-full bg-success" aria-hidden="true" />
+            Lowest price in 30 days
+          </p>
+        )}
+
         {landedFmt && (
           /* Cross-border total. Was "landed" with a `title=...` HTML
              tooltip — but that doesn't render on touch devices, and

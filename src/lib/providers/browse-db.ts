@@ -10,6 +10,7 @@ import { curatedAmazonDeals } from "@/lib/data/curated-amazon";
 import { isUsableMerchantUrl } from "@/lib/url-helpers";
 import { getPopularityRecord, type PopularityRecord } from "@/lib/popularity";
 import { searchCandidates } from "@/lib/search/query-expand";
+import { fetchOffersAt30dLow } from "@/lib/search/price-history";
 
 interface BestOfferRow {
   product_id: string;
@@ -203,7 +204,14 @@ async function searchDealsViaFts(
      re-ranked DB rows. sortDeals respects the user's sort field
      when it isn't "relevance" — for relevance it preserves order. */
   const curated = getCuratedDeals(q);
-  return sortDeals([...reranked, ...curated], q.sort);
+  const finalDeals = sortDeals([...reranked, ...curated], q.sort);
+
+  /* Mark offers at their 30-day price floor — same single-RPC
+     pattern as the browse path. Search results get the badge too
+     because users querying for a product expect to see "this is
+     the lowest it's been in 30 days" signals on the matches. */
+  const lowSet = await fetchOffersAt30dLow(finalDeals.map((d) => d.id));
+  return finalDeals.map((d) => lowSet.has(d.id) ? { ...d, at30DayLow: true } : d);
 }
 
 export const dbBrowseProvider: BrowseProvider = {
@@ -461,7 +469,15 @@ export const dbBrowseProvider: BrowseProvider = {
        curated entries compete on the same sort criteria as scraped
        data instead of always front-loading the feed. */
     const curated = getCuratedDeals(q);
-    return sortDeals([...fromDb, ...curated], q.sort);
+    const finalDeals = sortDeals([...fromDb, ...curated], q.sort);
+
+    /* Mark offers at their 30-day price floor. Single RPC for the
+       whole rendered set so card rendering doesn't trigger N+1.
+       Curated offers carry synthetic ids that the RPC filters out
+       (UUID gate inside fetchOffersAt30dLow) so the cost scales
+       only with the ingested-data subset. ~50-150ms typical. */
+    const lowSet = await fetchOffersAt30dLow(finalDeals.map((d) => d.id));
+    return finalDeals.map((d) => lowSet.has(d.id) ? { ...d, at30DayLow: true } : d);
   },
 
   async getCategoryCounts(): Promise<Record<string, number>> {

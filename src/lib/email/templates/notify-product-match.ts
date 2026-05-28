@@ -64,7 +64,7 @@ ${paragraph(`Quick update on <strong style="font-weight:600;">${escapeHtml(query
 ${rowsHtml}
 ${spacer(20)}
 ${paragraph(`${textLink({ url: compareUrl, label: "See all matches on Havlo" })}.`)}
-${signature("Daniel")}
+${signature("Danny")}
 ${spacer(8)}
 `;
 

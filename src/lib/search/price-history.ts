@@ -66,6 +66,147 @@ export async function fetchProductPriceHistory(
   }
 }
 
+/* ── Time-series for the PDP chart ──────────────────────────────────
+   Wraps the product_price_timeseries RPC (migration 0054) — returns
+   one row per day in the lookback window, each carrying the LOWEST
+   price seen across any store that day, plus how many stores were
+   present.
+
+   Different shape than fetchProductPriceHistory: that one returns
+   per-store rollups (one row per store, with lowest/latest
+   aggregates); this one returns per-day rollups (one row per day,
+   with min across stores). Both back the same offer_price_history
+   table, just sliced differently for their consumers.
+
+   Defensive: returns null when the RPC isn't applied yet, DB is
+   unreachable, or product has no history. The chart component
+   renders a "no price history yet" empty state when null. */
+export interface PriceHistoryPoint {
+  /** ISO date string for the bucket (yyyy-mm-dd). */
+  day:         string;
+  /** Lowest price seen across all stores on this day, in NGN
+      (USD prices converted at a fixed rate inside the RPC). */
+  minPriceNgn: number;
+  /** Number of distinct stores carrying the product that day —
+      drives the chart's confidence dimming on single-store days. */
+  storeCount:  number;
+}
+
+interface RpcTimeseriesRow {
+  bucket_day:    string;
+  min_price_ngn: number;
+  store_count:   number;
+}
+
+export async function fetchProductPriceTimeseries(
+  productId: string,
+  daysBack = 90,
+): Promise<PriceHistoryPoint[] | null> {
+  if (!productId) return null;
+  const supa = getSupabaseAdmin();
+  if (!supa) return null;
+
+  try {
+    const { data, error } = await supa.rpc("product_price_timeseries", {
+      p_product_id: productId,
+      p_days_back:  daysBack,
+    });
+    if (error || !data) return null;
+
+    return (data as RpcTimeseriesRow[]).map((r) => ({
+      day:         r.bucket_day,
+      minPriceNgn: Number(r.min_price_ngn),
+      storeCount:  Number(r.store_count),
+    }));
+  } catch {
+    return null;
+  }
+}
+
+/* ── Lowest-in-window helper ────────────────────────────────────────
+   Feature #2 badge logic — surfaces "Lowest in 30 days" on a deal
+   card when the current price equals the lowest seen across any
+   store in the window. Reuses fetchProductPriceTimeseries so the
+   read path is shared with the chart.
+
+   Returns null when no data or fewer than 2 stores in window (a
+   single-store floor is trivially true — same as the bar's
+   storeCount >= 2 gate). */
+export interface LowestInWindow {
+  lowestNgn:  number;
+  storeCount: number;
+  /** True when the passed-in currentNgn is within 1% of the floor —
+      gives the badge a slight tolerance for rounding / FX drift. */
+  isAtFloor:  boolean;
+}
+
+export function deriveLowestInWindow(
+  timeseries: PriceHistoryPoint[],
+  currentNgn: number,
+): LowestInWindow | null {
+  if (timeseries.length === 0) return null;
+
+  let lowest = timeseries[0].minPriceNgn;
+  let maxStores = timeseries[0].storeCount;
+  for (let i = 1; i < timeseries.length; i++) {
+    const t = timeseries[i];
+    if (t.minPriceNgn < lowest) lowest = t.minPriceNgn;
+    if (t.storeCount  > maxStores) maxStores = t.storeCount;
+  }
+  if (maxStores < 2) return null;
+
+  /* 1% tolerance — covers integer rounding in the RPC (numeric(12,2)
+     truncates fractions) and the fixed-rate USD→NGN conversion drift.
+     A real "current matches floor" event survives this tolerance;
+     a clear "current is well above floor" doesn't trigger the badge. */
+  const isAtFloor = currentNgn <= lowest * 1.01;
+
+  return { lowestNgn: lowest, storeCount: maxStores, isAtFloor };
+}
+
+/* ── Bulk badge lookup ──────────────────────────────────────────────
+   For a batch of offer_ids (typically a /deals page's rendered set),
+   return the subset whose current price is at the 30-day floor for
+   their underlying product. Single RPC call regardless of batch size
+   — avoids N+1 reads on the deals feed.
+
+   Pipes through to the offers_at_30d_low RPC (migration 0055). The
+   RPC enforces the storeCount >= 2 gate and the 1% tolerance so the
+   JS side just unwraps the result.
+
+   Defensive: returns an empty set when the RPC isn't applied yet or
+   the DB is unreachable. Deal cards then never render the badge —
+   safe-degrade. */
+export async function fetchOffersAt30dLow(
+  offerIds: string[],
+): Promise<Set<string>> {
+  if (offerIds.length === 0) return new Set();
+  const supa = getSupabaseAdmin();
+  if (!supa) return new Set();
+
+  /* Strip non-UUID-shaped ids before sending to the RPC. Curated
+     offers carry synthetic string ids (e.g. "curated:amazon-ng-...");
+     pushing them through the RPC would no-op (no matching row) but
+     wastes payload — pre-filter on the client. */
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const candidates = offerIds.filter((id) => UUID_RE.test(id));
+  if (candidates.length === 0) return new Set();
+
+  try {
+    const { data, error } = await supa.rpc("offers_at_30d_low", {
+      p_offer_ids: candidates,
+    });
+    if (error || !data) return new Set();
+    const set = new Set<string>();
+    for (const row of data as Array<{ offer_id: string }>) {
+      set.add(row.offer_id);
+    }
+    return set;
+  } catch {
+    return new Set();
+  }
+}
+
 /* Roll up the per-store rows into a single product-level summary. */
 export interface PriceHistorySummary {
   /** Lowest price seen for this product within the lookback window

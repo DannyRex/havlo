@@ -43,7 +43,7 @@ export function notifyProductConfirmation({ query, country }: Args): Email {
 ${paragraph("Hi,")}
 ${paragraph(`We're watching for <strong style="font-weight:600;">${escapeHtml(query)}</strong>. When something matching surfaces at a real discount, I'll email you the offers, cheapest first.`)}
 ${paragraph(`In the meantime, ${textLink({ url: dealsUrl, label: "browse what's already in today" })}.`)}
-${signature("Daniel")}
+${signature("Danny")}
 ${spacer(8)}
 `;
 

@@ -445,7 +445,7 @@ export function textLink(opts: { url: string; label: string }): string {
    unsubscribe note) so every plain-text alternative reads the same
    sign-off. */
 export function plainTextShell(opts: { body: string[]; signoff?: string }): string {
-  const sig = opts.signoff ?? "Daniel";
+  const sig = opts.signoff ?? "Danny";
   return [
     `Hi,`,
     ``,

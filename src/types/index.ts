@@ -80,6 +80,17 @@ export interface Deal {
       search response — survives across stores when Google has
       canonicalised the listing. Populated by serpapi-search providers. */
   googleShoppingId?: string;
+
+  /** True when this offer's current price equals (within 1%) the
+      lowest price seen for the same product across any store in the
+      last 30 days, AND the product has been tracked at ≥ 2 stores
+      in that window. Drives the small "30d low" badge on
+      MasonryCard / ListCard. Populated by the browse provider via
+      a single offers_at_30d_low RPC call per fetchDeals invocation
+      so card rendering doesn't trigger N+1 reads. Optional because
+      providers without the price-history backbone (curated catalogs,
+      live-search results) leave it undefined → no badge. */
+  at30DayLow?: boolean;
 }
 
 export interface PriceResult {

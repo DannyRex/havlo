@@ -24,14 +24,23 @@ const footerSections = [
     links: [
       { label: "Browse deals",  href: "/deals" },
       { label: "Find for less", href: "/compare" },
+      /* Barcode scanner — public utility surface (F5 build). In the
+         Product column rather than a tucked-away link because it's
+         a primary shopper feature, not back-of-house. */
+      { label: "Scan a barcode", href: "/scan" },
     ],
   },
   {
     title: "Company",
     links: [
-      { label: "About",   href: "/about" },
-      { label: "Blog",    href: "/blog" },
-      { label: "Contact", href: "/contact" },
+      { label: "About",          href: "/about" },
+      { label: "Blog",           href: "/blog" },
+      /* For merchants — public partnership landing page added F4
+         (KuantoKusta-inspired). Sits with About in the Company column
+         because the audience overlaps (partners reading "About" to
+         decide whether to apply). */
+      { label: "For merchants",  href: "/for-merchants" },
+      { label: "Contact",        href: "/contact" },
     ],
   },
   {

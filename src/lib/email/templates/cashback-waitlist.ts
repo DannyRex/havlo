@@ -41,7 +41,7 @@ export function cashbackWaitlistConfirmation({ country }: Args): Email {
 ${paragraph("Hi,")}
 ${paragraph(`You're in. We're a few weeks from launching cashback (actual accounts, actual payouts). When it ships, I'll email you here with what you've earned on qualifying stores, and how to withdraw.`)}
 ${paragraph(`Until then, keep using Havlo to ${textLink({ url: dealsUrl, label: "find cheaper deals across the stores you already know" })}.`)}
-${signature("Daniel")}
+${signature("Danny")}
 ${spacer(8)}
 `;
 
