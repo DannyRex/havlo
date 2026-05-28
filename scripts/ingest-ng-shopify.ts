@@ -80,14 +80,50 @@ const SHOPIFY_CONFIGS: ShopifyConfig[] = [
        deals × 15 collections = 3,750 deals" but in practice the catalog
        is much smaller (3CHub ~120 active SKUs total). */
     pageLimit: 1,
+    /* Auto-walk discovers every collection on the store, then walks
+       each. 3CHub's /collections/all carries the master catalog so the
+       gain here is modest (~5-10% extra products from collections
+       that exclude themselves from /all). Cost: 1 extra HTTPS fetch
+       to /collections.json. Worth it. Same for the other stores
+       below — opt in unilaterally since the cost is negligible. */
+    autoWalkAllCollections: true,
   },
 
-  /* Future NG Shopify stores append here. Examples to investigate
-     if their /products.json is publicly reachable:
-       - pointek.com.ng     (electronics)
-       - hayathub.com       (gadgets)
-       - mobinex.ng         (phones)
-     Each one is a 1-block addition. */
+  /* ── Payporte — NG fashion / beauty / lifestyle (May 2026 add) ── */
+  {
+    name:    "Payporte",
+    storeId: "payporte",
+    baseUrl: "https://www.payporte.com",
+    /* Hint set — the cat field bias for known handles. Auto-walk
+       picks up everything else (dresses, jeans, jewelry, footwear,
+       men's clothing, etc.) and assigns "all" as the default cat,
+       which downstream resolveCategory(product_type) refines. */
+    collections: [
+      { handle: "all",     cat: "fashion" },
+      { handle: "women",   cat: "fashion" },
+      { handle: "men",     cat: "fashion" },
+      { handle: "shoes",   cat: "fashion" },
+      { handle: "beauty",  cat: "beauty"  },
+      { handle: "watches", cat: "fashion" },
+    ],
+    /* Payporte's /collections/all is the master pool; auto-walk
+       enriches with their richer category tree (~30-50 collections
+       depending on season). 2 pages × 250 = up to 500 per collection.
+       At ~30 collections × 500 = nominal 15K cap, real catalog
+       likely 2-5K products. */
+    pageLimit: 2,
+    autoWalkAllCollections: true,
+  },
+
+  /* Future NG Shopify stores append here. Candidates probed May 2026:
+       ✗ pointek.com.ng     — DNS / timeout
+       ✗ hayathub.com       — DNS / timeout
+       ✗ mobinex.ng         — DNS / timeout
+       ✗ pricerite.ng       — DNS / timeout
+       ✓ payporte.com       — added above (NG fashion + beauty)
+     Re-probe every quarter; new candidates that pass the
+     /collections/all/products.json HTTP 200 + content-type:
+     application/json check are 1-block additions here. */
 ];
 
 /* RawDeal → Deal adapter. The Shopify helper returns the scraper

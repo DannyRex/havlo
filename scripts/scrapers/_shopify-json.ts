@@ -41,6 +41,30 @@ export interface ShopifyConfig {
       500 max per collection. Most NG retailer catalogs fit easily
       below that ceiling. */
   pageLimit?: number;
+  /** When true, fetch /collections.json first to discover EVERY
+      collection on the store, then walk each. The `collections`
+      array above is then used only to assign per-handle category
+      hints (when a discovered handle matches one of the configured
+      hints, use that cat; otherwise fall through to product_type
+      inference or "all" default). Auto-walk is the right call for
+      stores where the merchant uses many collections to organize
+      catalog but doesn't expose them all via /collections/all
+      (rare, but common enough for stores with rich category trees).
+      Costs more bandwidth (~1 extra HTTPS round trip + 1 fetch per
+      collection) but typically 2-3x the product count vs walking
+      just /collections/all. */
+  autoWalkAllCollections?: boolean;
+}
+
+/** Shopify /collections.json response — public on every store.
+    Returns the list of collections with handles + titles. */
+interface ShopifyCollection {
+  id:     number;
+  handle: string;
+  title:  string;
+}
+interface ShopifyCollectionsResponse {
+  collections: ShopifyCollection[];
 }
 
 /* Shopify products.json schema — only the fields we use. There's a
@@ -73,6 +97,46 @@ interface ShopifyResponse {
   products: ShopifyProduct[];
 }
 
+/* Auto-walk helper — fetch /collections.json, return an array of
+   handle+cat entries. The cat is inferred from the configured
+   collection hints when one matches; otherwise default to "all"
+   and let downstream category inference (resolveCategory on
+   product_type) handle it. */
+async function discoverAllCollections(cfg: ShopifyConfig): Promise<Array<{ handle: string; cat: string }>> {
+  const url = `${cfg.baseUrl}/collections.json?limit=250`;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+        "Accept": "application/json,text/plain,*/*",
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) {
+      console.warn(`    ${cfg.name} /collections.json: HTTP ${res.status}, falling back to configured collections`);
+      return cfg.collections;
+    }
+    const data = (await res.json()) as ShopifyCollectionsResponse;
+    const hints = new Map(cfg.collections.map((c) => [c.handle, c.cat]));
+    /* Drop the bare "frontpage" handle — duplicates /collections/all
+       on most Shopify storefronts and burns a fetch for no extra
+       products. Drop "all" too if present in the auto-discovery
+       output since we'll add it explicitly first. */
+    const discovered = data.collections
+      .filter((c) => c.handle !== "frontpage" && c.handle !== "all")
+      .map((c) => ({ handle: c.handle, cat: hints.get(c.handle) ?? "all" }));
+    /* Always include /collections/all first — it's the master pool
+       and ensures we don't miss products that exist outside any
+       merchant-defined collection. */
+    const out = [{ handle: "all", cat: hints.get("all") ?? "all" }, ...discovered];
+    console.log(`    ${cfg.name} auto-discovered ${out.length} collections (was ${cfg.collections.length} configured)`);
+    return out;
+  } catch (err) {
+    console.warn(`    ${cfg.name} /collections.json: ${(err as Error).message}, falling back to configured`);
+    return cfg.collections;
+  }
+}
+
 export async function scrapeShopifyCatalog(cfg: ShopifyConfig): Promise<RawDeal[]> {
   const deals: RawDeal[] = [];
   const seenHandles = new Set<string>();
@@ -80,7 +144,15 @@ export async function scrapeShopifyCatalog(cfg: ShopifyConfig): Promise<RawDeal[
 
   console.log(`  → ${cfg.name} (Shopify JSON)...`);
 
-  for (const { handle, cat } of cfg.collections) {
+  /* Resolve which collections to walk. Auto-discovery costs one
+     extra /collections.json fetch but typically uncovers 5-20x more
+     collections than a hand-curated list. The per-collection page
+     cap + seenHandles dedup keep total cost bounded. */
+  const collections = cfg.autoWalkAllCollections
+    ? await discoverAllCollections(cfg)
+    : cfg.collections;
+
+  for (const { handle, cat } of collections) {
     let pageDeals = 0;
     for (let page = 1; page <= pageLimit; page++) {
       const url = `${cfg.baseUrl}/collections/${handle}/products.json?limit=250&page=${page}`;
