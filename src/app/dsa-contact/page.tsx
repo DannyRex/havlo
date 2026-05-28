@@ -32,7 +32,7 @@ const sections = [
     title: "Single point of contact",
     paragraphs: [
       "For all DSA-related correspondence — from EU authorities, users, or third parties — please contact:",
-      "Daniel Ekum (designated DSA contact)",
+      "Danny Mine (designated DSA contact)",
       "Email: hello@havlo.io",
       "Language for correspondence: English. We will accept correspondence in German, French, Spanish, Italian, and Dutch but will respond in English.",
       "We aim to respond to any DSA notice within 5 working days for substantive matters and within 24 hours to acknowledge receipt.",

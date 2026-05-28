@@ -377,8 +377,19 @@ export async function GET(req: NextRequest) {
       }).catch(() => null),
     ]);
 
-    /* Country store filter — pure-function, runs over Deal[] */
-    const broadCountryFiltered = filterDealsForCountry(allRawAcrossOrigins, country);
+    /* Country store filter — pure-function, runs over Deal[].
+       The third arg is the user's EXPLICITLY-selected store set
+       (resolved earlier into realStoreIds). When present, those
+       stores bypass the country reachability check — the visitor
+       declared intent by ticking them in the dropdown, so silently
+       dropping their results because the store isn't in NG/UK/etc's
+       cross-border allowlist was wrong UX. Default discovery view
+       (no store filter ticked → realStoreIds is null) still gets
+       the full guard. */
+    const explicitlyFilteredStores = realStoreIds && realStoreIds.length > 0
+      ? new Set(realStoreIds)
+      : undefined;
+    const broadCountryFiltered = filterDealsForCountry(allRawAcrossOrigins, country, explicitlyFilteredStores);
 
     /* Bucket by store COUNTRY (not currency). Round-4 QA caught
        /uk/deals showing "Local stores: 0" even though John Lewis,

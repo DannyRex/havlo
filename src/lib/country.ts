@@ -963,8 +963,35 @@ export function inferStoreCountry(storeId: string, storeName: string): string | 
     Deal carries `currency` + `tags[]`, OfferLike carries the
     `isInternational` boolean. See isOfferAllowedForCountry's
     docstring for the full shape-contract notes. */
-export function filterDealsForCountry<T extends DealLike>(deals: T[], country: Country): T[] {
+export function filterDealsForCountry<T extends DealLike>(
+  deals: T[],
+  country: Country,
+  /* Optional set of store IDs the user EXPLICITLY selected via the
+     /deals store-filter dropdown. When provided, any deal whose
+     storeId is in this set is admitted regardless of country-
+     reachability — the user already declared they want to see
+     those stores, so overriding their explicit choice with our
+     "doesn't ship here" guard is wrong UX.
+
+     User report (May 2026): "selecting certain stores from deals
+     with more than one product shows no deals match those filters."
+     Repro: /ng/deals?stores=back-market,93mobiles → total=0 because
+     neither store is in NG's cross-border allowlist, even though
+     both have NG-visitor-relevant offers in the catalog.
+
+     The default-discovery view (no explicit store filter) still
+     gets the full country guard — users browsing /deals without
+     having picked anything continue to see only stores reachable
+     from their market. */
+  explicitlyFilteredStores?: Set<string>,
+): T[] {
   const countryFiltered = deals.filter((d) => {
+    /* Explicit-user-selection override. When the visitor has ticked
+       specific stores in the filter UI, those stores bypass the
+       country reachability check entirely. */
+    if (explicitlyFilteredStores && explicitlyFilteredStores.size > 0 && explicitlyFilteredStores.has(d.storeId)) {
+      return true;
+    }
     /* PRIMARY signal: DB-authoritative storeCountry when present.
        The /deals 3-pass RPC populates this field on every row from
        stores.country (migration 0038 wired it through, migration 0037
