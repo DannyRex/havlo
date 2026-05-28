@@ -81,9 +81,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
      post's publishedAt so unchanged posts don't churn. */
   const blogPostRoutes: MetadataRoute.Sitemap = posts.flatMap((post) => {
     const targets = !post.countries || post.countries.length === 0
-      ? COUNTRIES.map((c) => c.code)
+      ? ACTIVE_COUNTRIES.map((c) => c.code)
       : post.countries.includes("all")
-        ? COUNTRIES.map((c) => c.code)
+        ? ACTIVE_COUNTRIES.map((c) => c.code)
         : post.countries;
     return targets.map((c) => ({
       url:             `${SITE_URL}/${c}/blog/${post.slug}`,

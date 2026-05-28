@@ -19,19 +19,19 @@ interface Props {
   onChange: (slug: string) => void;
 }
 
+/* Mobile: single-row horizontal scroll (no-scrollbar + swipe).
+   Desktop: wrap onto multiple rows so every category is reachable
+   without horizontal scroll - which mouse-only desktop users can't
+   easily trigger (no horizontal scroll-wheel gesture, hidden
+   scrollbar). User report (May 2026): "on desktop in deals page,
+   the categories pills are truncated and there's no way to scroll
+   to reveal the ones at the right." The sm:flex-wrap +
+   sm:overflow-visible pair disables the horizontal scroll container
+   at sm+ and lets the pills naturally wrap. gap-y-2 gives the
+   wrapped rows a sensible vertical rhythm. */
 export default function CategoryNav({ active, onChange }: Props) {
   const { country } = useCountry();
   return (
-    {/* Mobile: single-row horizontal scroll (no-scrollbar + swipe).
-        Desktop: wrap onto multiple rows so every category is reachable
-        without horizontal scroll, which mouse-only desktop users can't
-        easily trigger (no horizontal scroll-wheel gesture, hidden
-        scrollbar). User report (May 2026): "on desktop in deals page,
-        the categories pills are truncated and there's no way to scroll
-        to reveal the ones at the right." The sm:flex-wrap +
-        sm:overflow-visible pair disables the horizontal scroll
-        container at sm+ and lets the pills naturally wrap. gap-y-2
-        gives the wrapped rows a sensible vertical rhythm. */}
     <div className="flex gap-1.5 sm:gap-y-2 overflow-x-auto sm:overflow-visible sm:flex-wrap no-scrollbar -mx-1 px-1">
       {categories.map((cat, i) => {
         const isActive = active === cat.slug;
