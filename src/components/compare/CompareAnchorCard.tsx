@@ -32,7 +32,6 @@ import {
   isCrossBorderForUser,
 } from "@/lib/landed-price";
 import { isOfferAllowedForCountry } from "@/lib/country";
-import { toAbsoluteMerchantUrl } from "@/lib/pdp-url";
 import { trackClick } from "@/lib/trackClick";
 import StoreLogo from "@/components/compare/StoreLogo";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
@@ -178,50 +177,29 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                   : null;
                 const deliveryDays = effectiveDeliveryDays(offer, country);
                 const isXBorder    = isCrossBorderForUser(offer, country);
-                /* Country-reachability gate.
-                   ─────────────────────────────────────────────────
-                   May 2026 bug: clicking BackMarket / 93mobiles /
-                   FoneZone / refurbed-de etc. on /ng/compare silently
-                   redirected to the cheapest NG-allowed store's PDP
-                   (Jumia). The "Visit X" CTA on the destination then
-                   contradicted the store name the user clicked.
-
-                   Root cause: those stores aren't in NG's cross-
-                   border allowlist (see COUNTRY_CROSS_BORDER.ng in
-                   src/lib/country.ts) because they don't realistically
-                   ship to NG. The PDP redirected for safety, but the
-                   compare row was still showing them as clickable
-                   like any other store — worst-of-both UX.
-
-                   Fix: for non-shoppable-from-this-country offers,
-                   bypass the PDP click model and route directly to
-                   the merchant URL via /api/go (so click tracking
-                   still fires). The row also gets a clearer
-                   "External · doesn't ship here" indicator (handled
-                   by the existing Cross-border chip + a small
-                   `target=_blank` on the anchor below).
-
-                   PDP click model preserved for stores that ARE
-                   country-allowed — unchanged behaviour for Jumia,
-                   Konga, Slot, Amazon UK (via cross-border), etc. */
+                /* Country-reachability flag — drives the cross-border
+                   chip label (informational) but no longer affects
+                   click routing. EVERY row routes to /p/<offerId>
+                   regardless of country-shoppability so the user's
+                   click goes to the store they actually clicked.
+                   The PDP renders a clear cross-border banner when
+                   the offer's store isn't country-allowed and lets
+                   the user see both the price they came for and any
+                   local alternative side-by-side. See the PDP page
+                   handler (no silent redirect for cross-border) in
+                   src/app/[country]/p/[id]/page.tsx. */
                 const isShoppableHere = isOfferAllowedForCountry(offer, country);
-                const rowHref = isShoppableHere
-                  ? pdpUrlForOffer(country.code, offer)
-                  : `/api/go?url=${encodeURIComponent(toAbsoluteMerchantUrl(offer.url))}&store=${encodeURIComponent(offer.storeId)}`;
                 return (
                   <li key={`${offer.storeId}-${offer.price}-${i}`}>
                     {/* Whole row is the click target — Spoken pattern.
-                        For country-shoppable stores routes to PDP
-                        (consistent with /deals, TrendingDeals, the
-                        PDP "You may also like" rail). For non-
-                        shoppable stores routes directly to the
-                        merchant via /api/go so the user gets where
-                        they expected to go (or doesn't waste a click
-                        on a store that can't deliver). */}
+                        Routes to the PDP for this offer, not directly
+                        outbound. PDP-first click model is consistent
+                        across /deals, TrendingDeals, the PDP "You may
+                        also like" rail, and this anchor row.
+                        pdpUrlForOffer falls back to /p/live for
+                        synthetic offers. */}
                     <a
-                      href={rowHref}
-                      target={isShoppableHere ? undefined : "_blank"}
-                      rel={isShoppableHere ? undefined : "noopener nofollow"}
+                      href={pdpUrlForOffer(country.code, offer)}
                       onClick={() => trackClick(anchor.key, query, i, "anchor-comparison")}
                       className={`group flex items-center gap-3 p-3 rounded-xl border transition-all ${
                         isBest

@@ -312,38 +312,64 @@ export default async function ProductPage({ params }: PageProps) {
        (Nokia 3310 at onbuy, country=UK in DB but not in JS roster). */
     storeCountry:    offer.store_country ?? null,
   };
-  if (!isOfferAllowedForCountry(anchorAsOfferLike, country)) {
-    /* Same-product pool first (strongest signal: literally the same
-       SKU at a different store). Sorted by price ascending — the
-       redirect should land the visitor on the BEST in-market deal
-       for this product, not just any in-market deal.
+  /* Cross-border / not-locally-shoppable detection.
+     ─────────────────────────────────────────────────────────────
+     Was previously a SILENT REDIRECT — when the visited offer's
+     store wasn't in the visitor's country allowlist (BackMarket /
+     93mobiles / FoneZone / refurbed-de etc. on /ng/...), the page
+     bounced to the cheapest locally-shoppable alternative. The
+     destination's CTA then read "Visit Jumia" even though the
+     user had clicked "BackMarket" upstream — user-reported UX bug
+     because the redirect happened with no explanation.
 
-       EXCLUDE the current offer.id from candidates: if the recovery
-       finds the same offer we just rejected as the "alternative",
-       we'd redirect to the same URL → infinite loop. Re-audit
-       symptom on /uk/p/661bbc27... before this guard. */
+     New approach (May 2026 v4): NEVER silently redirect away from
+     a clicked offer. Always render the PDP for the offer the user
+     actually clicked, so the "Visit X" CTA matches the store label
+     they came from. Compute the country-appropriate alternative
+     (if any) as a `localAlternative` value passed to ProductHero,
+     which renders a context banner: "BackMarket doesn't ship to
+     Nigeria — same product at Jumia for ₦850,000 →"
+
+     Hard 404 fallback only when there's NO alternative AND the
+     offer's data is structurally broken (no URL, no store name,
+     etc.). Cross-border-but-data-intact offers stay rendered with
+     the banner.
+
+     The redirect's original purpose (prevent users landing on a
+     PDP whose outbound CTA can't deliver) is preserved by the
+     banner — the user gets the warning AND the local alternative
+     AND retains the freedom to click through to the original store
+     if they have a freight forwarder. */
+  const isLocallyShoppable = isOfferAllowedForCountry(anchorAsOfferLike, country);
+  let localAlternative: { offerId: string; storeName: string; price: number; url: string } | null = null;
+  if (!isLocallyShoppable) {
     const sameProduct = anchorOffers
       .filter((o) => o.offerId && o.offerId !== offer.offer_id)
       .filter((o) => isOfferAllowedForCountry(o, country))
       .sort((a, b) => a.price - b.price);
-    if (sameProduct.length > 0) {
-      redirect(`/${country.code}/p/${sameProduct[0].offerId}`);
+    const broaderMatch = sameProduct.length === 0
+      ? dupes
+          .flatMap((d) => d.offers)
+          .filter((o) => o.offerId && o.offerId !== offer.offer_id)
+          .filter((o) => isOfferAllowedForCountry(o, country))
+          .sort((a, b) => a.price - b.price)
+      : [];
+    const alt = sameProduct[0] ?? broaderMatch[0] ?? null;
+    if (alt) {
+      localAlternative = {
+        offerId:   alt.offerId,
+        storeName: alt.storeName,
+        price:     alt.price,
+        url:       `/${country.code}/p/${alt.offerId}`,
+      };
     }
-    /* Fall back to broader dupes — covers curated rows whose
-       product_id wouldn't match anchorOffers' UUID lookup. Same
-       self-exclude rule. */
-    const broaderMatch = dupes
-      .flatMap((d) => d.offers)
-      .filter((o) => o.offerId && o.offerId !== offer.offer_id)
-      .filter((o) => isOfferAllowedForCountry(o, country))
-      .sort((a, b) => a.price - b.price);
-    if (broaderMatch.length > 0) {
-      redirect(`/${country.code}/p/${broaderMatch[0].offerId}`);
+    /* No alternative AND offer data is structurally broken → hard
+       404 fallback (no merchant URL at all means the "Visit X" CTA
+       would be a dead link). Cross-border WITH a real merchant URL
+       always renders. */
+    if (!localAlternative && (!offer.url || offer.url.trim().length === 0)) {
+      redirect(`/${country.code}/deals`);
     }
-    /* No country-appropriate alternative anywhere — better to
-       send the visitor back to /deals than render a CTA they
-       can't use. */
-    redirect(`/${country.code}/deals`);
   }
 
   /* Drop dupe-offers from stores that aren't appropriate for the
@@ -807,6 +833,15 @@ export default async function ProductPage({ params }: PageProps) {
           totalStores={totalStores}
           perStoreOffers={perStoreOffers}
           priceHistory={priceHistorySummary}
+          /* Cross-border context — renders an above-hero banner when
+             the visited offer's store doesn't ship to the visitor's
+             country. Replaces the previous silent-redirect behaviour
+             that confused users (BackMarket click → Jumia PDP).
+             localAlternative is null when the catalog has no in-
+             country equivalent — the banner still renders without
+             the "View local price" CTA in that case. */
+          isLocallyShoppable={isLocallyShoppable}
+          localAlternative={localAlternative}
         />
 
         {dupesForRail.length > 0 ? (

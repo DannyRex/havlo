@@ -87,6 +87,23 @@ interface Props {
       lowest" callouts on the bar. Undefined when product_price_history
       RPC is unavailable or the product has no history rows yet. */
   priceHistory?: PriceHistorySummary;
+  /** Cross-border context banner. When the visited offer's store
+      isn't shoppable from the visitor's country, this banner
+      surfaces a warning ("Doesn't ship to NG") and links to the
+      best locally-shoppable alternative if one exists. Replaces
+      the previous silent redirect that was confusing users — see
+      the comment in /[country]/p/[id]/page.tsx where this is
+      computed. Undefined for normal in-country offers. */
+  localAlternative?: {
+    offerId:   string;
+    storeName: string;
+    price:     number;
+    url:       string;
+  } | null;
+  /** Whether the visited offer's store IS shoppable from the
+      visitor's country. Only relevant when localAlternative is
+      surfaced — drives the banner's wording. */
+  isLocallyShoppable?: boolean;
 }
 
 /* Convert any price (NGN or USD) to the user's preferred currency.
@@ -106,11 +123,15 @@ function convertToUserCurrency(
   return country.currency === "USD" ? Math.round(out * 100) / 100 : Math.round(out);
 }
 
-export default function ProductHero({ offer, countryCode, totalStores, perStoreOffers, priceHistory, signedOutboundUrl }: Props) {
+export default function ProductHero({ offer, countryCode, totalStores, perStoreOffers, priceHistory, signedOutboundUrl, localAlternative, isLocallyShoppable }: Props) {
   const country = getCountry(countryCode);
   const [imgFailed, setImgFailed] = useState(false);
 
   const cleanedTitle = cleanTitle(offer.title);
+  /* Cross-border banner copy. Only renders when isLocallyShoppable
+     is explicitly false — undefined leaves the banner off (for the
+     vast majority of PDPs where the offer is in-country). */
+  const showCrossBorderBanner = isLocallyShoppable === false;
   /* Normalise the storeName for display — handles raw SerpAPI strings
      like "Amazon.co.uk - Amazon.co.uk-Seller" that escaped ingest-
      time canonicalisation (older DB rows). Pure function, idempotent,
@@ -209,6 +230,38 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
   const savingsAbs  = hasDiscount ? offer.originalPrice - offer.currentPrice : 0;
 
   return (
+    <>
+      {/* Cross-border context banner — only when the visited offer's
+          store doesn't ship to the visitor's country (BackMarket /
+          93mobiles / FoneZone / refurbed-de on NG, etc.). Replaces
+          the old silent redirect (see /[country]/p/[id]/page.tsx
+          comment). Renders ABOVE the hero so the user sees the
+          context BEFORE the price + CTA. When a local alternative
+          exists, the banner doubles as a one-click route to it. */}
+      {showCrossBorderBanner && (
+        <div className="mb-5 sm:mb-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 sm:p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-ink mb-1">
+                {displayStore} doesn&apos;t typically ship to {country.name}
+              </div>
+              <div className="text-xs text-ink-2">
+                {localAlternative
+                  ? <>The same product is available locally at <span className="font-semibold text-ink">{localAlternative.storeName}</span> for <span className="font-semibold text-ink">{formatLocal(localAlternative.price, country)}</span>.</>
+                  : <>You can still see the price and view it externally — just be aware that direct shipping may not be available.</>}
+              </div>
+            </div>
+            {localAlternative && (
+              <a
+                href={localAlternative.url}
+                className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-ink text-bg text-sm font-semibold whitespace-nowrap hover:bg-ink-2 transition-colors"
+              >
+                View local price
+              </a>
+            )}
+          </div>
+        </div>
+      )}
     <section className="grid md:grid-cols-[1fr,minmax(0,1.05fr)] gap-6 sm:gap-10 lg:gap-14">
       {/* ── Image column ─────────────────────────────────────────── */}
       {/* White tile when an image is present so dark products (black
@@ -464,5 +517,6 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
         />
       </div>
     </section>
+    </>
   );
 }
