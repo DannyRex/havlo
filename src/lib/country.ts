@@ -125,10 +125,50 @@ export function usdToLocal(usd: number, country: Country): number {
        on /us/deals show '$' but /ng/deals shows 'NGN'" — that's
        the Intl-engine fallback path. Bypass it.
 
-    USD keeps 2dp (cents), other currencies round to integer NGN/AED/etc.
-    Number formatting uses 'en' separators (commas) so it reads
-    naturally to our English-language users in all markets. */
+    Adaptive abbreviation (May 2026 v2): values ≥ 1,000,000 collapse
+    to a "1.5M" / "12M" form for all currencies. Above that threshold,
+    the full grouping ("₦1,500,000") starts to overflow narrow
+    surfaces (3-column chart tiles on mobile, reference-line chips,
+    deal card mini-prices). NGN/INR/ZAR cross the threshold often
+    and benefit most; USD/GBP/EUR rarely cross it for consumer goods
+    so they stay as full prices. Below 1M, full Intl formatting with
+    grouping separators ("₦150,000", "$1,250.00") — precise and
+    natural reading.
+
+    Use formatLocalExact() when you specifically need full precision
+    regardless of magnitude (chart hover tooltips, anywhere the user
+    is actively investigating a specific number).
+
+    USD keeps 2dp (cents) below 1M, integer above (the M-suffix
+    already implies precision). Other currencies round to integer
+    throughout. Number formatting uses 'en' separators (commas) so
+    it reads naturally to our English-language users in all
+    markets. */
 export function formatLocal(amount: number, country: Country): string {
+  /* Adaptive cutoff. Negative values handled identically (abs the
+     magnitude, prepend the minus). Zero stays as the plain
+     formatted form. */
+  if (Math.abs(amount) >= 1_000_000) {
+    const sign     = amount < 0 ? "-" : "";
+    const millions = Math.abs(amount) / 1_000_000;
+    /* One decimal for 1.0M-9.9M (where the digit carries real
+       information); integer for 10M+ (where the .X reads as
+       noise relative to magnitude). */
+    const body = millions >= 10 ? millions.toFixed(0) : millions.toFixed(1);
+    return `${sign}${country.symbol}${body}M`;
+  }
+  return formatLocalExact(amount, country);
+}
+
+/** Format a value with full precision regardless of magnitude.
+
+    Use when the surface needs the exact number (hover tooltips,
+    delta callouts, anywhere the user is comparing close values).
+    For everything else, prefer `formatLocal` which adapts at ≥ 1M.
+
+    Same symbol-prepended approach as formatLocal — bypasses Intl's
+    currency style for the reasons noted above. */
+export function formatLocalExact(amount: number, country: Country): string {
   const isUsd = country.currency === "USD";
   const body = new Intl.NumberFormat("en", {
     style:                 "decimal",

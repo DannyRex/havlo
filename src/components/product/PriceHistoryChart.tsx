@@ -41,7 +41,7 @@ import {
   useCallback, useEffect, useId, useLayoutEffect,
   useMemo, useRef, useState,
 } from "react";
-import { formatPriceForUser, timeAgo } from "@/lib/utils";
+import { formatPriceForUser, formatPriceForUserExact, timeAgo } from "@/lib/utils";
 import type { Country } from "@/lib/country";
 import type { PriceHistoryPoint } from "@/lib/search/price-history";
 import {
@@ -495,7 +495,11 @@ export default function PriceHistoryChart({
             {hover.deltaFromLow !== null && (
               <div className={`text-[10px] mt-1 leading-none tabular-nums ${hover.deltaFromLow > 0 ? "text-ink-3" : "text-success"}`}>
                 {hover.deltaFromLow > 0
-                  ? `+${formatPriceForUser(hover.deltaFromLow, country)} above lowest`
+                  /* Exact format for the delta — see the buildHoverState
+                     comment. The user is comparing close values and a
+                     ≥ 1M adaptive form would collapse small deltas to
+                     "+₦0.0M". */
+                  ? `+${formatPriceForUserExact(hover.deltaFromLow, country)} above lowest`
                   : "Lowest in window"}
               </div>
             )}
@@ -980,7 +984,12 @@ function buildHoverState(
   const x   = geom.xs[idx];
   const y   = geom.ys[idx];
   const dl  = dateFmt.format(new Date(p.day));
-  const pl  = formatPriceForUser(p.minPriceNgn, country);
+  /* formatPriceForUserExact (not formatPriceForUser) because the
+     tooltip is the surface where the user is actively inspecting
+     a specific number. The adaptive ≥ 1M abbreviation in
+     formatLocal would collapse "₦1,520,000" to "₦1.5M" — dropping
+     the variance that the chart's whole job is to surface. */
+  const pl  = formatPriceForUserExact(p.minPriceNgn, country);
   const dfl = p.minPriceNgn > geom.lowestNgn
     ? p.minPriceNgn - geom.lowestNgn
     : 0;

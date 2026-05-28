@@ -414,7 +414,7 @@ export function formatCompact(amount: number): string {
    Imported lazily to avoid pulling country.ts into utils.ts which
    doesn't otherwise depend on it. */
 import type { Country } from "@/lib/country";
-import { USD_FX, formatLocal } from "@/lib/country";
+import { USD_FX, formatLocal, formatLocalExact } from "@/lib/country";
 
 /* Format a price for the visitor's currency.
 
@@ -448,23 +448,45 @@ export function formatPriceForUser(
   country:        Country,
   sourceCurrency: "NGN" | "USD" = "NGN",
 ): string {
-  const sameCurrency = country.currency === sourceCurrency;
-  if (sameCurrency) {
-    return formatLocal(amount, country);
-  }
-
-  /* Convert source → USD intermediate → target. When source IS
-     USD, the first step is a pass-through. */
-  const amountUsd = sourceCurrency === "USD"
-    ? amount
-    : amount / USD_FX[sourceCurrency];
-  const target = amountUsd * USD_FX[country.currency];
+  const target = convertForUser(amount, country, sourceCurrency);
   /* No Math.round here — formatLocal hands off to Intl.NumberFormat
      with the right fraction-digit settings per currency, so the
      final rounding happens at display time on the floating value.
      Avoids the double-round bug where Math.round(0.499 * 1.0) = 0
      but Intl.format(0.499) with 2 fraction digits → "0.50". */
   return formatLocal(target, country);
+}
+
+/* Exact-precision counterpart to formatPriceForUser. Use when the
+   surface needs the full number regardless of magnitude — chart
+   hover tooltips, delta callouts on close values, anywhere the
+   user is actively investigating a specific datum. formatLocal's
+   ≥ 1M adaptive abbreviation would drop precision exactly when
+   the user needs it most. */
+export function formatPriceForUserExact(
+  amount:         number,
+  country:        Country,
+  sourceCurrency: "NGN" | "USD" = "NGN",
+): string {
+  const target = convertForUser(amount, country, sourceCurrency);
+  return formatLocalExact(target, country);
+}
+
+/* Shared conversion path. Avoids duplicating the
+   source-currency-aware math between the adaptive + exact
+   formatters. */
+function convertForUser(
+  amount:         number,
+  country:        Country,
+  sourceCurrency: "NGN" | "USD",
+): number {
+  if (country.currency === sourceCurrency) return amount;
+  /* Convert source → USD intermediate → target. When source IS
+     USD, the first step is a pass-through. */
+  const amountUsd = sourceCurrency === "USD"
+    ? amount
+    : amount / USD_FX[sourceCurrency];
+  return amountUsd * USD_FX[country.currency];
 }
 
 export function savings(original: number, sale: number): number {
