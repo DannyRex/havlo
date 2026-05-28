@@ -31,6 +31,8 @@ import {
   anyCrossBorderForUser,
   isCrossBorderForUser,
 } from "@/lib/landed-price";
+import { isOfferAllowedForCountry } from "@/lib/country";
+import { toAbsoluteMerchantUrl } from "@/lib/pdp-url";
 import { trackClick } from "@/lib/trackClick";
 import StoreLogo from "@/components/compare/StoreLogo";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
@@ -176,17 +178,50 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                   : null;
                 const deliveryDays = effectiveDeliveryDays(offer, country);
                 const isXBorder    = isCrossBorderForUser(offer, country);
+                /* Country-reachability gate.
+                   ─────────────────────────────────────────────────
+                   May 2026 bug: clicking BackMarket / 93mobiles /
+                   FoneZone / refurbed-de etc. on /ng/compare silently
+                   redirected to the cheapest NG-allowed store's PDP
+                   (Jumia). The "Visit X" CTA on the destination then
+                   contradicted the store name the user clicked.
+
+                   Root cause: those stores aren't in NG's cross-
+                   border allowlist (see COUNTRY_CROSS_BORDER.ng in
+                   src/lib/country.ts) because they don't realistically
+                   ship to NG. The PDP redirected for safety, but the
+                   compare row was still showing them as clickable
+                   like any other store — worst-of-both UX.
+
+                   Fix: for non-shoppable-from-this-country offers,
+                   bypass the PDP click model and route directly to
+                   the merchant URL via /api/go (so click tracking
+                   still fires). The row also gets a clearer
+                   "External · doesn't ship here" indicator (handled
+                   by the existing Cross-border chip + a small
+                   `target=_blank` on the anchor below).
+
+                   PDP click model preserved for stores that ARE
+                   country-allowed — unchanged behaviour for Jumia,
+                   Konga, Slot, Amazon UK (via cross-border), etc. */
+                const isShoppableHere = isOfferAllowedForCountry(offer, country);
+                const rowHref = isShoppableHere
+                  ? pdpUrlForOffer(country.code, offer)
+                  : `/api/go?url=${encodeURIComponent(toAbsoluteMerchantUrl(offer.url))}&store=${encodeURIComponent(offer.storeId)}`;
                 return (
                   <li key={`${offer.storeId}-${offer.price}-${i}`}>
                     {/* Whole row is the click target — Spoken pattern.
-                        Routes to the PDP for this offer, not directly
-                        outbound. PDP-first click model is consistent
-                        across /deals, TrendingDeals, the PDP "You may
-                        also like" rail, and this anchor row.
-                        pdpUrlForOffer falls back to /p/live for
-                        synthetic offers. */}
+                        For country-shoppable stores routes to PDP
+                        (consistent with /deals, TrendingDeals, the
+                        PDP "You may also like" rail). For non-
+                        shoppable stores routes directly to the
+                        merchant via /api/go so the user gets where
+                        they expected to go (or doesn't waste a click
+                        on a store that can't deliver). */}
                     <a
-                      href={pdpUrlForOffer(country.code, offer)}
+                      href={rowHref}
+                      target={isShoppableHere ? undefined : "_blank"}
+                      rel={isShoppableHere ? undefined : "noopener nofollow"}
                       onClick={() => trackClick(anchor.key, query, i, "anchor-comparison")}
                       className={`group flex items-center gap-3 p-3 rounded-xl border transition-all ${
                         isBest
@@ -220,10 +255,19 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                               isInternational DB flag, so a UK retailer
                               doesn't carry the tag for a UK user even
                               though the row was ingested USD-normalised.
-                              Same fix shape as DupeCard / MasonryCard. */}
+                              Same fix shape as DupeCard / MasonryCard.
+
+                              For NON-SHOPPABLE-from-country stores
+                              (BackMarket / refurbed-de / fonezone /
+                              bigbasket / 93mobiles on NG, etc.) we
+                              swap the label to "External" so users
+                              don't misread "Cross-border" as "yes I
+                              can buy this with a freight forwarder".
+                              The row routes directly outbound for
+                              these stores (see rowHref above). */}
                           {isXBorder && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-500 shrink-0">
-                              <Plane size={10} /> Cross-border
+                            <span className={`inline-flex items-center gap-0.5 text-[10px] shrink-0 ${isShoppableHere ? "text-amber-500" : "text-ink-3"}`}>
+                              <Plane size={10} /> {isShoppableHere ? "Cross-border" : "External"}
                             </span>
                           )}
                         </div>
