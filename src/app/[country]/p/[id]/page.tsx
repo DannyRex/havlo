@@ -38,6 +38,7 @@ import { isOfferAllowedForCountry, filterDealsForCountry } from "@/lib/country";
 import { computeAnchorStats } from "@/lib/pdp-stats";
 import { fetchProductPriceHistory, rollupPriceHistory } from "@/lib/search/price-history";
 import { partitionDupesByVariantMatch, variantOffers } from "@/lib/search/variant-pooling";
+import { partitionDupesByVariantMatchDeep } from "@/lib/search/variant-pooling-deep";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
 import { usdToNgn } from "@/lib/utils";
 import { getActiveBrowseProvider } from "@/lib/providers";
@@ -644,15 +645,32 @@ export default async function ProductPage({ params }: PageProps) {
      filters drop. Anchor-removal isn't needed here because the
      anchor's own product_id was already excluded by pgFtsFindDupes
      pre-filter. */
-  const partition = partitionDupesByVariantMatch(
-    /* family threads through to the gate so fashion / beauty / home
-       get their family-conditional loosenings (wider price band,
-       lenient size matching). category_slug from the products row
-       is the authoritative source — falls back to title-detection
-       inside the gate when null. */
-    { title: offer.title, brand: offer.brand, priceNgn: anchorPriceNgn, family: offer.category_slug ?? null },
-    countryFilteredDupes,
-  );
+  /* DEEP path (Phases 2/3/4) when product_id is known. Routes the
+     partition through image-phash + title-embedding + LLM-judge fast-
+     paths via partitionDupesByVariantMatchDeep. Sync fallback when
+     anchor has no products row (synthetic / live PDP).
+
+     family threads through to the gate so fashion / beauty / home
+     get their family-conditional loosenings (wider price band,
+     lenient size matching). category_slug from the products row
+     is the authoritative source — falls back to title-detection
+     inside the gate when null.
+
+     Cost on the happy path: 1 extra bulk SELECT (~50-100ms) for the
+     anchor + every dupe's enrichment. Cold-cache LLM consultations
+     add ~200-500ms each but only fire in the JUDGE_BAND (0.55-0.85)
+     and cache forever in match_decisions. */
+  const supaForDeepPartition = offer.product_id ? getSupabaseAdmin() : null;
+  const partition = supaForDeepPartition && offer.product_id
+    ? await partitionDupesByVariantMatchDeep(
+        supaForDeepPartition,
+        { id: offer.product_id, title: offer.title, brand: offer.brand, priceNgn: anchorPriceNgn, family: offer.category_slug ?? null },
+        countryFilteredDupes,
+      )
+    : partitionDupesByVariantMatch(
+        { title: offer.title, brand: offer.brand, priceNgn: anchorPriceNgn, family: offer.category_slug ?? null },
+        countryFilteredDupes,
+      );
   const augmentedAnchorOffers = [
     ...anchorOffers,
     ...variantOffers(partition.likelyVariants),

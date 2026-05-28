@@ -20,6 +20,7 @@ import { usdToNgn } from "@/lib/utils";
 import { isUsableMerchantUrl } from "@/lib/url-helpers";
 import { resolveStoreLogoUrl } from "@/lib/store-logo";
 import { partitionDupesByVariantMatch, variantOffers } from "./variant-pooling";
+import { partitionDupesByVariantMatchDeep } from "./variant-pooling-deep";
 import type {
   SearchOutput, ProductGroup, StoreOffer, DupeResult, SearchSuggestion,
 } from "./index";
@@ -1100,11 +1101,31 @@ export async function pgFtsFindByProductId(
      The same partition runs PDP-side in /[country]/p/[id]/page.tsx
      against fetchDupesCached. Doing it here on the BROAD set keeps
      /compare's anchor section consistent with the PDP CTA's count
-     promise. */
-  const partition = partitionDupesByVariantMatch(
-    { title: anchor.title, brand: anchor.brand, priceNgn: anchor.bestPrice },
-    broadDupes,
-  );
+     promise.
+
+     DEEP path (Phases 2/3/4) — when we have a Supabase handle and a
+     real product_id (anchor.key is the products.id for the by-id
+     path), route the partition through the deep variant that
+     consults image-phash, title-embedding, and the LLM judge as
+     fast-paths BEFORE the lexical gates. The deep variant gracefully
+     downgrades to the sync path if the enrichment fetch fails.
+
+     For the synthetic-key path (anchor.key is a signature like
+     "apple|iphone 15" rather than a UUID) we keep the sync path —
+     the bulk SELECT would just return nothing for the anchor since
+     the key isn't a real product_id. */
+  const supaForDeep = getSupabaseAdmin();
+  const anchorIsRealId = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(anchor.key);
+  const partition = supaForDeep && anchorIsRealId
+    ? await partitionDupesByVariantMatchDeep(
+        supaForDeep,
+        { id: anchor.key, title: anchor.title, brand: anchor.brand, priceNgn: anchor.bestPrice },
+        broadDupes,
+      )
+    : partitionDupesByVariantMatch(
+        { title: anchor.title, brand: anchor.brand, priceNgn: anchor.bestPrice },
+        broadDupes,
+      );
   const augmentedOffers = [
     ...anchor.offers,
     ...variantOffers(partition.likelyVariants),

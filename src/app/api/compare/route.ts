@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { searchByKey } from "@/lib/search";
 import { pgFtsFindSimilar, pgFtsFindByProductId, pgFtsFindDupes } from "@/lib/search/pg-fts";
 import { partitionDupesByVariantMatch, variantOffers } from "@/lib/search/variant-pooling";
+import { partitionDupesByVariantMatchDeep } from "@/lib/search/variant-pooling-deep";
+import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { getServerCountry } from "@/lib/country-server";
 import { getCountry, isOfferAllowedForCountry, COUNTRIES } from "@/lib/country";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
@@ -130,11 +132,31 @@ async function synthesizeAnchorFromOfferRow(row: OfferRow): Promise<SearchOutput
   /* Partition: same-product variants fold into the anchor's
      offers; truly different products stay in the rail. Mirrors
      pgFtsFindByProductId so /compare's anchor count is consistent
-     between DB-resolved and synthesised paths. */
-  const partition = partitionDupesByVariantMatch(
-    { title: row.title, brand: row.brand, priceNgn: visitingOffer.landedPrice },
-    dupes,
-  );
+     between DB-resolved and synthesised paths.
+
+     DEEP path (Phases 2/3/4): when product_id is known we route
+     through partitionDupesByVariantMatchDeep so the partition can
+     consult image-phash + title-embedding + LLM-judge fast-paths.
+     The anchor's row needs an id for the bulk enrichment fetch; if
+     product_id is missing (synthesised-only anchor with no products
+     row yet) we fall back to the sync path so this endpoint never
+     blocks the user on missing DB data.
+
+     Cost: ~50-100ms extra (one bulk SELECT for enrichment) on the
+     happy path; ~200-500ms more per ambiguous-band judge call on
+     cold cache (warms forever). Hidden behind DEEP_MATCH=1 env so
+     it can be A/B'd in production. */
+  const supaDeep = row.product_id ? getSupabaseAdmin() : null;
+  const partition = supaDeep && row.product_id
+    ? await partitionDupesByVariantMatchDeep(
+        supaDeep,
+        { id: row.product_id, title: row.title, brand: row.brand, priceNgn: visitingOffer.landedPrice },
+        dupes,
+      )
+    : partitionDupesByVariantMatch(
+        { title: row.title, brand: row.brand, priceNgn: visitingOffer.landedPrice },
+        dupes,
+      );
   const rawAugmented = [visitingOffer, ...variantOffers(partition.likelyVariants)];
 
   /* Dedupe by (storeId, rounded landed price) — same logic as the
