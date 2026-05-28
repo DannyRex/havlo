@@ -123,9 +123,21 @@ async function main() {
   let totalErrors = 0;
   const startMs = Date.now();
 
+  /* SerpAPI's google_shopping engine doesn't support 'ng' as a
+     country (returns "Country 'ng' not supported - falling back to
+     us"). NG zero-result queries get routed through the dedicated
+     search-ng-merchant-serpapi provider on the regular cron path,
+     so we skip them here to avoid double-fetching with wrong
+     country tagging. */
+  const SHOPPING_SUPPORTED = new Set(["us", "uk", "de", "in", "ae", "za"]);
+
   for (let i = 0; i < queries.length; i++) {
     const q = queries[i];
     const country = q.country ?? DEFAULT_COUNTRY;
+    if (!SHOPPING_SUPPORTED.has(country)) {
+      console.log(`  ${i + 1}/${queries.length} [${country}] SKIP "${q.query.slice(0, 40)}" — google_shopping doesn't support this market`);
+      continue;
+    }
     const sourceQuery = `zero-result-backfill:${country}:${q.query}`;
     try {
       const deals = await serpapi.searchDeals({
@@ -140,7 +152,8 @@ async function main() {
            searching for the product itself, not a deal. */
         mode:        "market",
       });
-      const result = await ingestDeals(deals, serpapi.id, sourceQuery);
+      /* ingestDeals signature: (sourceProvider, sourceQuery, deals). */
+      const result = await ingestDeals(serpapi.id, sourceQuery, deals);
       totalFetched += result.fetched;
       totalUpserted += result.upserted;
       totalErrors += result.errors.length;

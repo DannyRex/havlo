@@ -157,6 +157,17 @@ const TRENDING_BY_COUNTRY: Record<string, string[]> = {
   ],
 };
 
+/* SerpAPI's google_shopping engine doesn't accept "ng" — auto-falls
+   back to "us" and tags the resulting offers wrong. Skip NG for this
+   path; NG-targeted ingest lives in search-ng-merchant-serpapi (which
+   uses google_organic engine) and runs through ingest-providers.ts.
+
+   The trending list for NG above is intentionally KEPT (commented-out
+   entry below is wrong — we DO ingest NG-popular products, but via
+   UK / US / AE markets which carry many of the same SKUs and have
+   freight-forwarder routes NG shoppers actually use). */
+const SHOPPING_SUPPORTED = new Set(["us", "uk", "de", "in", "ae", "za"]);
+
 async function main() {
   const providers = await getActiveSearchProviders();
   const serpapi = providers.find((p) => p.id === "serpapi-shopping");
@@ -165,11 +176,16 @@ async function main() {
     process.exit(1);
   }
 
-  const countries = ONLY_COUNTRY
+  const requested = ONLY_COUNTRY
     ? (TRENDING_BY_COUNTRY[ONLY_COUNTRY] ? [ONLY_COUNTRY] : [])
     : Object.keys(TRENDING_BY_COUNTRY);
+  const countries = requested.filter((c) => SHOPPING_SUPPORTED.has(c));
+  const skipped   = requested.filter((c) => !SHOPPING_SUPPORTED.has(c));
+  if (skipped.length > 0) {
+    console.log(`Skipping ${skipped.join(",")} — google_shopping doesn't support these markets. NG-targeted ingest runs via search-ng-merchant-serpapi on the regular cron.`);
+  }
   if (countries.length === 0) {
-    console.error(`No trending list for country=${ONLY_COUNTRY}`);
+    console.error(`No supported countries left after filter (requested=${requested.join(",")})`);
     process.exit(1);
   }
 
@@ -204,7 +220,8 @@ async function main() {
           limit:       20,
           mode:        "market",
         });
-        const r = await ingestDeals(deals, serpapi.id, sourceQuery);
+        /* ingestDeals signature: (sourceProvider, sourceQuery, deals). */
+        const r = await ingestDeals(serpapi.id, sourceQuery, deals);
         totalFetched  += r.fetched;
         totalUpserted += r.upserted;
         totalErrors   += r.errors.length;
