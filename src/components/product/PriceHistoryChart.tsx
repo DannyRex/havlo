@@ -424,18 +424,33 @@ export default function PriceHistoryChart({
           )}
 
           {/* X-axis date labels */}
-          {geom.axisTicks.map((t, i) => (
-            <text
-              key={`tick-${i}`}
-              x={t.x}
-              y={CHART_HEIGHT - 8}
-              textAnchor={i === 0 ? "start" : i === geom.axisTicks.length - 1 ? "end" : "middle"}
-              className="fill-ink-3"
-              style={{ fontSize: 10, fontVariantNumeric: "tabular-nums" }}
-            >
-              {t.label}
-            </text>
-          ))}
+          {geom.axisTicks.map((t, i) => {
+            /* textAnchor:
+                 - single tick (1-point chart): centre on the tick x
+                   so the label sits in the middle of the chart.
+                 - multi-tick: pin first to the left edge, last to
+                   the right edge, intermediates centred. Keeps end
+                   labels from overflowing past the chart box. */
+            const isOnly  = geom.axisTicks.length === 1;
+            const isFirst = !isOnly && i === 0;
+            const isLast  = !isOnly && i === geom.axisTicks.length - 1;
+            const anchor: "start" | "end" | "middle" =
+              isFirst ? "start" :
+              isLast  ? "end"   :
+                        "middle";
+            return (
+              <text
+                key={`tick-${i}`}
+                x={t.x}
+                y={CHART_HEIGHT - 8}
+                textAnchor={anchor}
+                className="fill-ink-3"
+                style={{ fontSize: 10, fontVariantNumeric: "tabular-nums" }}
+              >
+                {t.label}
+              </text>
+            );
+          })}
         </svg>
 
         {/* Reference-line label — HTML overlay positioned at the
@@ -856,23 +871,40 @@ function computeGeometry(points: PriceHistoryPoint[], width: number): Geometry {
     ? `M ${xs[0].toFixed(2)} ${ys[0].toFixed(2)} L ${xs[0].toFixed(2)} ${areaBottom} Z`
     : `${pathD} L ${xs[xs.length - 1].toFixed(2)} ${areaBottom} L ${xs[0].toFixed(2)} ${areaBottom} Z`;
 
-  /* Axis ticks — 3-4 dates evenly spaced across the window. The
-     single-point case gets exactly one tick (otherwise the even-
-     spacing formula collapses all three labels onto the same x
-     coordinate and they render on top of each other). */
+  /* Axis ticks — up to 4 dates evenly spaced across the window.
+
+     Sparse-data gotcha (May 2026 mobile screenshot): when the
+     point count is below the tick count, the even-spacing formula
+     produces DUPLICATE indices. Example with points.length=2 and
+     tickCount=3: indices come out [0, round(0.5), round(1.0)] →
+     [0, 1, 1] because Math.round breaks ties toward positive
+     infinity. The last two ticks then land at the same x with
+     different textAnchor values ("middle" + "end"), rendering as
+     overlapping date labels like "MayMay 27" on the right edge.
+
+     Dedup by index handles every degenerate case:
+       N=1 → [0]                              (one tick)
+       N=2 → [0, 1]                            (two ticks, first + last)
+       N=3 → [0, 1, 2]                         (three unique)
+       N≥4 with tickCount=3 → 3 unique well-spaced
+       N≥30 with tickCount=4 → 4 unique well-spaced
+
+     Iterates the same evenly-spaced indices as before, but skips
+     any that already appeared. The remaining axisTicks array has
+     at most `tickCount` entries, all at distinct x positions. */
   const fmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
   const axisTicks: { x: number; label: string }[] = [];
-  if (points.length === 1) {
-    axisTicks.push({ x: xs[0], label: fmt.format(new Date(points[0].day)) });
-  } else {
-    const tickCount = points.length >= 30 ? 4 : 3;
-    for (let t = 0; t < tickCount; t++) {
-      const idx = Math.round((t / (tickCount - 1)) * (points.length - 1));
-      axisTicks.push({
-        x:     xs[idx],
-        label: fmt.format(new Date(points[idx].day)),
-      });
-    }
+  const seenIdx = new Set<number>();
+  const tickCount = points.length >= 30 ? 4 : 3;
+  for (let t = 0; t < tickCount; t++) {
+    const denom = Math.max(tickCount - 1, 1);
+    const idx = Math.round((t / denom) * (points.length - 1));
+    if (seenIdx.has(idx)) continue;
+    seenIdx.add(idx);
+    axisTicks.push({
+      x:     xs[idx],
+      label: fmt.format(new Date(points[idx].day)),
+    });
   }
 
   return {
