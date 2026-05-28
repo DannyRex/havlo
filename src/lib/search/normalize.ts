@@ -29,6 +29,11 @@ const BRANDS = [
   "oppo", "vivo", "realme", "oneplus", "google", "huawei", "honor", "nokia",
   "hisense", "tcl", "lg", "sony", "panasonic", "philips", "polystar", "scanfrost",
   "haier", "thermocool", "syinix", "skyrun", "midea", "sharp",
+  /* TV-hardware brands added May 28 2026 after the signature-leak
+     audit found Skyworth, Nexus, Vitron, Bruhm in PayPorte / Slot
+     TV listings being misattributed to "google" (the OS brand) when
+     no hardware brand was recognised. */
+  "skyworth", "nexus", "vitron", "bruhm",
   "hp", "dell", "lenovo", "asus", "acer", "msi", "razer", "macbook",
   "microsoft", "surface", "ipad",
   "jbl", "bose", "anker", "soundpeats", "oraimo", "earpods", "airpods", "beats",
@@ -179,7 +184,21 @@ const ALL_BRANDS = [...BRANDS, ...FASHION_BEAUTY_BRANDS];
    load. */
 const BRANDS_BY_LENGTH = ALL_BRANDS.slice().sort((a, b) => b.length - a.length);
 
+/* Ambiguous brands — names that appear in product titles as OS /
+   platform / feature markers rather than the actual hardware
+   manufacturer. If one of these matches AND another brand also
+   matches the same title, prefer the other brand (the hardware
+   maker is the real "brand" identity).
+
+   "google" is the canonical case: "Skyworth 55" Smart Google TV"
+   should resolve to skyworth (the hardware brand), not google (the
+   OS platform). Genuine Google hardware (Pixel, Nest) doesn't have
+   another competing brand in the title, so the fallback to the
+   ambiguous match still produces the right answer. */
+const AMBIGUOUS_BRANDS = new Set<string>(["google"]);
+
 function findBrand(norm: string): string | null {
+  let ambiguousFallback: string | null = null;
   for (const b of BRANDS_BY_LENGTH) {
     const re = new RegExp(`\\b${b.replace(/&/g, "\\&")}\\b`, "i");
     if (re.test(norm)) {
@@ -188,10 +207,19 @@ function findBrand(norm: string): string | null {
          signature key stays a stable single-segment slug — i.e.
          "fashion nova" → "fashionnova". This keeps the brand|model
          signature parseable downstream without ambiguity. */
-      return canonical.replace(/\s+/g, "");
+      const slug = canonical.replace(/\s+/g, "");
+      if (AMBIGUOUS_BRANDS.has(slug)) {
+        /* Hold the ambiguous match; keep iterating to see if a more
+           specific hardware brand also matches. */
+        if (!ambiguousFallback) ambiguousFallback = slug;
+        continue;
+      }
+      return slug;
     }
   }
-  return null;
+  /* No non-ambiguous match found — fall back to the ambiguous one
+     (genuine Google Pixel / Nest titles land here). */
+  return ambiguousFallback;
 }
 
 /* PRODUCT_TYPES — anchors a "model" signal for Fashion / Beauty /
