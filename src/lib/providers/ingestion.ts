@@ -1181,16 +1181,32 @@ export async function ingestDeals(
     if (!probeFailed) {
       const orphanIds = candidateOrphanIds.filter((id) => !haveOffer.has(id));
       if (orphanIds.length > 0) {
-        const { error: delErr } = await supa.from("products").delete().in("id", orphanIds);
-        if (delErr) {
-          result.errors.push(`Orphan reconciliation delete (${orphanIds.length}): ${delErr.message}`);
-        } else {
+        /* Chunked delete — same PostgREST URL-cap issue as the probe.
+           200 IDs per chunk = ~8KB query. May 28 2026 test of the
+           PayPorte daily ingest had 1,480 candidates and got "Bad
+           Request" on the single-shot delete. */
+        const ORPHAN_DELETE_CHUNK = 200;
+        let deletedTotal = 0;
+        let delFailed = false;
+        for (let i = 0; i < orphanIds.length; i += ORPHAN_DELETE_CHUNK) {
+          const chunk = orphanIds.slice(i, i + ORPHAN_DELETE_CHUNK);
+          const { error: delErr } = await supa.from("products").delete().in("id", chunk);
+          if (delErr) {
+            result.errors.push(`Orphan reconciliation delete (chunk ${Math.floor(i / ORPHAN_DELETE_CHUNK) + 1}, ${chunk.length} ids): ${delErr.message}`);
+            delFailed = true;
+            break;
+          }
+          deletedTotal += chunk.length;
+        }
+        if (!delFailed) {
           const insertedCount  = orphanIds.filter((id) => insertedProductIds.includes(id)).length;
           const displacedCount = orphanIds.length - insertedCount;
           console.log(
-            `[ingest] orphan reconciliation: removed ${orphanIds.length} offer-less product(s) ` +
+            `[ingest] orphan reconciliation: removed ${deletedTotal} offer-less product(s) ` +
             `(${insertedCount} from this run + ${displacedCount} displaced pre-existing).`,
           );
+        } else if (deletedTotal > 0) {
+          console.log(`[ingest] orphan reconciliation: partial — deleted ${deletedTotal} of ${orphanIds.length} before failure.`);
         }
       }
     }
