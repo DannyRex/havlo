@@ -32,6 +32,11 @@ import type { SearchOutput, ProductGroup, DupeResult, StoreOffer } from "@/lib/s
 const headers = {
   "Cache-Control": "s-maxage=3600, stale-while-revalidate=86400",
   "Vary":          "Accept-Encoding",
+  /* Deploy-verification sentinel — bump when validating that a new
+     code path is actually live. Easiest way to confirm Vercel
+     served the latest deploy when debugging caching/regression
+     issues that "should be fixed". */
+  "X-Match-Version": "v5-bidirectional-variant-veto-2026-05-28",
 };
 
 /* Empty results are NOT cached. An empty /compare response is exactly
