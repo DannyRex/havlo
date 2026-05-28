@@ -76,7 +76,7 @@ const FAQ = [
   },
   {
     q: "Do I have control over which products appear?",
-    a: "Yes. You can exclude individual SKUs or whole categories by adding a `havlo_exclude=true` field to your feed, or by letting us know via partnerships@havlo.io. We honour both.",
+    a: "Yes. You can exclude individual SKUs or whole categories by adding a `havlo_exclude=true` field to your feed, or by letting us know via hello@havlo.io. We honour both.",
   },
   {
     q: "What about returns, customer support, or fraud?",
@@ -124,11 +124,11 @@ export default function ForMerchantsPage() {
             <ArrowRight size={16} />
           </a>
           <a
-            href="mailto:partnerships@havlo.io"
+            href="mailto:hello@havlo.io"
             className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full border border-border-strong text-ink font-semibold text-sm hover:bg-surface-2 transition-colors"
           >
             <Mail size={16} />
-            partnerships@havlo.io
+            hello@havlo.io
           </a>
         </div>
 

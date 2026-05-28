@@ -3,7 +3,7 @@
 /* Merchant inquiry form for /for-merchants.
 
    Persists to merchant_inquiries (migration 0057) AND fires an email
-   to partnerships@havlo.io so the team gets notified without
+   to hello@havlo.io so the team gets notified without
    polling the dashboard. Confirmation email to the submitter on
    success.
 
@@ -99,7 +99,7 @@ export default function MerchantInquiryForm() {
         </div>
         <p className="text-sm text-ink-2 leading-relaxed">
           We respond to merchant inquiries within two business days. Look out
-          for an email from <strong>partnerships@havlo.io</strong> — sometimes
+          for an email from <strong>hello@havlo.io</strong> — sometimes
           it lands in Promotions, so check there too.
         </p>
       </div>

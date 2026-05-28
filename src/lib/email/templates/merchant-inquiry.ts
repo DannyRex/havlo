@@ -2,7 +2,7 @@
 
    Internal-facing only goal is to set expectations ("we respond within
    2 business days"). Personal shell so it lands in Primary, not
-   Promotions. The internal-side notification to partnerships@havlo.io
+   Promotions. The internal-side notification to hello@havlo.io
    happens via a separate sendEmail call in the API route. */
 
 import {
@@ -54,7 +54,7 @@ ${spacer(8)}
 }
 
 /* ── Internal notification ────────────────────────────────────────
-   Bare-bones text email to partnerships@havlo.io so the team gets
+   Bare-bones text email to hello@havlo.io so the team gets
    a Slack-like ping when a new inquiry lands. Plain text only —
    no need for layout chrome on an internal notification. */
 interface InternalArgs {

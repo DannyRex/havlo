@@ -3,7 +3,7 @@
 -- to be listed on Havlo. Submitted via the form on /for-merchants.
 --
 -- Each row is two things at once:
---   1. A partnership pipeline item — feeds the partnerships@havlo.io
+--   1. A partnership pipeline item — feeds the hello@havlo.io
 --      backlog so the team can prioritise.
 --   2. A demand signal — which categories / countries / SKU-volumes
 --      are knocking on the door. Useful for ingestion roadmap

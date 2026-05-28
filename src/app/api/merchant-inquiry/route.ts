@@ -3,7 +3,7 @@
 
    POST shape mirrors the MerchantInquiryForm fields. Persists to
    merchant_inquiries (migration 0057), fires a confirmation to the
-   applicant, and pings partnerships@havlo.io so the team gets
+   applicant, and pings hello@havlo.io so the team gets
    notified without polling the dashboard.
 
    Failure-tolerance mirrors /api/notify-product and /api/alerts:
@@ -34,7 +34,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const URL_RE   = /^https?:\/\/.+/i;
 const MAX_LEN  = 2000;
 
-const PARTNERSHIPS_INBOX = process.env.PARTNERSHIPS_INBOX?.trim() || "partnerships@havlo.io";
+const PARTNERSHIPS_INBOX = process.env.PARTNERSHIPS_INBOX?.trim() || "hello@havlo.io";
 
 function clean(s: string | undefined, max = MAX_LEN): string | null {
   const t = s?.trim();
