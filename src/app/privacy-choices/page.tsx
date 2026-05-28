@@ -33,11 +33,11 @@ const sections = [
       "All of the following are free, take effect immediately, and don't require an account:",
     ],
     bullets: [
-      "Reject analytics + affiliate cookies — use the cookie banner. If it isn't visible, clear your browser's localStorage for havlo.io and refresh; the banner will reappear so you can change your selection.",
-      "Opt out of marketing emails — every Havlo email has an unsubscribe link in the footer. You can also reply 'remove' to any of our emails.",
-      "Request data deletion — email hello@havlo.io from the address you signed up with, and we'll delete your data within 14 days.",
-      "Request a copy of your data — email hello@havlo.io. We send a machine-readable JSON of every field associated with you, including newsletter signups, click-through history (truncated /24 IPs), and search-log entries.",
-      "Honor Global Privacy Control (GPC) signal — your browser sends a GPC signal automatically if you've enabled it; we treat that as a request to disable analytics + affiliate cookies regardless of any banner state.",
+      "Reject analytics + affiliate cookies - use the cookie banner. If it isn't visible, clear your browser's localStorage for havlo.io and refresh; the banner will reappear so you can change your selection.",
+      "Opt out of marketing emails - every Havlo email has an unsubscribe link in the footer. You can also reply 'remove' to any of our emails.",
+      "Request data deletion - email hello@havlo.io from the address you signed up with, and we'll delete your data within 14 days.",
+      "Request a copy of your data - email hello@havlo.io. We send a machine-readable JSON of every field associated with you, including newsletter signups, click-through history (truncated /24 IPs), and search-log entries.",
+      "Honor Global Privacy Control (GPC) signal - your browser sends a GPC signal automatically if you've enabled it; we treat that as a request to disable analytics + affiliate cookies regardless of any banner state.",
     ],
   },
   {
@@ -46,13 +46,13 @@ const sections = [
       "See the full Privacy Policy for the comprehensive list. The categories most relevant to your privacy choices are:",
     ],
     bullets: [
-      "Identifiers: IP address (truncated to /24 in our logs), browser type, OS — used for security, debugging, and country-detection so we can show local retailers.",
-      "Internet activity: pages viewed, searches submitted, deals clicked — used to rank results + measure feature performance.",
+      "Identifiers: IP address (truncated to /24 in our logs), browser type, OS - used for security, debugging, and country-detection so we can show local retailers.",
+      "Internet activity: pages viewed, searches submitted, deals clicked - used to rank results + measure feature performance.",
       "Commercial information: only what you explicitly submit (newsletter signups, contact-form messages, notify-me requests).",
     ],
   },
   {
-    title: "Sale or share — formal disclosure",
+    title: "Sale or share - formal disclosure",
     paragraphs: [
       "For the avoidance of doubt under CCPA/CPRA: in the past 12 months Havlo has not sold or shared personal information. We do not engage in 'targeted advertising' as defined by VCDPA/CTDPA. We do not profile users for automated decisions producing legal or similarly significant effects.",
     ],
@@ -79,7 +79,7 @@ const sections = [
 
 export const metadata: Metadata = {
   title:       "Your Privacy Choices · Havlo",
-  description: "How to opt out of analytics, marketing, or data processing on Havlo — under CCPA, CPRA, VCDPA, CTDPA, CPA, UCPA, and equivalent laws.",
+  description: "How to opt out of analytics, marketing, or data processing on Havlo - under CCPA, CPRA, VCDPA, CTDPA, CPA, UCPA, and equivalent laws.",
 };
 
 export default function PrivacyChoicesPage() {

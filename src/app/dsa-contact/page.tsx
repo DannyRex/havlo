@@ -31,7 +31,7 @@ const sections = [
   {
     title: "Single point of contact",
     paragraphs: [
-      "For all DSA-related correspondence — from EU authorities, users, or third parties — please contact:",
+      "For all DSA-related correspondence - from EU authorities, users, or third parties - please contact:",
       "Danny Mine (designated DSA contact)",
       "Email: hello@havlo.io",
       "Language for correspondence: English. We will accept correspondence in German, French, Spanish, Italian, and Dutch but will respond in English.",
@@ -46,7 +46,7 @@ const sections = [
     bullets: [
       "A description of the suspected illegal content or product, including a URL on havlo.io if applicable.",
       "Your reason for considering it illegal, with a reference to the law that applies.",
-      "Your name and email (required so we can communicate the outcome) — your identity will not be shared with the retailer unless legally required.",
+      "Your name and email (required so we can communicate the outcome) - your identity will not be shared with the retailer unless legally required.",
       "A statement confirming your good faith belief that the information you provide is accurate.",
     ],
     /* The four bullets above mirror DSA Article 16(2). Critical for
@@ -61,7 +61,7 @@ const sections = [
     ],
     bullets: [
       "Acknowledge receipt within 24 hours.",
-      "Review the notice for completeness — if information is missing we'll request it.",
+      "Review the notice for completeness - if information is missing we'll request it.",
       "Assess the listing against EU law and any specific national-law claims included.",
       "Take a decision: leave the listing live, remove it, or de-rank it. For removals we keep an audit log of the decision.",
       "Communicate the decision to you and (separately) to the affected retailer where applicable, in line with DSA Article 17.",
@@ -70,7 +70,7 @@ const sections = [
   {
     title: "Content moderation transparency",
     paragraphs: [
-      "Havlo does not perform automated content moderation in the DSA sense — we do not use AI to flag user-generated content for removal. Our product-matching engine (which decides whether two listings refer to the same product) does not make moderation decisions; it only groups equivalent products for price comparison.",
+      "Havlo does not perform automated content moderation in the DSA sense - we do not use AI to flag user-generated content for removal. Our product-matching engine (which decides whether two listings refer to the same product) does not make moderation decisions; it only groups equivalent products for price comparison.",
       "Listings removed under a DSA notice are recorded in an internal log with the reason, the law cited, and the decision date. Aggregated statistics are reported annually below.",
     ],
   },

@@ -159,21 +159,21 @@ ${escapeHtml(preheader)}
 </div>
 
 <!-- White-band header is a SINGLE PNG (logo-email-band.png) rendered
-     at width="100%". Three prior HTML approaches — outer table with
+     at width="100%". Three prior HTML approaches - outer table with
      bgcolor, single-cell wrapper with !important inline white, and
-     two top-level tables for full-bleed — all failed in Gmail mobile
+     two top-level tables for full-bleed - all failed in Gmail mobile
      dark mode: the band rendered as a small centered box because
      Gmail wraps every email in its own card and inverts free
      background fills inside that card. A baked PNG sidesteps the
      entire CSS-fight: the white pixels ARE the band, no background
      property for Gmail's auto-invert to misinterpret, and at
      width="100%" the image stretches to exactly the email viewport's
-     visible width — whatever that is on each client.
+     visible width - whatever that is on each client.
 
      Source asset: public/logo-email-band.png (1200x180, RGB, solid
      white bg, wordmark centered at 299x90 native). At 1200x180 the
      aspect is ~6.67:1, so on a 360px Gmail mobile viewport the band
-     renders ~54px tall — same vertical weight as the prior padded
+     renders ~54px tall - same vertical weight as the prior padded
      html band, no surprises. Inline width="600" + style:width:100%
      keeps Outlook (which ignores style and uses width attribute)
      from showing it stretched to the full 1200 native width. -->

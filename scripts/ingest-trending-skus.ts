@@ -110,17 +110,23 @@ const TRENDING_BY_COUNTRY: Record<string, string[]> = {
     "Apple Watch Ultra 2", "Garmin Forerunner 265",
     "Lululemon Define Jacket",
   ],
-  de: [
-    "iPhone 16 Pro", "Samsung Galaxy S24 Ultra", "Google Pixel 9",
-    "MacBook Pro M4", "iPad Pro M4",
-    "AirPods Pro 2", "Bose QuietComfort Ultra", "Sennheiser Momentum 4",
-    "Nintendo Switch 2", "PlayStation 5",
-    "Adidas Samba OG", "Adidas Stan Smith", "New Balance 574",
-    "Birkenstock Boston", "Le Creuset",
-    "Dyson V12", "Vorwerk Thermomix TM6", "Smeg toaster",
-    "Apple Watch Series 10", "Garmin Fenix 7",
-    "Charlotte Tilbury", "Estee Lauder Advanced Night Repair",
-  ],
+  /* DE removed from trending-SKU ingest (May 2026) — Germany is
+     deferred from first launch until the Impressum lands. The
+     candidate list is preserved as a commented block so the work
+     of curating it isn't lost; re-enable by uncommenting and
+     dropping "de" from middleware DEFERRED_LAUNCH at the same
+     time as removing COUNTRIES.de.deferredLaunch.
+     de: [
+       "iPhone 16 Pro", "Samsung Galaxy S24 Ultra", "Google Pixel 9",
+       "MacBook Pro M4", "iPad Pro M4",
+       "AirPods Pro 2", "Bose QuietComfort Ultra", "Sennheiser Momentum 4",
+       "Nintendo Switch 2", "PlayStation 5",
+       "Adidas Samba OG", "Adidas Stan Smith", "New Balance 574",
+       "Birkenstock Boston", "Le Creuset",
+       "Dyson V12", "Vorwerk Thermomix TM6", "Smeg toaster",
+       "Apple Watch Series 10", "Garmin Fenix 7",
+       "Charlotte Tilbury", "Estee Lauder Advanced Night Repair",
+     ], */
   in: [
     "iPhone 16 Pro Max", "Samsung Galaxy S24 Ultra", "OnePlus 13",
     "OnePlus Nord 4", "Samsung Galaxy M55",

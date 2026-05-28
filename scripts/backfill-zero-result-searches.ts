@@ -128,8 +128,12 @@ async function main() {
      us"). NG zero-result queries get routed through the dedicated
      search-ng-merchant-serpapi provider on the regular cron path,
      so we skip them here to avoid double-fetching with wrong
-     country tagging. */
-  const SHOPPING_SUPPORTED = new Set(["us", "uk", "de", "in", "ae", "za"]);
+     country tagging.
+
+     DE removed May 2026 - Germany is deferred from first launch
+     until the Impressum lands. No point burning SerpAPI credits on
+     a market we're not serving. */
+  const SHOPPING_SUPPORTED = new Set(["us", "uk", "in", "ae", "za"]);
 
   for (let i = 0; i < queries.length; i++) {
     const q = queries[i];

@@ -1,0 +1,202 @@
+[
+  {
+    "product_id": "774b7b5c-4007-4a60-b4af-59061d44bfd1",
+    "title": "LG 4K OLED Smart TV",
+    "brand": "lg",
+    "category": "electronics",
+    "country": "UK",
+    "image_url": "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcQy75hXyU2s5FUklHegQJYncsJ76cibxR3Xr7dCLZh_AH57g4-Vg0kQkr_0VPR7jOuwzqIy6k6854PuydGz7UX3hBmi3GUZPkRJV1H_jJx4",
+    "image_local": "/Users/admin/Havlo/outputs/havlo-instagram/sources/1-774b7b5c.com",
+    "cheap": {
+      "store_id": "appliances-direct",
+      "store_name": "Appliances Direct",
+      "price": 1903.73,
+      "currency": "USD",
+      "display": "£2,419"
+    },
+    "dear": {
+      "store_id": "very",
+      "store_name": "Very",
+      "price": 2665.73,
+      "currency": "USD",
+      "display": "£3,387"
+    },
+    "saving_display": "£968",
+    "saving_pct": 29
+  },
+  {
+    "product_id": "dbd4da71-bf5a-4ab5-8ed3-1a6d93939742",
+    "title": "Apple MacBook Pro 16 Inch With M4 Chip Core GPU 48GB SSD Space Black",
+    "brand": "apple",
+    "category": "computing",
+    "country": "AE",
+    "image_url": "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcRo3CbVKKNP0qCNLP-1jJ64jyxlmNeXHF7rUiTeO9Rbko8iEPgS8bKvNN1bjRM200uD_5D4kWv0DWv_oxTdijyeApzVxmjdLwnY-u7A6dgabya6EYSmHlkW",
+    "image_local": "/Users/admin/Havlo/outputs/havlo-instagram/sources/2-dbd4da71.com",
+    "cheap": {
+      "store_id": "macpro-la",
+      "store_name": "Macpro La",
+      "price": 2649,
+      "currency": "USD",
+      "display": "AED 9,099"
+    },
+    "dear": {
+      "store_id": "hitechcomputers-ae",
+      "store_name": "Hitechcomputers Ae",
+      "price": 3399.73,
+      "currency": "USD",
+      "display": "AED 11,678"
+    },
+    "saving_display": "AED 2,579",
+    "saving_pct": 22
+  },
+  {
+    "product_id": "29b04818-c27b-4108-a5f3-432cc617f4aa",
+    "title": "Samsung HW-Q990F 11.1.4 Channel Soundbar",
+    "brand": "samsung",
+    "category": "audio",
+    "country": "US",
+    "image_url": "https://encrypted-tbn1.gstatic.com/shopping?q=tbn:ANd9GcTsc3hvwWYLhXsbEcmslE5mtchYA6L7Ts8EtUJc69WX9DAecedImhuasooLsxseaJeZjS4XfdWpmtt7K3VSn1v90DjvJfCvtygOAdL8KroJMIHlqDvPp6X9",
+    "image_local": "/Users/admin/Havlo/outputs/havlo-instagram/sources/3-29b04818.com",
+    "cheap": {
+      "store_id": "greentoe-tv-s-home-theater",
+      "store_name": "Greentoe Tv S Home Theater",
+      "price": 935.31,
+      "currency": "USD",
+      "display": "$877"
+    },
+    "dear": {
+      "store_id": "best-buy",
+      "store_name": "Best Buy",
+      "price": 1597.99,
+      "currency": "USD",
+      "display": "$1,498"
+    },
+    "saving_display": "$621",
+    "saving_pct": 41
+  },
+  {
+    "product_id": "425574e5-14fa-4df2-9c6b-3eebf444fd06",
+    "title": "HP Omen 16L Gaming PC",
+    "brand": "hp",
+    "category": "gaming",
+    "country": "UK",
+    "image_url": "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcQ87RXn3HMhtqwtaLTuJfJsJM1c_JvOZtXAwiXFBGC0pD6OH4sByp3q3nfmmomYVd0eTJomlSHeNXpq7iGNJ73QGCwbEFSrN_4FFb0hxbWUlmKEFaCKNwc_yw",
+    "image_local": "/Users/admin/Havlo/outputs/havlo-instagram/sources/4-425574e5.com",
+    "cheap": {
+      "store_id": "amazon-uk",
+      "store_name": "Amazon UK",
+      "price": 990.59,
+      "currency": "USD",
+      "display": "£1,259"
+    },
+    "dear": {
+      "store_id": "currys",
+      "store_name": "Currys",
+      "price": 1649.73,
+      "currency": "USD",
+      "display": "£2,096"
+    },
+    "saving_display": "£837",
+    "saving_pct": 40
+  },
+  {
+    "product_id": "f7462704-3849-4212-8d62-9b145f2e3413",
+    "title": "ASUS ROG G700 Gaming Desktop Computer",
+    "brand": "asus",
+    "category": "computing",
+    "country": "US",
+    "image_url": "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcTB1yJkWj6BeViZbVzmhMk1HPeBSejTlAPznGKeY5ysdPhWY1WQKWCnw-9veWKYZ1ewXBUtzPABY1lrbXInvsVNfHIx-f0HvaYaQXxF7xEgxf4r9z6ejB7ubg",
+    "image_local": "/Users/admin/Havlo/outputs/havlo-instagram/sources/5-f7462704.com",
+    "cheap": {
+      "store_id": "best-buy",
+      "store_name": "Best Buy",
+      "price": 1299.99,
+      "currency": "USD",
+      "display": "$1,219"
+    },
+    "dear": {
+      "store_id": "abt-electronics-appliances",
+      "store_name": "Abt Electronics Appliances",
+      "price": 1849.99,
+      "currency": "USD",
+      "display": "$1,734"
+    },
+    "saving_display": "$516",
+    "saving_pct": 30
+  },
+  {
+    "product_id": "a2141a5f-76f2-4b7b-8fe2-f1d582af2dfa",
+    "title": "Apple IPhone 14 Pro 6.1\" (128GB ROM + 6GB RAM) Nano ...",
+    "brand": "apple",
+    "category": "phones",
+    "country": "NG",
+    "image_url": "https://ng.jumia.is/unsafe/fit-in/300x300/filters:fill(white)/product/42/1036814/1.jpg?2900",
+    "image_local": "/Users/admin/Havlo/outputs/havlo-instagram/sources/6-a2141a5f.jpg",
+    "cheap": {
+      "store_id": "jumia",
+      "store_name": "Jumia",
+      "price": 850000,
+      "currency": "NGN",
+      "display": "₦850,000"
+    },
+    "dear": {
+      "store_id": "kara",
+      "store_name": "Kara",
+      "price": 1243000,
+      "currency": "NGN",
+      "display": "₦1,243,000"
+    },
+    "saving_display": "₦393,000",
+    "saving_pct": 32
+  },
+  {
+    "product_id": "2b0a6f1c-edc5-48e2-b904-dd1efe05ba7c",
+    "title": "HP Victus Gaming Laptop – 13th Gen / Intel Core i7-13620H / 15.6inch FHD / 512GB SSD / 16GB RAM / 6GB NVIDIA GeForce RTX 3050 Graphics",
+    "brand": "hp",
+    "category": "computing",
+    "country": "AE",
+    "image_url": "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcRb2zChikonvwQbR0NEetsxkdPbI8x6e8l0ihQ3FisnPBxfuizAm1jZ9FXDFTfyWV6vcoCjqetAPuuhXlJ5BBVtNXCbkpsOIKmk13HXyl9Sb2fjDavlv3yuHg",
+    "image_local": "/Users/admin/Havlo/outputs/havlo-instagram/sources/7-2b0a6f1c.com",
+    "cheap": {
+      "store_id": "noon",
+      "store_name": "Noon",
+      "price": 884.57,
+      "currency": "USD",
+      "display": "AED 3,038"
+    },
+    "dear": {
+      "store_id": "jumbo-ae",
+      "store_name": "Jumbo Ae",
+      "price": 1142.13,
+      "currency": "USD",
+      "display": "AED 3,923"
+    },
+    "saving_display": "AED 885",
+    "saving_pct": 23
+  },
+  {
+    "product_id": "5374af43-efd9-4f22-876d-b1c37f2e173c",
+    "title": "Hisense 50\" Uhd 4k Smart Tv,3hdmi,2usb,1av,free Wall",
+    "brand": "hisense",
+    "category": "electronics",
+    "country": "NG",
+    "image_url": "https://www-konga-com-res.cloudinary.com/image/upload/f_auto,fl_lossy,dpr_auto,q_auto,w_3840/media/catalog/product/X/D/_1766561713.jpg",
+    "image_local": "/Users/admin/Havlo/outputs/havlo-instagram/sources/8-5374af43.jpg",
+    "cheap": {
+      "store_id": "konga",
+      "store_name": "Konga",
+      "price": 433400,
+      "currency": "NGN",
+      "display": "₦433,400"
+    },
+    "dear": {
+      "store_id": "jumia",
+      "store_name": "Jumia",
+      "price": 696200,
+      "currency": "NGN",
+      "display": "₦696,200"
+    },
+    "saving_display": "₦262,800",
+    "saving_pct": 38
+  }
+]

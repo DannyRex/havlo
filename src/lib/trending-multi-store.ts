@@ -239,7 +239,7 @@ async function fetchMultiStoreTitlesForCountry(countryCode: string): Promise<Mul
     .filter((s) => s.size >= MIN_STORES_FOR_CHIP).length;
   if (qualifiedCountScoped < MIN_SCOPED_QUALIFYING) {
     console.warn(
-      `[trending-multi-store] country=${countryCode} country-scoped pool only ${qualifiedCountScoped} qualifying products — falling back to global`,
+      `[trending-multi-store] country=${countryCode} country-scoped pool only ${qualifiedCountScoped} qualifying products - falling back to global`,
     );
     const global = await aggregateOfferPairsGlobal(supa);
     /* Intersect: products with >=2 stores GLOBALLY (broader pool for

@@ -254,12 +254,12 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
                   fact check that and correct the necessary ones because
                   some are wrong." */}
               <div className="text-sm font-semibold text-ink mb-1">
-                International seller — check shipping to {country.name}
+                International seller - check shipping to {country.name}
               </div>
               <div className="text-xs text-ink-2">
                 {localAlternative
                   ? <><span className="font-semibold text-ink">{displayStore}</span> may not ship directly to {country.name}. The same product is available locally at <span className="font-semibold text-ink">{localAlternative.storeName}</span> for <span className="font-semibold text-ink">{formatLocal(localAlternative.price, country)}</span>.</>
-                  : <><span className="font-semibold text-ink">{displayStore}</span> may not ship directly to {country.name} — visit the store to confirm shipping options before ordering.</>}
+                  : <><span className="font-semibold text-ink">{displayStore}</span> may not ship directly to {country.name} - visit the store to confirm shipping options before ordering.</>}
               </div>
             </div>
             {localAlternative && (
@@ -410,7 +410,7 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             below also satisfies the platform-level FTC + Amazon
             Associates rel-attribute requirement. */}
         <p className="text-[11px] text-ink-3 mb-1.5 leading-snug">
-          Havlo may earn a commission from this link — at no extra cost to you.
+          Havlo may earn a commission from this link - at no extra cost to you.
         </p>
 
         {/* Primary CTA — outbound to merchant via /api/go */}

@@ -73,7 +73,7 @@ const sections = [
       "Danny Mine, Havlo Founder",
       "Email: hello@havlo.io",
       "We respond to data-subject requests within 14 days. For EU DSA matters (illegal-content notices, authority correspondence), the dedicated page is at /dsa-contact with a 5-working-day target response window.",
-      "If a request is sent to the wrong address it will still be honored — we route all privacy correspondence through hello@havlo.io.",
+      "If a request is sent to the wrong address it will still be honored - we route all privacy correspondence through hello@havlo.io.",
     ],
   },
   {

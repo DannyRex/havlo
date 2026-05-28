@@ -65,9 +65,21 @@ const COUNTRIES = QUICK || ONLY_COUNTRY
 
 /* ── HTTP helper ─────────────────────────────────────────────── */
 async function fetchJson(url: string, country: string): Promise<{ data: unknown; ms: number }> {
+  /* Bust Vercel's 1-hour edge cache (Cache-Control: s-maxage=3600
+     on /api/compare) so the test always exercises the LATEST
+     deploy's matching logic. Without this, the test reports
+     stale verdicts cached from before the most-recent code change
+     and we can't tell whether a fix actually landed in production.
+     The extra param is innocuous on the server side — searchParams
+     just ignores unknown keys. */
+  const buster = `${url.includes("?") ? "&" : "?"}_t=${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
   const t0 = Date.now();
-  const res = await fetch(url, {
-    headers: { "Cookie": `havlo-country=${country}`, "User-Agent": "havlo-extreme-test/1.0" },
+  const res = await fetch(url + buster, {
+    headers: {
+      "Cookie": `havlo-country=${country}`,
+      "User-Agent": "havlo-extreme-test/1.0",
+      "Cache-Control": "no-cache",
+    },
   });
   const ms = Date.now() - t0;
   if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);

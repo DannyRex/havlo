@@ -52,9 +52,15 @@ function inferModeForCategory(slug: string, forceMode?: "deals" | "market"): "de
    - de:  Amazon.de, Zalando (auto parts, fashion)
    - in:  Amazon.in, Flipkart (some electronics)
    - za:  Takealot (regional)
-   Skip: ng (Google Shopping doesn't operate in Nigeria — use the
-   Playwright scraper or affiliate APIs for local stores). */
-const DEFAULT_COUNTRIES = ["us", "uk", "ae", "de", "in", "za"];
+   Skip: ng (Google Shopping doesn't operate in Nigeria - use the
+   Playwright scraper or affiliate APIs for local stores).
+
+   Skip: de (Germany deferred from first launch - see middleware
+   DEFERRED_LAUNCH + COUNTRIES.de.deferredLaunch. No point burning
+   SerpAPI credits on a market we're not serving until the Impressum
+   ships. Re-add to this list at the same time as removing the
+   deferredLaunch flag elsewhere.) */
+const DEFAULT_COUNTRIES = ["us", "uk", "ae", "in", "za"];
 
 interface CliArgs {
   categorySlugs?: string[];

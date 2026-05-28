@@ -174,7 +174,7 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                 full disclosure page. Slim enough not to dominate the
                 rail, prominent enough that we're not hiding it. */}
             <p className="text-[11px] text-ink-3 mb-2 leading-snug">
-              Havlo may earn a commission from these links — at no extra cost to you. <Link href="/how-we-make-money" className="underline underline-offset-2 hover:text-ink">How we make money</Link>.
+              Havlo may earn a commission from these links - at no extra cost to you. <Link href="/how-we-make-money" className="underline underline-offset-2 hover:text-ink">How we make money</Link>.
             </p>
             <ul className="space-y-1.5">
               {sortedRows.map((offer, i) => {
