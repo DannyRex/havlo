@@ -37,6 +37,7 @@ import { pgFtsFindDupes, pgFtsAnchorOffersByProductId } from "@/lib/search/pg-ft
 import { isOfferAllowedForCountry, filterDealsForCountry } from "@/lib/country";
 import { computeAnchorStats } from "@/lib/pdp-stats";
 import { fetchProductPriceHistory, rollupPriceHistory, fetchProductPriceTimeseries } from "@/lib/search/price-history";
+import { effectiveLandedPrice } from "@/lib/landed-price";
 import { partitionDupesByVariantMatch, variantOffers } from "@/lib/search/variant-pooling";
 import { partitionDupesByVariantMatchDeep } from "@/lib/search/variant-pooling-deep";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
@@ -455,6 +456,38 @@ export default async function ProductPage({ params }: PageProps) {
     ? usdToNgn(offer.current_price)
     : offer.current_price;
 
+  /* Anchor's EFFECTIVE landed price for the visitor — the price the
+     band gate below should compare alternatives against.
+
+     Why this exists (May 2026 audit fix): the band gate previously
+     compared alternatives' landed price (which the dupes engine
+     bakes with +30% for intl stores) against the anchor's BARE
+     price (anchorPriceNgn). Asymmetric for any PDP where the
+     anchor is cross-border for the visitor — e.g. NG visitor on
+     an Amazon US PDP. Some legitimate alternatives dropped out as
+     too expensive because their landed-side was inflated relative
+     to the anchor's bare reference; some too-expensive ones
+     survived for the inverse reason.
+
+     Now: compute the anchor's own landed price (price + 30%
+     surcharge when intl for visitor, else bare), and compare like-
+     with-like via effectiveLandedPrice. Local-anchor case
+     unchanged because effective === bare when not cross-border. */
+  const anchorOfferLike = {
+    storeId:         offer.store_id,
+    storeName:       offer.store_name,
+    isInternational: offer.is_international,
+    storeCountry:    offer.store_country ?? null,
+    /* currency stays NGN here because anchorPriceNgn is already
+       NGN-normalised above. landedCostExtra = price × 0.3 mirrors
+       the bake-time computation used by the dupes engine. */
+    currency:        "NGN" as const,
+    price:           anchorPriceNgn,
+    landedCostExtra: Math.round(anchorPriceNgn * 0.3),
+    landedPrice:     Math.round(anchorPriceNgn * 1.3),
+  };
+  const anchorEffectiveNgn = effectiveLandedPrice(anchorOfferLike, country);
+
   /* Drop the anchor product itself from the "You may also like" rail.
      pgFtsFindDupes returns every product matching the title — including
      the anchor (same title, by definition, scores high). User report
@@ -525,20 +558,29 @@ export default async function ProductPage({ params }: PageProps) {
     if (offer.offer_id && d.offers.some((o) => o.offerId === offer.offer_id)) return false;
 
     /* Price-band gate. The dupe's CHEAPEST offer must sit within
-       [anchor * FLOOR_RATIO, anchor * CEILING_RATIO]. Only applies
-       when we have an anchor price to compare against. */
-    if (anchorPriceNgn > 0) {
-      const best = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
+       [anchorEffective * FLOOR_RATIO, anchorEffective * CEILING_RATIO].
+       Both sides now use effectiveLandedPrice with the visitor's
+       country so the comparison is symmetric (visitor-cross-border-
+       inflated against the same definition on both sides). */
+    if (anchorEffectiveNgn > 0) {
+      const best = [...d.offers].sort(
+        (a, b) => effectiveLandedPrice(a, country) - effectiveLandedPrice(b, country),
+      )[0];
       if (best) {
-        if (best.landedPrice < anchorPriceNgn * FLOOR_RATIO)   return false;
-        if (best.landedPrice > anchorPriceNgn * CEILING_RATIO) return false;
+        const bestEffective = effectiveLandedPrice(best, country);
+        if (bestEffective < anchorEffectiveNgn * FLOOR_RATIO)   return false;
+        if (bestEffective > anchorEffectiveNgn * CEILING_RATIO) return false;
       }
     }
 
     /* Dedupe by best-offer id (defensive — dupes engine already
        groups by signature, but FTS scoring sometimes splits near-
-       identical titles into separate groups). */
-    const best = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
+       identical titles into separate groups). Use the same
+       effective-price sort so the "best" offer is consistent with
+       the band-gate logic above. */
+    const best = [...d.offers].sort(
+      (a, b) => effectiveLandedPrice(a, country) - effectiveLandedPrice(b, country),
+    )[0];
     const id = best?.offerId || (best?.storeId + ":" + d.key);
     if (seenIds.has(id)) return false;
     seenIds.add(id);
