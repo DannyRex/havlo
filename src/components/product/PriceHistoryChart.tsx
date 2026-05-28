@@ -638,26 +638,26 @@ function RangeToggle({ value, onChange, dataSpanDays }: RangeToggleProps) {
     >
       {RANGE_OPTIONS.map((r) => {
         const isActive = r.key === value;
-        /* Disable a range when the dataset doesn't have enough
-           span to make it different from a smaller range — keeps
-           the toggle honest. The All option is never disabled. */
-        const isDisabled = r.key !== "ALL" && dataSpanDays > 0 && dataSpanDays < r.days * 0.5;
+        /* Hide a range when the dataset doesn't have enough span
+           to make it meaningfully different from the smaller ranges.
+           Previously this just disabled the button, but a greyed-out
+           tab still draws the eye to a control that can't do anything
+           — better to remove it entirely until the data can fill it.
+           The All option is never hidden. */
+        const isHidden = r.key !== "ALL" && dataSpanDays > 0 && dataSpanDays < r.days * 0.5;
+        if (isHidden) return null;
         return (
           <button
             key={r.key}
             type="button"
             role="tab"
             aria-selected={isActive}
-            disabled={isDisabled}
             onClick={() => onChange(r.key)}
             className={`px-2.5 py-1 rounded-full text-[11px] font-semibold tabular-nums transition-colors ${
               isActive
                 ? "bg-ink text-bg"
-                : isDisabled
-                  ? "text-ink-3/50 cursor-not-allowed"
-                  : "text-ink-2 hover:text-ink"
+                : "text-ink-2 hover:text-ink"
             }`}
-            title={isDisabled ? `Not enough data yet for ${r.label}` : undefined}
           >
             {r.label}
           </button>
@@ -858,7 +858,12 @@ function computeGeometry(points: PriceHistoryPoint[], width: number): Geometry {
 
   const xForI = (i: number) =>
     points.length === 1
-      ? PAD_LEFT + usableW / 2
+      /* Single-point: anchor the dot to the RIGHT edge so it reads
+         as "latest reading, today". The flat-hold path drawn below
+         then extends from the chart's left edge across to this dot,
+         visually communicating "we've observed this price; we'll
+         start showing change once a second reading lands". */
+      ? PAD_LEFT + usableW
       : PAD_LEFT + (i / (points.length - 1)) * usableW;
   const yForP = (p: number) =>
     PAD_TOP + ((yMax - p) / (yMax - yMin)) * chartH;
@@ -894,18 +899,23 @@ function computeGeometry(points: PriceHistoryPoint[], width: number): Geometry {
      band of the surrounding data because of the monotonicity
      guarantee. Net: cleaner reading, no real signal lost.
 
-     Single-point path: just an M command, no curve. The single
-     dot rendered downstream becomes the only visible marker. */
+     Single-point path: flat horizontal line at the price level from
+     the chart's left edge to the dot at the right edge. Honest — no
+     trajectory claimed, just a steady-hold at the observed price.
+     A bare dot felt unfinished; an ascending curve from zero would
+     falsely imply the price climbed from £0 to its current value.
+     Flat line says "this is where it sits" without making a claim
+     about how it got there. */
   const pathD = points.length === 1
-    ? `M ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}`
+    ? `M ${PAD_LEFT.toFixed(2)} ${ys[0].toFixed(2)} L ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}`
     : buildMonotonePath(xs, ys);
 
   const areaBottom = CHART_HEIGHT - PAD_BOTTOM;
-  /* For 1-point case, close the area down to bottom in a thin
-     vertical line — produces a centred drop without a visible
-     fill (zero width). The dot is the dominant signal. */
+  /* Single-point area: a rectangle under the flat hold-line, from
+     the left edge to the dot's X position. Gives the chart visual
+     weight without claiming a trajectory. */
   const areaD = points.length === 1
-    ? `M ${xs[0].toFixed(2)} ${ys[0].toFixed(2)} L ${xs[0].toFixed(2)} ${areaBottom} Z`
+    ? `M ${PAD_LEFT.toFixed(2)} ${ys[0].toFixed(2)} L ${xs[0].toFixed(2)} ${ys[0].toFixed(2)} L ${xs[0].toFixed(2)} ${areaBottom} L ${PAD_LEFT.toFixed(2)} ${areaBottom} Z`
     : `${pathD} L ${xs[xs.length - 1].toFixed(2)} ${areaBottom} L ${xs[0].toFixed(2)} ${areaBottom} Z`;
 
   /* Axis ticks — up to 4 dates evenly spaced across the window.
