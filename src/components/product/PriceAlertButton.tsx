@@ -113,7 +113,9 @@ export default function PriceAlertButton({ productId, productTitle, currentPrice
 
   if (done) {
     return (
-      <div className="inline-flex items-start gap-2 mt-2 px-4 py-2.5 rounded-lg bg-success/10 border border-success/20 text-sm text-success">
+      /* Full-width confirmation card so it matches the visual rhythm
+         of the surrounding PriceComparisonBar / per-store rails. */
+      <div className="flex items-start gap-2 w-full mt-2 px-4 py-2.5 rounded-lg bg-success/10 border border-success/20 text-sm text-success">
         <Check size={16} className="mt-0.5 shrink-0" />
         <span>
           You&apos;re set. We&apos;ll email you when {productTitle.slice(0, 40)}{productTitle.length > 40 ? "…" : ""} drops to your target.
@@ -136,7 +138,12 @@ export default function PriceAlertButton({ productId, productTitle, currentPrice
   }
 
   return (
-    <div className="mt-2 p-4 rounded-xl border border-border bg-surface-2/60 max-w-sm">
+    /* Full-width expanded panel so the form spans the same column as
+       the PriceComparisonBar below + the "Visit" / "Compare" CTAs
+       above. Previously capped at max-w-sm which stranded the form
+       at a child width on desktop and looked inconsistent next to
+       the bar. */
+    <div className="w-full mt-2 p-4 rounded-xl border border-border bg-surface-2/60">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <BellRing size={16} className="text-ink" />
