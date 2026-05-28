@@ -889,7 +889,18 @@ export default async function ProductPage({ params }: PageProps) {
             have no history rows). The component itself handles its
             own empty state for products that DO have a product_id but
             haven't seen a price change yet. */}
-        {priceTimeseries && priceTimeseries.length > 0 && (
+        {/* Render whenever the fetch returned ANY result (including an
+            empty array) — the chart owns its own empty state. We only
+            hide entirely when priceTimeseries is null, which means
+            the product_id failed the UUID gate (synthetic anchors from
+            the curated catalog / live-search) or the RPC errored.
+
+            Previously the gate was `length > 0`, which silently hid
+            the section for valid-UUID products that had been ingested
+            but hadn't yet seen a price change — the chart's empty
+            state ("Once the price changes at any store, you'll see
+            the full timeline here") was unreachable. */}
+        {priceTimeseries !== null && (
           <div className="mt-6 sm:mt-8">
             <PriceHistoryChart
               points={priceTimeseries}

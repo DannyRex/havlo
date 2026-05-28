@@ -121,7 +121,14 @@ async function fetchInitialDeals(
        longer window keeps Fluid CPU + Supabase egress in check. */
     const isRotatingSort = !params.sort || params.sort === "relevance";
     const res = await fetch(url, { next: { revalidate: isRotatingSort ? 60 : 600 } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      /* Log the status so Vercel captures the SSR-time failure.
+         Previously `if (!res.ok) return null` silently degraded to
+         the skeleton + client-side fetch path, indistinguishable
+         from a healthy first paint — no signal to investigate. */
+      console.error(`[fetchInitialDeals] /api/deals returned ${res.status}`, { url });
+      return null;
+    }
     const j = await res.json();
     return {
       items:        j.items ?? [],
@@ -130,7 +137,11 @@ async function fetchInitialDeals(
       originCounts: j.originCounts,
       storeOptions: Array.isArray(j.stores) ? j.stores : undefined,
     };
-  } catch {
+  } catch (err) {
+    /* Same rationale — surface the underlying error to Vercel
+       logs so a persistent SSR failure doesn't masquerade as a
+       successful skeleton render. */
+    console.error("[fetchInitialDeals] threw", (err as Error).message);
     return null;
   }
 }

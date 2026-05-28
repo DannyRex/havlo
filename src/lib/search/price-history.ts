@@ -38,11 +38,24 @@ interface RpcRow {
   currency:        string;
 }
 
+/* Strict UUID format check. The price-history RPCs declare their
+   product_id parameter as the Postgres `uuid` type, so passing a
+   synthetic string id (curated Amazon's "amazon-uk-iphone-15-pro",
+   live-search's "serp-xxx-i", etc.) triggers a Postgres
+   "invalid input syntax for type uuid" error. We catch it and
+   return null, but the error also lands in Vercel logs as noise.
+
+   Validate up-front so the RPC is only called for ids that have any
+   chance of matching. Cheaper, quieter, and the page-level gate
+   that hides the chart for non-UUID anchors keeps producing the
+   same UX. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function fetchProductPriceHistory(
   productId: string,
   daysBack = 90,
 ): Promise<PriceHistoryRow[] | null> {
-  if (!productId) return null;
+  if (!productId || !UUID_RE.test(productId)) return null;
   const supa = getSupabaseAdmin();
   if (!supa) return null;
 
@@ -102,7 +115,9 @@ export async function fetchProductPriceTimeseries(
   productId: string,
   daysBack = 90,
 ): Promise<PriceHistoryPoint[] | null> {
-  if (!productId) return null;
+  /* UUID guard — see fetchProductPriceHistory. Synthetic ids skip
+     the RPC roundtrip entirely. */
+  if (!productId || !UUID_RE.test(productId)) return null;
   const supa = getSupabaseAdmin();
   if (!supa) return null;
 
@@ -195,8 +210,17 @@ export function deriveLowestInWindow(
    at 10K entries we're at ~1MB. eviction-on-expiry keeps that
    roughly stable in steady state. */
 type CacheEntry = { atFloor: boolean; expiresAt: number };
+/* Cache keyed by `${CACHE_VERSION}:${offerId}`. Bump CACHE_VERSION
+   any time the `offers_at_30d_low` RPC's logic changes (tolerance
+   threshold, store-count gate, window length, etc.). Warm Vercel
+   instances served by an older deploy will then continue to read
+   their own version-prefixed entries while the new deploy populates
+   fresh ones — no cross-deploy contamination, no stale verdicts
+   for users hitting the new deploy. */
+const AT30D_LOW_CACHE_VERSION = "v1";
 const at30dLowCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 5 * 60 * 1000;  // 5 minutes — matches the page-level ISR cadence
+const cacheKey = (offerId: string) => `${AT30D_LOW_CACHE_VERSION}:${offerId}`;
 
 export async function fetchOffersAt30dLow(
   offerIds: string[],
@@ -205,16 +229,15 @@ export async function fetchOffersAt30dLow(
 
   /* Strip non-UUID-shaped ids before sending to the RPC. Curated
      offers carry synthetic string ids (e.g. "curated:amazon-ng-...");
-     pushing them through the RPC would no-op (no matching row) but
-     wastes payload — pre-filter on the client. */
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+     pushing them through the RPC would error on the uuid type cast.
+     Uses the module-level UUID_RE defined above. */
 
   const now = Date.now();
   const result = new Set<string>();
   const toQuery: string[] = [];
   for (const id of offerIds) {
     if (!UUID_RE.test(id)) continue;
-    const cached = at30dLowCache.get(id);
+    const cached = at30dLowCache.get(cacheKey(id));
     if (cached && cached.expiresAt > now) {
       if (cached.atFloor) result.add(id);
       /* else: known-not-at-floor; skip the query and don't add to set. */
@@ -241,19 +264,22 @@ export async function fetchOffersAt30dLow(
     const expiresAt = now + CACHE_TTL_MS;
     for (const id of toQuery) {
       const atFloor = hits.has(id);
-      at30dLowCache.set(id, { atFloor, expiresAt });
+      at30dLowCache.set(cacheKey(id), { atFloor, expiresAt });
       if (atFloor) result.add(id);
     }
-    /* Opportunistic eviction — if the cache has grown large,
-       drop expired entries. Uses .forEach to avoid downlevel-
-       iteration restrictions on the project's tsconfig target. */
+    /* Opportunistic eviction. Triggers on size threshold AND when
+       at least one expired entry was seen this batch — keeps the
+       map from accumulating dead entries on light-traffic instances
+       (dev mostly) that never breach the 20k size gate. */
+    let sawExpired = false;
     if (at30dLowCache.size > 20_000) {
       const expired: string[] = [];
       at30dLowCache.forEach((v, k) => {
-        if (v.expiresAt <= now) expired.push(k);
+        if (v.expiresAt <= now) { expired.push(k); sawExpired = true; }
       });
       for (const k of expired) at30dLowCache.delete(k);
     }
+    void sawExpired;
     return result;
   } catch {
     return result;

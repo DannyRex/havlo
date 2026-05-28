@@ -65,7 +65,13 @@ function rowToDeal(r: BestOfferRow, popularity?: PopularityRecord): Deal {
        indexing — a stale cache from a deploy mid-rollout could in
        theory return something unexpected. */
     clicks: (popularity && typeof popularity === "object" && popularity[r.product_id]) || 0,
-    postedAt: r.scraped_at.slice(0, 10),
+    /* Keep full ISO timestamp so "newest" sort can break same-day
+       ties by sub-second precision. Old slice(0, 10) collapsed
+       every same-day deal to identical sort keys, which then
+       sorted arbitrarily — surfacing a stale 03:00 ingest above a
+       fresh 22:00 ingest. timeAgo() + Date parsers handle the
+       full ISO form transparently. */
+    postedAt: r.scraped_at,
     storeCountry: r.store_country ?? null,
   };
 }

@@ -121,7 +121,17 @@ export function computeAnchorStats(
   let medianPrice = 0;
   if (offerPrices.length > 0) {
     const sorted = [...offerPrices].sort((a, b) => a - b);
-    medianPrice = sorted[Math.floor(sorted.length / 2)];
+    /* True median: average the two middle values for even-length
+       arrays. Old code (sorted[Math.floor(N/2)]) picked the UPPER
+       middle for even N — e.g. [100,200,300,400] returned 300 not
+       250, which biased the outlier band high enough to drop the
+       cheapest legitimate offer as an "outlier" relative to its
+       inflated centre. Odd-N case unchanged: floor(N/2) is the
+       true middle index. */
+    const mid = Math.floor(sorted.length / 2);
+    medianPrice = sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
   }
   const referencePrice = anchorPriceNgn > 0 ? anchorPriceNgn : medianPrice;
   const dedupedFiltered = referencePrice > 0
