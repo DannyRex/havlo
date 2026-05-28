@@ -32,7 +32,12 @@
    ───────────────────────────────────────────────────────────────── */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isLikelySameProduct } from "./query-understanding";
+import {
+  isLikelySameProduct,
+  extractRequiredNumbers,
+  extractRequiredModelTokens,
+  extractVariantTokens,
+} from "./query-understanding";
 import { judgeMatch, JUDGE_BAND_MIN, JUDGE_BAND_MAX } from "./match-judge";
 
 export interface DeepMatchProduct {
@@ -114,6 +119,68 @@ function approximateScore(
   return s;
 }
 
+/** Hard-veto check. Even when embedding similarity is high or the
+    LLM judge would say "same", certain anchor/candidate combinations
+    are DEFINITIVELY different products — embeddings are great at
+    semantic similarity but terrible at distinguishing model generations
+    that share most of their tokens.
+
+    May 2026 audit caught this with "Samsung Galaxy A17 5G" pooling
+    in "Samsung Galaxy A15 5G" and "Galaxy A57 5G" via Phase 3's
+    cosine ≥ 0.85 admission. Both candidates have ~0.93 cosine to
+    the anchor (same brand + same product line + same suffix
+    pattern) but they're CLEARLY different SKUs — anyone reading
+    "A17" vs "A15" knows.
+
+    The veto: when anchor numeric model markers (15, 17, 24) or
+    letter-glued model tokens (s24, 1000xm5, h2) disagree with the
+    candidate's, no amount of semantic similarity can rescue the
+    match. Same for variant tokens (Pro vs Mini vs Ultra) — if both
+    sides have variant tokens AND they don't overlap, they're
+    different products.
+
+    This mirrors the hard-fail logic INSIDE isLikelySameProduct's
+    gates, but applied EXTERNALLY here as a stage 2.5 veto so the
+    embedding/judge paths can't accidentally admit what the lexical
+    gates clearly rejected. */
+function deepMatchVeto(anchor: DeepMatchProduct, candidate: DeepMatchProduct): boolean {
+  const aNum = extractRequiredNumbers(anchor.title);
+  const cNum = extractRequiredNumbers(candidate.title);
+  /* Veto if both sides have numeric model markers AND none overlap.
+     "Galaxy A17 5G" anchor has [17, 5]; "Galaxy A15 5G" candidate
+     has [15, 5]. Intersection: [5]. We need at least one of the
+     anchor's IDENTITY-CARRYING numbers (not the common 5G suffix)
+     to appear in candidate. Approximation: when anchor's UNIQUE
+     numbers (numbers in anchor not in candidate) is non-empty AND
+     candidate has its own unique numbers, the two products carry
+     different identifying numbers → veto. */
+  const aUniq = aNum.filter((n) => !cNum.includes(n));
+  const cUniq = cNum.filter((n) => !aNum.includes(n));
+  if (aUniq.length > 0 && cUniq.length > 0) return true;
+
+  /* Same idea for letter-glued model tokens (s24 vs s25, xm4 vs xm5,
+     h2 vs h3). These are unique-per-generation identifiers and a
+     mismatch is a hard signal. */
+  const aMod = extractRequiredModelTokens(anchor.title);
+  const cMod = extractRequiredModelTokens(candidate.title);
+  const aModUniq = aMod.filter((m) => !cMod.includes(m));
+  const cModUniq = cMod.filter((m) => !aMod.includes(m));
+  if (aModUniq.length > 0 && cModUniq.length > 0) return true;
+
+  /* Variant token disagreement (Pro / Max / Ultra / Plus / Mini / SE).
+     Both sides have variant tokens AND none overlap → different
+     SKUs (iPhone 15 Pro vs iPhone 15 Ultra would not exist; iPhone
+     15 Pro vs iPhone 15 Plus IS a real product difference). */
+  const aVar = extractVariantTokens(anchor.title);
+  const cVar = extractVariantTokens(candidate.title);
+  if (aVar.length > 0 && cVar.length > 0) {
+    const overlap = aVar.some((v) => cVar.includes(v));
+    if (!overlap) return true;
+  }
+
+  return false;
+}
+
 export async function isLikelySameProductDeep(
   supa:      SupabaseClient,
   anchor:    DeepMatchProduct,
@@ -126,6 +193,18 @@ export async function isLikelySameProductDeep(
   /* Stage 2 — abort cheaply when the lexical gates are clearly no. */
   const score = approximateScore(anchor, candidate);
   if (score < LEXICAL_ABORT_SCORE) return false;
+
+  /* Stage 2.5 — HARD VETO on definitive identity-marker mismatches.
+     Embedding cosine is great at finding semantically-similar
+     products but TERRIBLE at distinguishing model generations
+     (Galaxy A15 / A17 / A57 all cluster at ~0.93 cosine — they
+     share the line, suffix, and brand). Without this veto, Phase 3
+     was admitting cross-generation false positives ("A17 5G" anchor
+     pulled in A15 and A57 offers). The veto runs BEFORE stages 3
+     and 4 so neither can accidentally rescue a hard-different pair.
+     Mirrors the hard-fail signals INSIDE isLikelySameProduct's
+     gates — see deepMatchVeto for the specific checks. */
+  if (deepMatchVeto(anchor, candidate)) return false;
 
   /* Stage 3 — semantic embedding admission. The caller is expected
      to have pre-fetched candidate.similarityToAnchor via the

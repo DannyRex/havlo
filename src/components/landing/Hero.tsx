@@ -101,6 +101,46 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
      newer one — matches the deals page fetchSeq pattern. */
   const fetchSeqRef = useRef(0);
 
+  /* Rotating placeholder examples.
+     ────────────────────────────────────────────────────────────
+     The subhead above the composer already says "Paste a link or
+     search any product. Havlo finds it cheaper in <country>." —
+     the placeholder used to say "Search or paste a product link…"
+     which was an exact echo of the same instruction. User report:
+     "the placeholders in the homepage search box seem duplicated".
+
+     The placeholder now ROTATES through concrete example queries
+     (3.5s each) so it doubles as an idea-spark instead of repeating
+     the subhead. Examples are country-aware — picking products
+     that are realistic in the local market (Tecno Spark feels at
+     home in NG, less so in DE; Galaxus is DE-specific; etc.).
+
+     Hydration-safe: the index starts at 0 (so SSR + first client
+     render show the same first example) and only rotates after
+     mount via the useEffect below. Suspended while the user is
+     focused/typing so the placeholder doesn't shift mid-input. */
+  const placeholderExamples = (() => {
+    switch (countryCode) {
+      case "ng": return ["iPhone 15 Pro", "Tecno Spark 20", "Stanley Quencher", "Oraimo earbuds", "AirPods 4"];
+      case "uk": return ["AirPods 4", "Nintendo Switch 2", "Dyson V12", "Apple Watch Ultra", "Le Creuset Dutch oven"];
+      case "us": return ["AirPods 4", "Nintendo Switch 2", "Dyson Airwrap", "Stanley Quencher", "Apple Watch Ultra"];
+      case "de": return ["AirPods 4", "Bose QuietComfort", "Nintendo Switch 2", "Dyson Airwrap", "Sony WH-1000XM5"];
+      case "in": return ["OnePlus Nord", "boAt earphones", "Stanley Quencher", "Apple Watch SE", "Samsung Galaxy A06"];
+      case "ae": return ["iPhone 15 Pro", "Apple Watch Ultra", "Dyson Airwrap", "Nintendo Switch 2", "Sony WH-1000XM5"];
+      case "za": return ["AirPods 4", "Apple Watch SE", "Samsung Galaxy S24", "Nintendo Switch 2", "Sony WH-1000XM5"];
+      default:   return ["iPhone 15 Pro", "AirPods 4", "Nintendo Switch 2", "Dyson V12", "Stanley Quencher"];
+    }
+  })();
+  const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  useEffect(() => {
+    /* Suspend rotation when the user has the box focused or has typed
+       anything — shifting the placeholder text under their cursor is
+       distracting. Resumes on blur with an empty box. */
+    if (focused || query.length > 0) return;
+    const t = setInterval(() => setPlaceholderIdx((i) => (i + 1) % placeholderExamples.length), 3500);
+    return () => clearInterval(t);
+  }, [focused, query.length, placeholderExamples.length]);
+
   /* Search routing — fork on intent:
        URL paste → /compare. The user has a specific product link,
          sniff-to-anchor extracts the title + price + image and the
@@ -413,12 +453,13 @@ export default function Hero({ storeCount, countryCode, countryName }: Props) {
                 blurTimerRef.current = setTimeout(() => setFocused(false), 150);
               }}
               rows={1}
-              /* Shortened in round-3 QA: original "Paste a product
-                 link, or search anything…" wrapped to 2 lines on
-                 iPhone 14 Pro and the second line was clipped
-                 mid-comma. Compact form fits on one line at the
-                 textarea's mobile width. */
-              placeholder="Search or paste a product link…"
+              /* Rotating concrete examples — see placeholderExamples
+                 + the useEffect that drives the rotation. Replaced
+                 the static "Search or paste a product link…" which
+                 echoed the subhead one-for-one. The "Try " prefix
+                 reads naturally with any of the cycling product
+                 names regardless of length. */
+              placeholder={`Try ${placeholderExamples[placeholderIdx]}…`}
               className="w-full"
               style={{
                 minHeight: "52px",
