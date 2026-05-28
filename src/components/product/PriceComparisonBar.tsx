@@ -486,7 +486,16 @@ export default function PriceComparisonBar({
                   {formatPriceForUser(row.effectiveNgn, country)}
                 </p>
                 {row.isCrossBorder && (
-                  <p className="text-[10px] text-amber-300 inline-flex items-center gap-1 mt-0.5 leading-tight">
+                  /* Adapt the amber to the popover's inverted background.
+                     The popover uses `bg-ink text-bg`, which renders:
+                       • light mode → dark navy popover (slate-900)
+                       • dark  mode → near-white popover (#f5f5f5)
+                     amber-300 (#fcd34d) had decent contrast on the dark
+                     light-mode popover but vanished against the near-
+                     white dark-mode popover. amber-700 (#b45309) gives
+                     ~5.4:1 contrast on that near-white background while
+                     staying legible. Icon inherits color from <p>. */
+                  <p className="text-[10px] text-amber-300 dark:text-amber-700 inline-flex items-center gap-1 mt-0.5 leading-tight">
                     <Plane size={9} aria-hidden="true" /> Cross-border
                   </p>
                 )}
