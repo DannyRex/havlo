@@ -59,6 +59,19 @@ interface Props {
   /** Optional — used in the reference-line label so users see e.g.
       "Jumia · ₦12,500" instead of a generic "Your price". */
   visitingStoreName?: string;
+  /** Where this PDP's product data lives:
+        "tracked"  — real product in the offers table; history rows
+                     accumulate as prices change. Empty state means
+                     "we just haven't seen a change yet."
+        "curated"  — static curated catalog (curated-amazon.ts and
+                     similar). We never write offer_price_history
+                     for these; empty state means "tracking doesn't
+                     apply to this product type."
+
+      Default "tracked" preserves the existing behaviour for the
+      vast majority of PDPs. The PDP page passes "curated" when
+      the offer's product_id is a synthetic (non-UUID) string. */
+  dataSource?:        "tracked" | "curated";
 }
 
 /* ── Layout tokens (all px, absolute — no ratio math) ─────────── */
@@ -84,7 +97,7 @@ const RANGE_OPTIONS = [
 type RangeKey = typeof RANGE_OPTIONS[number]["key"];
 
 export default function PriceHistoryChart({
-  points, currentNgn, country, visitingStoreName,
+  points, currentNgn, country, visitingStoreName, dataSource = "tracked",
 }: Props) {
   const uid = useId();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -205,18 +218,35 @@ export default function PriceHistoryChart({
      the chart frame — a single dot plus a flat hold-line communicates
      "we've seen one price point, here it is" honestly and is more
      useful than hiding the chart entirely. The 2+ point path draws
-     the full curve. */
+     the full curve.
+
+     Copy branches by dataSource:
+       "tracked" — real product, history will accumulate. Forward-
+                   looking copy invites the user to come back later.
+       "curated" — static curated catalog (curated-amazon.ts etc.).
+                   We don't write offer_price_history rows for
+                   these — the empty state should explain that
+                   tracking just doesn't apply to this product
+                   type instead of implying it's about to start. */
   if (sliced.length < 1) {
+    const isCurated = dataSource === "curated";
     return (
       <section
         ref={containerRef}
         className="rounded-2xl border border-border bg-surface-2/40 px-5 py-8 text-center"
-        aria-label="Price history. No data yet"
+        aria-label={isCurated
+          ? "Price history. Not tracked for this listing"
+          : "Price history. No data yet"
+        }
       >
         <Calendar size={20} className="mx-auto text-ink-3 mb-2" aria-hidden="true" />
-        <p className="text-sm text-ink-2">No price activity yet</p>
-        <p className="text-xs text-ink-3 mt-1 max-w-xs mx-auto">
-          Once the price changes at any store, you&apos;ll see the full timeline here.
+        <p className="text-sm text-ink-2">
+          {isCurated ? "Price history not tracked here" : "No price activity yet"}
+        </p>
+        <p className="text-xs text-ink-3 mt-1 max-w-sm mx-auto leading-relaxed">
+          {isCurated
+            ? <>This listing comes from our curated set. Live price tracking kicks in for products in our actively-monitored catalog.</>
+            : <>Once the price changes at any store, you&apos;ll see the full timeline here.</>}
         </p>
       </section>
     );

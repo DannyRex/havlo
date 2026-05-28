@@ -950,11 +950,31 @@ export default async function ProductPage({ params }: PageProps) {
                 inconsistent ("why does this PDP have a chart and
                 that one doesn't?"). */}
         <div className="mt-6 sm:mt-8">
+          {/* dataSource picks the empty-state copy:
+                "curated" → synthetic-id anchor (offer.product_id is
+                            non-UUID e.g. "amazon-ae-airpods-pro-2"
+                            from curated-amazon.ts, or "serp-…" from
+                            live-search). These products live in
+                            static catalogs that don't get tracked in
+                            offer_price_history, so the empty state
+                            explains tracking just doesn't apply
+                            here rather than implying it's about to
+                            start. Detection mirrors the UUID guard
+                            in lib/search/price-history.ts so both
+                            sides agree on what "tracked" means.
+                "tracked" → real DB product whose history table just
+                            hasn't accumulated rows yet. Forward-
+                            looking copy invites the visitor back. */}
           <PriceHistoryChart
             points={priceTimeseries ?? []}
             currentNgn={anchorPriceNgn}
             country={country}
             visitingStoreName={offer.store_name}
+            dataSource={
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(offer.product_id ?? "")
+                ? "tracked"
+                : "curated"
+            }
           />
         </div>
 
