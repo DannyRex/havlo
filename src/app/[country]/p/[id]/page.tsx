@@ -764,14 +764,21 @@ export default async function ProductPage({ params }: PageProps) {
     ["pdp-price-history"],
     { revalidate: 1800, tags: ["pdp-price-history"] },
   );
-  /* Time-series for the new PriceHistoryChart. Separate RPC from
-     the rollup above — same underlying offer_price_history table
-     but bucketed by day with min-across-stores per bucket, which
-     is what the line chart needs to plot. Both reads parallelise
-     since they hit different RPCs. */
+  /* Time-series for the PriceHistoryChart. Separate RPC from the
+     rollup above — same offer_price_history table but bucketed
+     by day with min-across-stores per bucket, which is what the
+     line chart needs to plot.
+
+     Window bumped 90 → 365 days (May 2026 chart v2 rewrite). The
+     chart now has client-side 30/90/All toggles; fetching the
+     full year server-side means range switches are instant (no
+     refetch) and the cost is bounded — daily buckets cap the
+     return payload at 365 rows regardless of how chatty the
+     product's price stream is. Cache key bumped to v2 to skip
+     stale 90d-only entries from the prior revalidate window. */
   const fetchPriceTimeseriesCached = unstable_cache(
-    async (productId: string) => fetchProductPriceTimeseries(productId, 90),
-    ["pdp-price-timeseries"],
+    async (productId: string) => fetchProductPriceTimeseries(productId, 365),
+    ["pdp-price-timeseries-v2"],
     { revalidate: 1800, tags: ["pdp-price-timeseries"] },
   );
   const [priceHistoryRows, priceTimeseries] = await Promise.all([
@@ -867,7 +874,7 @@ export default async function ProductPage({ params }: PageProps) {
               points={priceTimeseries}
               currentNgn={anchorPriceNgn}
               country={country}
-              windowDays={90}
+              visitingStoreName={offer.store_name}
             />
           </div>
         )}

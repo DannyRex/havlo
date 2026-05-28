@@ -686,9 +686,23 @@ export default function DealFeed({
           /* Deal-count summary on its own line — separate paragraph
              so the metric breathes instead of crowding the subhead.
              Origin-scoped (activeCounts) so it agrees with the active
-             tab and the toolbar count — see the B1 regression fix. */
+             tab and the toolbar count — see the B1 regression fix.
+
+             Copy fix (May 2026): old phrasing was "X on sale of Y
+             total" which implied all Y items were part of a sale.
+             They aren't — Y is the whole browsable catalog (includes
+             pharmacy / grocery / Shopify feeds at retail price);
+             X is the subset with a real discount. Reframed as two
+             facts joined by an interpunct so neither claims the
+             other: total catalog size, then "of which N are
+             discounted". Handles the degenerate edge cases (deals=0
+             and deals=total) so the copy never lies. */
           <p className="text-xs sm:text-sm text-ink-3 mt-2 tabular-nums">
-            {activeCounts.deals.toLocaleString()} on sale of {activeCounts.total.toLocaleString()} total.
+            {activeCounts.deals === 0
+              ? `Browsing ${activeCounts.total.toLocaleString()} products. Nothing currently on sale here.`
+              : activeCounts.deals >= activeCounts.total
+                ? `All ${activeCounts.total.toLocaleString()} products are on sale right now.`
+                : <>Browsing {activeCounts.total.toLocaleString()} products · {activeCounts.deals.toLocaleString()} on sale right now.</>}
           </p>
         )}
       </div>

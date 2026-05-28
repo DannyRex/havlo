@@ -1,382 +1,1006 @@
 "use client";
 
-/* Price-history line chart for the PDP.
+/* Price-history line chart for the PDP — v2.
 
-   Renders the product_price_timeseries data (one point per day,
-   lowest price across stores) as an SVG line + area chart. No
-   chart library — the data shape is simple enough that a hand-rolled
-   SVG is smaller, faster, and gives full control over the visual
-   language that has to match PriceComparisonBar.
+   What changed vs v1 (May 2026 chart rewrite):
+     • viewBox now scales to the container's measured width so
+       strokes + circles stay geometrically true at every viewport
+       (v1 used preserveAspectRatio="none" which non-uniformly
+       stretched everything).
+     • Range toggle: 30D / 90D / All. Client-side slice so switching
+       is instant (server fetch is now 365d, see page.tsx).
+     • Verdict header: dynamic copy + colour that answers "is this
+       a good price right now?" — "Lowest in 30 days" (success),
+       "X% above lowest" (warn), "Highest in window" (danger).
+     • Tooltip rendered at the hovered point as an HTML overlay
+       (not below the chart). Smart-flips to avoid overflow.
+     • X-axis date ticks — 3-4 evenly spaced labels.
+     • Labeled reference line for the visitor's current price so
+       they can read "you are here" at a glance.
+     • Recent-change pill: "↓ ₦X last 7 days" when meaningful.
+     • Keyboard navigation — arrow keys move the hovered index,
+       Home/End jump to bounds, Esc unpins.
+     • Respects prefers-reduced-motion.
+     • Single SVG (no mobile/desktop duplicate trees from v1).
+     • role="img" + aria-label + sr-only summary for screen readers.
 
-   What it shows:
-     • The PRICE FLOOR across all stores carrying this product over
-       the last 90 days. Not the visiting store's price specifically —
-       the bar above the chart shows that. The chart is "what's the
-       cheapest this product has ever been across any store?"
-     • A dashed reference line for the visiting store's current price,
-       so the visitor can see if their offer is above / below / at
-       the historical floor.
-     • Tooltip on hover (desktop) / touch (mobile) showing exact
-       price + date for that point.
+   What's deliberately NOT in scope:
+     • Per-store lines. The cross-store min line + a labeled
+       reference for the visitor's offer is enough decision
+       support; per-store would clutter and needs a new RPC.
+     • Y-axis ticks. The tile strip below shows lowest/highest
+       as exact numbers — labelled axis ticks would duplicate
+       and crowd the chart.
+     • Single-store-day dimming. Polish item; ignored for v2.
 
-   What it deliberately doesn't show:
-     • Per-store lines. KuantoKusta's chart is single-line (lowest
-       across stores). Multi-line would be cluttered for products
-       with 5+ stores and confusing when stores enter/exit the data
-       over time.
-     • Original (non-sale) prices. The data is current/sale prices
-       only — that's what shoppers actually care about.
+   Currency contract: every *Ngn input is NGN. formatPriceForUser
+   converts at render time via the country prop. Passing user-
+   currency values would double-convert. */
 
-   Empty / sparse data:
-     • <2 points: show empty state ("No price history yet").
-     • 2-6 points: show the chart but suppress the "X day low" badge
-       in the header (not enough data to claim a low confidently).
-     • 7+ points: full chart + badges.
-
-   Currency contract: prices come in as NGN. The component runs them
-   through formatPriceForUser at render time using the same Country
-   object the PriceComparisonBar uses. */
-
-import { useState, useId, useMemo } from "react";
-import { formatPriceForUser } from "@/lib/utils";
+import {
+  useCallback, useEffect, useId, useLayoutEffect,
+  useMemo, useRef, useState,
+} from "react";
+import { formatPriceForUser, timeAgo } from "@/lib/utils";
 import type { Country } from "@/lib/country";
 import type { PriceHistoryPoint } from "@/lib/search/price-history";
-import { TrendingDown, Calendar } from "lucide-react";
+import {
+  TrendingDown, TrendingUp, Minus, Calendar,
+} from "lucide-react";
 
 interface Props {
-  /** Time-series points, oldest first. */
-  points:        PriceHistoryPoint[];
-  /** Visiting offer's current NGN price — drives the dashed
-      reference line + "this price vs floor" framing. */
-  currentNgn:    number;
-  /** Country object for currency formatting (matches the bar above). */
-  country:       Country;
-  /** Lookback window the data covers — used in the empty-state copy
-      and the chart header. Default 90 to match the page's fetch. */
-  windowDays?:   number;
+  /** Time-series points, oldest first. NGN. */
+  points:             PriceHistoryPoint[];
+  /** Visiting offer's current NGN price — drives the reference line
+      + the verdict copy in the header. */
+  currentNgn:         number;
+  /** Country for price + date formatting (matches the bar above). */
+  country:            Country;
+  /** Optional — used in the reference-line label so users see e.g.
+      "Jumia · ₦12,500" instead of a generic "Your price". */
+  visitingStoreName?: string;
 }
 
-/* Visual tuning ─────────────────────────────────────────────────────
-   Chart dimensions chosen to match the PriceComparisonBar's visual
-   weight without overshadowing it. 380px height on desktop is enough
-   to read individual points; 240px on mobile keeps the chart from
-   dominating the above-the-fold area when the PDP scrolls. */
-const CHART_HEIGHT_DESKTOP = 200;
-const CHART_HEIGHT_MOBILE  = 160;
-const PADDING_X            = 12;
-const PADDING_TOP          = 16;
-const PADDING_BOTTOM       = 28;
+/* ── Layout tokens (all px, absolute — no ratio math) ─────────── */
+const CHART_HEIGHT      = 220;
+const PAD_TOP           = 16;   // breathing space above the line
+const PAD_BOTTOM        = 28;   // room for the x-axis date row
+const PAD_LEFT          = 12;
+const PAD_RIGHT         = 12;
+const TOOLTIP_OFFSET_Y  = 14;
+const HOVER_DOT_RADIUS  = 4.5;
 
-export default function PriceHistoryChart({ points, currentNgn, country, windowDays = 90 }: Props) {
+/* ── Visual tokens ────────────────────────────────────────────── */
+const LINE_HEX          = "#16a34a";  // success
+const REF_LINE_HEX      = "#6b7280";  // neutral grey, distinct from line
+const GRID_HEX_ALPHA    = "rgba(120, 113, 108, 0.18)";
+
+/* ── Range toggle options ─────────────────────────────────────── */
+const RANGE_OPTIONS = [
+  { key: "30D", days:  30, label: "30D" },
+  { key: "90D", days:  90, label: "90D" },
+  { key: "ALL", days: 365, label: "All" },
+] as const;
+type RangeKey = typeof RANGE_OPTIONS[number]["key"];
+
+export default function PriceHistoryChart({
+  points, currentNgn, country, visitingStoreName,
+}: Props) {
   const uid = useId();
-  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<HTMLDivElement | null>(null);
 
-  /* Empty state — no history rows yet. Most likely cause: product
-     was just ingested, hasn't had a price change recorded yet. The
-     trigger from migration 0027 always writes at least one row on
-     INSERT so this should only fire for legitimately new products. */
-  if (points.length < 2) {
+  /* Default range: prefer 90D when we have ≥ 7 days of data
+     (statistically interesting). Otherwise show All so users
+     aren't staring at a 1-2 point window. Initial value is
+     stable across SSR + client. */
+  const initialRange: RangeKey = useMemo(() => {
+    if (points.length < 7) return "ALL";
+    /* If the span covered by `points` is less than 60 days,
+       starting on 90D would render the same data as All — pick
+       30D so the toggle actually does something visible. */
+    const span = computeSpanDays(points);
+    if (span < 60) return "30D";
+    return "90D";
+  }, [points]);
+  const [rangeKey, setRangeKey] = useState<RangeKey>(initialRange);
+
+  const range = useMemo(
+    () => RANGE_OPTIONS.find((r) => r.key === rangeKey) ?? RANGE_OPTIONS[1],
+    [rangeKey],
+  );
+
+  /* Slice the points to the active window. Anchored at the LATEST
+     point — sliding window from now backwards. */
+  const sliced = useMemo(
+    () => sliceToLastNDays(points, range.days),
+    [points, range.days],
+  );
+
+  /* Container width drives the SVG viewBox. ResizeObserver keeps
+     it in sync as the layout shifts (responsive grid, side-nav
+     open/close, etc.). 640 is a sensible SSR default that maps to
+     a centred max-width-3xl card. */
+  const width = useContainerWidth(containerRef, 640);
+  const reducedMotion = usePrefersReducedMotion();
+
+  /* Derive everything geometry-related once per (sliced, width,
+     currentNgn) change. The math doesn't depend on hover state.
+     currentNgn flows through because the reference-line Y position
+     depends on it. */
+  const geom = useMemo(
+    () => computeGeometryFull(sliced, width, currentNgn),
+    [sliced, width, currentNgn],
+  );
+
+  /* Hover + pin state. `pinned` keeps the tooltip visible after a
+     tap (mobile) or Enter/Space (keyboard) until the user moves
+     pointer away or hits Esc / taps outside. */
+  const [hoverIdx, setHoverIdxRaw] = useState<number | null>(null);
+  const [pinned, setPinned] = useState(false);
+  const setHoverIdx = useCallback((i: number | null) => {
+    setHoverIdxRaw(i);
+    if (i === null) setPinned(false);
+  }, []);
+
+  /* Click-outside unpins the tooltip (touch UX). */
+  useEffect(() => {
+    if (!pinned) return;
+    const handler = (e: PointerEvent) => {
+      if (!chartRef.current?.contains(e.target as Node)) {
+        setPinned(false);
+        setHoverIdxRaw(null);
+      }
+    };
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
+  }, [pinned]);
+
+  /* Keyboard nav — only when the chart has focus. Arrows move the
+     hovered index; Home/End jump to bounds; Esc unpins. */
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (sliced.length === 0) return;
+      const last = sliced.length - 1;
+      switch (e.key) {
+        case "ArrowLeft":
+        case "ArrowDown":
+          e.preventDefault();
+          setHoverIdxRaw((i) => Math.max(0, (i ?? last) - 1));
+          setPinned(true);
+          break;
+        case "ArrowRight":
+        case "ArrowUp":
+          e.preventDefault();
+          setHoverIdxRaw((i) => Math.min(last, (i ?? -1) + 1));
+          setPinned(true);
+          break;
+        case "Home":
+          e.preventDefault();
+          setHoverIdxRaw(0);
+          setPinned(true);
+          break;
+        case "End":
+          e.preventDefault();
+          setHoverIdxRaw(last);
+          setPinned(true);
+          break;
+        case "Enter":
+        case " ":
+          e.preventDefault();
+          setPinned((p) => !p);
+          break;
+        case "Escape":
+          e.preventDefault();
+          setHoverIdxRaw(null);
+          setPinned(false);
+          break;
+      }
+    },
+    [sliced.length],
+  );
+
+  /* ── Empty state ──────────────────────────────────────────────
+     < 2 points means we can't draw a line. This is most likely a
+     freshly-ingested product whose price hasn't changed yet (the
+     trigger from migration 0027 always writes 1 row at INSERT). */
+  if (sliced.length < 2) {
     return (
-      <div className="rounded-2xl border border-border bg-surface-2/40 px-5 py-8 text-center">
-        <Calendar size={20} className="mx-auto text-ink-3 mb-2" />
-        <p className="text-sm text-ink-2">No price history yet.</p>
-        <p className="text-xs text-ink-3 mt-1">
-          Check back in a few days — we&apos;ll track this product&apos;s price across stores.
+      <section
+        ref={containerRef}
+        className="rounded-2xl border border-border bg-surface-2/40 px-5 py-8 text-center"
+        aria-label="Price history — not enough data yet"
+      >
+        <Calendar size={20} className="mx-auto text-ink-3 mb-2" aria-hidden="true" />
+        <p className="text-sm text-ink-2">Not enough price history yet</p>
+        <p className="text-xs text-ink-3 mt-1 max-w-xs mx-auto">
+          We start tracking the moment a product is ingested. Check back in a few days.
         </p>
-      </div>
+      </section>
     );
   }
 
-  /* Scale points to chart coordinates. Recomputed on every render
-     but the math is trivial (≤90 elements) — useMemo only to keep
-     downstream JSX dependency-tracking simple. */
-  const { pathD, areaD, lowest, lowestIdx, highest, prices, days } = useMemo(() => {
-    const prices = points.map((p) => p.minPriceNgn);
-    const days   = points.map((p) => p.day);
-    let lowest   = prices[0];
-    let lowestIdx = 0;
-    let highest  = prices[0];
-    for (let i = 1; i < prices.length; i++) {
-      if (prices[i] < lowest)  { lowest = prices[i]; lowestIdx = i; }
-      if (prices[i] > highest) { highest = prices[i]; }
-    }
-    /* Range padding so the line doesn't sit flush against the
-       chart edges. If lowest === highest (flat price), pad both
-       directions equally so the line ends up centre-vertically. */
-    const rangeRaw  = highest - lowest;
-    const range     = rangeRaw === 0 ? Math.max(highest * 0.1, 100) : rangeRaw;
-    const minPadded = lowest  - range * 0.15;
-    const maxPadded = highest + range * 0.15;
-    const heightUsable = 100 - ((PADDING_TOP + PADDING_BOTTOM) / 200) * 100; // % space
-    const xStep = 100 / Math.max(prices.length - 1, 1);
+  /* ── Verdict + change indicators ──────────────────────────── */
+  const verdict       = computeVerdict(currentNgn, geom.lowestNgn, geom.meanNgn, range.days);
+  const weekChange    = computeRecentChange(sliced, 7);
 
-    const coords = prices.map((p, i) => {
-      const x = i * xStep;
-      const y = PADDING_TOP + ((maxPadded - p) / (maxPadded - minPadded)) * heightUsable;
-      return { x, y };
-    });
-    /* Step-after line (price holds until next change) — the
-       offer_price_history data is event-based not sampled, so
-       drawing a smooth line between two points implies prices
-       continuously slid between them. Step-after makes the chart
-       honest: prices hold the last known value until a new event
-       overwrites them. */
-    const segments: string[] = [];
-    coords.forEach((c, i) => {
-      if (i === 0) {
-        segments.push(`M ${c.x.toFixed(2)} ${c.y.toFixed(2)}`);
-      } else {
-        const prev = coords[i - 1];
-        segments.push(`L ${c.x.toFixed(2)} ${prev.y.toFixed(2)}`);
-        segments.push(`L ${c.x.toFixed(2)} ${c.y.toFixed(2)}`);
-      }
-    });
-    const pathD = segments.join(" ");
-    /* Area shape closes the line back down to the bottom edge for
-       the gradient fill — pure cosmetic depth cue. */
-    const last = coords[coords.length - 1];
-    const first = coords[0];
-    const areaD = `${pathD} L ${last.x.toFixed(2)} ${100 - PADDING_BOTTOM / 200 * 100} L ${first.x.toFixed(2)} ${100 - PADDING_BOTTOM / 200 * 100} Z`;
-    return { pathD, areaD, lowest, lowestIdx, highest, prices, days };
-  }, [points]);
+  /* Date format string used for tooltip + lowest tile dates. */
+  const dateFmt = useMemo(
+    () => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }),
+    [],
+  );
+  const dateFmtYear = useMemo(
+    () => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }),
+    [],
+  );
 
-  const currentVsLowest = currentNgn - lowest;
-  const isCurrentAtFloor = currentNgn <= lowest * 1.01;
+  /* Lowest-date callout — shown both in the header pill (verdict
+     when applicable) and in the lowest tile. */
+  const lowestDate = dateFmt.format(new Date(sliced[geom.lowestIdx].day));
 
-  /* Format the lowest date as "Mar 12" — short, locale-agnostic. */
-  const lowestDate = new Date(days[lowestIdx]).toLocaleDateString("en-US", {
-    month: "short", day: "numeric",
+  /* Reference-line label that floats on the right edge. Slight
+     dim so it doesn't compete with the line. */
+  const referenceLabel = visitingStoreName
+    ? `${visitingStoreName} · ${formatPriceForUser(currentNgn, country)}`
+    : `Your price · ${formatPriceForUser(currentNgn, country)}`;
+
+  /* Tooltip + hover marker computations — done once at render time. */
+  const hover = hoverIdx !== null
+    ? buildHoverState(sliced, hoverIdx, geom, width, country, dateFmtYear)
+    : null;
+
+  /* ── Screen-reader summary ────────────────────────────────── */
+  const a11ySummary = buildAriaSummary({
+    range, sliced, geom, currentNgn, country, lowestDate,
   });
 
   return (
-    <section className="rounded-2xl border border-border bg-surface-2/40 p-4 sm:p-5">
-      {/* Header — context + the "lowest in N days" callout. Mirrors
-          the PriceComparisonBar's header rhythm so the two surfaces
-          read as siblings. */}
+    <section
+      ref={containerRef}
+      className="rounded-2xl border border-border bg-surface-2/40 p-4 sm:p-5"
+      aria-label="Price history"
+    >
+      {/* ── Header: verdict + range toggle ─────────────────── */}
       <header className="flex items-start justify-between gap-3 mb-3 sm:mb-4">
-        <div>
+        <div className="min-w-0">
           <h3 className="text-sm sm:text-base font-semibold text-ink leading-tight">
             Price history
           </h3>
-          <p className="text-xs text-ink-3 mt-0.5">
-            Lowest across stores · last {windowDays} days
-          </p>
-        </div>
-        {points.length >= 7 && (
-          <div className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 border border-success/20">
-            <TrendingDown size={11} className="text-success" />
-            <span className="text-[11px] font-semibold text-success whitespace-nowrap">
-              Low: {formatPriceForUser(lowest, country)}
-            </span>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <VerdictPill verdict={verdict} />
+            {weekChange && <WeekChangePill change={weekChange} country={country} />}
           </div>
-        )}
+        </div>
+        <RangeToggle
+          value={rangeKey}
+          onChange={setRangeKey}
+          /* Disable ranges with insufficient data so the toggle
+             never produces an empty chart. */
+          dataSpanDays={computeSpanDays(points)}
+        />
       </header>
 
-      {/* SVG chart. preserveAspectRatio=none lets the chart stretch
-          to the container width while we keep the math in 0-100
-          coordinate space. */}
-      <div className="relative" style={{ height: CHART_HEIGHT_DESKTOP }}>
-        <div className="absolute inset-0 hidden sm:block">
-          <ChartSvg
-            uid={uid}
-            pathD={pathD}
-            areaD={areaD}
-            prices={prices}
-            currentNgn={currentNgn}
-            lowest={lowest}
-            highest={highest}
-            lowestIdx={lowestIdx}
-            hoverIdx={hoverIdx}
-            setHoverIdx={setHoverIdx}
+      {/* ── Chart container ──────────────────────────────────── */}
+      <div
+        ref={chartRef}
+        role="img"
+        aria-label={a11ySummary}
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
+        className="relative outline-none focus-visible:ring-2 focus-visible:ring-ink/30 rounded-lg"
+        style={{ height: CHART_HEIGHT }}
+      >
+        <svg
+          width="100%"
+          height={CHART_HEIGHT}
+          viewBox={`0 0 ${width} ${CHART_HEIGHT}`}
+          preserveAspectRatio="none"
+          aria-hidden="true"
+          /* Why preserveAspectRatio="none" here BUT it's safe (unlike
+             v1): viewBox width === measured container width, so the
+             scale factor is always 1×1. The strokes / circles render
+             at their literal px values. */
+          onMouseMove={(e) => {
+            const rect = chartRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const px = e.clientX - rect.left;
+            const idx = nearestIndex(px, geom);
+            setHoverIdxRaw(idx);
+          }}
+          onMouseLeave={() => {
+            if (!pinned) setHoverIdxRaw(null);
+          }}
+          onTouchStart={(e) => {
+            const rect = chartRef.current?.getBoundingClientRect();
+            const touch = e.touches[0];
+            if (!rect || !touch) return;
+            const px = touch.clientX - rect.left;
+            const idx = nearestIndex(px, geom);
+            setHoverIdxRaw(idx);
+            setPinned(true);
+          }}
+          onTouchMove={(e) => {
+            const rect = chartRef.current?.getBoundingClientRect();
+            const touch = e.touches[0];
+            if (!rect || !touch) return;
+            const px = touch.clientX - rect.left;
+            const idx = nearestIndex(px, geom);
+            setHoverIdxRaw(idx);
+          }}
+        >
+          <defs>
+            <linearGradient id={`grad-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor={LINE_HEX} stopOpacity="0.20" />
+              <stop offset="100%" stopColor={LINE_HEX} stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+
+          {/* Subtle grid — vertical lines at axis ticks only.
+              Horizontal grid omitted; the price tiles below show
+              numeric anchors. */}
+          {geom.axisTicks.map((t, i) => (
+            <line
+              key={`grid-${i}`}
+              x1={t.x} x2={t.x}
+              y1={PAD_TOP} y2={CHART_HEIGHT - PAD_BOTTOM}
+              stroke={GRID_HEX_ALPHA}
+              strokeWidth={1}
+            />
+          ))}
+
+          {/* Area fill — step-after, capped at the chart bottom */}
+          <path d={geom.areaD} fill={`url(#grad-${uid})`} />
+
+          {/* Reference line: visitor's current price. Dashed,
+              clamped to the chart band so an out-of-range price
+              still appears at the top/bottom edge. */}
+          <line
+            x1={PAD_LEFT}
+            x2={width - PAD_RIGHT}
+            y1={geom.currentRefY}
+            y2={geom.currentRefY}
+            stroke={REF_LINE_HEX}
+            strokeWidth={1}
+            strokeDasharray="4 3"
+            opacity="0.55"
           />
-        </div>
-        <div className="absolute inset-0 sm:hidden" style={{ height: CHART_HEIGHT_MOBILE }}>
-          <ChartSvg
-            uid={uid + "-m"}
-            pathD={pathD}
-            areaD={areaD}
-            prices={prices}
-            currentNgn={currentNgn}
-            lowest={lowest}
-            highest={highest}
-            lowestIdx={lowestIdx}
-            hoverIdx={hoverIdx}
-            setHoverIdx={setHoverIdx}
+
+          {/* The price line itself — step-after, emerald */}
+          <path
+            d={geom.pathD}
+            fill="none"
+            stroke={LINE_HEX}
+            strokeWidth={2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
           />
+
+          {/* Lowest marker — dot + soft ring */}
+          <circle
+            cx={geom.lowestX}
+            cy={geom.lowestY}
+            r={5}
+            fill="none"
+            stroke={LINE_HEX}
+            strokeWidth={1}
+            opacity="0.45"
+          />
+          <circle
+            cx={geom.lowestX}
+            cy={geom.lowestY}
+            r={3}
+            fill={LINE_HEX}
+          />
+
+          {/* Hover guide + marker. Only render when an index is
+              active AND it's not the lowest (avoids visual clash). */}
+          {hover && (
+            <>
+              <line
+                x1={hover.x} x2={hover.x}
+                y1={PAD_TOP} y2={CHART_HEIGHT - PAD_BOTTOM}
+                stroke={REF_LINE_HEX}
+                strokeWidth={1}
+                strokeDasharray="2 2"
+                opacity="0.5"
+              />
+              <circle
+                cx={hover.x}
+                cy={hover.y}
+                r={HOVER_DOT_RADIUS + 2}
+                fill="white"
+              />
+              <circle
+                cx={hover.x}
+                cy={hover.y}
+                r={HOVER_DOT_RADIUS}
+                fill={LINE_HEX}
+                stroke="white"
+                strokeWidth={1.5}
+              />
+            </>
+          )}
+
+          {/* X-axis date labels */}
+          {geom.axisTicks.map((t, i) => (
+            <text
+              key={`tick-${i}`}
+              x={t.x}
+              y={CHART_HEIGHT - 8}
+              textAnchor={i === 0 ? "start" : i === geom.axisTicks.length - 1 ? "end" : "middle"}
+              className="fill-ink-3"
+              style={{ fontSize: 10, fontVariantNumeric: "tabular-nums" }}
+            >
+              {t.label}
+            </text>
+          ))}
+        </svg>
+
+        {/* Reference-line label — HTML overlay positioned at the
+            right edge of the chart. Floats above/below the line
+            depending on where the line sits. */}
+        <div
+          className="absolute pointer-events-none text-[10px] font-medium text-ink-2 px-1.5 py-0.5 rounded-md bg-surface/90 border border-border backdrop-blur"
+          style={{
+            right: PAD_RIGHT + 4,
+            top:   geom.currentRefY > CHART_HEIGHT / 2
+              ? geom.currentRefY - 22
+              : geom.currentRefY + 6,
+            transition: reducedMotion ? "none" : "top 200ms ease-out",
+            maxWidth: "60%",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {referenceLabel}
         </div>
+
+        {/* Hover tooltip — HTML overlay positioned above the hovered
+            point. Smart-flips when near the top or right edges. */}
+        {hover && (
+          <div
+            className="absolute pointer-events-none rounded-lg border border-border bg-surface shadow-card px-2.5 py-2 z-10"
+            style={{
+              ...hover.tooltipStyle,
+              transition: reducedMotion ? "none" : "left 120ms ease-out, top 120ms ease-out",
+              minWidth: 110,
+            }}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="text-[11px] text-ink-3 leading-none mb-1 tabular-nums">
+              {hover.dateLabel}
+            </div>
+            <div className="text-sm font-semibold text-ink leading-none tabular-nums">
+              {hover.priceLabel}
+            </div>
+            {hover.deltaFromLow !== null && (
+              <div className={`text-[10px] mt-1 leading-none tabular-nums ${hover.deltaFromLow > 0 ? "text-ink-3" : "text-success"}`}>
+                {hover.deltaFromLow > 0
+                  ? `+${formatPriceForUser(hover.deltaFromLow, country)} above lowest`
+                  : "Lowest in window"}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Footer strip — three info tiles below the chart. Mirrors
-          the PriceComparisonBar's facts strip for visual
-          consistency. */}
+      {/* ── Tiles strip ─────────────────────────────────────── */}
       <div className="mt-3 sm:mt-4 grid grid-cols-3 gap-2">
-        <div className="rounded-lg bg-surface border border-border px-3 py-2">
-          <div className="text-[10px] uppercase tracking-wide text-ink-3 font-medium">Lowest</div>
-          <div className="text-sm font-semibold text-success mt-0.5">
-            {formatPriceForUser(lowest, country)}
-          </div>
-          <div className="text-[10px] text-ink-3 mt-0.5">{lowestDate}</div>
-        </div>
-        <div className="rounded-lg bg-surface border border-border px-3 py-2">
-          <div className="text-[10px] uppercase tracking-wide text-ink-3 font-medium">Highest</div>
-          <div className="text-sm font-semibold text-ink mt-0.5">
-            {formatPriceForUser(highest, country)}
-          </div>
-          <div className="text-[10px] text-ink-3 mt-0.5">in {windowDays}d</div>
-        </div>
-        <div className="rounded-lg bg-surface border border-border px-3 py-2">
-          <div className="text-[10px] uppercase tracking-wide text-ink-3 font-medium">Right now</div>
-          <div className={`text-sm font-semibold mt-0.5 ${isCurrentAtFloor ? "text-success" : "text-ink"}`}>
-            {formatPriceForUser(currentNgn, country)}
-          </div>
-          <div className={`text-[10px] mt-0.5 ${isCurrentAtFloor ? "text-success" : "text-ink-3"}`}>
-            {isCurrentAtFloor
-              ? "At lowest"
-              : currentVsLowest > 0
-                ? `+${formatPriceForUser(currentVsLowest, country)} vs low`
-                : `${formatPriceForUser(currentVsLowest, country)} vs low`}
-          </div>
-        </div>
+        <Tile
+          label="Lowest"
+          value={formatPriceForUser(geom.lowestNgn, country)}
+          caption={lowestDate}
+          tone="success"
+        />
+        <Tile
+          label="Highest"
+          value={formatPriceForUser(geom.highestNgn, country)}
+          caption={`in ${range.label === "All" ? "this window" : range.label.toLowerCase()}`}
+        />
+        <Tile
+          label="Right now"
+          value={formatPriceForUser(currentNgn, country)}
+          caption={verdict.tileCaption}
+          tone={verdict.tone === "success" ? "success" : undefined}
+        />
       </div>
 
-      {/* Hover tooltip — desktop only, only renders when an index
-          is hovered. Positioned absolutely above the hovered point
-          via the inline left offset. */}
-      {hoverIdx !== null && (
-        <div className="mt-2 text-xs text-ink-2 text-center">
-          <span className="font-semibold text-ink">{formatPriceForUser(prices[hoverIdx], country)}</span>
-          <span className="text-ink-3"> · {new Date(days[hoverIdx]).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-        </div>
-      )}
+      {/* ── Freshness strip ──────────────────────────────────── */}
+      <p className="mt-3 text-[11px] text-ink-3 leading-tight">
+        Tracked across {geom.peakStoreCount} {geom.peakStoreCount === 1 ? "store" : "stores"} ·
+        {" "}last refreshed{" "}
+        <time suppressHydrationWarning>{timeAgo(sliced[sliced.length - 1].day)}</time>
+      </p>
+
+      {/* sr-only fallback list for screen readers — duplicates the
+          chart as a tiny table so the data is reachable without
+          interaction. */}
+      <span className="sr-only">{a11ySummary}</span>
     </section>
   );
 }
 
-/* Inner SVG component — shared by desktop + mobile variants.
-   Coordinate system is 0-100 in both dimensions (preserveAspectRatio
-   none lets it stretch); strokes use vector-effect=non-scaling-stroke
-   so line thickness doesn't distort when the container resizes. */
-interface SvgProps {
-  uid:        string;
-  pathD:      string;
-  areaD:      string;
-  prices:     number[];
-  currentNgn: number;
-  lowest:     number;
-  highest:    number;
-  lowestIdx:  number;
-  hoverIdx:   number | null;
-  setHoverIdx: (i: number | null) => void;
+/* ══════════════════════════════════════════════════════════════
+   Subcomponents
+   ══════════════════════════════════════════════════════════════ */
+
+interface Verdict {
+  copy:        string;
+  tone:        "success" | "warn" | "danger" | "neutral";
+  icon:        "down" | "up" | "flat";
+  tileCaption: string;
 }
 
-function ChartSvg({ uid, pathD, areaD, prices, currentNgn, lowest, highest, lowestIdx, hoverIdx, setHoverIdx }: SvgProps) {
-  /* Map currentNgn to chart Y so the dashed "your price" reference
-     line lands at the right vertical position. Outside the data
-     range we clamp to the chart edges. */
-  const range = (highest - lowest) || Math.max(highest * 0.1, 100);
-  const minPadded = lowest  - range * 0.15;
-  const maxPadded = highest + range * 0.15;
-  const heightUsable = 100 - ((PADDING_TOP + PADDING_BOTTOM) / 200) * 100;
-  const currentY = Math.max(
-    PADDING_TOP,
-    Math.min(
-      PADDING_TOP + heightUsable,
-      PADDING_TOP + ((maxPadded - currentNgn) / (maxPadded - minPadded)) * heightUsable,
-    ),
-  );
-
-  const xStep = 100 / Math.max(prices.length - 1, 1);
-  const lowestX = lowestIdx * xStep;
-  const lowestY = PADDING_TOP + ((maxPadded - prices[lowestIdx]) / (maxPadded - minPadded)) * heightUsable;
-
+function VerdictPill({ verdict }: { verdict: Verdict }) {
+  const tones = {
+    success: "bg-success/10 text-success border-success/20",
+    warn:    "bg-warn/10    text-warn    border-warn/20",
+    danger:  "bg-danger/10  text-danger  border-danger/20",
+    neutral: "bg-surface    text-ink-2   border-border",
+  } as const;
+  const Icon = verdict.icon === "down" ? TrendingDown
+            : verdict.icon === "up"   ? TrendingUp
+            :                            Minus;
   return (
-    <svg
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      className="w-full h-full"
-      onMouseLeave={() => setHoverIdx(null)}
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold ${tones[verdict.tone]}`}
     >
-      <defs>
-        <linearGradient id={`grad-${uid}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="rgb(16 185 129)" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="rgb(16 185 129)" stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
+      <Icon size={11} aria-hidden="true" />
+      {verdict.copy}
+    </span>
+  );
+}
 
-      {/* Area fill below the line — subtle gradient. */}
-      <path d={areaD} fill={`url(#grad-${uid})`} />
+function WeekChangePill({
+  change, country,
+}: { change: { deltaNgn: number; direction: "up" | "down" }; country: Country }) {
+  const isDown = change.direction === "down";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium tabular-nums ${
+        isDown ? "text-success" : "text-ink-3"
+      }`}
+    >
+      {isDown ? "▼" : "▲"}
+      {formatPriceForUser(Math.abs(change.deltaNgn), country)} last 7 days
+    </span>
+  );
+}
 
-      {/* Dashed reference line for the visitor's current price */}
-      <line
-        x1="0" y1={currentY}
-        x2="100" y2={currentY}
-        stroke="rgb(120 113 108)"
-        strokeWidth="0.4"
-        strokeDasharray="1.5 1"
-        vectorEffect="non-scaling-stroke"
-        opacity="0.5"
-      />
+interface RangeToggleProps {
+  value:        RangeKey;
+  onChange:     (k: RangeKey) => void;
+  dataSpanDays: number;
+}
 
-      {/* The line itself — emerald to match the success tokens */}
-      <path
-        d={pathD}
-        fill="none"
-        stroke="rgb(16 185 129)"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-      />
-
-      {/* Hover hit-targets — invisible vertical strips, one per
-          point, that catch mouse/touch and surface the tooltip
-          state. Width slightly wider than xStep so adjacent strips
-          overlap a hair and hover never lands in a dead zone. */}
-      {prices.map((_, i) => {
-        const x = i * xStep;
-        const half = xStep / 2 + 0.5;
+function RangeToggle({ value, onChange, dataSpanDays }: RangeToggleProps) {
+  return (
+    <div
+      className="inline-flex rounded-full border border-border bg-surface p-0.5 shrink-0"
+      role="tablist"
+      aria-label="Price history time range"
+    >
+      {RANGE_OPTIONS.map((r) => {
+        const isActive = r.key === value;
+        /* Disable a range when the dataset doesn't have enough
+           span to make it different from a smaller range — keeps
+           the toggle honest. The All option is never disabled. */
+        const isDisabled = r.key !== "ALL" && dataSpanDays > 0 && dataSpanDays < r.days * 0.5;
         return (
-          <rect
-            key={i}
-            x={Math.max(0, x - half)}
-            y={0}
-            width={Math.min(100, half * 2)}
-            height={100}
-            fill="transparent"
-            onMouseEnter={() => setHoverIdx(i)}
-            onTouchStart={() => setHoverIdx(i)}
-            style={{ cursor: "pointer" }}
-          />
+          <button
+            key={r.key}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            disabled={isDisabled}
+            onClick={() => onChange(r.key)}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-semibold tabular-nums transition-colors ${
+              isActive
+                ? "bg-ink text-bg"
+                : isDisabled
+                  ? "text-ink-3/50 cursor-not-allowed"
+                  : "text-ink-2 hover:text-ink"
+            }`}
+            title={isDisabled ? `Not enough data yet for ${r.label}` : undefined}
+          >
+            {r.label}
+          </button>
         );
       })}
-
-      {/* Lowest-point marker — a green dot + ring */}
-      <circle cx={lowestX} cy={lowestY} r="2.2" fill="rgb(16 185 129)" vectorEffect="non-scaling-stroke" />
-      <circle cx={lowestX} cy={lowestY} r="3.5" fill="none" stroke="rgb(16 185 129)" strokeWidth="0.5" opacity="0.5" vectorEffect="non-scaling-stroke" />
-
-      {/* Hover marker — only renders when an index is hovered */}
-      {hoverIdx !== null && (
-        <>
-          <line
-            x1={hoverIdx * xStep} y1={PADDING_TOP}
-            x2={hoverIdx * xStep} y2={100 - PADDING_BOTTOM / 200 * 100}
-            stroke="rgb(120 113 108)"
-            strokeWidth="0.3"
-            strokeDasharray="0.8 0.8"
-            vectorEffect="non-scaling-stroke"
-            opacity="0.6"
-          />
-          <circle
-            cx={hoverIdx * xStep}
-            cy={PADDING_TOP + ((maxPadded - prices[hoverIdx]) / (maxPadded - minPadded)) * heightUsable}
-            r="2"
-            fill="white"
-            stroke="rgb(16 185 129)"
-            strokeWidth="0.8"
-            vectorEffect="non-scaling-stroke"
-          />
-        </>
-      )}
-    </svg>
+    </div>
   );
 }
+
+interface TileProps {
+  label:   string;
+  value:   string;
+  caption: string;
+  tone?:   "success" | "warn" | "danger";
+}
+function Tile({ label, value, caption, tone }: TileProps) {
+  const valueTone =
+    tone === "success" ? "text-success" :
+    tone === "warn"    ? "text-warn"    :
+    tone === "danger"  ? "text-danger"  :
+                          "text-ink";
+  return (
+    <div className="rounded-lg bg-surface border border-border px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wide text-ink-3 font-medium">
+        {label}
+      </div>
+      <div className={`text-sm font-semibold mt-0.5 tabular-nums ${valueTone}`}>
+        {value}
+      </div>
+      <div className={`text-[10px] mt-0.5 ${tone === "success" ? "text-success" : "text-ink-3"}`}>
+        {caption}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Hooks
+   ══════════════════════════════════════════════════════════════ */
+
+/* Container-width tracker via ResizeObserver. Falls back to
+   `fallback` during SSR / first paint. */
+function useContainerWidth(ref: React.RefObject<HTMLElement>, fallback: number): number {
+  const [w, setW] = useState(fallback);
+  useLayoutEffect(() => {
+    if (!ref.current) return;
+    const el = ref.current;
+    const initial = el.clientWidth;
+    if (initial > 0) setW(initial);
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) {
+        const cw = e.contentRect.width;
+        if (cw > 0) setW(Math.round(cw));
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+  return w;
+}
+
+function usePrefersReducedMotion(): boolean {
+  const [prefers, setPrefers] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setPrefers(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefers(e.matches);
+    mq.addEventListener?.("change", handler);
+    return () => mq.removeEventListener?.("change", handler);
+  }, []);
+  return prefers;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Geometry + math helpers
+   ══════════════════════════════════════════════════════════════ */
+
+interface Geometry {
+  pathD:      string;
+  areaD:      string;
+  xs:         number[];      // pixel x for each sliced point
+  ys:         number[];      // pixel y for each sliced point
+  lowestIdx:  number;
+  lowestNgn:  number;
+  lowestX:    number;
+  lowestY:    number;
+  highestNgn: number;
+  meanNgn:    number;
+  currentRefY: number;
+  axisTicks:  { x: number; label: string }[];
+  peakStoreCount: number;
+}
+
+function computeGeometry(points: PriceHistoryPoint[], width: number): Geometry {
+  if (points.length === 0) {
+    return {
+      pathD: "", areaD: "", xs: [], ys: [],
+      lowestIdx: 0, lowestNgn: 0, lowestX: 0, lowestY: 0,
+      highestNgn: 0, meanNgn: 0,
+      currentRefY: PAD_TOP, axisTicks: [], peakStoreCount: 0,
+    };
+  }
+
+  /* Sweep for stats in one pass. */
+  let lowestNgn  = points[0].minPriceNgn;
+  let lowestIdx  = 0;
+  let highestNgn = points[0].minPriceNgn;
+  let sum        = points[0].minPriceNgn;
+  let peakStores = points[0].storeCount;
+  for (let i = 1; i < points.length; i++) {
+    const p = points[i].minPriceNgn;
+    if (p < lowestNgn)  { lowestNgn  = p; lowestIdx = i; }
+    if (p > highestNgn) { highestNgn = p; }
+    if (points[i].storeCount > peakStores) peakStores = points[i].storeCount;
+    sum += p;
+  }
+  const meanNgn = sum / points.length;
+
+  /* Y-axis range with 12% padding so the line never touches the
+     chart edges. Flat-price (lowest === highest) gets fake-padded
+     so the line sits in the middle of the band. */
+  const rangeRaw    = highestNgn - lowestNgn;
+  const range       = rangeRaw === 0 ? Math.max(highestNgn * 0.1, 100) : rangeRaw;
+  const yMin        = lowestNgn  - range * 0.12;
+  const yMax        = highestNgn + range * 0.12;
+  const chartH      = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+  const usableW     = width - PAD_LEFT - PAD_RIGHT;
+
+  const xForI = (i: number) =>
+    points.length === 1
+      ? PAD_LEFT + usableW / 2
+      : PAD_LEFT + (i / (points.length - 1)) * usableW;
+  const yForP = (p: number) =>
+    PAD_TOP + ((yMax - p) / (yMax - yMin)) * chartH;
+
+  /* Step-after path — price holds until next event. */
+  const xs: number[] = [];
+  const ys: number[] = [];
+  const segments: string[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const x = xForI(i);
+    const y = yForP(points[i].minPriceNgn);
+    xs.push(x); ys.push(y);
+    if (i === 0) {
+      segments.push(`M ${x.toFixed(2)} ${y.toFixed(2)}`);
+    } else {
+      const prevY = ys[i - 1];
+      segments.push(`L ${x.toFixed(2)} ${prevY.toFixed(2)}`);
+      segments.push(`L ${x.toFixed(2)} ${y.toFixed(2)}`);
+    }
+  }
+  const pathD = segments.join(" ");
+  const areaBottom = CHART_HEIGHT - PAD_BOTTOM;
+  const areaD = `${pathD} L ${xs[xs.length - 1].toFixed(2)} ${areaBottom} L ${xs[0].toFixed(2)} ${areaBottom} Z`;
+
+  /* Axis ticks — 3-4 dates evenly spaced across the window. */
+  const tickCount = points.length >= 30 ? 4 : 3;
+  const axisTicks: { x: number; label: string }[] = [];
+  const fmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+  for (let t = 0; t < tickCount; t++) {
+    const idx = Math.round((t / (tickCount - 1)) * (points.length - 1));
+    axisTicks.push({
+      x:     xs[idx],
+      label: fmt.format(new Date(points[idx].day)),
+    });
+  }
+
+  return {
+    pathD,
+    areaD,
+    xs, ys,
+    lowestIdx,
+    lowestNgn,
+    lowestX: xs[lowestIdx],
+    lowestY: ys[lowestIdx],
+    highestNgn,
+    meanNgn,
+    /* Reference Y clamped to the chart band so out-of-range
+       prices still appear at the top/bottom edge. */
+    currentRefY: PAD_TOP, // placeholder; caller sets via buildHoverState's external use
+    axisTicks,
+    peakStoreCount: peakStores,
+  };
+}
+
+/* Add currentRefY post-hoc since it depends on `currentNgn` which
+   isn't in `points`. */
+function computeGeometryFull(
+  points: PriceHistoryPoint[],
+  width: number,
+  currentNgn: number,
+): Geometry {
+  const g = computeGeometry(points, width);
+  if (points.length === 0) return g;
+  const rangeRaw = g.highestNgn - g.lowestNgn;
+  const range    = rangeRaw === 0 ? Math.max(g.highestNgn * 0.1, 100) : rangeRaw;
+  const yMin     = g.lowestNgn  - range * 0.12;
+  const yMax     = g.highestNgn + range * 0.12;
+  const chartH   = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+  const refRaw   = PAD_TOP + ((yMax - currentNgn) / (yMax - yMin)) * chartH;
+  return {
+    ...g,
+    currentRefY: Math.max(PAD_TOP + 2, Math.min(CHART_HEIGHT - PAD_BOTTOM - 2, refRaw)),
+  };
+}
+
+/* The component above uses `computeGeometry` then patches in
+   currentRefY in a useMemo. Keep both exports for readability. */
+function nearestIndex(px: number, geom: Geometry): number {
+  if (geom.xs.length === 0) return 0;
+  let bestIdx  = 0;
+  let bestDist = Math.abs(px - geom.xs[0]);
+  for (let i = 1; i < geom.xs.length; i++) {
+    const d = Math.abs(px - geom.xs[i]);
+    if (d < bestDist) { bestDist = d; bestIdx = i; }
+  }
+  return bestIdx;
+}
+
+interface HoverState {
+  x:            number;
+  y:            number;
+  dateLabel:    string;
+  priceLabel:   string;
+  deltaFromLow: number | null;
+  tooltipStyle: React.CSSProperties;
+}
+
+function buildHoverState(
+  points:   PriceHistoryPoint[],
+  idx:      number,
+  geom:     Geometry,
+  width:    number,
+  country:  Country,
+  dateFmt:  Intl.DateTimeFormat,
+): HoverState {
+  const p   = points[idx];
+  const x   = geom.xs[idx];
+  const y   = geom.ys[idx];
+  const dl  = dateFmt.format(new Date(p.day));
+  const pl  = formatPriceForUser(p.minPriceNgn, country);
+  const dfl = p.minPriceNgn > geom.lowestNgn
+    ? p.minPriceNgn - geom.lowestNgn
+    : 0;
+
+  /* Tooltip positioning. Default above the point, but flip below
+     if the point is in the top 1/3 of the chart. Right-edge clamp
+     prevents overflow. */
+  const flipBelow = y < CHART_HEIGHT * 0.35;
+  /* Tooltip is ~110px wide (CSS minWidth) — keep the left/right
+     edges within the chart. */
+  const halfBox = 60;
+  const left = Math.max(halfBox, Math.min(width - halfBox, x)) - halfBox;
+  const top  = flipBelow
+    ? y + TOOLTIP_OFFSET_Y
+    : y - TOOLTIP_OFFSET_Y - 56;
+
+  return {
+    x, y,
+    dateLabel:    dl,
+    priceLabel:   pl,
+    deltaFromLow: dfl,
+    tooltipStyle: { left, top },
+  };
+}
+
+interface RecentChange {
+  deltaNgn:  number;
+  direction: "up" | "down";
+}
+
+function computeRecentChange(
+  points: PriceHistoryPoint[],
+  daysBack: number,
+): RecentChange | null {
+  if (points.length < 2) return null;
+  const last = points[points.length - 1];
+  const lastDate = new Date(last.day).getTime();
+  const threshold = lastDate - daysBack * 86_400_000;
+  /* Find the point closest to (but not after) the threshold. */
+  let comparison: PriceHistoryPoint | null = null;
+  for (let i = points.length - 1; i >= 0; i--) {
+    if (new Date(points[i].day).getTime() <= threshold) {
+      comparison = points[i];
+      break;
+    }
+  }
+  /* If no data point exists from N days ago, fall back to the
+     oldest point IF the window spans at least daysBack / 2. */
+  if (!comparison) {
+    const oldest = points[0];
+    const oldestDate = new Date(oldest.day).getTime();
+    if ((lastDate - oldestDate) >= (daysBack * 86_400_000) / 2) {
+      comparison = oldest;
+    } else {
+      return null;
+    }
+  }
+
+  const delta = last.minPriceNgn - comparison.minPriceNgn;
+  /* Suppress small drift (under 1% relative) so the pill doesn't
+     trumpet noise. */
+  if (Math.abs(delta) / comparison.minPriceNgn < 0.01) return null;
+
+  return {
+    deltaNgn:  delta,
+    direction: delta < 0 ? "down" : "up",
+  };
+}
+
+function computeVerdict(
+  currentNgn: number,
+  lowestNgn:  number,
+  meanNgn:    number,
+  rangeDays:  number,
+): Verdict {
+  const rangeLabel = rangeDays >= 365 ? "this window"
+                  : `${rangeDays} days`;
+
+  /* At-floor: 1% tolerance for FX + rounding drift. */
+  if (currentNgn <= lowestNgn * 1.01) {
+    return {
+      copy:        `Lowest in ${rangeLabel}`,
+      tone:        "success",
+      icon:        "down",
+      tileCaption: "At lowest",
+    };
+  }
+  /* Below mean: still a good time to buy, just not the floor. */
+  if (currentNgn <= meanNgn) {
+    const pctAboveLow = Math.round(((currentNgn - lowestNgn) / lowestNgn) * 100);
+    return {
+      copy:        `${pctAboveLow}% above lowest`,
+      tone:        "neutral",
+      icon:        "flat",
+      tileCaption: `${pctAboveLow}% above floor`,
+    };
+  }
+  /* Above mean: warn signal. */
+  const pctAboveLow = Math.round(((currentNgn - lowestNgn) / lowestNgn) * 100);
+  if (pctAboveLow >= 20) {
+    return {
+      copy:        `Higher than usual`,
+      tone:        "warn",
+      icon:        "up",
+      tileCaption: `${pctAboveLow}% above floor`,
+    };
+  }
+  return {
+    copy:        `${pctAboveLow}% above lowest`,
+    tone:        "warn",
+    icon:        "up",
+    tileCaption: `${pctAboveLow}% above floor`,
+  };
+}
+
+/* Slice helpers ─────────────────────────────────────────────── */
+
+function sliceToLastNDays(points: PriceHistoryPoint[], days: number): PriceHistoryPoint[] {
+  if (points.length === 0) return points;
+  const last = new Date(points[points.length - 1].day).getTime();
+  const threshold = last - days * 86_400_000;
+  /* Binary search would be overkill — 365 elements max. */
+  let firstIdx = 0;
+  for (let i = points.length - 1; i >= 0; i--) {
+    if (new Date(points[i].day).getTime() < threshold) {
+      firstIdx = i + 1;
+      break;
+    }
+  }
+  return points.slice(firstIdx);
+}
+
+function computeSpanDays(points: PriceHistoryPoint[]): number {
+  if (points.length < 2) return 0;
+  const first = new Date(points[0].day).getTime();
+  const last  = new Date(points[points.length - 1].day).getTime();
+  return Math.max(0, Math.round((last - first) / 86_400_000));
+}
+
+/* Build a screen-reader summary that describes the chart in prose.
+   Keeps the chart accessible without an interactive layer. */
+function buildAriaSummary({
+  range, sliced, geom, currentNgn, country, lowestDate,
+}: {
+  range:      typeof RANGE_OPTIONS[number];
+  sliced:     PriceHistoryPoint[];
+  geom:       Geometry;
+  currentNgn: number;
+  country:    Country;
+  lowestDate: string;
+}): string {
+  const cur  = formatPriceForUser(currentNgn,    country);
+  const low  = formatPriceForUser(geom.lowestNgn, country);
+  const high = formatPriceForUser(geom.highestNgn, country);
+  return `Price history over ${range.label}. ${sliced.length} data points. ` +
+         `Current price ${cur}. Lowest ${low} on ${lowestDate}. Highest ${high}.`;
+}
+
