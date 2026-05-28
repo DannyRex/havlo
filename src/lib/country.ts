@@ -192,34 +192,112 @@ const COUNTRY_CROSS_BORDER: Record<string, string[]> = {
     /* Cross-region globals NG buyers also reach. */
     "wish.com", "alibaba.com", "lightinthebox", "geekbuying",
   ],
-  /* Non-NG cross-border lists expanded May 2026 to credit the full
-     set of global retailers a shopper in each market can plausibly
-     reach. The previous lists were tight (4-5 entries: AliExpress,
-     SHEIN, Temu, DHgate, Banggood) which under-counted Wish /
-     Alibaba / Lightinthebox / Geekbuying / Trendyol — globals that
-     ship worldwide. The new entries also feed the Hero store-count
-     pill via getCrossBorderStoreCountForCountry so non-NG markets
-     show "local + intl" counts that match the user's actual reach,
-     not just the country's marquee. NG list is unchanged — already
-     comprehensive (UK retailers + US retailers via freight
-     forwarders). */
-  uk: ["aliexpress", "shein", "temu", "dhgate", "banggood", "wish.com", "alibaba.com", "lightinthebox", "geekbuying", "trendyol"],
-  us: ["aliexpress", "shein", "temu", "dhgate", "wish.com", "alibaba.com", "lightinthebox", "geekbuying", "trendyol"],
-  de: ["aliexpress", "shein", "temu", "dhgate", "banggood", "wish.com", "alibaba.com", "lightinthebox", "geekbuying", "trendyol"],
-  ae: ["aliexpress", "shein", "temu", "amazon.com", "amazon.co.uk", "dhgate", "banggood", "wish.com", "alibaba.com", "trendyol"],
-  // Shein officially banned in India since 2020. Import duties make
-  // most Western cross-border purchases impractical.
-  //
-  // Tightened May 2026 v3 — removed amazon.com. Indian shoppers
-  // access US Amazon inventory via Amazon India's 'Global Store'
-  // feature (which surfaces in our catalog as amazon.in offers
-  // anyway, since the storefront is amazon.in). Direct cross-border
-  // to amazon.com isn't realistic: 18% GST + 30%+ customs + slow
-  // shipping vs domestic Amazon Global Store at fraction of the
-  // friction. So the cross-border list keeps only the truly global
-  // marketplaces that DO clear Indian customs at low thresholds.
+  /* Non-NG cross-border lists — May 2026 v4 audit.
+     ─────────────────────────────────────────────────────────────
+     User report: "fact check shipping for all countries, not just
+     ng". The previous lists were too tight — only the 5 China
+     globals + a few regional Amazon variants. That meant we wrongly
+     flagged ASOS, BackMarket, and several Amazon-Global-reachable
+     stores as "won't ship" for UK/US/DE/AE/ZA users.
+
+     Verified each addition via direct shipping pages (see commit
+     message). Core principle: include any retailer with a confirmed
+     direct shipping route (Amazon Global, ASOS's 200-country
+     network, BackMarket's per-country sites) and exclude retailers
+     that are local-only or forwarder-only from this market.
+
+     What we DO NOT add even though they're in NG's list:
+       - Best Buy / Walmart / Target / Wayfair / Macy's / Nordstrom —
+         US-focused, direct intl shipping is rare (NG users reach
+         them via freight forwarders, not store-direct shipping —
+         the NG list is permissive on this front)
+       - Currys / John Lewis / Argos / Boots — UK-focused, same
+         rationale as US retailers above
+       - Apple.com — local per-country stores only; doesn't ship
+         from .com cross-border (the .com → local-redirect handles
+         it implicitly, so it doesn't NEED to be in the cross-
+         border list)
+
+     What we DO add to all non-NG lists:
+       - China globals (aliexpress, shein, temu, dhgate, banggood,
+         wish, alibaba, lightinthebox, geekbuying, trendyol)
+       - ASOS (UK warehouse, ships to 200+ countries — verified)
+       - BackMarket (per-country sites for UK/US/DE; AE/ZA via
+         intl programs)
+       - eBay variants (Global Shipping Program covers ~100
+         countries; cross-market reach is the norm)
+       - Amazon Global eligible variants per market (verified) */
+
+  /* UK shoppers can shop from amazon.com (Amazon Global Export),
+     amazon.de (cross-EU), eBay US (GSP), ASOS US/intl, BackMarket
+     UK site (local), plus the China globals. */
+  uk: [
+    "aliexpress", "shein", "temu", "dhgate", "banggood",
+    "wish.com", "alibaba.com", "lightinthebox", "geekbuying", "trendyol",
+    "amazon.com", "amazon-com", "amazon-us",
+    "amazon.de", "amazon-de",
+    "asos", "ebay", "ebay.com", "ebay-us",
+    "back-market", "backmarket",
+  ],
+
+  /* US shoppers can shop from amazon.co.uk (Amazon Global), amazon.de
+     (Amazon Global), eBay UK (GSP), ASOS UK/intl, BackMarket US site
+     (local), plus the China globals. */
+  us: [
+    "aliexpress", "shein", "temu", "dhgate", "banggood",
+    "wish.com", "alibaba.com", "lightinthebox", "geekbuying", "trendyol",
+    "amazon.co.uk", "amazon-co-uk", "amazon-uk",
+    "amazon.de", "amazon-de",
+    "asos", "ebay", "ebay.co.uk", "ebay-uk",
+    "back-market", "backmarket",
+  ],
+
+  /* DE shoppers — strongest cross-border reach in the EU. Direct
+     to amazon.co.uk (EU shipping), amazon.com (Amazon Global),
+     amazon.fr/it (EU same-day in many cases), ASOS DE/intl,
+     BackMarket DE site (local), eBay UK/DE. */
+  de: [
+    "aliexpress", "shein", "temu", "dhgate", "banggood",
+    "wish.com", "alibaba.com", "lightinthebox", "geekbuying", "trendyol",
+    "amazon.com", "amazon-com", "amazon-us",
+    "amazon.co.uk", "amazon-co-uk", "amazon-uk",
+    "asos", "ebay", "ebay.co.uk", "ebay-uk",
+    "back-market", "backmarket",
+  ],
+
+  /* AE shoppers — Lagos/Dubai is a major freight hub. Direct to
+     amazon.com, amazon.co.uk (already in), amazon.de (EU), Noon
+     (already local, cross-MENA), ASOS UAE (direct ship), eBay GSP.
+     BackMarket has no UAE site as of mid-2026 but Amazon AE local
+     covers refurb needs. */
+  ae: [
+    "aliexpress", "shein", "temu", "dhgate", "banggood",
+    "wish.com", "alibaba.com", "lightinthebox", "geekbuying", "trendyol",
+    "amazon.com", "amazon-com", "amazon-us",
+    "amazon.co.uk", "amazon-co-uk", "amazon-uk",
+    "amazon.de", "amazon-de",
+    "asos", "ebay", "ebay.com", "ebay-us",
+  ],
+
+  /* IN shoppers — Indian customs is genuinely heavy (18% GST + 30%+
+     customs on most categories) and Shein is officially banned since
+     2020. Amazon India's 'Global Store' surfaces in our catalog as
+     amazon.in offers (not amazon.com), so amazon.com cross-border
+     isn't realistic for IN. Keep tight — just the three globals that
+     DO clear Indian customs at low thresholds + AliExpress for
+     bargain shoppers. */
   in: ["aliexpress", "wish.com", "alibaba.com"],
-  za: ["aliexpress", "shein", "temu", "amazon.com", "amazon.co.uk", "dhgate", "banggood", "wish.com", "alibaba.com", "trendyol"],
+
+  /* ZA shoppers — Cape Town/Johannesburg are well-served by Amazon
+     Global (amazon.com + amazon.co.uk both verified), ASOS ZA site
+     (direct ship), Takealot (local), plus the China globals. */
+  za: [
+    "aliexpress", "shein", "temu", "dhgate", "banggood",
+    "wish.com", "alibaba.com", "lightinthebox", "geekbuying", "trendyol",
+    "amazon.com", "amazon-com", "amazon-us",
+    "amazon.co.uk", "amazon-co-uk", "amazon-uk",
+    "asos", "ebay", "ebay.com",
+  ],
 };
 
 function crossBorderListFor(countryCode: string): string[] {
