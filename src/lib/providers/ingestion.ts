@@ -213,7 +213,7 @@ export function normaliseTitleKey(title: string): string {
     .slice(0, 120);
 }
 
-function dealToProductRow(d: Deal, signature: string) {
+function dealToProductRow(d: Deal, signature: string | null) {
   /* Strip merchant-side brand placeholders ("Generic", "Unbranded",
      "No Brand") before any other title work — every downstream
      consumer (signature/dedup, search FTS, category inference, card
@@ -258,7 +258,15 @@ function dealToProductRow(d: Deal, signature: string) {
     brand: parsed.brand,
     model: parsed.model,
     image_url: d.imageUrl ?? null,
-    signature,
+    /* Empty-string signature → NULL in the DB. buildSignature returns
+       "" when it can't extract both brand AND model (May 2026 audit:
+       69% of catalog falls into this bucket — Fashion, Beauty, etc.).
+       Writing NULL instead of "?|?" / "brand|?" stops the heuristic
+       clustering from grouping unrelated products together (the
+       Samsung-TVs-with-Samsung-fridges-with-Samsung-earbuds problem).
+       Cross-store dedup still works via title_key, which is the right
+       signal for descriptive titles. */
+    signature: signature && signature.length > 0 ? signature : null,
     /* title_key — stored normalized form for fast dedup lookup.
        See normaliseTitleKey() above + migration 0046 for the design
        rationale. Must match the SQL backfill formula. */

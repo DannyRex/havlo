@@ -581,12 +581,34 @@ export function buildSignature(
       inches >= 19   // 19"+ → TV / monitor / large laptop. Phones are
                       // <8", so this also excludes phones cleanly.
     );
-  const parts = [
-    brand ?? "?",
-    model ?? "?",
-    inchesIsProductIdentity ? `${inches}in` : null,
-  ].filter(Boolean);
-  const key = parts.join("|");
+
+  /* Signature key — ONLY produced when both brand AND model extract
+     cleanly. Otherwise we return an empty string so the caller writes
+     NULL into products.signature (see dealToProductRow).
+
+     History: previous versions wrote `brand|?` whenever brand was
+     known but model wasn't ("Samsung 65 Inch Smart TV" → `samsung|?`)
+     and `?|?` when neither was known ("Vero Moda lace mini skirt" →
+     `?|?`). May 2026 audit found these "give-up" signatures were
+     silently lying: 70 unrelated Samsung products (TVs + fridges +
+     earbuds + ACs) were grouped under `samsung|?`, 37 unrelated LG
+     products under `lg|?`, etc. Downstream consumers (similar-
+     products rails, compare anchor pool, FTS clustering) trusted the
+     grouping and surfaced wrong matches.
+
+     The honest behaviour is: when we can't extract a full identity
+     (brand + model), don't claim a cluster. NULL signatures opt
+     out of heuristic clustering for those rows. They still dedupe
+     across stores via the title_key path (also stored on each
+     product), which is the right signal for descriptive titles
+     where the regex matcher couldn't anchor on a known model. */
+  const key = brand && model
+    ? [
+        brand,
+        model,
+        inchesIsProductIdentity ? `${inches}in` : null,
+      ].filter(Boolean).join("|")
+    : "";
 
   return {
     brand, model, storageGb, ramGb, inches, color, tokens, key, norm,
