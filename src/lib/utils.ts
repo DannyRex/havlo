@@ -416,17 +416,54 @@ export function formatCompact(amount: number): string {
 import type { Country } from "@/lib/country";
 import { USD_FX, formatLocal } from "@/lib/country";
 
-export function formatPriceForUser(amountNgn: number, country: Country): string {
-  if (country.currency === "NGN") {
-    /* Same currency — keep the compact ₦XXk form for parity with the
-       rest of the NG-facing UI. */
-    return formatCompact(amountNgn);
+/* Format a price for the visitor's currency.
+
+   Default mode: `amount` is in NGN (matches every existing call
+   site). Pipeline does NGN → USD → target via USD_FX.
+
+   Opt-in mode: pass `sourceCurrency` when you have the original
+   currency at the call site. The function skips the NGN
+   intermediate and converts SOURCE → USD → target directly,
+   avoiding the 1-unit rounding drift introduced by `usdToNgn`'s
+   integer cast.
+
+   Why the drift mattered: a $99.99 USD source flowing through
+   usdToNgn(99.99) = 159984 NGN, then formatPriceForUser(159984, UK)
+   = (159984/1600 = 99.99) × 0.79 = £78.99 → £79. The same $99.99
+   passed direct as sourceCurrency="USD" computes 99.99 × 0.79 =
+   £78.99 → £79. Identical for round prices, but two products
+   originating at sub-cent USD values could drift by 1 minor unit
+   between paths. Opt-in keeps the default behaviour unchanged
+   while letting precision-sensitive surfaces (cards that have
+   both raw price + currency in hand) take the cleaner path.
+
+   Same currency as visitor's: full Intl format via formatLocal
+   regardless of currency. The old NGN-only compact (₦5K) was an
+   inconsistency — a UK shopper saw "£1,250" but an NG shopper saw
+   "₦5K". Unified: every currency renders with grouping separators
+   and (for USD) cents. Compact display is still available via the
+   formatCompact helper for surfaces that explicitly want it. */
+export function formatPriceForUser(
+  amount:         number,
+  country:        Country,
+  sourceCurrency: "NGN" | "USD" = "NGN",
+): string {
+  const sameCurrency = country.currency === sourceCurrency;
+  if (sameCurrency) {
+    return formatLocal(amount, country);
   }
-  /* NGN → USD intermediate → target currency. Same FX table used by
-     MasonryCard's price conversion so the two surfaces never disagree. */
-  const ngnPerUsd = USD_FX.NGN;
-  const amountUsd = amountNgn / ngnPerUsd;
-  const target = Math.round(amountUsd * USD_FX[country.currency]);
+
+  /* Convert source → USD intermediate → target. When source IS
+     USD, the first step is a pass-through. */
+  const amountUsd = sourceCurrency === "USD"
+    ? amount
+    : amount / USD_FX[sourceCurrency];
+  const target = amountUsd * USD_FX[country.currency];
+  /* No Math.round here — formatLocal hands off to Intl.NumberFormat
+     with the right fraction-digit settings per currency, so the
+     final rounding happens at display time on the floating value.
+     Avoids the double-round bug where Math.round(0.499 * 1.0) = 0
+     but Intl.format(0.499) with 2 fraction digits → "0.50". */
   return formatLocal(target, country);
 }
 
