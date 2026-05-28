@@ -1185,28 +1185,41 @@ export async function ingestDeals(
            200 IDs per chunk = ~8KB query. May 28 2026 test of the
            PayPorte daily ingest had 1,480 candidates and got "Bad
            Request" on the single-shot delete. */
+        /* Chunked delete — adding .select("id") so we get back the
+           actual deleted rows (not just success). The May 28 2026
+           probe found that the DB trigger reap_orphaned_product_trigger
+           fires on offer UPDATE before this code runs, so by the time
+           we get here the displaced products are already deleted. The
+           previous version reported `chunk.length` as deleted (a lie —
+           Supabase returned success even when 0 rows matched), making
+           the log misleading. Now logs the TRUE delete count returned
+           by the API. */
         const ORPHAN_DELETE_CHUNK = 200;
-        let deletedTotal = 0;
+        let actuallyDeleted = 0;
         let delFailed = false;
         for (let i = 0; i < orphanIds.length; i += ORPHAN_DELETE_CHUNK) {
           const chunk = orphanIds.slice(i, i + ORPHAN_DELETE_CHUNK);
-          const { error: delErr } = await supa.from("products").delete().in("id", chunk);
+          const { data: delData, error: delErr } = await supa.from("products").delete().in("id", chunk).select("id");
           if (delErr) {
             result.errors.push(`Orphan reconciliation delete (chunk ${Math.floor(i / ORPHAN_DELETE_CHUNK) + 1}, ${chunk.length} ids): ${delErr.message}`);
             delFailed = true;
             break;
           }
-          deletedTotal += chunk.length;
+          actuallyDeleted += delData?.length ?? 0;
         }
-        if (!delFailed) {
+        if (!delFailed && actuallyDeleted > 0) {
           const insertedCount  = orphanIds.filter((id) => insertedProductIds.includes(id)).length;
           const displacedCount = orphanIds.length - insertedCount;
           console.log(
-            `[ingest] orphan reconciliation: removed ${deletedTotal} offer-less product(s) ` +
-            `(${insertedCount} from this run + ${displacedCount} displaced pre-existing).`,
+            `[ingest] orphan reconciliation: deleted ${actuallyDeleted} of ${orphanIds.length} candidate orphan(s) ` +
+            `(${insertedCount} from this run + ${displacedCount} pre-existing; remainder already reaped by DB trigger).`,
           );
-        } else if (deletedTotal > 0) {
-          console.log(`[ingest] orphan reconciliation: partial — deleted ${deletedTotal} of ${orphanIds.length} before failure.`);
+        } else if (!delFailed && actuallyDeleted === 0 && orphanIds.length > 0) {
+          /* Healthy state — the DB trigger handled every displaced
+             product before we got to this reconciliation step. */
+          console.log(`[ingest] orphan reconciliation: ${orphanIds.length} candidate(s) flagged, all already reaped by DB trigger.`);
+        } else if (delFailed && actuallyDeleted > 0) {
+          console.log(`[ingest] orphan reconciliation: partial — deleted ${actuallyDeleted} before failure.`);
         }
       }
     }
