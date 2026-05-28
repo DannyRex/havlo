@@ -167,6 +167,18 @@ export function stripTrailingModifiers(query: string): string | null {
 const VARIANT_TOKENS = [
   "pro max", "ultra", "plus", "max", "pro", "mini", "lite", "se",
   "m4", "m5", "m3", "m2", "m1",
+  /* Apple Silicon chip-variant compounds — distinguish M4 (base) from
+     M4 Pro / M4 Max / M4 Ultra (different SKUs entirely). Sync gate +
+     deep veto both rely on these landing as DISTINCT tokens; without
+     them MacBook Pro M4 was admitting M4 Pro / M4 Max as same product
+     because the single-token "m4" + "pro" sets matched in both. May
+     2026 audit caught the leak: 1bc912c3 (MacBook Pro 16" M4) anchor
+     pooling 589fc183 (M4 Pro) and other chip-tier variants. */
+  "m1 pro", "m1 max", "m1 ultra",
+  "m2 pro", "m2 max", "m2 ultra",
+  "m3 pro", "m3 max", "m3 ultra",
+  "m4 pro", "m4 max", "m4 ultra",
+  "m5 pro", "m5 max", "m5 ultra",
 ];
 
 export function extractVariantTokens(query: string): string[] {

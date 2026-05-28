@@ -36,7 +36,7 @@ const headers = {
      code path is actually live. Easiest way to confirm Vercel
      served the latest deploy when debugging caching/regression
      issues that "should be fixed". */
-  "X-Match-Version": "v6-belt-and-braces-final-veto-2026-05-28",
+  "X-Match-Version": "v7-apple-chip-variant-tokens-2026-05-28",
 };
 
 /* Empty results are NOT cached. An empty /compare response is exactly
