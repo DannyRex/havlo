@@ -31,6 +31,13 @@ export interface Country {
       don't accidentally couple the public country code to the search-engine
       knob if they diverge later (e.g. uk vs gb). */
   serpGl:      string;
+  /** Country deferred from first launch — keeps the entry in the
+      master COUNTRIES list (so existing data filtering / SerpAPI
+      configs still work in scripts/internal tools) but the middleware
+      redirects away from /<code>/ and the public country picker hides
+      it. Currently used for DE pending Impressum + verified company
+      registration. Default false. */
+  deferredLaunch?: boolean;
 }
 
 /* MVP roster — every country here either:
@@ -44,7 +51,14 @@ export interface Country {
    position, so reordering doesn't change which country a fresh
    visitor lands on. */
 export const COUNTRIES: Country[] = [
-  { code: "de", name: "Germany",        flag: "🇩🇪", currency: "EUR", symbol: "€", serpGl: "de" },
+  /* Germany deferred from first launch (May 2026) — Impressum +
+     verified legal-entity registration not yet shipped; German
+     commercial-website law requires both before /de/ can be served.
+     Middleware redirects /de/* to /uk/* in the meantime; this flag
+     hides DE from the country picker so users can't switch into it
+     manually. Re-enable by removing deferredLaunch:true (and the
+     middleware DEFERRED_LAUNCH entry) once Impressum lands. */
+  { code: "de", name: "Germany",        flag: "🇩🇪", currency: "EUR", symbol: "€", serpGl: "de", deferredLaunch: true },
   { code: "in", name: "India",          flag: "🇮🇳", currency: "INR", symbol: "₹", serpGl: "in" },
   { code: "ng", name: "Nigeria",        flag: "🇳🇬", currency: "NGN", symbol: "₦", serpGl: "ng" },
   { code: "za", name: "South Africa",   flag: "🇿🇦", currency: "ZAR", symbol: "R", serpGl: "za" },

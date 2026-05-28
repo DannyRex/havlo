@@ -37,8 +37,22 @@ const footerSections = [
   {
     title: "Legal",
     links: [
-      { label: "Privacy Policy", href: "/privacy-policy" },
-      { label: "Terms of Use",   href: "/terms-of-use" },
+      /* "Your Privacy Choices" satisfies CCPA + CPRA + parallel state
+         laws (VA / CT / CO / UT) requirement for a clearly-labeled
+         opt-out link in the footer. Labeled to match Global Privacy
+         Control conventions (vs the harsher literal "Do Not Sell My
+         Info" which over-claims since we don't actually sell data). */
+      { label: "Your Privacy Choices", href: "/privacy-choices" },
+      { label: "Privacy Policy",       href: "/privacy-policy"  },
+      { label: "Terms of Use",         href: "/terms-of-use"    },
+      /* Accessibility statement — required by the EU Accessibility Act
+         (in force 28 June 2025) for e-commerce-related services. Also
+         signals good faith on US ADA Title III + UK Equality Act. */
+      { label: "Accessibility",        href: "/accessibility"   },
+      /* DSA contact — required by EU Digital Services Act (Articles
+         11 + 12) for any platform accessible to EU users. Visible
+         single point of contact for users + EU authorities. */
+      { label: "DSA Contact",          href: "/dsa-contact"     },
     ],
   },
 ] as const;

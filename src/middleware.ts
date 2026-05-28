@@ -20,6 +20,24 @@ import { NextResponse, type NextRequest } from "next/server";
 const SUPPORTED = new Set(["ng", "us", "uk", "ae", "de", "in", "za"]);
 const COUNTRY_COOKIE = "havlo-country";
 
+/* Countries DEFERRED from first launch — middleware redirects any
+   /<cc>/ request for these to the user's next-best country (cookie
+   or geo, else UK as a stable English-language EU adjacent default).
+   Geo-IP signals matching a deferred country also fall through to
+   the next-best inference.
+
+   DE is deferred until the Impressum (legally required by German
+   commercial-website law) is shipped with verified company-registration
+   details. The /accessibility + /dsa-contact pages cover the other
+   EU obligations; only the Impressum is missing. Re-enable by removing
+   "de" here once the legal entity + address are confirmed.
+   See task #42 + the chat thread on May 2026 launch compliance. */
+const DEFERRED_LAUNCH = new Set(["de"]);
+/* Fallback when a deferred country needs to be replaced — pick the
+   nearest English-language market that's launched. UK works well for
+   DACH visitors (the EU-adjacent + cross-border-friendly choice). */
+const DEFERRED_FALLBACK = "uk";
+
 /* Read country from the edge geo headers Vercel + Cloudflare set on
    incoming requests. Returns null when no header resolves to a
    supported country code. Used as the second-priority signal after
@@ -102,6 +120,19 @@ export function middleware(req: NextRequest) {
      prefix and redirect to the canonical /global-page so the user
      lands on a working page. */
   if (SUPPORTED.has(seg)) {
+    /* DEFERRED-LAUNCH check — if this country is deferred (currently:
+       DE, awaiting Impressum), redirect to the fallback country
+       (UK) preserving the rest of the path so bookmarks + shared
+       links don't 404. Use 307 (temporary) so we can re-enable
+       cleanly later without browser cache friction. */
+    if (DEFERRED_LAUNCH.has(seg)) {
+      const target = req.nextUrl.clone();
+      const restOfPath = path.split("/").slice(2).join("/");
+      target.pathname = `/${DEFERRED_FALLBACK}${restOfPath ? `/${restOfPath}` : ""}`;
+      const res = NextResponse.redirect(target, 307);
+      res.headers.set("Cache-Control", "no-store");
+      return res;
+    }
     const secondSeg = path.split("/")[2]?.toLowerCase() ?? "";
     if (secondSeg && GLOBAL_PAGES.has(secondSeg)) {
       const target = req.nextUrl.clone();
@@ -130,7 +161,11 @@ export function middleware(req: NextRequest) {
   if (COUNTRY_SCOPED.has(seg) && !GLOBAL_PAGES.has(seg)) {
     const cookieCc = req.cookies.get(COUNTRY_COOKIE)?.value;
     const geoCc    = inferGeoCountry(req);
-    const cc       = (cookieCc && SUPPORTED.has(cookieCc)) ? cookieCc : (geoCc ?? "ng");
+    let cc         = (cookieCc && SUPPORTED.has(cookieCc)) ? cookieCc : (geoCc ?? "ng");
+    /* If the resolved country is deferred (DE), substitute the
+       fallback (UK). Same rationale as the prefixed-path branch
+       above. */
+    if (DEFERRED_LAUNCH.has(cc)) cc = DEFERRED_FALLBACK;
     const target = req.nextUrl.clone();
     target.pathname = `/${cc}${path === "/" ? "" : path}`;
     const res = NextResponse.redirect(target, 307);

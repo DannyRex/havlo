@@ -187,8 +187,17 @@ export function CountryProvider({ initialCode, children }: Props) {
     [code, router, pathname],
   );
 
+  /* The country picker uses `countries` to render its list — hide
+     deferred-launch countries so users can't switch into a market
+     we're not legally ready for (currently DE, awaiting Impressum).
+     The full COUNTRIES list stays available to internal tools
+     (sitemap, ingest scripts) via direct import. */
   const value = useMemo<CountryContextValue>(
-    () => ({ country: getCountry(code), countries: COUNTRIES, setCountry }),
+    () => ({
+      country:   getCountry(code),
+      countries: COUNTRIES.filter((c) => !c.deferredLaunch),
+      setCountry,
+    }),
     [code, setCountry],
   );
 

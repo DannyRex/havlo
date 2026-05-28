@@ -401,6 +401,18 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
           )}
         </div>
 
+        {/* FTC affiliate-disclosure inline above the click-out CTA.
+            16 CFR Part 255 requires the disclosure to be clear-and-
+            conspicuous "near the triggering claim" — for outbound
+            CTAs, the immediate-vicinity-of-the-button placement is
+            the gold standard. Slim 11px / ink-3 so it doesn't dominate
+            but is comfortably readable. rel="sponsored" on the anchor
+            below also satisfies the platform-level FTC + Amazon
+            Associates rel-attribute requirement. */}
+        <p className="text-[11px] text-ink-3 mb-1.5 leading-snug">
+          Havlo may earn a commission from this link — at no extra cost to you.
+        </p>
+
         {/* Primary CTA — outbound to merchant via /api/go */}
         <a
           href={outboundUrl}

@@ -67,6 +67,16 @@ const sections = [
     ],
   },
   {
+    title: "Information Officer (POPIA) and DSA contact (EU)",
+    paragraphs: [
+      "South Africa's Protection of Personal Information Act (POPIA) requires us to designate an Information Officer. The EU Digital Services Act requires a named point of contact for users and authorities. Both roles are held by:",
+      "Daniel Ekum, Havlo Founder",
+      "Email: hello@havlo.io",
+      "We respond to data-subject requests within 14 days. For EU DSA matters (illegal-content notices, authority correspondence), the dedicated page is at /dsa-contact with a 5-working-day target response window.",
+      "If a request is sent to the wrong address it will still be honored — we route all privacy correspondence through hello@havlo.io.",
+    ],
+  },
+  {
     title: "Third-party retailers",
     paragraphs: [
       "When you click through to a retailer (Konga, Amazon, AliExpress, ASOS, etc.), you leave Havlo. From that point their privacy policy, payment handling, and delivery terms apply. Havlo does not see your purchase, payment, or delivery details.",
