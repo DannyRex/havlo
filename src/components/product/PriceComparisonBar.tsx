@@ -145,6 +145,53 @@ export default function PriceComparisonBar({
   const lowestPriceNgn = allEffectives.length > 0 ? Math.min(...allEffectives) : thisPriceNgn;
   const highestPriceNgn = allEffectives.length > 0 ? Math.max(...allEffectives) : thisPriceNgn;
 
+  /* Row-assignment for per-store dots so close-price dots don't
+     overlap (May 2026 bug fix). Two bugs traced to the same root:
+       1. Hovering ONE dot highlighted ALL of them — CSS hover:scale-125
+          was firing on every button under the cursor because their
+          28×28 hit zones overlapped.
+       2. Clicking a dot opened the callout on a DIFFERENT dot —
+          when buttons overlapped, the later-rendered one won
+          mouseenter and the popover anchored at its price (a
+          slightly different left%), making the popover look
+          "off" from the clicked dot.
+
+     Both fixes converge: give each dot a non-overlapping hit zone
+     by assigning it a vertical row offset whenever its X position
+     is within MIN_GAP_PCT of a recent neighbour. Walk dots sorted
+     by X; for each, find the smallest row index not already used
+     by any dot inside the cluster window (anything within
+     MIN_GAP_PCT to the left). The base row (0) is the centerline;
+     1 = below the bar; -1 = above; 2 = further below; etc.
+
+     dotRowByStoreId maps storeId → row index (0, ±1, ±2, …) so
+     the render loop downstream can shift each dot's Y position
+     by row * ROW_OFFSET_PX. */
+  const MIN_GAP_PCT    = 3.5;   // ~21px on a 600px-wide bar (matches the 28px button width)
+  const ROW_CANDIDATES = [0, 1, -1, 2, -2, 3, -3, 4, -4];
+  const dotRowByStoreId = new Map<string, number>();
+  {
+    const dotsByX = perStoreOffers
+      .filter((row) => row.storeId !== thisStoreId)
+      .map((row) => ({ id: row.storeId, left: (lowestPriceNgn === highestPriceNgn
+                                                ? 50
+                                                : ((row.effectiveNgn - lowestPriceNgn) /
+                                                   (highestPriceNgn - lowestPriceNgn) * 100)) }))
+      .sort((a, b) => a.left - b.left);
+    const placed: Array<{ left: number; row: number }> = [];
+    for (const { id, left } of dotsByX) {
+      const usedRows = new Set<number>();
+      for (let i = placed.length - 1; i >= 0; i--) {
+        if (left - placed[i].left > MIN_GAP_PCT) break;
+        usedRows.add(placed[i].row);
+      }
+      const row = ROW_CANDIDATES.find((r) => !usedRows.has(r)) ?? 0;
+      dotRowByStoreId.set(id, row);
+      placed.push({ left, row });
+    }
+  }
+  const DOT_ROW_OFFSET_PX = 14;
+
   /* Two distinct collapse cases, NOT folded together:
        isSingleStore — only one store carries the product. The bar
                        degrades to "watching for more" + a pinned
@@ -398,6 +445,14 @@ export default function PriceComparisonBar({
             const left = Math.max(DOT_INSET_PCT, Math.min(100 - DOT_INSET_PCT, pos * 100));
             const isCheapestDot = row.storeId === cheapest?.storeId;
             const isActive      = activeDotStoreId === row.storeId;
+            /* Vertical row offset — see dotRowByStoreId construction
+               above. Row 0 = bar centerline; ±1 = directly above/below;
+               ±2 = further; etc. Combined with the -translate-y-1/2
+               baseline this puts the dot at (50% + row * 14px) from
+               the bar top. Each row's hit zone is then disjoint from
+               its neighbours so mouseenter / click events route
+               unambiguously to the dot under the cursor. */
+            const dotRow = dotRowByStoreId.get(row.storeId) ?? 0;
             return (
               <button
                 key={row.storeId}
@@ -420,16 +475,28 @@ export default function PriceComparisonBar({
                   setActiveDotStoreId(isActive ? null : row.storeId);
                 }}
                 className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center pointer-events-auto z-10 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                style={{ left: `${left}%` }}
+                style={{
+                  left:      `${left}%`,
+                  /* Composes with the -translate-y-1/2 in className.
+                     Tailwind's translate utilities can't take dynamic
+                     px values, so we apply the row delta via a CSS
+                     custom property on the transform's input. */
+                  marginTop: `${dotRow * DOT_ROW_OFFSET_PX}px`,
+                }}
                 aria-label={`${row.storeName} at ${formatPriceForUser(row.effectiveNgn, country)}`}
                 aria-pressed={isActive}
               >
+                {/* Removed `hover:scale-125` — CSS :hover was firing on
+                    every overlapping button under the cursor, lighting
+                    up all of them at once. isActive is the sole driver
+                    now; it's set by JS onMouseEnter on the actually-
+                    targeted button. */}
                 <span
-                  className={`block rounded-full transition-all ${
+                  className={`block rounded-full transition-transform duration-150 ${
                     isCheapestDot
                       ? "bg-emerald-700 ring-2 ring-white/90"
                       : "bg-ink/70 ring-2 ring-white/70"
-                  } ${isActive ? "scale-150" : "hover:scale-125"}`}
+                  } ${isActive ? "scale-150" : ""}`}
                   style={{
                     width:  `${DOT_PIXEL_SIZE}px`,
                     height: `${DOT_PIXEL_SIZE}px`,
@@ -453,6 +520,13 @@ export default function PriceComparisonBar({
             if (!row || row.storeId === thisStoreId) return null;
             const pos = positionOf(row.effectiveNgn);
             const left = Math.max(DOT_INSET_PCT, Math.min(100 - DOT_INSET_PCT, pos * 100));
+            /* Shift the popover up by the active dot's row offset so
+               it sits directly above the actual dot position (rather
+               than always anchoring to the bar centerline). Keeps the
+               visual link "this popover belongs to that dot" clear
+               when overlap-jitter has pushed the dot above or below
+               the bar. */
+            const activeDotRow = dotRowByStoreId.get(row.storeId) ?? 0;
             /* Edge-aware horizontal anchor — was always -translate-x-1/2
                (center on dot), which clipped on small viewports when
                the dot sat at the bar's extreme left/right. User
@@ -476,7 +550,10 @@ export default function PriceComparisonBar({
                 role="dialog"
                 aria-label={`${row.storeName} details`}
                 className={`absolute -top-16 ${translateClass} z-30 rounded-lg bg-ink text-bg px-2.5 py-1.5 shadow-[0_6px_18px_rgba(0,0,0,0.25)] whitespace-nowrap pointer-events-none max-w-[calc(100vw-2rem)]`}
-                style={{ left: `${left}%` }}
+                style={{
+                  left:      `${left}%`,
+                  marginTop: `${activeDotRow * DOT_ROW_OFFSET_PX}px`,
+                }}
                 data-anchor={anchor}
               >
                 <p className="text-[11px] font-semibold leading-tight">
