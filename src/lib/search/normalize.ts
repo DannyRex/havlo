@@ -232,6 +232,35 @@ const PRODUCT_TYPES: string[] = [
   /* Personal care */
   "perfume", "cologne", "deodorant", "soap", "bodywash", "shampoo",
   "conditioner", "razor", "trimmer", "toothpaste", "toothbrush",
+  /* Electronics — display + audio */
+  "television", "tv", "monitor", "projector", "display",
+  "earbuds", "earphones", "earphone", "headphones", "headphone",
+  "headset", "speaker", "soundbar", "amplifier",
+  /* Electronics — computing */
+  "laptop", "notebook", "desktop", "tablet", "ipad", "chromebook",
+  "smartwatch", "smartphone", "phone", "powerbank",
+  "keyboard", "mouse", "mousepad", "webcam",
+  /* Electronics — networking + photography + storage */
+  "router", "modem", "hub", "switch",
+  "camera", "camcorder", "drone", "gimbal", "tripod",
+  "ssd", "harddrive", "flashdrive", "memorycard",
+  /* Electronics — gaming */
+  "console", "controller", "joystick", "headset",
+  /* Appliances — kitchen */
+  "fridge", "refrigerator", "freezer", "microwave", "oven",
+  "stove", "cooker", "blender", "mixer", "grinder", "toaster",
+  "kettle", "coffeemaker", "fryer", "airfryer", "dishwasher",
+  /* Appliances — laundry + comfort */
+  "washingmachine", "washer", "dryer", "iron", "steamer",
+  "vacuum", "vacuumcleaner", "fan", "heater", "humidifier",
+  "dehumidifier", "purifier",
+  /* Appliances — climate */
+  "airconditioner", "split",
+  /* Health */
+  "vitamin", "supplement", "tablets", "capsules", "syrup",
+  "thermometer", "scale", "monitor",
+  /* Apple — small product anchors found in the catalog */
+  "airtag", "airpods", "homepod", "magsafe",
 ];
 const PRODUCT_TYPES_BY_LENGTH = PRODUCT_TYPES.slice().sort((a, b) => b.length - a.length);
 
