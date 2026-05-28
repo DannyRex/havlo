@@ -99,37 +99,32 @@ export default function PriceComparisonBar({
   productId,
   productSearchTitle,
 }: Props) {
-  /* Tap-to-reveal popover for per-store dots. Desktop hovers don't
-     surface store info clearly (the native title= tooltip is
-     unreliable on touch). Now: every dot is a real button; tapping
-     opens a small popover above the spectrum with store name +
-     price + cross-border flag. Tapping another dot moves the
-     popover; tapping outside closes it. Works on both mobile and
-     desktop with a single interaction model.
+  /* Cluster-based popover (May 2026 rewrite). Dots within
+     CLUSTER_THRESHOLD_PCT of each other on the spectrum belong to
+     one cluster and share a single popover that LISTS every store
+     in the band. A click on any dot in a cluster opens the same
+     popover — the user's question on a price spectrum is "which
+     stores sit around here?", not "which single store?", so one
+     callout answers it in one tap.
 
-     KEYED BY offerId (May 2026 fix), not storeId. pdp-stats's
-     dedupAnchorOffers dedups by storeId+price-bucket, so the same
-     store with multiple variants at different prices (e.g. MacPro-LA
-     at ₦650K, ₦655K, ₦660K) survives as three distinct PerStoreOffer
-     rows that share a storeId but differ by offerId. Keying the
-     popover by storeId collapsed those three dots into one
-     addressable identity: hovering any of them activated all three,
-     and `perStoreOffers.find(r => r.storeId === activeId)` returned
-     the FIRST match so the popover anchored to the wrong dot's
-     position + price. Switching to offerId makes every dot
-     independently addressable. */
-  const [activeDotOfferId, setActiveDotOfferId] = useState<string | null>(null);
+     This replaces the previous per-store popover (state keyed by
+     offerId) which forced N taps to inspect N close-priced stores
+     and required vertical row-fanning to keep hit zones separated.
+     The fan put dots visually off the bar — a price-spectrum dot
+     drifting up or down loses its primary semantic ("position =
+     price"). Clusters keep every dot on the centerline. */
+  const [activeClusterId, setActiveClusterId] = useState<number | null>(null);
   const barWrapperRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!activeDotOfferId) return;
+    if (activeClusterId === null) return;
     const onPointerDown = (e: PointerEvent) => {
       if (!barWrapperRef.current?.contains(e.target as Node)) {
-        setActiveDotOfferId(null);
+        setActiveClusterId(null);
       }
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [activeDotOfferId]);
+  }, [activeClusterId]);
 
   /* Out-of-stock takes priority over price comparison — there's no
      point ranking the price of an unavailable item. */
@@ -157,77 +152,115 @@ export default function PriceComparisonBar({
   const lowestPriceNgn = allEffectives.length > 0 ? Math.min(...allEffectives) : thisPriceNgn;
   const highestPriceNgn = allEffectives.length > 0 ? Math.max(...allEffectives) : thisPriceNgn;
 
-  /* Row-assignment for per-store dots so close-price dots don't
-     overlap (May 2026 bug fix). Two bugs traced to the same root:
-       1. Hovering ONE dot highlighted ALL of them — CSS hover:scale-125
-          was firing on every button under the cursor because their
-          28×28 hit zones overlapped.
-       2. Clicking a dot opened the callout on a DIFFERENT dot —
-          when buttons overlapped, the later-rendered one won
-          mouseenter and the popover anchored at its price (a
-          slightly different left%), making the popover look
-          "off" from the clicked dot.
+  /* Cluster computation. Walk dots sorted by X position; chain dots
+     within CLUSTER_THRESHOLD_PCT of the previous into one cluster.
+     For multi-dot clusters, redistribute each dot's display X to
+     give visible separation (DOT_SPACING_PCT) while keeping the
+     cluster centered at its true price centroid.
 
-     Both fixes converge: give each dot a non-overlapping hit zone
-     by assigning it a vertical row offset whenever its X position
-     is within MIN_GAP_PCT of a recent neighbour. Walk dots sorted
-     by X; for each, find the smallest row index not already used
-     by any dot inside the cluster window (anything within
-     MIN_GAP_PCT to the left). The base row (0) is the centerline;
-     1 = below the bar; -1 = above; 2 = further below; etc.
+       CLUSTER_THRESHOLD_PCT  3 — dots within 3% are visually
+         indistinguishable on the bar and belong in one band.
+       DOT_SPACING_PCT        1.8 — ~10-12px visual spacing on a
+         common bar width. Small enough that the dot's displayed
+         X stays close to its true price-position; large enough
+         that each dot reads as its own circle, not a blur.
 
-     dotRowByOfferId maps offerId → row index (0, ±1, ±2, …) so the
-     render loop downstream can shift each dot's Y position by
-     row * ROW_OFFSET_PX. Keyed by offerId (not storeId) so that
-     same-store multi-variant rows each get their own slot — keying
-     by storeId let a Map.set overwrite collapse three MacPro-LA
-     offers into one final row value, stacking the dots at the same
-     Y even though the placement algorithm thought it had separated
-     them. */
-  /* Sizing chosen so every dot has a real, non-overlapping hit zone
-     on BOTH mobile (~330px-wide bar) and desktop. The earlier
-     numbers (MIN_GAP_PCT=3.5, OFFSET=14, 28-px hit zone) were tuned
-     for desktop spacing and silently failed on mobile: 3.5% of 330px
-     is only ~12px, but the button hit zone is 28px wide, so two
-     dots at adjacent prices still overlapped horizontally despite
-     being assigned to different rows. The vertical offset of 14px
-     was likewise half the button's 28px height, so rows 0 and 1
-     overlapped vertically by 14px. Net effect on a phone: tapping
-     "MacPro-LA at ₦1.7M" landed on the Bajaj-Markets dot rendered
-     0.5% to the right because both hit zones covered that pixel.
+     dotAssignByOfferId maps offerId → { clusterId, displayLeftPct }
+     so the render loop can position each dot and route its click
+     to the right cluster popover. */
+  const CLUSTER_THRESHOLD_PCT = 3;
+  /* Spacing between dots in a cluster. Sized so the gap is visible
+     on a 330-px mobile bar (3% ≈ 10px between dot centres, 2px of
+     whitespace between the 8-px circles) while not feeling sprawled
+     on desktop. */
+  const DOT_SPACING_PCT       = 3;
 
-       MIN_GAP_PCT 7.5 + 24-px hit zone (w-6 h-6 below): 7.5% of a
-       330px mobile bar is ~25px, just over the 24-px hit width, so
-       same-row dots never overlap horizontally. On a 600-px desktop
-       bar 7.5% is 45px — generous, but the algorithm only fans to
-       another row when needed, so isolated dots still sit on the
-       centerline.
-       DOT_ROW_OFFSET_PX 24 matches the hit zone height, so rows ±1
-       are exactly stacked with no vertical overlap. */
-  const MIN_GAP_PCT    = 7.5;
-  const ROW_CANDIDATES = [0, 1, -1, 2, -2, 3, -3, 4, -4];
-  const dotRowByOfferId = new Map<string, number>();
+  interface ClusterDef {
+    id:        number;
+    offerIds:  string[];
+    centerPct: number;
+    minNgn:    number;
+    maxNgn:    number;
+  }
+  interface DotAssignment {
+    clusterId:      number;
+    displayLeftPct: number;
+  }
+  const clusters: ClusterDef[]                       = [];
+  const dotAssignByOfferId = new Map<string, DotAssignment>();
   {
-    const dotsByX = perStoreOffers
+    const cands = perStoreOffers
       .filter((row) => row.storeId !== thisStoreId)
-      .map((row) => ({ id: row.offerId, left: (lowestPriceNgn === highestPriceNgn
-                                                ? 50
-                                                : ((row.effectiveNgn - lowestPriceNgn) /
-                                                   (highestPriceNgn - lowestPriceNgn) * 100)) }))
-      .sort((a, b) => a.left - b.left);
-    const placed: Array<{ left: number; row: number }> = [];
-    for (const { id, left } of dotsByX) {
-      const usedRows = new Set<number>();
-      for (let i = placed.length - 1; i >= 0; i--) {
-        if (left - placed[i].left > MIN_GAP_PCT) break;
-        usedRows.add(placed[i].row);
+      .map((row) => ({
+        offerId:      row.offerId,
+        effectiveNgn: row.effectiveNgn,
+        leftPct: lowestPriceNgn === highestPriceNgn
+          ? 50
+          : ((row.effectiveNgn - lowestPriceNgn) / (highestPriceNgn - lowestPriceNgn) * 100),
+      }))
+      .sort((a, b) => a.leftPct - b.leftPct);
+
+    let current: { offerIds: string[]; pcts: number[]; ngns: number[] } | null = null;
+    const flush = () => {
+      if (!current) return;
+      const id  = clusters.length;
+      const sum = current.pcts.reduce((a, b) => a + b, 0);
+      clusters.push({
+        id,
+        offerIds:  current.offerIds,
+        centerPct: sum / current.pcts.length,
+        minNgn:    Math.min(...current.ngns),
+        maxNgn:    Math.max(...current.ngns),
+      });
+      current = null;
+    };
+    for (const c of cands) {
+      const lastInCurrent = current ? current.pcts[current.pcts.length - 1] : null;
+      if (current && lastInCurrent !== null && c.leftPct - lastInCurrent <= CLUSTER_THRESHOLD_PCT) {
+        current.offerIds.push(c.offerId);
+        current.pcts.push(c.leftPct);
+        current.ngns.push(c.effectiveNgn);
+      } else {
+        flush();
+        current = { offerIds: [c.offerId], pcts: [c.leftPct], ngns: [c.effectiveNgn] };
       }
-      const row = ROW_CANDIDATES.find((r) => !usedRows.has(r)) ?? 0;
-      dotRowByOfferId.set(id, row);
-      placed.push({ left, row });
+    }
+    flush();
+
+    /* For each cluster, lay dots out evenly around the cluster's
+       centroid so they sit on the bar with a small visible gap.
+       Single-dot clusters keep their true X (no shift). */
+    for (const cluster of clusters) {
+      const n = cluster.offerIds.length;
+      if (n === 1) {
+        const cand = cands.find((c) => c.offerId === cluster.offerIds[0])!;
+        dotAssignByOfferId.set(cluster.offerIds[0], {
+          clusterId:      cluster.id,
+          displayLeftPct: cand.leftPct,
+        });
+      } else {
+        const totalSpread = (n - 1) * DOT_SPACING_PCT;
+        /* Edge clamp the cluster as a whole so a cluster at the bar's
+           extreme (e.g. two stores tied at the lowest price → cluster
+           centroid at 0%) still produces distinct dot positions. Per-
+           dot clamping via DOT_INSET_PCT later would otherwise collapse
+           both dots back to the same X. Shift the cluster bodily into
+           the [DOT_INSET_PCT, 100 - DOT_INSET_PCT - totalSpread] band
+           and lay dots out from there. */
+        let startPct = cluster.centerPct - totalSpread / 2;
+        const minStart = DOT_INSET_PCT;
+        const maxStart = 100 - DOT_INSET_PCT - totalSpread;
+        if (startPct < minStart) startPct = minStart;
+        else if (startPct > maxStart) startPct = maxStart;
+        for (let i = 0; i < n; i++) {
+          dotAssignByOfferId.set(cluster.offerIds[i], {
+            clusterId:      cluster.id,
+            displayLeftPct: startPct + i * DOT_SPACING_PCT,
+          });
+        }
+      }
     }
   }
-  const DOT_ROW_OFFSET_PX = 24;
 
   /* Two distinct collapse cases, NOT folded together:
        isSingleStore — only one store carries the product. The bar
@@ -478,67 +511,38 @@ export default function PriceComparisonBar({
               cross-border flag. */}
           {!isSingleStore && perStoreOffers.map((row) => {
             if (row.storeId === thisStoreId) return null;
-            const pos = positionOf(row.effectiveNgn);
-            const left = Math.max(DOT_INSET_PCT, Math.min(100 - DOT_INSET_PCT, pos * 100));
-            const isCheapestDot = row.offerId === cheapest?.offerId;
-            const isActive      = activeDotOfferId === row.offerId;
-            /* Vertical row offset — see dotRowByOfferId construction
-               above. Row 0 = bar centerline; ±1 = directly above/below;
-               ±2 = further; etc. Combined with the -translate-y-1/2
-               baseline this puts the dot at (50% + row * 14px) from
-               the bar top. Each row's hit zone is then disjoint from
-               its neighbours so mouseenter / click events route
-               unambiguously to the dot under the cursor. */
-            const dotRow = dotRowByOfferId.get(row.offerId) ?? 0;
+            const assignment = dotAssignByOfferId.get(row.offerId);
+            if (!assignment) return null;
+
+            const left = Math.max(DOT_INSET_PCT, Math.min(100 - DOT_INSET_PCT, assignment.displayLeftPct));
+            const isCheapestDot     = row.offerId === cheapest?.offerId;
+            const isInActiveCluster = activeClusterId === assignment.clusterId;
+
             return (
               <button
                 key={row.offerId}
                 type="button"
-                /* Desktop: hover reveals the popover (mouse-driven
-                   discovery, no click needed). Mobile / touch: tap
-                   toggles since hover doesn't exist on touch devices.
-                   Both paths converge on setActiveDotOfferId — the
-                   popover state machine is identical, only the
-                   trigger event differs.
-
-                   onMouseEnter/Leave is desktop-only (no-op on touch);
-                   onClick stays as the mobile fallback. onTouchStart
-                   on touch devices fires BEFORE onMouseEnter so the
-                   activation order is deterministic. */
-                onMouseEnter={() => setActiveDotOfferId(row.offerId)}
-                onMouseLeave={() => setActiveDotOfferId((current) => (current === row.offerId ? null : current))}
+                /* Every dot in a cluster routes to the SAME activeClusterId.
+                   Hover/click on any dot opens the shared cluster popover.
+                   No vertical fanning — dots stay on the bar centerline so
+                   the "position = price" semantic of the spectrum holds. */
+                onMouseEnter={() => setActiveClusterId(assignment.clusterId)}
+                onMouseLeave={() => setActiveClusterId((current) => (current === assignment.clusterId ? null : current))}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setActiveDotOfferId(isActive ? null : row.offerId);
+                  setActiveClusterId(isInActiveCluster ? null : assignment.clusterId);
                 }}
-                /* 24×24 (w-6 h-6) hit zone sized to match MIN_GAP_PCT
-                   so no two dots share pixels. Smaller than Apple's
-                   44-pt HIG ideal but the bar margin extends the
-                   practical hit area, and the visible 8-px dot still
-                   centers in the button so users can aim at it. */
-                className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center pointer-events-auto z-10 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                style={{
-                  left:      `${left}%`,
-                  /* Composes with the -translate-y-1/2 in className.
-                     Tailwind's translate utilities can't take dynamic
-                     px values, so we apply the row delta via a CSS
-                     custom property on the transform's input. */
-                  marginTop: `${dotRow * DOT_ROW_OFFSET_PX}px`,
-                }}
+                className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center pointer-events-auto z-10 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                style={{ left: `${left}%` }}
                 aria-label={`${row.storeName} at ${formatPriceForUser(row.effectiveNgn, country)}`}
-                aria-pressed={isActive}
+                aria-pressed={isInActiveCluster}
               >
-                {/* Removed `hover:scale-125` — CSS :hover was firing on
-                    every overlapping button under the cursor, lighting
-                    up all of them at once. isActive is the sole driver
-                    now; it's set by JS onMouseEnter on the actually-
-                    targeted button. */}
                 <span
                   className={`block rounded-full transition-transform duration-150 ${
                     isCheapestDot
                       ? "bg-emerald-700 ring-2 ring-white/90"
                       : "bg-ink/70 ring-2 ring-white/70"
-                  } ${isActive ? "scale-150" : ""}`}
+                  } ${isInActiveCluster ? "scale-150" : ""}`}
                   style={{
                     width:  `${DOT_PIXEL_SIZE}px`,
                     height: `${DOT_PIXEL_SIZE}px`,
@@ -549,87 +553,113 @@ export default function PriceComparisonBar({
             );
           })}
 
-          {/* Per-store popover — renders above the active dot with
-              store name + effective price + cross-border flag. The
-              popover position mirrors the active dot's left% so
-              it sits directly above. -top-14 leaves room for the
-              triangle marker that lives at -top-3. The translate-x
-              auto-centers; clamping the position at extremes
-              (3-97%) keeps the popover on-screen even at the
-              ends of the bar. */}
-          {!isSingleStore && activeDotOfferId && (() => {
-            const row = perStoreOffers.find((r) => r.offerId === activeDotOfferId);
-            if (!row || row.storeId === thisStoreId) return null;
-            const pos = positionOf(row.effectiveNgn);
-            const left = Math.max(DOT_INSET_PCT, Math.min(100 - DOT_INSET_PCT, pos * 100));
-            /* Shift the popover up by the active dot's row offset so
-               it sits directly above the actual dot position (rather
-               than always anchoring to the bar centerline). Keeps the
-               visual link "this popover belongs to that dot" clear
-               when overlap-jitter has pushed the dot above or below
-               the bar. */
-            const activeDotRow = dotRowByOfferId.get(row.offerId) ?? 0;
-            /* Edge-aware horizontal anchor — was always -translate-x-1/2
-               (center on dot), which clipped on small viewports when
-               the dot sat at the bar's extreme left/right. User
-               report May 2026: popover gets cut off on mobile at the
-               edges.
+          {/* Cluster popover — renders above the active cluster's
+              centroid. For a 1-store cluster, it's a compact pill
+              (store name + price). For 2+ stores, it's a small
+              list: header ("3 stores at ₦1.7M" or "3 stores from
+              ₦1.65M – ₦1.75M") plus a row per store with price and
+              cross-border flag. One callout answers "which stores
+              sit at this price band?" — the actual question a
+              price-spectrum user asks. */}
+          {!isSingleStore && activeClusterId !== null && (() => {
+            const cluster = clusters[activeClusterId];
+            if (!cluster) return null;
+            const clusterOffers = cluster.offerIds
+              .map((id) => perStoreOffers.find((o) => o.offerId === id))
+              .filter((o): o is PerStoreOffer => Boolean(o));
+            if (clusterOffers.length === 0) return null;
 
-               New behaviour:
-                 left < 20%    → anchor popover to LEFT (no translate)
-                 left > 80%    → anchor popover to RIGHT (-100% translate)
-                 otherwise     → center (-50% translate, current)
+            const left = Math.max(DOT_INSET_PCT, Math.min(100 - DOT_INSET_PCT, cluster.centerPct));
 
-               The arrow tail position adjusts to match (see below). */
+            /* Edge-aware horizontal anchor — keeps the popover on-screen
+               at the bar's extreme left/right on small viewports.
+                 left  < 20%  → anchor LEFT  (no translate)
+                 left  > 80%  → anchor RIGHT (-100% translate)
+                 otherwise    → CENTER       (-50% translate) */
             const anchor: "left" | "right" | "center" =
               left < 20 ? "left" : left > 80 ? "right" : "center";
             const translateClass =
               anchor === "left"  ? "translate-x-0" :
               anchor === "right" ? "-translate-x-full" :
                                    "-translate-x-1/2";
+
+            /* SINGLE-STORE CLUSTER — compact pill (the common case
+               for isolated dots; this preserves the original tooltip
+               feel where most spectra are sparse). */
+            if (clusterOffers.length === 1) {
+              const row = clusterOffers[0];
+              return (
+                <div
+                  role="dialog"
+                  aria-label={`${row.storeName} details`}
+                  className={`absolute -top-16 ${translateClass} z-30 rounded-lg bg-ink text-bg px-2.5 py-1.5 shadow-[0_6px_18px_rgba(0,0,0,0.25)] whitespace-nowrap pointer-events-none max-w-[calc(100vw-2rem)]`}
+                  style={{ left: `${left}%` }}
+                  data-anchor={anchor}
+                >
+                  <p className="text-[11px] font-semibold leading-tight">
+                    {row.storeName}
+                  </p>
+                  <p className="text-[12px] tabular-nums font-bold leading-tight">
+                    {formatPriceForUser(row.effectiveNgn, country)}
+                  </p>
+                  {row.isCrossBorder && (
+                    <p className="text-[10px] text-amber-300 dark:text-amber-700 inline-flex items-center gap-1 mt-0.5 leading-tight">
+                      <Plane size={9} aria-hidden="true" /> Cross-border
+                    </p>
+                  )}
+                  <span
+                    aria-hidden="true"
+                    className={`absolute -bottom-1 w-2 h-2 rotate-45 bg-ink ${
+                      anchor === "left"  ? "left-3" :
+                      anchor === "right" ? "right-3" :
+                                            "left-1/2 -translate-x-1/2"
+                    }`}
+                  />
+                </div>
+              );
+            }
+
+            /* MULTI-STORE CLUSTER — list panel. The header summarises
+               the band; rows show each store + price. Using bottom-full
+               + mb-3 so the panel anchors its BOTTOM to the bar top —
+               this lets the panel grow upward as more stores join the
+               cluster without clipping the topmost row off-screen. */
+            const minFmt    = formatPriceForUser(cluster.minNgn, country);
+            const maxFmt    = formatPriceForUser(cluster.maxNgn, country);
+            const sameBand  = minFmt === maxFmt;
+            const sortedOffers = [...clusterOffers].sort((a, b) => a.effectiveNgn - b.effectiveNgn);
+
             return (
               <div
                 role="dialog"
-                aria-label={`${row.storeName} details`}
-                className={`absolute -top-16 ${translateClass} z-30 rounded-lg bg-ink text-bg px-2.5 py-1.5 shadow-[0_6px_18px_rgba(0,0,0,0.25)] whitespace-nowrap pointer-events-none max-w-[calc(100vw-2rem)]`}
-                style={{
-                  left:      `${left}%`,
-                  marginTop: `${activeDotRow * DOT_ROW_OFFSET_PX}px`,
-                }}
+                aria-label={`${clusterOffers.length} stores in this price band`}
+                className={`absolute bottom-full mb-3 ${translateClass} z-30 rounded-lg bg-ink text-bg px-3 py-2 shadow-[0_6px_18px_rgba(0,0,0,0.25)] pointer-events-none max-w-[calc(100vw-2rem)] min-w-[180px]`}
+                style={{ left: `${left}%` }}
                 data-anchor={anchor}
               >
-                <p className="text-[11px] font-semibold leading-tight">
-                  {row.storeName}
+                <p className="text-[10px] font-semibold uppercase tracking-[0.06em] opacity-80 mb-1.5 whitespace-nowrap">
+                  {clusterOffers.length} stores {sameBand ? `at ${minFmt}` : `· ${minFmt} – ${maxFmt}`}
                 </p>
-                <p className="text-[12px] tabular-nums font-bold leading-tight">
-                  {formatPriceForUser(row.effectiveNgn, country)}
-                </p>
-                {row.isCrossBorder && (
-                  /* Adapt the amber to the popover's inverted background.
-                     The popover uses `bg-ink text-bg`, which renders:
-                       • light mode → dark navy popover (slate-900)
-                       • dark  mode → near-white popover (#f5f5f5)
-                     amber-300 (#fcd34d) had decent contrast on the dark
-                     light-mode popover but vanished against the near-
-                     white dark-mode popover. amber-700 (#b45309) gives
-                     ~5.4:1 contrast on that near-white background while
-                     staying legible. Icon inherits color from <p>. */
-                  <p className="text-[10px] text-amber-300 dark:text-amber-700 inline-flex items-center gap-1 mt-0.5 leading-tight">
-                    <Plane size={9} aria-hidden="true" /> Cross-border
-                  </p>
-                )}
-                {/* Tail pointing at the dot below — position adjusts
-                    to match the popover's edge-aware anchor so the
-                    triangle still points AT the dot, not into empty
-                    space.
-                      center: triangle in the middle of popover
-                      left-anchored: triangle near popover's left edge
-                      right-anchored: triangle near popover's right edge */}
+                <ul className="space-y-1">
+                  {sortedOffers.map((o) => (
+                    <li key={o.offerId} className="flex items-baseline justify-between gap-3 text-[12px]">
+                      <span className="font-medium truncate inline-flex items-center gap-1">
+                        {o.storeName}
+                        {o.isCrossBorder && (
+                          <Plane size={9} className="text-amber-300 dark:text-amber-700 shrink-0" aria-hidden="true" />
+                        )}
+                      </span>
+                      <span className="tabular-nums font-bold whitespace-nowrap">
+                        {formatPriceForUser(o.effectiveNgn, country)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
                 <span
                   aria-hidden="true"
                   className={`absolute -bottom-1 w-2 h-2 rotate-45 bg-ink ${
-                    anchor === "left"  ? "left-3" :
-                    anchor === "right" ? "right-3" :
+                    anchor === "left"  ? "left-4" :
+                    anchor === "right" ? "right-4" :
                                           "left-1/2 -translate-x-1/2"
                   }`}
                 />
