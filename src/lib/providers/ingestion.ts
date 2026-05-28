@@ -655,11 +655,21 @@ export async function ingestDeals(
      largely uniform anyway. */
   const urls = Array.from(new Set(offerUrls.map((o) => o.url).filter(Boolean)));
   const offerHits = new Map<string, string>(); // key = `${storeId}:${url}` → product_id
-  if (urls.length > 0) {
-    const { data: rows } = await supa
+  /* Chunked lookup — PostgREST URL cap is ~8KB. PayPorte's 1,480-URL
+     daily ingest blew past that limit silently here (no error check
+     on the original query — `rows` came back null, the loop ran over
+     nothing, dedup missed every entry). Chunk by 100 URLs. */
+  const OFFER_URL_CHUNK_SIZE = 100;
+  for (let i = 0; i < urls.length; i += OFFER_URL_CHUNK_SIZE) {
+    const chunk = urls.slice(i, i + OFFER_URL_CHUNK_SIZE);
+    const { data: rows, error: rowsErr } = await supa
       .from("offers")
       .select("store_id, url, product_id")
-      .in("url", urls);
+      .in("url", chunk);
+    if (rowsErr) {
+      result.errors.push(`Offers-by-url probe (chunk ${Math.floor(i / OFFER_URL_CHUNK_SIZE) + 1}): ${rowsErr.message}`);
+      continue;
+    }
     for (const r of (rows ?? []) as Array<{ store_id: string; url: string; product_id: string }>) {
       offerHits.set(`${r.store_id}:${r.url}`, r.product_id);
     }
@@ -1068,20 +1078,33 @@ export async function ingestDeals(
     /* Two .in() filters AND-combine in PostgREST, so the result is a
        superset of the actual (store_id, url) tuples we care about —
        we narrow to exact tuple matches in the loop below. */
-    const { data: existing, error: existingErr } = await supa
-      .from("offers")
-      .select("product_id, store_id, url")
-      .in("store_id", storeIds)
-      .in("url", urls);
-    if (existingErr) {
-      result.errors.push(`Displaced-offer probe: ${existingErr.message}`);
-    } else {
-      const existingMap = new Map<string, string>();
-      for (const o of (existing ?? []) as Array<{ product_id: string; store_id: string; url: string }>) {
-        existingMap.set(`${o.store_id} ${o.url}`, o.product_id);
+    /* Chunked probe — PostgREST URL cap ~8KB. PayPorte's 1,480-URL
+       daily ingest blew past that limit. 100 URLs per chunk. Note:
+       the previous single-shot version had a NULL-byte typo in the
+       Map key template ("${o.store_id}\0${o.url}"), so even when the
+       query succeeded the displaced lookup never matched anything. */
+    const DISPLACED_URL_CHUNK_SIZE = 100;
+    const existingMap = new Map<string, string>();
+    let probeFailed = false;
+    for (let i = 0; i < urls.length; i += DISPLACED_URL_CHUNK_SIZE) {
+      const chunk = urls.slice(i, i + DISPLACED_URL_CHUNK_SIZE);
+      const { data: existing, error: existingErr } = await supa
+        .from("offers")
+        .select("product_id, store_id, url")
+        .in("store_id", storeIds)
+        .in("url", chunk);
+      if (existingErr) {
+        result.errors.push(`Displaced-offer probe (chunk ${Math.floor(i / DISPLACED_URL_CHUNK_SIZE) + 1}): ${existingErr.message}`);
+        probeFailed = true;
+        break;
       }
+      for (const o of (existing ?? []) as Array<{ product_id: string; store_id: string; url: string }>) {
+        existingMap.set(`${o.store_id} ${o.url}`, o.product_id);
+      }
+    }
+    if (!probeFailed) {
       for (const row of offerRows) {
-        const prevPid = existingMap.get(`${row.store_id} ${row.url}`);
+        const prevPid = existingMap.get(`${row.store_id} ${row.url}`);
         if (prevPid && prevPid !== row.product_id) {
           displacedProductIds.add(prevPid);
         }
@@ -1134,16 +1157,28 @@ export async function ingestDeals(
   displacedProductIds.forEach((id) => candidateOrphanSet.add(id));
   const candidateOrphanIds = Array.from(candidateOrphanSet);
   if (candidateOrphanIds.length > 0) {
-    const { data: withOffers, error: probeErr } = await supa
-      .from("offers")
-      .select("product_id")
-      .in("product_id", candidateOrphanIds);
-    if (probeErr) {
-      result.errors.push(`Orphan-reconciliation probe: ${probeErr.message}`);
-    } else {
-      const haveOffer = new Set(
-        (withOffers ?? []).map((r) => (r as { product_id: string }).product_id),
-      );
+    /* Chunked probe — UUIDs are 36 chars each; 1,480 candidates is
+       ~55KB of inline IN values, over the PostgREST 8KB URL cap.
+       200 IDs per chunk = ~8KB query, leaves headroom. */
+    const ORPHAN_PROBE_CHUNK = 200;
+    const haveOffer = new Set<string>();
+    let probeFailed = false;
+    for (let i = 0; i < candidateOrphanIds.length; i += ORPHAN_PROBE_CHUNK) {
+      const chunk = candidateOrphanIds.slice(i, i + ORPHAN_PROBE_CHUNK);
+      const { data: withOffers, error: probeErr } = await supa
+        .from("offers")
+        .select("product_id")
+        .in("product_id", chunk);
+      if (probeErr) {
+        result.errors.push(`Orphan-reconciliation probe (chunk ${Math.floor(i / ORPHAN_PROBE_CHUNK) + 1}): ${probeErr.message}`);
+        probeFailed = true;
+        break;
+      }
+      for (const r of (withOffers ?? []) as Array<{ product_id: string }>) {
+        haveOffer.add(r.product_id);
+      }
+    }
+    if (!probeFailed) {
       const orphanIds = candidateOrphanIds.filter((id) => !haveOffer.has(id));
       if (orphanIds.length > 0) {
         const { error: delErr } = await supa.from("products").delete().in("id", orphanIds);
