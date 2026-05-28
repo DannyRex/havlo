@@ -49,6 +49,7 @@ import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import { getClickThroughUrl } from "@/lib/utils";
 import { appendSignature } from "@/lib/go-signing";
 import PdpBackLink from "@/components/product/PdpBackLink";
+import PriceHistoryChartSkeleton from "@/components/product/PriceHistoryChartSkeleton";
 import { ArrowDown } from "lucide-react";
 import type { Deal } from "@/types";
 import dynamic from "next/dynamic";
@@ -60,10 +61,19 @@ import dynamic from "next/dynamic";
    first paint looks like.
 
    ssr: true (default) keeps the HTML server-rendered for SEO + CLS
-   protection — only the client JS chunk loads lazily. */
+   protection — only the client JS chunk loads lazily.
+
+   The price-history chart gets a dedicated skeleton because its
+   chunk is larger than the others (~10 kB of curve math + tooltip
+   logic) and its absence would leave a tall empty patch in the page
+   during the brief hydration window. The skeleton renders SAME
+   dimensions as the real chart so the swap-in is invisible. */
 const SimilarProducts     = dynamic(() => import("@/components/product/SimilarProducts"));
 const FallbackCategoryRail = dynamic(() => import("@/components/product/FallbackCategoryRail"));
-const PriceHistoryChart    = dynamic(() => import("@/components/product/PriceHistoryChart"));
+const PriceHistoryChart    = dynamic(
+  () => import("@/components/product/PriceHistoryChart"),
+  { loading: () => <PriceHistoryChartSkeleton /> },
+);
 
 /* Offers churn frequently (every ingest cycle adds + retires rows).
    ISR revalidate keeps the cached HTML fresh without re-rendering

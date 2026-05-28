@@ -201,27 +201,29 @@ export default function PriceHistoryChart({
   );
 
   /* ── Empty state ──────────────────────────────────────────────
-     < 2 points means we can't draw a line. This is most likely a
-     freshly-ingested product whose price hasn't changed yet (the
-     trigger from migration 0027 always writes 1 row at INSERT). */
-  if (sliced.length < 2) {
+     Only fires when we have ZERO points. With ≥ 1 point we render
+     the chart frame — a single dot plus a flat hold-line communicates
+     "we've seen one price point, here it is" honestly and is more
+     useful than hiding the chart entirely. The 2+ point path draws
+     the full curve. */
+  if (sliced.length < 1) {
     return (
       <section
         ref={containerRef}
         className="rounded-2xl border border-border bg-surface-2/40 px-5 py-8 text-center"
-        aria-label="Price history — not enough data yet"
+        aria-label="Price history — no data yet"
       >
         <Calendar size={20} className="mx-auto text-ink-3 mb-2" aria-hidden="true" />
-        <p className="text-sm text-ink-2">Not enough price history yet</p>
+        <p className="text-sm text-ink-2">No price activity yet</p>
         <p className="text-xs text-ink-3 mt-1 max-w-xs mx-auto">
-          We start tracking the moment a product is ingested. Check back in a few days.
+          Once the price changes at any store, you&apos;ll see the full timeline here.
         </p>
       </section>
     );
   }
 
   /* ── Verdict + change indicators ──────────────────────────── */
-  const verdict       = computeVerdict(currentNgn, geom.lowestNgn, geom.meanNgn, range.days);
+  const verdict       = computeVerdict(currentNgn, geom.lowestNgn, geom.meanNgn, range.days, sliced.length);
   const weekChange    = computeRecentChange(sliced, 7);
 
   /* Date format string used for tooltip + lowest tile dates. */
@@ -698,6 +700,75 @@ interface Geometry {
   peakStoreCount: number;
 }
 
+/* Monotone cubic Hermite spline → cubic Bezier path.
+
+   Implements Fritsch–Carlson tangent estimation so the resulting
+   curve:
+     • Passes exactly through every data point.
+     • Cannot overshoot the data range between points (monotonic
+       on each segment when the underlying data is monotonic).
+     • Flattens its tangent at local extrema so peaks and troughs
+       round naturally instead of forming kinks.
+
+   Input: parallel xs / ys arrays of length n ≥ 2 (single-point
+   case handled in the caller).
+   Output: an SVG path string starting with M then n−1 C cubic
+   segments. */
+function buildMonotonePath(xs: number[], ys: number[]): string {
+  const n = xs.length;
+  if (n < 2) return n === 1 ? `M ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}` : "";
+  if (n === 2) {
+    /* Two-point case: a single straight cubic. No tangent estimation
+       needed — just use the slope itself. */
+    return `M ${xs[0].toFixed(2)} ${ys[0].toFixed(2)} L ${xs[1].toFixed(2)} ${ys[1].toFixed(2)}`;
+  }
+
+  /* Step 1: secant slopes between consecutive points. */
+  const dx: number[] = new Array(n - 1);
+  const slope: number[] = new Array(n - 1);
+  for (let i = 0; i < n - 1; i++) {
+    const dxi = xs[i + 1] - xs[i];
+    dx[i] = dxi === 0 ? 1e-6 : dxi;  // guard against duplicate x
+    slope[i] = (ys[i + 1] - ys[i]) / dx[i];
+  }
+
+  /* Step 2: tangent at each point.
+       Endpoints use the adjacent secant slope (one-sided).
+       Interior points use the Fritsch–Carlson weighted harmonic
+       mean of the two surrounding secants — IF the slopes share
+       sign; otherwise the tangent is forced to zero (preserves
+       monotonicity through local extrema). */
+  const tangent: number[] = new Array(n);
+  tangent[0] = slope[0];
+  tangent[n - 1] = slope[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    if (slope[i - 1] * slope[i] <= 0) {
+      tangent[i] = 0;
+    } else {
+      const w1 = 2 * dx[i] + dx[i - 1];
+      const w2 = dx[i] + 2 * dx[i - 1];
+      tangent[i] = (w1 + w2) / (w1 / slope[i - 1] + w2 / slope[i]);
+    }
+  }
+
+  /* Step 3: emit cubic Bezier segments. Control-point distance is
+     dx/3 from each endpoint along the local tangent — the standard
+     conversion from Hermite to Bezier for unit-time parameters. */
+  const parts: string[] = [`M ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}`];
+  for (let i = 0; i < n - 1; i++) {
+    const cp1x = xs[i] + dx[i] / 3;
+    const cp1y = ys[i] + (tangent[i] * dx[i]) / 3;
+    const cp2x = xs[i + 1] - dx[i] / 3;
+    const cp2y = ys[i + 1] - (tangent[i + 1] * dx[i]) / 3;
+    parts.push(
+      `C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)} ` +
+      `${cp2x.toFixed(2)} ${cp2y.toFixed(2)} ` +
+      `${xs[i + 1].toFixed(2)} ${ys[i + 1].toFixed(2)}`,
+    );
+  }
+  return parts.join(" ");
+}
+
 function computeGeometry(points: PriceHistoryPoint[], width: number): Geometry {
   if (points.length === 0) {
     return {
@@ -740,36 +811,68 @@ function computeGeometry(points: PriceHistoryPoint[], width: number): Geometry {
   const yForP = (p: number) =>
     PAD_TOP + ((yMax - p) / (yMax - yMin)) * chartH;
 
-  /* Step-after path — price holds until next event. */
+  /* Build pixel coords once. */
   const xs: number[] = [];
   const ys: number[] = [];
-  const segments: string[] = [];
   for (let i = 0; i < points.length; i++) {
-    const x = xForI(i);
-    const y = yForP(points[i].minPriceNgn);
-    xs.push(x); ys.push(y);
-    if (i === 0) {
-      segments.push(`M ${x.toFixed(2)} ${y.toFixed(2)}`);
-    } else {
-      const prevY = ys[i - 1];
-      segments.push(`L ${x.toFixed(2)} ${prevY.toFixed(2)}`);
-      segments.push(`L ${x.toFixed(2)} ${y.toFixed(2)}`);
-    }
+    xs.push(xForI(i));
+    ys.push(yForP(points[i].minPriceNgn));
   }
-  const pathD = segments.join(" ");
-  const areaBottom = CHART_HEIGHT - PAD_BOTTOM;
-  const areaD = `${pathD} L ${xs[xs.length - 1].toFixed(2)} ${areaBottom} L ${xs[0].toFixed(2)} ${areaBottom} Z`;
 
-  /* Axis ticks — 3-4 dates evenly spaced across the window. */
-  const tickCount = points.length >= 30 ? 4 : 3;
-  const axisTicks: { x: number; label: string }[] = [];
+  /* Monotone cubic Hermite spline (the "curveMonotoneX" curve from
+     D3, attributable to Fritsch–Carlson 1980).
+
+     Why this curve, not a generic Catmull-Rom or simple bezier:
+       • Passes EXACTLY through every data point. Critical for a
+         price chart — the curve can't claim a price the data
+         doesn't.
+       • Cannot overshoot the data range between points. A cheap
+         bezier or Catmull-Rom can produce visible humps that
+         look like prices that never existed; monotone is
+         guaranteed not to.
+       • Tangents flatten naturally at local minima / maxima, so
+         the "lowest ever" point gets a soft cup shape rather
+         than a kink. Reads as a trend.
+
+     We trade off the step-after honesty of v1 ("price held flat
+     until the next event") for the natural readability of a
+     curve. The deception is bounded: between two known prices
+     the spline interpolates smoothly rather than holding flat,
+     but the curve never claims a price outside the [low, high]
+     band of the surrounding data because of the monotonicity
+     guarantee. Net: cleaner reading, no real signal lost.
+
+     Single-point path: just an M command, no curve. The single
+     dot rendered downstream becomes the only visible marker. */
+  const pathD = points.length === 1
+    ? `M ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}`
+    : buildMonotonePath(xs, ys);
+
+  const areaBottom = CHART_HEIGHT - PAD_BOTTOM;
+  /* For 1-point case, close the area down to bottom in a thin
+     vertical line — produces a centred drop without a visible
+     fill (zero width). The dot is the dominant signal. */
+  const areaD = points.length === 1
+    ? `M ${xs[0].toFixed(2)} ${ys[0].toFixed(2)} L ${xs[0].toFixed(2)} ${areaBottom} Z`
+    : `${pathD} L ${xs[xs.length - 1].toFixed(2)} ${areaBottom} L ${xs[0].toFixed(2)} ${areaBottom} Z`;
+
+  /* Axis ticks — 3-4 dates evenly spaced across the window. The
+     single-point case gets exactly one tick (otherwise the even-
+     spacing formula collapses all three labels onto the same x
+     coordinate and they render on top of each other). */
   const fmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
-  for (let t = 0; t < tickCount; t++) {
-    const idx = Math.round((t / (tickCount - 1)) * (points.length - 1));
-    axisTicks.push({
-      x:     xs[idx],
-      label: fmt.format(new Date(points[idx].day)),
-    });
+  const axisTicks: { x: number; label: string }[] = [];
+  if (points.length === 1) {
+    axisTicks.push({ x: xs[0], label: fmt.format(new Date(points[0].day)) });
+  } else {
+    const tickCount = points.length >= 30 ? 4 : 3;
+    for (let t = 0; t < tickCount; t++) {
+      const idx = Math.round((t / (tickCount - 1)) * (points.length - 1));
+      axisTicks.push({
+        x:     xs[idx],
+        label: fmt.format(new Date(points[idx].day)),
+      });
+    }
   }
 
   return {
@@ -920,9 +1023,22 @@ function computeVerdict(
   lowestNgn:  number,
   meanNgn:    number,
   rangeDays:  number,
+  pointCount: number = 2,
 ): Verdict {
   const rangeLabel = rangeDays >= 365 ? "this window"
                   : `${rangeDays} days`;
+
+  /* Single-observation case — we can't claim "lowest" or
+     "above usual" with just one data point. Honest framing: the
+     price is what it is, no trend judgment yet. */
+  if (pointCount < 2) {
+    return {
+      copy:        "Just started tracking",
+      tone:        "neutral",
+      icon:        "flat",
+      tileCaption: "First reading",
+    };
+  }
 
   /* At-floor: 1% tolerance for FX + rounding drift. */
   if (currentNgn <= lowestNgn * 1.01) {
