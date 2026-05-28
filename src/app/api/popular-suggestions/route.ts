@@ -70,9 +70,20 @@ export async function GET(req: NextRequest) {
      Pro Max') instead of the raw retailer title (e.g. 'Apple iPhone
      15 Pro Max - 6.9 inch, 256gb Rom, 8gb Ram, Black Titanium').
      Cleaner display + cleaner search query when the user taps the
-     chip, since the click action runs the chip text as a search. */
+     chip.
+
+     `key` (product_id) is surfaced so the chip click can route as
+     /compare?q=<title>&pid=<key> — direct product lookup, guaranteed
+     to land on a real anchor with at least 2 stores. Without this,
+     the chip click does text-search (pgFtsFindSimilar) which can
+     fail when the cleaned chip label drifts from the underlying
+     product's FTS-indexed title (chipLabelForTitle strips a lot of
+     detail). User report (May 2026): "the displayed pills must
+     always have at least 2 products in the db" — same product
+     does have ≥ 2 stores, the text-search just couldn't find it. */
   const items = ((data as SuggestionRow[] | null) ?? []).map((r) => ({
     title:      chipLabelForTitle(r.title),
+    key:        r.product_id,
     storeCount: r.store_count,
   }));
 

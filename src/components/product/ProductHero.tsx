@@ -242,13 +242,24 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
         <div className="mb-5 sm:mb-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             <div className="flex-1 min-w-0">
+              {/* Advisory copy — was previously "{Store} doesn't typically
+                  ship to {Country}" which was too definitive. Many
+                  retailers we flag as "external" actually CAN ship cross-
+                  border via freight forwarders, store-side international
+                  programs (Amazon Global, ASOS Premier), or third-party
+                  couriers — Havlo can't reliably tell which path the user
+                  has access to. Soften to "may not ship directly" and
+                  let the user decide. May 2026 user report: "when you
+                  say a store doesn't ship to a country, i need you to
+                  fact check that and correct the necessary ones because
+                  some are wrong." */}
               <div className="text-sm font-semibold text-ink mb-1">
-                {displayStore} doesn&apos;t typically ship to {country.name}
+                International seller — check shipping to {country.name}
               </div>
               <div className="text-xs text-ink-2">
                 {localAlternative
-                  ? <>The same product is available locally at <span className="font-semibold text-ink">{localAlternative.storeName}</span> for <span className="font-semibold text-ink">{formatLocal(localAlternative.price, country)}</span>.</>
-                  : <>You can still see the price and view it externally — just be aware that direct shipping may not be available.</>}
+                  ? <><span className="font-semibold text-ink">{displayStore}</span> may not ship directly to {country.name}. The same product is available locally at <span className="font-semibold text-ink">{localAlternative.storeName}</span> for <span className="font-semibold text-ink">{formatLocal(localAlternative.price, country)}</span>.</>
+                  : <><span className="font-semibold text-ink">{displayStore}</span> may not ship directly to {country.name} — visit the store to confirm shipping options before ordering.</>}
               </div>
             </div>
             {localAlternative && (

@@ -157,9 +157,13 @@ const COUNTRY_CROSS_BORDER: Record<string, string[]> = {
        May 2026 v3 fix per user observation. */
     "amazon.com", "amazon-com", "amazon-us",
     "amazon.co.uk", "amazon-co-uk", "amazon-uk",
-    /* Amazon AE removed May 2026 v3 per user direction —
-       Nigerians realistically buy from US + UK only. AE adds
-       noise without a real freight-route. */
+    /* Amazon AE — RE-ADDED May 2026 v4 after fact-check. The earlier
+       removal ("no real freight route") was wrong. Amazon.ae's
+       Amazon Global program explicitly lists Nigeria as a shipping
+       destination; Lagos↔Dubai is a heavy freight corridor used by
+       NG cross-border shoppers + many Nigerian businesses import via
+       UAE wholesalers. Source: amazon.ae/gp/help GJF6884LHHZ5ELD4. */
+    "amazon.ae", "amazon-ae",
     "aliexpress", "asos",
     "shein", "temu", "dhgate", "ebay", "apple.com", "banggood",
     /* US retailers commonly used by NG cross-border shoppers — most

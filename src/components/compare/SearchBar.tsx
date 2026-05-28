@@ -131,8 +131,17 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
      listing page. Fetched from /api/popular-suggestions which is
      edge-cached for 10 min and falls back to [] if Supabase is
      down — in that case we keep using the hand-curated pool. */
-  const [chipPool, setChipPool] = useState<string[]>(SUGGESTIONS_POOL);
-  const [chips, setChips] = useState<string[]>(() => SUGGESTIONS_POOL.slice(0, 6));
+  /* Chip shape: { title } for the static fallback (no pid available)
+     and { title, key } for the dynamic pool from /api/popular-suggestions.
+     The key — when present — is the product_id, which the click handler
+     passes to submit() so the resulting /compare URL uses pid= instead
+     of just q=. Direct pid lookup is GUARANTEED to find the anchor (it
+     came from the same DB); a q= text search can miss because of FTS
+     drift between the cleaned chip label and the indexed title. */
+  type Chip = { title: string; key?: string };
+  const STATIC_CHIPS: Chip[] = SUGGESTIONS_POOL.map((title) => ({ title }));
+  const [chipPool, setChipPool] = useState<Chip[]>(STATIC_CHIPS);
+  const [chips, setChips] = useState<Chip[]>(() => STATIC_CHIPS.slice(0, 6));
   const prevValue = useRef(initialQuery);
 
   const { country } = useCountry();
@@ -150,9 +159,16 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
     fetch(`/api/popular-suggestions?country=${encodeURIComponent(cc)}`)
       .then((r) => r.json())
       .then((d) => {
-        const items: { title: string }[] = Array.isArray(d?.items) ? d.items : [];
-        if (items.length >= 6) setChipPool(items.map((i) => i.title));
-        else setChipPool(SUGGESTIONS_POOL);  // fall back if the country pool is thin
+        const items: Array<{ title: string; key?: string }> = Array.isArray(d?.items) ? d.items : [];
+        /* Only keep items that carry a real pid (key) — those are the
+           ones we can lookup directly and guarantee land on a multi-
+           store anchor. Items without a key would fall back to text-
+           search at click time and reintroduce the empty-result bug. */
+        const withKeys: Chip[] = items
+          .filter((i) => i.title && i.key)
+          .map((i) => ({ title: i.title, key: i.key }));
+        if (withKeys.length >= 6) setChipPool(withKeys);
+        else setChipPool(STATIC_CHIPS);  // thin country pool → fall back
       })
       .catch(() => { /* keep current pool on failure */ });
   }, [country?.code]);
@@ -420,17 +436,24 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
       {!hideTrendingChips && !value.trim() && suggestions.length === 0 && (
         <div className="mt-5 flex flex-wrap justify-center gap-2 px-2">
           <span className="text-xs text-ink-3 self-center mr-1">Try:</span>
-          {chips.map((s) => (
+          {chips.map((c) => (
             <button
               /* keying on the chip text makes React mount a new node when
                  the value changes — which lets the fade-in CSS replay on
                  every rotation. animate-fade-in is defined globally. */
-              key={s}
+              key={c.title}
               type="button"
-              onClick={() => { setValue(s); submit(s); }}
+              /* When the chip carries a pid (dynamic chips from
+                 /api/popular-suggestions), pass it to submit() so the
+                 compare URL uses pid= and the anchor is found by
+                 direct product_id lookup. Static chips with no key
+                 fall back to text-search — they're SUGGESTIONS_POOL
+                 entries which are hand-curated and match popular
+                 catalog products by construction. */
+              onClick={() => { setValue(c.title); submit(c.title, c.key); }}
               className="px-3 py-1.5 rounded-full text-xs text-ink-2 hover:text-ink bg-surface-2 hover:bg-surface border border-border hover:border-border-strong transition-colors animate-fade-in"
             >
-              {s}
+              {c.title}
             </button>
           ))}
         </div>
