@@ -1378,7 +1378,27 @@ async function sweepStaleOffers(
     run can't nuke an active catalogue. The whole-catalog cron
     (scripts/sweep-stale-offers.ts) covers stores nothing's
     ingesting. */
-const TTL_DAYS = 30;
+/* Lowered May 29 2026 from 30 to 14 days after a user trust-break
+   report ("Last refreshed 2w ago, merchant price had changed").
+
+   Mon+Thu scrape cadence means ~6 cycles in 14 days; if SIX
+   consecutive cycles fail to re-verify an offer, the offer is almost
+   certainly gone from the merchant feed (Shopify catalog change,
+   SerpAPI query no longer running, store removed the listing). A
+   transient scraper outage usually clears within 1-2 cycles, so 14
+   days is well past the noise threshold while still aggressive
+   enough that stale data doesn't accumulate.
+
+   Combined with the staleness warning chip on ProductHero (b4f5a0e)
+   the user-facing experience now is:
+     fresh        (< 7 days)   normal PDP
+     aging         (7-14 days) amber "price may have changed" chip
+     stale flip   (>= 14 days) offer flipped in_stock=false ->
+                                 spectrum shows OUT OF STOCK ->
+                                 PDP becomes noindex (existing logic) ->
+                                 Google stops surfacing in results ->
+                                 alternatives rail surfaces cheaper picks */
+const TTL_DAYS = 14;
 
 /**
  * Per-store TTL sweep. For each store the caller touched in this

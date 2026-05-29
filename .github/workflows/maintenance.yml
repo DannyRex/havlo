@@ -66,6 +66,41 @@ jobs:
       - name: Prune price_history older than 90 days
         run: npm run prune:price-history -- --apply
 
+  # ── Catalog-wide stale-offer TTL sweep ────────────────────────────
+  # Closes the gap that the in-ingest per-store TTL sweep leaves
+  # open. The ingestDeals path only sweeps stores it ACTUALLY touched
+  # this run; if a scraper is broken or a per-SKU SerpAPI / curated
+  # path never hits a store, that store's stale offers accumulate
+  # indefinitely. Sunday 04:00 UTC catalog-wide sweep catches them.
+  #
+  # User trust-break report May 29 2026: a PDP showed "Last refreshed
+  # 2w ago" + a stale price. Root cause was the offer hadn't been
+  # re-verified for weeks because no ingest run touched that store,
+  # so the in-ingest sweep never fired for it. Adding this scheduled
+  # catalog-wide pass closes that path.
+  #
+  # 14-day threshold matches TTL_DAYS in ingestion.ts so the two
+  # paths agree on what "stale" means. Worst case the offer sits
+  # stale Mon-Sat (up to 6 days past the threshold) before this sweep
+  # catches it on Sunday — combined with the ProductHero amber
+  # warning chip (b4f5a0e) the user still sees the staleness signal
+  # during that window.
+  stale-offer-sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: "20", cache: "npm" }
+      - run: npm ci
+      - name: Sweep offers older than 14 days to in_stock=false
+        run: npm run sweep:stale-offers -- --apply --days=14
+
   brand-dtc-scrape:
     runs-on: ubuntu-latest
     timeout-minutes: 15
