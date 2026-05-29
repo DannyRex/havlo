@@ -46,6 +46,7 @@ import { effectiveLandedPrice } from "@/lib/landed-price";
 import { partitionDupesByVariantMatch, variantOffers } from "@/lib/search/variant-pooling";
 import { partitionDupesByVariantMatchDeep } from "@/lib/search/variant-pooling-deep";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
+import { fetchProductDescription } from "@/lib/offers/fetch-product-description";
 import { usdToNgn } from "@/lib/utils";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getCategory } from "@/lib/data/categories";
@@ -53,6 +54,7 @@ import JsonLd from "@/components/seo/JsonLd";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import PdpViewTracker from "@/components/product/PdpViewTracker";
+import ProductAbout from "@/components/product/ProductAbout";
 import { getClickThroughUrl } from "@/lib/utils";
 import { appendSignature } from "@/lib/go-signing";
 import PdpBackLink from "@/components/product/PdpBackLink";
@@ -331,11 +333,23 @@ export default async function ProductPage({ params }: PageProps) {
     ["pdp-price-timeseries-v2"],
     { revalidate: 1800, tags: ["pdp-price-timeseries"] },
   );
-  const [dupes, anchorOffers, priceHistoryRows, priceTimeseries] = await Promise.all([
+  /* products.description fetch — populated by ingestion when the
+     scraper carried a merchant body. Joined here (not on the
+     product_best_offers view) because descriptions can be 1–5KB
+     and most surfaces don't render them. Cached 1h with the
+     rest of the PDP read path; tag separately so a backfill
+     run can invalidate it without busting the price caches. */
+  const fetchProductDescriptionCached = unstable_cache(
+    async (productId: string) => fetchProductDescription(productId),
+    ["pdp-product-description"],
+    { revalidate: 3600, tags: ["pdp-product-description"] },
+  );
+  const [dupes, anchorOffers, priceHistoryRows, priceTimeseries, productDescriptionRaw] = await Promise.all([
     fetchDupesCached(offer.title),
     fetchAnchorOffersCached(offer.product_id),
     offer.product_id ? fetchPriceHistoryCached(offer.product_id) : Promise.resolve(null),
     offer.product_id ? fetchPriceTimeseriesCached(offer.product_id) : Promise.resolve(null),
+    offer.product_id ? fetchProductDescriptionCached(offer.product_id) : Promise.resolve(null),
   ]);
 
   /* ── Anchor country-relevance guard ───────────────────────────────
@@ -919,9 +933,24 @@ export default async function ProductPage({ params }: PageProps) {
        • dateModified      — most recent scrape timestamp; Google uses
                               this as a freshness signal */
   const productUrl = `${SITE_URL}/${country.code}/p/${offer.offer_id}`;
-  const productDescription = offer.brand
-    ? `${offer.title} from ${offer.brand}. Compare prices across stores in ${country.name} on Havlo. See similar products for less.`
-    : `${offer.title}. Compare prices across stores in ${country.name} on Havlo. See similar products for less.`;
+  /* JSON-LD description: prefer the real merchant body when we have
+     one (richer, on-topic prose Google's NLP weights highly), fall
+     back to the templated line otherwise. Cap at 500 chars — Google
+     truncates Rich Results descriptions around that mark anyway and
+     it keeps the structured payload lean. Strip inline HTML so
+     entities and tags don't pollute the JSON. */
+  const merchantDescriptionForLd = productDescriptionRaw
+    ? productDescriptionRaw
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 500)
+    : null;
+  const productDescription = merchantDescriptionForLd && merchantDescriptionForLd.length >= 50
+    ? merchantDescriptionForLd
+    : offer.brand
+      ? `${offer.title} from ${offer.brand}. Compare prices across stores in ${country.name} on Havlo. See similar products for less.`
+      : `${offer.title}. Compare prices across stores in ${country.name} on Havlo. See similar products for less.`;
   const priceValidUntil = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
 
   /* Build offer block — single Offer when only one store, or
@@ -1078,6 +1107,24 @@ export default async function ProductPage({ params }: PageProps) {
             }
           />
         </div>
+
+        {/* About this product — May 29 2026 PDP content pass.
+            Three jobs (see ProductAbout.tsx for the full rationale):
+            give the page visible body copy for HCU + AI Overviews,
+            surface products.description when the scraper captured
+            one, and render structured spec chips parsed from the
+            title. Slots between the chart and "You may also like"
+            so the page flows: identity → price → history → context
+            → alternatives. */}
+        <ProductAbout
+          title={offer.title}
+          brand={offer.brand}
+          categorySlug={offer.category_slug}
+          description={productDescriptionRaw}
+          storeName={offer.store_name}
+          storeCount={totalStores}
+          countryName={country.name}
+        />
 
         {dupesForRail.length > 0 ? (
           /* Cheaper alternatives section — moved ABOVE the sibling
