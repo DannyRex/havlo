@@ -44,7 +44,10 @@ const CATEGORIES: CatItem[] = [
   { label: "Fashion",    slug: "fashion",     Icon: FashionIcon },
   { label: "Beauty",     slug: "beauty",      Icon: BeautyIcon },
   { label: "Gaming",     slug: "gaming",      Icon: GamingIcon },
-  { label: "Appliances", slug: "appliances",  Icon: AppliancesIcon },
+  /* "Appliances" merged into the Electronics category (May 2026). Kept
+     as a concrete doorway chip — its own icon, but routes to the
+     merged ?category=electronics filter. */
+  { label: "Appliances", slug: "electronics", Icon: AppliancesIcon },
 ];
 
 interface Props {

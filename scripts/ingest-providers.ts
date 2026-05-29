@@ -37,7 +37,7 @@ import { fetchSerpapiAccount, hasBudget } from "../src/lib/providers/serpapi-cre
    still exists for manual focused enrichment runs, and --mode=deals
    exists as a fallback override. */
 const MARKET_MODE_CATEGORIES = new Set([
-  "phones", "computing", "audio", "electronics", "appliances",
+  "phones", "computing", "audio", "electronics", // "appliances" merged into electronics (May 2026)
 ]);
 
 function inferModeForCategory(slug: string, forceMode?: "deals" | "market"): "deals" | "market" {

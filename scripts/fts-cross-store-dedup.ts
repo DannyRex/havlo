@@ -51,7 +51,8 @@ import { getSupabaseAdmin } from "../src/lib/providers/db-client";
 import { pgFtsFindDupes } from "../src/lib/search/pg-fts";
 import { partitionDupesByVariantMatch } from "../src/lib/search/variant-pooling";
 
-const COMPARABLE_CATS = new Set(["phones", "computing", "gaming", "audio", "appliances", "electronics"]);
+// "appliances" merged into "electronics" (May 2026) — one slug now.
+const COMPARABLE_CATS = new Set(["phones", "computing", "gaming", "audio", "electronics"]);
 const APPLY = process.argv.includes("--apply");
 const LIMIT = (() => {
   const a = process.argv.find((s) => s.startsWith("--limit="));

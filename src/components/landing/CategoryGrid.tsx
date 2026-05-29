@@ -7,7 +7,7 @@ import { type Country } from "@/lib/country";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
-  BeautyIcon, SportsIcon, EarbudsIcon, AppliancesIcon, ElectronicsIcon,
+  BeautyIcon, SportsIcon, EarbudsIcon, ElectronicsIcon,
 } from "@/components/ui/CategoryIcons";
 import type { ComponentType } from "react";
 
@@ -23,7 +23,6 @@ const ICON_FOR: Record<string, IconComp> = {
   sports:      SportsIcon,
   computing:   LaptopIcon,
   audio:       EarbudsIcon,
-  appliances:  AppliancesIcon,
 };
 
 /* Browsable on the homepage = everything except "all" AND anything

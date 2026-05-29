@@ -800,7 +800,10 @@ export function isLikelySameProduct(
        are real product identity. Loosening pools different SKUs. */
   const fam = anchor.family ?? detectQueryFamily(anchor.title);
   const isLenientFam = fam === "fashion" || fam === "beauty" || fam === "sports";
-  const isMediumFam  = fam === "home"    || fam === "appliances" || fam === "health";
+  /* "appliances" folded into Electronics (May 2026) — appliance items
+     now carry the electronics family and fall into the strict bucket
+     below alongside phones/electronics/computing/audio/gaming. */
+  const isMediumFam  = fam === "home"    || fam === "health";
 
   /* Size match — strict by default. For fashion/beauty: skip
      entirely (size regex doesn't match S/M/L/XL anyway). For

@@ -253,9 +253,8 @@ function computeDiscount(originalPrice: number, salePrice: number): number {
 const CATEGORY_USD_FLOOR: Record<string, number> = {
   phones:      30,    // ~₦40K
   computing:   60,    // ~₦80K
-  electronics: 12,    // ~₦15K
+  electronics: 12,    // ~₦15K (incl. former appliances)
   audio:       4,     // ~₦5K
-  appliances:  15,    // ~₦20K
   gaming:      12,
   fashion:     2,
   beauty:      1,
@@ -273,7 +272,7 @@ function inferCategoryFromTitle(title: string): string | null {
   if (/\b(airpods|headphone|headset|earbuds|earphone|speaker)\b/.test(t)) return "audio";
   if (/\b(tv|television|qled|oled)\b/.test(t)) return "electronics";
   if (/\b(playstation|ps5|ps4|xbox|nintendo|switch)\b/.test(t)) return "gaming";
-  if (/\b(fridge|washer|dryer|microwave)\b/.test(t)) return "appliances";
+  if (/\b(fridge|washer|dryer|microwave)\b/.test(t)) return "electronics"; // appliances merged into electronics
   return null;
 }
 

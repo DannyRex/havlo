@@ -115,7 +115,7 @@ export function computeAnchorStats(
      stay at 4× (real cross-store spread is wider there). */
   const ANCHOR_OUTLIER_RATIO =
     family === "fashion"  || family === "beauty"  || family === "sports" ? 4 :
-    family === "home"     || family === "appliances" || family === "health" ? 3 :
+    family === "home"     || family === "health" ? 3 :
     /* phones, electronics, computing, audio, gaming, default */         2.5;
   const offerPrices = deduped.map((o) => effectiveLandedPrice(o, country)).filter((p) => p > 0);
   let medianPrice = 0;

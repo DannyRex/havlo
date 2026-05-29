@@ -203,10 +203,18 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
      generic-sounding game name. */
   { pattern: /\b(ubisoft\s*(store|connect)?|activision|blizzard|rockstar\s*games|epic\s*games\s*store|green\s*man\s*gaming|gamestop|xbox\.com|xbox\s*store|playstation\s*store)\b/i, slug: "gaming", reason: "game publisher / store" },
 
-  // ── Appliances ──
-  { pattern: /\b(refrigerator|fridge|freezer|washer|dryer|dishwasher|microwave|oven|range|cooktop|stove)\b/i, slug: "appliances", reason: "major appliance" },
-  { pattern: /\b(air\s*fryer|pressure\s*cooker|slow\s*cooker|rice\s*cooker|stand\s*mixer|kitchenaid|instant\s*pot|blender|toaster|kettle|coffee\s*maker|espresso\s*machine)\b/i, slug: "appliances", reason: "kitchen appliance" },
-  { pattern: /\b(vacuum|dyson\s*v\d|robot\s*vacuum|roomba)\b/i, slug: "appliances", reason: "vacuum" },
+  // ── Appliances (merged into Electronics — May 2026) ──
+  //    The standalone Appliances category was folded into Electronics.
+  //    These rules still recognise appliance titles, but now route to
+  //    "electronics" so the merged category catches them. The AC /
+  //    generator / fan / iron / water-heater rule was added at merge
+  //    time to cover appliance-class items scraped from merchant
+  //    "appliances" pages that no central rule previously recognised
+  //    (they used to keep whatever source tag the provider assigned).
+  { pattern: /\b(refrigerator|fridge|freezer|washer|washing\s*machine|tumble\s*dryer|dryer|dishwasher|microwave|oven|range|cooktop|stove)\b/i, slug: "electronics", reason: "major appliance" },
+  { pattern: /\b(air\s*fryer|pressure\s*cooker|slow\s*cooker|rice\s*cooker|stand\s*mixer|kitchenaid|instant\s*pot|blender|toaster|kettle|coffee\s*maker|espresso\s*machine)\b/i, slug: "electronics", reason: "kitchen appliance" },
+  { pattern: /\b(vacuum|dyson\s*v\d|robot\s*vacuum|roomba)\b/i, slug: "electronics", reason: "vacuum" },
+  { pattern: /\b(air\s*conditioner|air\s*conditioning|split\s*ac\b|window\s*ac\b|\bac\s*(?:inverter|split|unit)\b|standing\s*fan|ceiling\s*fan|rechargeable\s*fan|industrial\s*fan|water\s*heater|water\s*dispenser|electric\s*iron|steam\s*iron|clothes\s*iron|deep\s*freezer|chest\s*freezer|(?:petrol|diesel|power|inverter|portable|standby)\s*generator|generator\s*\d)\b/i, slug: "electronics", reason: "home appliance (AC/generator/fan/iron)" },
 
   // ── Wearables / Fitness ──
   { pattern: /\b(apple\s*watch|smart\s*watch|smartwatch|garmin|fitbit|whoop|fossil\s*smart)\b/i, slug: "electronics", reason: "smartwatch" },

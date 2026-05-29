@@ -315,7 +315,7 @@ async function fetchMultiStoreTitlesForCountry(countryCode: string): Promise<Mul
 
   /* Group by category, cap each, then merge. Round-robin across
      categories so the final pool order is interleaved (phones,
-     beauty, computing, fashion, audio, home, gaming, appliances,
+     beauty, computing, fashion, audio, home, gaming, electronics,
      phones, ...) — TrendingChipRail picks 10 random from this
      pre-mixed pool so the visible chips look diverse even before
      the rotation kicks in. */

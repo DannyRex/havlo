@@ -77,7 +77,7 @@ const FLAGSHIP_SKUS: SkuQuery[] = [
   { q: "PlayStation 5 Slim",       categorySlug: "electronics" },
   { q: "AirPods Pro 2",            categorySlug: "audio" },
   { q: "Sony WH-1000XM5",          categorySlug: "audio" },
-  { q: "Dyson V15 Detect",         categorySlug: "appliances" },
+  { q: "Dyson V15 Detect",         categorySlug: "electronics" }, // appliances merged into electronics (May 2026)
   { q: "Stanley Quencher tumbler", categorySlug: "home" },
   { q: "Nike Air Force 1",         categorySlug: "fashion" },
   { q: "Lego Technic",             categorySlug: "gaming" },
@@ -90,7 +90,7 @@ const ELECTRONICS_SKUS: SkuQuery[] = FLAGSHIP_SKUS.filter((s) =>
   ["phones", "computing", "electronics", "audio"].includes(s.categorySlug),
 );
 const HOME_SKUS: SkuQuery[] = FLAGSHIP_SKUS.filter((s) =>
-  ["home", "appliances"].includes(s.categorySlug),
+  ["home"].includes(s.categorySlug),
 );
 const DIY_SKUS: SkuQuery[]  = [];
 const FASHION_SPORTS_SKUS: SkuQuery[] = FLAGSHIP_SKUS.filter((s) =>

@@ -19,9 +19,8 @@
 const CATEGORY_PRICE_FLOOR_NGN: Record<string, number> = {
   phones:      40_000,
   computing:   80_000,
-  electronics: 15_000,
+  electronics: 15_000,  // includes former "appliances" (merged May 2026)
   audio:        5_000,
-  appliances:  20_000,
   gaming:      15_000,
   fashion:      3_000,
   beauty:       1_500,
