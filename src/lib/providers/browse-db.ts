@@ -153,6 +153,18 @@ async function searchDealsViaFts(
   const merged: BestOfferRow[] = [];
 
   for (let i = 0; i < candidates.length; i++) {
+    /* Broader-candidate gate (May 29 2026 search-quality fix). Live
+       user report: searching "iphone 15 pro" surfaced iPhone 13 Pro,
+       Xiaomi Redmi Note 14 Pro, phone cases — all because the loop
+       always walked candidate 2 = "iphone 15" (stripTrailingTokens
+       result) and UNIONED its noisy results into merged.
+
+       Now: only walk candidates beyond i=0 if the literal query
+       didn't produce enough good rows. MIN_USABLE_ROWS (6) is the
+       smallest first-scroll surface; with that many literal matches
+       there's no reason to broaden, and broadening only adds noise. */
+    if (i > 0 && merged.length >= MIN_USABLE_ROWS) break;
+
     const queryStr = candidates[i];
     const { data, error } = await supa.rpc("search_deals_fts", {
       q: queryStr,
@@ -168,8 +180,6 @@ async function searchDealsViaFts(
       seenOfferIds.add(row.offer_id);
       merged.push(row);
     }
-    // Stop early when the literal query gave us plenty of matches.
-    if (i === 0 && rows.length >= MIN_USABLE_ROWS * 4) break;
   }
 
   if (merged.length === 0) {
