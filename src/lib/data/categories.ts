@@ -4,7 +4,7 @@ import type { Category } from "@/types";
 export const categories: Category[] = [
   { id: "all",         name: "All",              slug: "all",         icon: "LayoutGrid",   color: "#0057FF", dealCount: 120 },
   { id: "phones",      name: "Phones",           slug: "phones",      icon: "Smartphone",   color: "#8B5CF6", dealCount: 28  },
-  { id: "electronics", name: "Electronics & Appliances", slug: "electronics", icon: "Cpu",    color: "#0057FF", dealCount: 43  },
+  { id: "electronics", name: "Electronics",      slug: "electronics", icon: "Cpu",          color: "#0057FF", dealCount: 43  },
   { id: "gaming",      name: "Gaming",           slug: "gaming",      icon: "Gamepad2",     color: "#EF4444", dealCount: 18  },
   { id: "fashion",     name: "Fashion",          slug: "fashion",     icon: "Shirt",        color: "#EC4899", dealCount: 24  },
   { id: "home",        name: "Home & Kitchen",   slug: "home",        icon: "Home",         color: "#10B981", dealCount: 16  },
