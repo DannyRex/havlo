@@ -54,9 +54,20 @@ export const organizationJsonLd = {
   "@type":      "Organization",
   "@id":        `${SITE_URL}#organization`,
   name:         SITE_NAME,
+  legalName:    "Havlo",
   url:          SITE_URL,
-  logo:         `${SITE_URL}/icon`,
-  description:  "Independent price-comparison and product-discovery platform serving shoppers in Nigeria and globally.",
+  /* Concrete PNG (not the SVG icon route). Google's Knowledge Graph
+     parser handles SVG poorly and the Rich Results validator warned
+     "Logo URL did not resolve to a valid image" pointing at /icon.
+     The PNG is the same icon shipped via /icon.png, served as
+     image/png with explicit dimensions. */
+  logo: {
+    "@type":  "ImageObject",
+    url:      `${SITE_URL}/icon.png`,
+    width:    512,
+    height:   512,
+  },
+  description:  "Independent price-comparison and product-discovery platform serving shoppers in Nigeria, UK, US, India, UAE, and South Africa.",
   sameAs: [
     /* Verified social accounts. Google reads these for entity
        verification + sitelinks; helps unlock the knowledge-panel
@@ -87,9 +98,18 @@ export const websiteJsonLd = {
   publisher:   { "@id": `${SITE_URL}#organization` },
   potentialAction: {
     "@type":  "SearchAction",
+    /* Target a route that ACTUALLY performs a search server-side.
+       Previously pointed at /compare?q= but the un-prefixed /compare
+       route is the global landing screen and doesn't run the query
+       until the user submits manually. /ng/deals?search= matches
+       the homepage textarea form's actual behaviour: visitor types,
+       form submits, /deals renders matching results. NG is the
+       primary market so the sitelinks search box defaults there;
+       a visitor whose locale resolves elsewhere is routed by middleware
+       to their country page from the landing surface. */
     target: {
       "@type":     "EntryPoint",
-      urlTemplate: `${SITE_URL}/compare?q={search_term_string}`,
+      urlTemplate: `${SITE_URL}/ng/deals?search={search_term_string}&origin=all`,
     },
     "query-input": "required name=search_term_string",
   },
@@ -125,6 +145,11 @@ export interface SeoDeal {
   originalPrice:   number;
   currency:        string;
   discountPercent: number;
+  /** Real product brand if known. Falls back to storeName ONLY when
+      omitted by caller — but callers should always pass this when
+      products.brand is populated (most are after the May 29 2026
+      signature pass). */
+  brand?:          string | null;
 }
 
 export function buildItemListJsonLd(deals: SeoDeal[], listName: string = "Trending deals on Havlo") {
@@ -141,7 +166,14 @@ export function buildItemListJsonLd(deals: SeoDeal[], listName: string = "Trendi
         name:        d.title,
         url:         d.url,
         image:       d.imageUrl,
-        brand:       d.storeName,
+        /* Use the product's actual brand when known. Storing the
+           store name as the brand was a launch-day mis-modeling
+           that Rich Results occasionally flagged ("Product brand
+           does not match domain content"). Falls back to omitting
+           the field rather than misrepresenting it. */
+        brand:       d.brand
+          ? { "@type": "Brand", name: d.brand }
+          : undefined,
         offers: {
           "@type":          "Offer",
           price:            d.salePrice,

@@ -877,23 +877,73 @@ export default async function ProductPage({ params }: PageProps) {
     { name: offer.title,      url: `${SITE_URL}/${country.code}/p/${offer.offer_id}` },
   ]);
 
+  /* Product structured data — May 29 2026 SEO enrichment pass.
+     Adds the fields Google's Rich Results validator + Search Console
+     repeatedly flag as "Missing" on Shopping rich results:
+       • description       — falls back to a constructed sentence so
+                              every PDP carries one
+       • sku / productID   — uses the canonical offer_id
+       • mainEntityOfPage  — explicit canonical the parser respects
+       • priceValidUntil   — 30 days out (Google warns when absent)
+       • aggregateOffer    — when multiple stores carry this product,
+                              swap the single Offer for an
+                              AggregateOffer with lowPrice/highPrice/
+                              offerCount so the SERP can show price
+                              ranges instead of a single store's
+                              number
+       • dateModified      — most recent scrape timestamp; Google uses
+                              this as a freshness signal */
+  const productUrl = `${SITE_URL}/${country.code}/p/${offer.offer_id}`;
+  const productDescription = offer.brand
+    ? `${offer.title} from ${offer.brand}. Compare prices across stores in ${country.name} on Havlo. See similar products for less.`
+    : `${offer.title}. Compare prices across stores in ${country.name} on Havlo. See similar products for less.`;
+  const priceValidUntil = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+
+  /* Build offer block — single Offer when only one store, or
+     AggregateOffer when multiple stores carry the same product
+     (perStoreOffers from computeAnchorStats above). lowPrice /
+     highPrice are in the visiting offer's currency to match the
+     other PDP signals; numbers come from the country-aware
+     effectiveLandedPrice rollup the spectrum already uses. */
+  const offerBlock = perStoreOffers.length > 1
+    ? {
+        "@type":         "AggregateOffer",
+        url:             productUrl,
+        priceCurrency:   offer.currency,
+        lowPrice:        Math.min(...perStoreOffers.map((o) => o.effectiveNgn)),
+        highPrice:       Math.max(...perStoreOffers.map((o) => o.effectiveNgn)),
+        offerCount:      perStoreOffers.length,
+        availability:    offer.in_stock
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+        priceValidUntil,
+      }
+    : {
+        "@type":         "Offer",
+        url:             productUrl,
+        priceCurrency:   offer.currency,
+        price:           offer.current_price,
+        availability:    offer.in_stock
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+        seller:          { "@type": "Organization", name: offer.store_name },
+        priceValidUntil,
+      };
+
   const productSchema = {
-    "@context": "https://schema.org",
-    "@type": "Product",
-    name: offer.title,
-    image: offer.image_url ? [offer.image_url] : undefined,
-    brand: offer.brand ? { "@type": "Brand", name: offer.brand } : undefined,
-    category: offer.category_slug ?? undefined,
-    offers: {
-      "@type": "Offer",
-      url: `${SITE_URL}/${country.code}/p/${offer.offer_id}`,
-      priceCurrency: offer.currency,
-      price: offer.current_price,
-      availability: offer.in_stock
-        ? "https://schema.org/InStock"
-        : "https://schema.org/OutOfStock",
-      seller: { "@type": "Organization", name: offer.store_name },
-    },
+    "@context":         "https://schema.org",
+    "@type":            "Product",
+    "@id":              productUrl,
+    name:               offer.title,
+    description:        productDescription,
+    image:              offer.image_url ? [offer.image_url] : undefined,
+    brand:              offer.brand ? { "@type": "Brand", name: offer.brand } : undefined,
+    category:           offer.category_slug ?? undefined,
+    sku:                offer.offer_id,
+    productID:          offer.offer_id,
+    mainEntityOfPage:   productUrl,
+    dateModified:       offer.scraped_at,
+    offers:             offerBlock,
   };
 
   return (

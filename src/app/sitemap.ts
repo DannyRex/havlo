@@ -2,8 +2,42 @@ import type { MetadataRoute } from "next";
 import { ACTIVE_COUNTRIES } from "@/lib/country";
 import { SITE_URL, buildHreflangAlternates } from "@/lib/seo";
 import { posts } from "@/lib/blog/posts";
+import { getSupabaseAdmin } from "@/lib/providers/db-client";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+/* Pull the canonical (cheapest in-stock) offer_id per product so
+   each product PDP gets ONE sitemap entry. We don't multiply by
+   country — emitting all 14k products × 6 countries (~84k URLs)
+   would overflow Google's 50K-per-file limit and serialise the
+   wrong message (six "variants" of the same product page) when
+   the actual difference is just price display. Per-country routing
+   is handled by hreflang alternates on the single NG-primary URL.
+
+   Filter is intentional: only PRODUCTS WITH INVENTORY get crawl
+   priority. Out-of-stock pages are already noindex via robots
+   metadata; emitting them as sitemap entries would tell Google to
+   spend budget on URLs we don't want indexed. */
+async function fetchProductSitemapRows(): Promise<Array<{ offerId: string; updatedAt: string }>> {
+  const supa = getSupabaseAdmin();
+  if (!supa) return [];
+  /* Top-N cap because Google's per-file limit is 50,000 entries
+     and we have ~14,800 products today — well under. The cap
+     guards against future growth: bumping past 45k would require
+     splitting into multiple files via a sitemap index. When that
+     becomes urgent, switch to Next.js's generateSitemaps() pattern
+     so each sub-sitemap stays under the limit. */
+  const { data, error } = await supa
+    .from("product_best_offers")
+    .select("offer_id, scraped_at")
+    .order("scraped_at", { ascending: false })
+    .limit(45_000);
+  if (error || !data) return [];
+  return (data as Array<{ offer_id: string; scraped_at: string }>).map((r) => ({
+    offerId:   r.offer_id,
+    updatedAt: r.scraped_at,
+  }));
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   /* Stable date for the brand homepages — bump only when the
@@ -117,6 +151,30 @@ export default function sitemap(): MetadataRoute.Sitemap {
      to spend index budget on near-duplicate query-string variants.
      Same pattern as NerdWallet / Wirecutter / Skyscanner sitemaps. */
 
+  /* Product PDPs — May 29 2026 SEO pass. Pulls top in-stock products
+     by recency and emits one canonical NG-prefixed URL per product,
+     with hreflang alternates pointing at the same product under
+     /uk, /us, /in, /ae, /za. Single URL × 6 hreflang variants is
+     the recommended pattern for multi-region single-language sites
+     (vs emitting 14k × 6 entries which Google reads as duplicate). */
+  let productRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const rows = await fetchProductSitemapRows();
+    productRoutes = rows.map((r) => ({
+      url:             `${SITE_URL}/ng/p/${r.offerId}`,
+      priority:        0.6,
+      changeFrequency: "weekly" as const,
+      lastModified:    new Date(r.updatedAt),
+      alternates:      { languages: buildHreflangAlternates(`p/${r.offerId}`) },
+    }));
+  } catch (err) {
+    /* Sitemap is build-time critical — if Supabase is unreachable
+       we'd rather emit a partial sitemap than fail the build. The
+       missing product entries will reappear on the next successful
+       build. */
+    console.error("[sitemap] failed to fetch product rows:", (err as Error).message);
+  }
+
   return [
     ...homepages,
     ...dealsPages,
@@ -124,5 +182,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...globalRoutes,
     ...blogIndexRoutes,
     ...blogPostRoutes,
+    ...productRoutes,
   ];
 }
