@@ -54,7 +54,6 @@ import JsonLd from "@/components/seo/JsonLd";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import PdpViewTracker from "@/components/product/PdpViewTracker";
-import ProductAbout from "@/components/product/ProductAbout";
 import { getClickThroughUrl } from "@/lib/utils";
 import { appendSignature } from "@/lib/go-signing";
 import PdpBackLink from "@/components/product/PdpBackLink";
@@ -1108,19 +1107,21 @@ export default async function ProductPage({ params }: PageProps) {
           />
         </div>
 
-        {/* About this product — surfaces the merchant body captured
-            into products.description by ingestion. Renders ONLY when
-            we have real scraped copy; returns null otherwise so the
-            section is earned, not padded with title-echo prose.
-            Founder direction May 29 2026: "enrich with data from
-            scraping/ingest, not inferences from the title". The
-            inferred intro line + title-parsed spec chips that the
-            v1 component included read as echoes of the hero — they
-            had to go. */}
-        <ProductAbout
-          description={productDescriptionRaw}
-          storeName={offer.store_name}
-        />
+        {/* "About this product" section removed May 29 2026 per
+            founder direction: the v1 section padded the page with
+            inferred prose that echoed the hero (intro line, title-
+            parsed spec chips), and the merchant-body-only v2 still
+            didn't earn its place because coverage was too thin
+            (~30-40% of products) and adding a visible section that
+            shows up on only some PDPs created an inconsistent shape.
+            The page now flows chart → "You may also like" cleanly.
+
+            products.description is still fetched (productDescriptionRaw)
+            because the JSON-LD descriptor enrichment from 71b3858
+            uses it — real merchant prose in structured data is a
+            free SEO win, and search engines see it regardless of
+            visible rendering. fetchProductDescription stays for that
+            consumer; ProductAbout.tsx is deleted. */}
 
         {dupesForRail.length > 0 ? (
           /* Cheaper alternatives section — moved ABOVE the sibling
