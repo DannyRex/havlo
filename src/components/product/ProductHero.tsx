@@ -420,13 +420,25 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
         {(() => {
           const fresh = freshnessOf(offer.scrapedAt);
           if (!fresh.warn) return null;
+          /* Inline annotation, not a card. The earlier amber-bg +
+             amber-border treatment was claiming banner-grade real
+             estate for a chip that fires on ~20% of PDPs at any
+             given time (Mon+Thu ingest cadence + 7-day stale
+             threshold + 14-day TTL means a healthy slice of the
+             catalog sits in the 7–13d-old window). When a "warning"
+             reads as default UI chrome it loses urgency — exactly
+             the opposite of the trust play we're making. AlertTriangle
+             + amber-800 text on the plain surface still catches the
+             eye via the icon and color shift, but reads as honest
+             annotation instead of "Havlo thinks this price is
+             broken." May 29 2026 trust-signal refinement. */
           return (
-            <div className="mb-3 inline-flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-300/40">
-              <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
-              <p className="text-[12px] text-amber-800 dark:text-amber-200 leading-snug">
+            <p className="mb-3 inline-flex items-start gap-1.5 text-[12px] text-amber-800 dark:text-amber-400 leading-snug">
+              <AlertTriangle size={13} className="text-amber-600 dark:text-amber-400 shrink-0 mt-[1px]" aria-hidden="true" />
+              <span>
                 Price last verified {timeAgo(offer.scrapedAt).toLowerCase()}, it may have changed at {displayStore}.
-              </p>
-            </div>
+              </span>
+            </p>
           );
         })()}
 
