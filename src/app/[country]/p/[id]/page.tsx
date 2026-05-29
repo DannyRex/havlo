@@ -55,6 +55,7 @@ import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import PdpViewTracker from "@/components/product/PdpViewTracker";
 import ProductAbout from "@/components/product/ProductAbout";
+import { extractDisplaySpecs, resolveBrand } from "@/lib/product-specs";
 import { getClickThroughUrl } from "@/lib/utils";
 import { appendSignature } from "@/lib/go-signing";
 import PdpBackLink from "@/components/product/PdpBackLink";
@@ -1117,9 +1118,14 @@ export default async function ProductPage({ params }: PageProps) {
             so the page flows: identity → price → history → context
             → alternatives. */}
         <ProductAbout
-          title={offer.title}
-          brand={offer.brand}
+          /* Pre-parse server-side — ProductAbout is a client component
+             and can't import from @/lib/search/normalize (loads optional
+             datasets via Node's fs, which the browser bundle can't
+             resolve). resolveBrand + extractDisplaySpecs are the
+             server-only seam. */
+          brand={resolveBrand(offer.brand, offer.title)}
           categorySlug={offer.category_slug}
+          specs={extractDisplaySpecs(offer.title)}
           description={productDescriptionRaw}
           storeName={offer.store_name}
           storeCount={totalStores}

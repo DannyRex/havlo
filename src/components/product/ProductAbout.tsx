@@ -33,18 +33,22 @@
    on toggle. */
 
 import { useState } from "react";
-import type { ProductSignature } from "@/lib/search/normalize";
-import { buildSignature } from "@/lib/search/normalize";
 import { brandDisplay } from "@/lib/brand-display";
 import { displayStoreName } from "@/lib/store-display";
+import type { DisplaySpec } from "@/lib/product-specs";
 
 interface Props {
-  /** Raw product title (offer.title). Shown verbatim only inside
-      the spec extraction; the intro line uses brand + categoryLabel
-      instead of repeating the hero's headline. */
-  title:        string;
+  /** Brand, already resolved server-side via resolveBrand() — uses
+      products.brand when present, falls back to the signature
+      parser otherwise. Lowercase from the DB; this component
+      handles display casing via brandDisplay. */
   brand:        string | null;
   categorySlug: string | null;
+  /** Pre-extracted spec rows. Built server-side via
+      extractDisplaySpecs() so this client component doesn't need
+      to import @/lib/search/normalize (which loads optional
+      datasets via Node's fs and breaks the browser bundle). */
+  specs:        DisplaySpec[];
   /** Merchant body description from products.description (via
       fetchProductDescription). Null when the column is empty or
       the offer is a curated synthetic-id. */
@@ -98,37 +102,8 @@ function indefiniteArticle(word: string): "a" | "an" {
   return /^[aeiou]/i.test(word) ? "an" : "a";
 }
 
-interface Spec { label: string; value: string }
-
-function buildSpecs(sig: ProductSignature): Spec[] {
-  const out: Spec[] = [];
-  /* Storage: filter on 8 GB floor so an "8GB RAM" parsed as storage
-     by mistake (the regex is permissive) doesn't surface as a 0.008
-     TB storage chip. Display TB when >= 1024 GB. */
-  if (sig.storageGb !== null && sig.storageGb >= 8) {
-    out.push({
-      label: "Storage",
-      value: sig.storageGb >= 1024 ? `${sig.storageGb / 1024} TB` : `${sig.storageGb} GB`,
-    });
-  }
-  if (sig.ramGb !== null && sig.ramGb >= 2) {
-    out.push({ label: "RAM", value: `${sig.ramGb} GB` });
-  }
-  /* Inches: only render for "looks like a screen size" range —
-     3"–100". Catches tiny smartwatches at the low end and giant
-     TVs at the high end, excludes accidental matches on shoe
-     sizes or weight specs that leaked through the regex. */
-  if (sig.inches !== null && sig.inches >= 3 && sig.inches <= 100) {
-    out.push({ label: "Display", value: `${sig.inches}"` });
-  }
-  if (sig.color) {
-    out.push({
-      label: "Colour",
-      value: sig.color.charAt(0).toUpperCase() + sig.color.slice(1),
-    });
-  }
-  return out;
-}
+/* Spec extraction moved to @/lib/product-specs (server-only). This
+   client component receives the pre-built array via props. */
 
 /* Strip any HTML tags + collapse whitespace. Shopify merchant
    descriptions occasionally land as raw HTML through the JSON
@@ -150,9 +125,9 @@ function stripHtml(s: string): string {
 }
 
 export default function ProductAbout({
-  title,
   brand,
   categorySlug,
+  specs,
   description,
   storeName,
   storeCount,
@@ -160,8 +135,7 @@ export default function ProductAbout({
 }: Props) {
   const [expanded, setExpanded] = useState(false);
 
-  const sig = buildSignature(title);
-  const brandLabel    = brandDisplay(brand ?? sig.brand);
+  const brandLabel    = brandDisplay(brand);
   const categoryLabel = categoryLabelFor(categorySlug);
   const article       = indefiniteArticle(categoryLabel);
   const storeLabel    = displayStoreName(storeName);
@@ -192,7 +166,8 @@ export default function ProductAbout({
     ? merchantClean.slice(0, TRUNCATE_AT).trimEnd() + "…"
     : merchantClean;
 
-  const specs = buildSpecs(sig);
+  /* specs comes from props (extracted server-side via
+     extractDisplaySpecs in @/lib/product-specs). */
 
   /* Edge case: section content is JUST the intro + coverage line
      (no merchant text, no specs). That's still useful body copy —
