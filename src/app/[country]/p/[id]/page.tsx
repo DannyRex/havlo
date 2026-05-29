@@ -55,7 +55,6 @@ import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import PdpViewTracker from "@/components/product/PdpViewTracker";
 import ProductAbout from "@/components/product/ProductAbout";
-import { extractDisplaySpecs, resolveBrand } from "@/lib/product-specs";
 import { getClickThroughUrl } from "@/lib/utils";
 import { appendSignature } from "@/lib/go-signing";
 import PdpBackLink from "@/components/product/PdpBackLink";
@@ -1109,27 +1108,18 @@ export default async function ProductPage({ params }: PageProps) {
           />
         </div>
 
-        {/* About this product — May 29 2026 PDP content pass.
-            Three jobs (see ProductAbout.tsx for the full rationale):
-            give the page visible body copy for HCU + AI Overviews,
-            surface products.description when the scraper captured
-            one, and render structured spec chips parsed from the
-            title. Slots between the chart and "You may also like"
-            so the page flows: identity → price → history → context
-            → alternatives. */}
+        {/* About this product — surfaces the merchant body captured
+            into products.description by ingestion. Renders ONLY when
+            we have real scraped copy; returns null otherwise so the
+            section is earned, not padded with title-echo prose.
+            Founder direction May 29 2026: "enrich with data from
+            scraping/ingest, not inferences from the title". The
+            inferred intro line + title-parsed spec chips that the
+            v1 component included read as echoes of the hero — they
+            had to go. */}
         <ProductAbout
-          /* Pre-parse server-side — ProductAbout is a client component
-             and can't import from @/lib/search/normalize (loads optional
-             datasets via Node's fs, which the browser bundle can't
-             resolve). resolveBrand + extractDisplaySpecs are the
-             server-only seam. */
-          brand={resolveBrand(offer.brand, offer.title)}
-          categorySlug={offer.category_slug}
-          specs={extractDisplaySpecs(offer.title)}
           description={productDescriptionRaw}
           storeName={offer.store_name}
-          storeCount={totalStores}
-          countryName={country.name}
         />
 
         {dupesForRail.length > 0 ? (
