@@ -22,7 +22,7 @@ export const categories: Category[] = [
      merge dropped the grid from 10 → 9 browsable tiles, so promoting
      Health restores a clean 10-tile grid (no orphaned tile on the 2-
      and 5-col breakpoints). Count on the tile is live per country. */
-  { id: "health",      name: "Health & Wellness", slug: "health",     icon: "HeartPulse",  color: "#0EA5E9", dealCount: 0  },
+  { id: "health",      name: "Health",            slug: "health",     icon: "HeartPulse",  color: "#0EA5E9", dealCount: 0  },
 ];
 
 export const getCategory = (slug: string) =>
