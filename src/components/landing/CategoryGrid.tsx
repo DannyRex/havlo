@@ -7,7 +7,7 @@ import { type Country } from "@/lib/country";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
-  BeautyIcon, SportsIcon, EarbudsIcon, ElectronicsIcon,
+  BeautyIcon, SportsIcon, EarbudsIcon, ElectronicsIcon, HealthIcon,
 } from "@/components/ui/CategoryIcons";
 import type { ComponentType } from "react";
 
@@ -23,14 +23,19 @@ const ICON_FOR: Record<string, IconComp> = {
   sports:      SportsIcon,
   computing:   LaptopIcon,
   audio:       EarbudsIcon,
+  health:      HealthIcon,
 };
 
 /* Browsable on the homepage = everything except "all" AND anything
    marked `hidden: true`. The hidden flag lets us add taxonomies to
    the data layer + /deals CategoryNav chips without disturbing the
-   homepage grid's count/layout. Add a `health` category at the
-   data layer, but skip its homepage tile until the grid earns a row
-   swap and can absorb an extra column. */
+   homepage grid's count/layout.
+
+   Health was hidden while the grid held 10 browsable tiles (an 11th
+   orphaned a tile on the 2- and 5-col breakpoints). The May 2026
+   Appliances→Electronics merge dropped the grid to 9, freeing the
+   slot — so Health is now promoted out of `hidden` and back to a
+   clean 10-tile grid. */
 const browsable = categories.filter((c) => c.slug !== "all" && !c.hidden);
 
 /* Per-category counts, cached by country.

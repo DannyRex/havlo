@@ -16,15 +16,13 @@ export const categories: Category[] = [
      ACs, vacuums, kitchen appliances now live under the Electronics
      slug. Migration 0065 flipped existing rows; categorize.ts routes
      appliance titles to "electronics". No standalone Appliances tile. */
-  /* Health & Wellness — added May 2026. Hidden from the homepage
-     CategoryGrid because the grid is currently `grid-cols-2 sm:grid-cols-3
-     lg:grid-cols-5` and 10 browsable tiles fit cleanly on 2 and 5 cols;
-     adding an 11th would orphan a tile on every breakpoint. Still
-     surfaces in /deals CategoryNav chips (no grid constraint) and
-     accepts deep-link traffic via /deals?category=health. Promote
-     out of `hidden` once the homepage grid earns a row swap. */
-  { id: "health",      name: "Health & Wellness", slug: "health",     icon: "HeartPulse",  color: "#0EA5E9", dealCount: 0,
-    hidden: true },
+  /* Health & Wellness — pharmacy, OTC meds, supplements, vitamins,
+     first aid, baby health (see categorize.ts health rules).
+     Surfaced on the homepage grid May 2026: the Appliances→Electronics
+     merge dropped the grid from 10 → 9 browsable tiles, so promoting
+     Health restores a clean 10-tile grid (no orphaned tile on the 2-
+     and 5-col breakpoints). Count on the tile is live per country. */
+  { id: "health",      name: "Health & Wellness", slug: "health",     icon: "HeartPulse",  color: "#0EA5E9", dealCount: 0  },
 ];
 
 export const getCategory = (slug: string) =>
