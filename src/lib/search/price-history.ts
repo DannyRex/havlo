@@ -20,6 +20,7 @@
 
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { withTimeout } from "@/lib/promise-timeout";
+import { priceLooksPlausible } from "@/lib/search/price-floor";
 
 export interface PriceHistoryRow {
   storeId:      string;
@@ -323,21 +324,69 @@ export interface PriceHistorySummary {
   storeCount:           number;
 }
 
+/* User report May 29 2026: "Lowest tracked from 2w ago returns some
+   really low prices which was corrupted leakage before our fix.
+   E.g. $10 when current is $300."
+
+   Pre-fix scrape windows wrote bogus rows into offer_price_history
+   for several reasons:
+     · Shopify variant ingest grabbed a 0-priced accessory variant
+       under the parent product_id
+     · Some scrapers captured the discount AMOUNT or unit-of-measure
+       price (e.g. ₦10/g shown next to ₦10K total) instead of the
+       headline price
+     · Currency mis-detection wrote a raw USD value as NGN
+     · pre-d730342 signature leak grouped unrelated products together
+       and some history rows still reference the merged-then-split id
+   The rows are in the DB, will be swept by migration 0063, and the
+   ingest-side guard (added in the same change) prevents new ones.
+
+   But until the sweep applies AND until cached page renders cycle,
+   we still need to keep the corrupt rows out of the "Lowest tracked"
+   line and the chart. The same priceLooksPlausible used at FTS read
+   time is the right gate — it's flagship-aware, category-aware, and
+   shared with /compare so the bar's lowest matches /compare's
+   anchor floor.
+
+   sanitisePriceHistory drops any row whose lowestSeen, after USD->NGN
+   conversion, falls below the plausibility floor for the offer's
+   title + category. Returns the surviving rows; callers fall back to
+   "current-prices-only" rendering when the result is empty. */
+export function sanitisePriceHistory(
+  history: PriceHistoryRow[],
+  productTitle: string | null | undefined,
+  categorySlug: string | null | undefined,
+  usdToNgn: (usd: number) => number,
+): PriceHistoryRow[] {
+  if (history.length === 0) return history;
+  /* Without a title or category we have no plausibility signal —
+     return rows unchanged rather than nuke the whole history. The
+     DB sweep will catch these on its pass. */
+  if (!productTitle && !categorySlug) return history;
+  return history.filter((r) => {
+    const lowestNgn = r.currency === "USD" ? usdToNgn(r.lowestSeen) : r.lowestSeen;
+    return priceLooksPlausible(lowestNgn, categorySlug ?? null, productTitle ?? undefined);
+  });
+}
+
 export function rollupPriceHistory(
   history: PriceHistoryRow[],
   visitingStoreId: string,
   usdToNgn: (usd: number) => number,
+  productTitle?: string | null,
+  categorySlug?: string | null,
 ): PriceHistorySummary | null {
-  if (history.length === 0) return null;
+  const sane = sanitisePriceHistory(history, productTitle, categorySlug, usdToNgn);
+  if (sane.length === 0) return null;
 
   const inNgn = (r: PriceHistoryRow, v: number) =>
     r.currency === "USD" ? usdToNgn(v) : v;
 
-  let bestRow = history[0];
+  let bestRow = sane[0];
   let bestLowNgn = inNgn(bestRow, bestRow.lowestSeen);
 
-  for (let i = 1; i < history.length; i++) {
-    const r = history[i];
+  for (let i = 1; i < sane.length; i++) {
+    const r = sane[i];
     const ngn = inNgn(r, r.lowestSeen);
     if (ngn < bestLowNgn) {
       bestRow = r;
@@ -345,7 +394,7 @@ export function rollupPriceHistory(
     }
   }
 
-  const thisStore = history.find((r) => r.storeId === visitingStoreId);
+  const thisStore = sane.find((r) => r.storeId === visitingStoreId);
 
   return {
     allTimeLowNgn:    bestLowNgn,
@@ -353,6 +402,28 @@ export function rollupPriceHistory(
     allTimeLowStoreId: bestRow.storeId,
     thisStoreLowNgn:  thisStore ? inNgn(thisStore, thisStore.lowestSeen) : undefined,
     thisStoreLatestAt: thisStore ? thisStore.latestAt : undefined,
-    storeCount:       history.length,
+    storeCount:       sane.length,
   };
+}
+
+/* Same plausibility gate for the per-day timeseries used by the
+   PriceHistoryChart. The RPC pre-aggregates min(price) across stores
+   per day, so we can't apply the filter at the row level — instead
+   we drop entire day buckets whose minPriceNgn falls below the floor.
+   A real flash-sale day survives the filter; a corrupt-row day
+   disappears from the chart line (creating a gap, not a dip into
+   "fake low" territory).
+
+   Without title/category, same conservative fallback: return as-is
+   and trust the DB sweep to clean the underlying rows. */
+export function sanitisePriceTimeseries(
+  timeseries: PriceHistoryPoint[],
+  productTitle: string | null | undefined,
+  categorySlug: string | null | undefined,
+): PriceHistoryPoint[] {
+  if (timeseries.length === 0) return timeseries;
+  if (!productTitle && !categorySlug) return timeseries;
+  return timeseries.filter((p) =>
+    priceLooksPlausible(p.minPriceNgn, categorySlug ?? null, productTitle ?? undefined),
+  );
 }

@@ -14,6 +14,7 @@ import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { categoryDisagreesWithTitle } from "@/lib/categorize";
 import { categories } from "@/lib/data/categories";
 import { canonicaliseOfferUrl } from "@/lib/url-helpers";
+import { priceLooksPlausible } from "@/lib/search/price-floor";
 
 /* Secret-scrubber leakage guard. The upstream provider chain has a
    middleware that replaces detected secrets (JWTs, API keys, OAuth
@@ -1067,7 +1068,47 @@ export async function ingestDeals(
      Before the upsert: capture which product_ids are about to lose
      their (store_id, url) anchor to a different product. The orphan
      check below (Step 5b) needs to know these so it can clean up
-     the previous owners — see comment there. */
+     the previous owners — see comment there.
+
+     Step 4.5 — price-plausibility guard (added May 29 2026 after
+     user reported "Lowest tracked $10 when current is $300" on PDP):
+     drop any deal whose sale price falls below the priceLooksPlausible
+     floor for its title + category. Catches the upstream leaks that
+     produced bogus history rows — Shopify accessory-variant prices
+     under flagship parent products, scrapers grabbing discount or
+     unit-of-measure amounts, currency mis-detection writing raw USD
+     as NGN. Same plausibility function used at FTS read time and
+     /api/live-search filter, so an offer can't sneak past one
+     surface and fail another.
+
+     Drops are logged (not silent) so we notice if a real legit
+     sub-floor deal gets rejected — that would be a flagship-floor
+     map tuning issue we want to surface. */
+  const USD_TO_NGN = 1_600;  // matches price-floor.ts USD_TO_NGN
+  const refusedAsBogus: Array<{ title: string; storeId: string; ngn: number }> = [];
+  const offerWritesPlausible: typeof offerWrites = [];
+  for (const w of offerWrites) {
+    const ngn = w.deal.currency === "USD"
+      ? Math.round(w.deal.salePrice * USD_TO_NGN)
+      : w.deal.salePrice;
+    if (priceLooksPlausible(ngn, w.deal.categorySlug ?? null, w.deal.title)) {
+      offerWritesPlausible.push(w);
+    } else {
+      refusedAsBogus.push({ title: w.deal.title, storeId: w.deal.storeId, ngn });
+    }
+  }
+  if (refusedAsBogus.length > 0) {
+    /* Capped log — avoid flooding the cron output when a misbehaving
+       provider sends a thousand bogus rows in one wave. */
+    const sample = refusedAsBogus.slice(0, 5).map((r) =>
+      `${r.storeId}|${r.title.slice(0, 60)}|${r.ngn}NGN`
+    ).join("; ");
+    result.errors.push(
+      `[ingest] refused ${refusedAsBogus.length} deals as below-floor (sample: ${sample}${refusedAsBogus.length > 5 ? "; ..." : ""})`,
+    );
+  }
+  offerWrites.length = 0;
+  offerWrites.push(...offerWritesPlausible);
   const offerRows = offerWrites.map(({ deal, productId }) =>
     dealToOfferRow(deal, productId, sourceProvider, sourceQuery, runStartedAt),
   );

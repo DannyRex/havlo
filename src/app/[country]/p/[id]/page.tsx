@@ -36,7 +36,12 @@ import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { pgFtsFindDupes, pgFtsAnchorOffersByProductId } from "@/lib/search/pg-fts";
 import { isOfferAllowedForCountry, filterDealsForCountry } from "@/lib/country";
 import { computeAnchorStats } from "@/lib/pdp-stats";
-import { fetchProductPriceHistory, rollupPriceHistory, fetchProductPriceTimeseries } from "@/lib/search/price-history";
+import {
+  fetchProductPriceHistory,
+  rollupPriceHistory,
+  fetchProductPriceTimeseries,
+  sanitisePriceTimeseries,
+} from "@/lib/search/price-history";
 import { effectiveLandedPrice } from "@/lib/landed-price";
 import { partitionDupesByVariantMatch, variantOffers } from "@/lib/search/variant-pooling";
 import { partitionDupesByVariantMatchDeep } from "@/lib/search/variant-pooling-deep";
@@ -867,10 +872,29 @@ export default async function ProductPage({ params }: PageProps) {
 
   /* priceHistoryRows + priceTimeseries are now fetched UP TOP in
      the same Promise.all as dupes + anchorOffers — see the May 2026
-     perf comment above. Only the JS-side rollup happens here. */
+     perf comment above. Only the JS-side rollup happens here.
+
+     Title + category are passed through to sanitisePriceHistory
+     (inside rollupPriceHistory) so corrupt pre-fix rows — captured
+     before the signature-leak fix + ingest-side price guard — don't
+     poison the "Lowest tracked" line. A real flash sale survives
+     priceLooksPlausible; a $10-on-a-$300-iPhone history row does not. */
   const priceHistorySummary = priceHistoryRows
-    ? rollupPriceHistory(priceHistoryRows, offer.store_id, usdToNgn) ?? undefined
+    ? rollupPriceHistory(
+        priceHistoryRows,
+        offer.store_id,
+        usdToNgn,
+        offer.title,
+        offer.category_slug ?? null,
+      ) ?? undefined
     : undefined;
+  /* Same gate on the chart's per-day timeseries — drops day buckets
+     whose min(price) across stores falls below the plausibility
+     floor. Real low days survive; bogus days create a gap in the
+     line rather than a fake dip. */
+  const priceTimeseriesSane = priceTimeseries
+    ? sanitisePriceTimeseries(priceTimeseries, offer.title, offer.category_slug ?? null)
+    : null;
   const breadcrumb = buildBreadcrumbList([
     { name: "Havlo",          url: `${SITE_URL}/${country.code}` },
     { name: country.name,     url: `${SITE_URL}/${country.code}` },
@@ -1043,7 +1067,7 @@ export default async function ProductPage({ params }: PageProps) {
                             hasn't accumulated rows yet. Forward-
                             looking copy invites the visitor back. */}
           <PriceHistoryChart
-            points={priceTimeseries ?? []}
+            points={priceTimeseriesSane ?? []}
             currentNgn={anchorPriceNgn}
             country={country}
             visitingStoreName={offer.store_name}
