@@ -140,3 +140,77 @@ export function priceLooksPlausibleForLiveDeal(
      flagship line, which is permissive (doesn't reject niche brands). */
   return priceLooksPlausible(priceNgn, "all", title);
 }
+
+/* ── Listing classification ────────────────────────────────────────
+   Two predicates that stop NON-EQUIVALENT listings from contaminating
+   a product's price-comparison pool. Caught by the May 2026 PDP-trust
+   audit ("hows the cheapest 49 when its 50?"): for a meaningful slice
+   of multi-store products the "cheapest" was a different/inferior item
+   pooled in by a loose signature / FTS-title match.
+
+     isAccessoryListing — the row is an accessory / spare PART, not the
+       product itself ("Replacement Earpads for Bose QC Ultra",
+       "Silicone Cover for Sony WH-1000XM5", "Water Bottle Pouch for
+       Stanley Quencher"). When such a row shares a pool with the
+       parent it sinks to the bottom and falsely becomes the cheapest.
+
+     isUsedListing — the row is used / refurbished / open-box. A real,
+       genuinely-cheaper datapoint, but it must be DISCLOSED, never
+       silently shown as the cheapest NEW price.
+
+   Both are deliberately HIGH-PRECISION title/store heuristics — they
+   favour false negatives over false positives so a legitimate product
+   is never dropped from (or mislabelled within) its own pool. The
+   accessory guard is also applied ASYMMETRICALLY by callers (only
+   filter a candidate when the ANCHOR itself isn't an accessory) so an
+   all-earpads pool still compares earpad prices normally. */
+
+/* Unambiguous accessory / part phrases — these classify a row on their
+   own, regardless of surrounding context. */
+const ACCESSORY_HARD: RegExp[] = [
+  /\bear\s?pads?\b/, /\bear\s?cushions?\b/, /\bear\s?cups?\b/,
+  /\bheadband\b/, /\bhead\s?beam\b/,
+  /\breplacement\b/, /\bspare\s?parts?\b/,
+  /\bscreen\s?protectors?\b/, /\btempered\s?glass\b/,
+  /\bpouch\b/, /\blanyard\b/, /\bdecals?\b/, /\bskin\s?stickers?\b/,
+  /\baccessor(?:y|ies)\s?kit\b/, /\bkit\s+for\b/,
+];
+/* Softer accessory nouns — classify ONLY when the title also carries a
+   "for <something>" fitment phrase (the "<accessory> for <Product>"
+   shape that marks a fitment item, not the product). Keeps "iPhone 15
+   ... Cover Screen" and "Charging Case" (parts of the actual product)
+   out of the net while catching "Case for iPhone 15". */
+const ACCESSORY_SOFT_NOUN = /\b(?:case|cover|sleeve|strap|holder|stand|mount|grip|bumper|shell|guard|dock|cushion|protector)\b/;
+const FITMENT_FOR = /\bfor\b\s+\S/;
+
+export function isAccessoryListing(title?: string | null): boolean {
+  if (!title) return false;
+  const lc = title.toLowerCase();
+  if (ACCESSORY_HARD.some((re) => re.test(lc))) return true;
+  if (ACCESSORY_SOFT_NOUN.test(lc) && FITMENT_FOR.test(lc)) return true;
+  return false;
+}
+
+/* Title condition words that mark a used / refurbished / open-box
+   listing. Note: deliberately NO "grade a/b/c" rule — it collides with
+   appliance energy ratings ("Grade A++ Fridge"). */
+const USED_TITLE =
+  /\b(?:refurb(?:ished)?|renewed|pre[-\s]?owned|preowned|open[-\s]?box|ex[-\s]?display|second[-\s]?hand|certified\s+pre[-\s]?owned)\b|\bused\b/;
+/* Stores whose inventory is predominantly refurbished / used — a
+   store-level signal for rows whose titles omit the condition word.
+   Kept tight (refurb-dedicated retailers only). Open marketplaces
+   like eBay / Bonanza are NOT listed: they sell new too, so a blanket
+   "used" label there would be a false positive. Catching unlabelled
+   used on those needs ingest-time condition capture (follow-up). */
+const REFURB_STORES = [
+  "back market", "backmarket", "refurbed", "obiwezy", "music magpie", "musicmagpie",
+];
+
+export function isUsedListing(storeName?: string | null, title?: string | null): boolean {
+  if (title && USED_TITLE.test(title.toLowerCase())) return true;
+  if (storeName) {
+    const s = storeName.toLowerCase();
+    if (REFURB_STORES.some((r) => s.includes(r))) return true;
+  }
+  return false;
+}

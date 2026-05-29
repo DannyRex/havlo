@@ -20,6 +20,7 @@
 import type { StoreOffer } from "@/lib/search";
 import { type Country, isOfferAllowedForCountry } from "@/lib/country";
 import { effectiveLandedPrice, isCrossBorderForUser } from "@/lib/landed-price";
+import { isAccessoryListing, isUsedListing } from "@/lib/search/price-floor";
 
 /* Per-store summary the new PriceComparisonBar needs to plot dots
    along the spectrum. One row per distinct store remaining after
@@ -31,6 +32,12 @@ export interface PerStoreOffer {
   effectiveNgn:  number;       // country-aware (local: base; intl: landed)
   isCrossBorder: boolean;      // for the visitor specifically
   offerId:       string;       // for "cheaper at [Store]" deep-link
+  /** Used / refurbished / open-box listing (high-precision detection
+      via store + title). The bar excludes these from the headline
+      "cheapest" / verdict math and surfaces them as a separately
+      LABELLED line so a used unit never silently undercuts the new
+      price. May 2026 PDP-trust fix. */
+  isUsed:        boolean;
 }
 
 export interface AnchorStats {
@@ -96,12 +103,24 @@ export function computeAnchorStats(
   anchorPriceNgn: number,
   country: Country,
   family?: string | null,
+  anchorTitle?: string | null,
 ): AnchorStats {
   const countryFiltered = country.code === "ng"
     ? anchorOffers
     : anchorOffers.filter((o) => isOfferAllowedForCountry(o, country));
 
-  const deduped = dedupAnchorOffers(countryFiltered, country);
+  /* Accessory guard (May 2026 PDP-trust fix). A "Replacement Earpads
+     for Bose QC Ultra" or "Silicone Cover for Sony WH-1000XM5" listing
+     priced like the parent was sinking to the bottom of the pool and
+     becoming the "cheapest". Drop accessory/part rows — but ONLY when
+     the anchor itself isn't an accessory, so an all-earpads product
+     still compares earpad prices normally (asymmetric by design). */
+  const anchorIsAccessory = isAccessoryListing(anchorTitle);
+  const accessoryFiltered = anchorIsAccessory
+    ? countryFiltered
+    : countryFiltered.filter((o) => !isAccessoryListing(o.productTitle));
+
+  const deduped = dedupAnchorOffers(accessoryFiltered, country);
 
   /* Outlier filter — defense against over-merged products in the DB
      AND against legitimate-but-misleading storage-tier spreads (the
@@ -157,6 +176,7 @@ export function computeAnchorStats(
       effectiveNgn:  effectiveLandedPrice(o, country),
       isCrossBorder: isCrossBorderForUser(o, country),
       offerId:       o.offerId,
+      isUsed:        isUsedListing(o.storeName, o.productTitle),
     }))
     .filter((r) => r.effectiveNgn > 0)
     .sort((a, b) => a.effectiveNgn - b.effectiveNgn);

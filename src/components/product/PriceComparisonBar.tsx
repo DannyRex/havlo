@@ -38,7 +38,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Check, Globe, AlertCircle, TrendingDown, Award, Sparkles, ArrowRight, Plane } from "lucide-react";
+import { Check, Globe, AlertCircle, TrendingDown, Award, Sparkles, ArrowRight, Plane, RotateCcw } from "lucide-react";
 import { formatPriceForUser, timeAgo } from "@/lib/utils";
 import { type Country } from "@/lib/country";
 import type { PerStoreOffer } from "@/lib/pdp-stats";
@@ -90,7 +90,7 @@ export default function PriceComparisonBar({
   thisStoreName,
   thisIsCrossBorder,
   country,
-  perStoreOffers,
+  perStoreOffers: allPerStoreOffers,
   priceHistory,
   lastCheckedAt,
   storeCountry,
@@ -145,6 +145,27 @@ export default function PriceComparisonBar({
       </div>
     );
   }
+
+  /* ── Used / refurbished split (May 2026 PDP-trust fix) ───────────
+     Used/refurb listings are real datapoints but must NOT silently
+     become the headline "cheapest". A £123 used unit under a £200 new
+     one would otherwise drag the spectrum low end down, flip the
+     visiting NEW offer's verdict to "Above average", and headline a
+     price the buyer can't actually get new.
+
+     So EVERY spectrum / verdict / cheapest / dot calculation below
+     runs on the NEW-only subset (we just rebind `perStoreOffers` to
+     it, leaving the ~700 lines downstream untouched), and used rows
+     are surfaced as a separately-LABELLED line beneath the bar.
+
+     Fallback: if EVERY listing is used, keep showing them all so the
+     bar doesn't blank out — there's simply no new price to rank
+     against, and the used line is suppressed (nothing to contrast). */
+  const newPerStore = allPerStoreOffers.filter((r) => !r.isUsed);
+  const perStoreOffers = newPerStore.length > 0 ? newPerStore : allPerStoreOffers;
+  const usedOffers = (newPerStore.length > 0 ? allPerStoreOffers.filter((r) => r.isUsed) : [])
+    .filter((r) => r.storeId !== thisStoreId && r.effectiveNgn > 0)
+    .sort((a, b) => a.effectiveNgn - b.effectiveNgn);
 
   /* ── Spectrum range ─────────────────────────────────────────────
      min/max derived from the per-store rows. */
@@ -757,6 +778,48 @@ export default function PriceComparisonBar({
           <ArrowRight size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0 group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
         </Link>
       )}
+
+      {/* ── Used / refurbished disclosure (May 2026 PDP-trust fix) ──
+          Used/refurb listings are surfaced here as a SEPARATE, clearly
+          labelled line rather than being allowed to silently win the
+          headline "cheapest" above. The spectrum, verdict, dots and
+          cheapest-at action all run on the NEW-only subset (see the
+          used/new split near the top of this component); this strip
+          gives the genuinely-cheaper-but-used datapoints their due
+          without letting a used unit misrepresent the new-price story.
+          Suppressed when every listing is used (newPerStore empty →
+          usedOffers empty) — there's no new price to contrast against. */}
+      {usedOffers.length > 0 && (() => {
+        const cheapestUsed = usedOffers[0];
+        const moreCount    = usedOffers.length - 1;
+        return (
+          <div className="mb-3 px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border">
+            <div className="flex items-start gap-2.5">
+              <RotateCcw size={14} className="text-ink-3 shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-[12px] text-ink-2 leading-relaxed">
+                  Used or refurbished from{" "}
+                  <span className="font-semibold text-ink tabular-nums">
+                    {formatPriceForUser(cheapestUsed.effectiveNgn, country)}
+                  </span>{" "}
+                  at <span className="font-medium text-ink">{cheapestUsed.storeName}</span>
+                  {cheapestUsed.isCrossBorder && (
+                    <span className="text-ink-3 whitespace-nowrap">
+                      {" "}<Plane size={9} className="inline -mt-px" aria-hidden="true" /> cross-border
+                    </span>
+                  )}
+                  {moreCount > 0 && (
+                    <span className="text-ink-3"> · {moreCount} more {moreCount === 1 ? "listing" : "listings"}</span>
+                  )}
+                </p>
+                <p className="text-[11px] text-ink-3 leading-relaxed mt-0.5">
+                  Not included in the price ranking above.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Historical signal ──────────────────────────────────── */}
       {priceHistory && !isHistoricalLow && (
