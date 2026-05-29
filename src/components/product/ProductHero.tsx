@@ -13,7 +13,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ExternalLink, Tag, Store as StoreIcon, Globe } from "lucide-react";
+import { ExternalLink, Tag, Store as StoreIcon, Globe, AlertTriangle } from "lucide-react";
 import {
   cleanTitle,
   proxiedImageUrl,
@@ -21,6 +21,8 @@ import {
   formatUSDPrice,
   formatCompact,
   isStoreSearchUrl,
+  freshnessOf,
+  timeAgo,
 } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import PriceComparisonBar from "@/components/product/PriceComparisonBar";
@@ -401,6 +403,32 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             </p>
           )}
         </div>
+
+        {/* Staleness warning — shown only when the offer's scrapedAt
+            is more than a week old. Sits between the bold price
+            block and the FTC line so the user reads it on the same
+            eye-track as the number they're about to trust. May 29 2026
+            trust-break report: user saw "Verified 2w ago" on the
+            spectrum's trust strip (small + grey) and went ahead and
+            clicked through, then found the merchant price had
+            changed. The chart's freshness strip and the spectrum's
+            "Verified X ago" line now ALSO recolour to amber on stale
+            data, but this hero-level chip is the loudest signal
+            because it's the closest to the headline price + the
+            Visit CTA, and the only one most quick visitors will
+            actually read. */}
+        {(() => {
+          const fresh = freshnessOf(offer.scrapedAt);
+          if (!fresh.warn) return null;
+          return (
+            <div className="mb-3 inline-flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-300/40">
+              <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="text-[12px] text-amber-800 dark:text-amber-200 leading-snug">
+                Price last verified {timeAgo(offer.scrapedAt).toLowerCase()} — it may have changed at {displayStore}. We&apos;ll show the new number after our next refresh.
+              </p>
+            </div>
+          );
+        })()}
 
         {/* FTC affiliate-disclosure inline above the click-out CTA.
             16 CFR Part 255 requires the disclosure to be clear-and-

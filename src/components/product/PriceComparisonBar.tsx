@@ -39,7 +39,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Check, Globe, AlertCircle, TrendingDown, Award, Sparkles, ArrowRight, Plane } from "lucide-react";
-import { formatPriceForUser, timeAgo } from "@/lib/utils";
+import { formatPriceForUser, timeAgo, freshnessOf } from "@/lib/utils";
 import { type Country } from "@/lib/country";
 import type { PerStoreOffer } from "@/lib/pdp-stats";
 import type { PriceHistorySummary } from "@/lib/search/price-history";
@@ -805,17 +805,32 @@ export default function PriceComparisonBar({
           <Check size={11} aria-hidden="true" />
           {confidence.label}
         </span>
-        {lastCheckedAt && (
-          /* suppressHydrationWarning — same reason as above:
-             timeAgo reads Date.now() at render so the relative
-             string ("4d ago" vs "5d ago" at a day boundary) can
-             differ between SSR and CSR. Visual UX is identical;
-             the suppress just silences the warning. */
-          <span className="inline-flex items-center gap-1 text-ink-3" suppressHydrationWarning>
-            <span aria-hidden="true">·</span>
-            Verified {timeAgo(lastCheckedAt)}
-          </span>
-        )}
+        {lastCheckedAt && (() => {
+          const fresh = freshnessOf(lastCheckedAt);
+          /* When the price is more than a week old we have no
+             grounds to claim it's still accurate (Mon+Thu scrape
+             cadence means a healthy offer should be < 4 days
+             old). Surface "Price may have changed since" in the
+             same line so the visitor doesn't trust the number
+             before clicking through. May 29 2026 trust-break
+             report. */
+          const staleToneClass = fresh.tone === "danger"
+            ? "text-amber-700 dark:text-amber-300 font-medium"
+            : fresh.tone === "warn"
+              ? "text-amber-700 dark:text-amber-300"
+              : "text-ink-3";
+          return (
+            <span className={`inline-flex items-center gap-1 ${staleToneClass}`} suppressHydrationWarning>
+              <span aria-hidden="true">·</span>
+              Verified {timeAgo(lastCheckedAt)}
+              {fresh.warn && (
+                <span className="ml-1 italic">
+                  · price may have changed
+                </span>
+              )}
+            </span>
+          );
+        })()}
         {!isSingleStore && cheapest && cheapest.storeId !== thisStoreId && (
           <span className="inline-flex items-center gap-1 text-ink-3">
             <span aria-hidden="true">·</span>

@@ -41,7 +41,7 @@ import {
   useCallback, useEffect, useId, useLayoutEffect,
   useMemo, useRef, useState,
 } from "react";
-import { formatPriceForUser, formatPriceForUserExact, timeAgo } from "@/lib/utils";
+import { formatPriceForUser, formatPriceForUserExact, timeAgo, freshnessOf } from "@/lib/utils";
 import type { Country } from "@/lib/country";
 import type { PriceHistoryPoint } from "@/lib/search/price-history";
 import {
@@ -561,12 +561,34 @@ export default function PriceHistoryChart({
         />
       </div>
 
-      {/* ── Freshness strip ──────────────────────────────────── */}
-      <p className="mt-3 text-[11px] text-ink-3 leading-tight">
-        Tracked across {geom.peakStoreCount} {geom.peakStoreCount === 1 ? "store" : "stores"} ·
-        {" "}last refreshed{" "}
-        <time suppressHydrationWarning>{timeAgo(sliced[sliced.length - 1].day)}</time>
-      </p>
+      {/* ── Freshness strip ──────────────────────────────────────
+          When the last recorded day is more than a week back, this
+          line is the user's warning that the chart's "right now"
+          tile may have drifted. Default styling stays muted for
+          fresh data; tier-driven recolouring surfaces the staleness
+          before the user clicks through and finds the merchant
+          price doesn't match. May 29 2026 trust-break report. */}
+      {(() => {
+        const lastDay = sliced[sliced.length - 1].day;
+        const fresh = freshnessOf(lastDay);
+        const toneCls = fresh.tone === "danger"
+          ? "text-amber-700 dark:text-amber-300 font-medium"
+          : fresh.tone === "warn"
+            ? "text-amber-700 dark:text-amber-300"
+            : "text-ink-3";
+        return (
+          <p className={`mt-3 text-[11px] ${toneCls} leading-tight`}>
+            Tracked across {geom.peakStoreCount} {geom.peakStoreCount === 1 ? "store" : "stores"} ·
+            {" "}last refreshed{" "}
+            <time suppressHydrationWarning>{timeAgo(lastDay)}</time>
+            {fresh.warn && (
+              <span className="ml-1 italic">
+                · price may have changed since
+              </span>
+            )}
+          </p>
+        );
+      })()}
 
       {/* sr-only fallback list for screen readers — duplicates the
           chart as a tiny table so the data is reachable without

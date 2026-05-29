@@ -529,6 +529,45 @@ export function timeAgo(dateStr: string): string {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
+/* Freshness tier for price-staleness signals on the PDP.
+   The May 29 2026 trust-break report: a user saw "Last refreshed
+   2w ago" on a PDP, clicked through, found the price had changed
+   at the store. The bare "X ago" string was treated identically
+   whether verified 1 hour or 2 weeks. The visual tone never
+   shifted, so users defaulted to trusting it.
+
+   Tiers chosen against the Mon+Thu scrape cadence:
+     - fresh (<3 days)   — within one scrape cycle; price is reliable
+     - aging (3-7 days)  — past one cycle; could have drifted but unlikely
+     - stale (7-30 days) — multiple cycles missed; explicit warning
+     - veryStale (30+)   — likely incident or feed-source broken;
+                            loudest warning
+
+   `warn` flag is what callers use to decide whether to surface a
+   "Price may have changed" caveat. `tone` is the Tailwind class
+   bucket so callers can drive colour without re-encoding the tier. */
+export type FreshnessTier = "fresh" | "aging" | "stale" | "veryStale";
+
+export interface Freshness {
+  tier:   FreshnessTier;
+  ageMs:  number;
+  days:   number;
+  warn:   boolean;        // true when caller should surface staleness caveat
+  tone:   "success" | "neutral" | "warn" | "danger";
+}
+
+export function freshnessOf(dateStr: string | null | undefined): Freshness {
+  if (!dateStr) {
+    return { tier: "veryStale", ageMs: Infinity, days: Infinity, warn: true, tone: "danger" };
+  }
+  const ageMs = Date.now() - new Date(dateStr).getTime();
+  const days  = Math.floor(ageMs / 86400000);
+  if (days < 3)   return { tier: "fresh",     ageMs, days, warn: false, tone: "success" };
+  if (days < 7)   return { tier: "aging",     ageMs, days, warn: false, tone: "neutral" };
+  if (days < 30)  return { tier: "stale",     ageMs, days, warn: true,  tone: "warn"    };
+  return            { tier: "veryStale", ageMs, days, warn: true,  tone: "danger"  };
+}
+
 export function daysUntil(dateStr: string): number {
   return Math.ceil(
     (new Date(dateStr).getTime() - Date.now()) / 86400000
