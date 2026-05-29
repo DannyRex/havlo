@@ -424,7 +424,7 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             <div className="mb-3 inline-flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-300/40">
               <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
               <p className="text-[12px] text-amber-800 dark:text-amber-200 leading-snug">
-                Price last verified {timeAgo(offer.scrapedAt).toLowerCase()} — it may have changed at {displayStore}. We&apos;ll show the new number after our next refresh.
+                Price last verified {timeAgo(offer.scrapedAt).toLowerCase()}, it may have changed at {displayStore}.
               </p>
             </div>
           );
