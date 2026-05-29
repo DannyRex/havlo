@@ -15,6 +15,7 @@ import { categoryDisagreesWithTitle } from "@/lib/categorize";
 import { categories } from "@/lib/data/categories";
 import { canonicaliseOfferUrl } from "@/lib/url-helpers";
 import { priceLooksPlausible } from "@/lib/search/price-floor";
+import { rewriteMerchantUrl } from "@/lib/merchant-url-rewrite";
 
 /* Secret-scrubber leakage guard. The upstream provider chain has a
    middleware that replaces detected secrets (JWTs, API keys, OAuth
@@ -310,14 +311,31 @@ function dealToOfferRow(
   return {
     product_id: productId,
     store_id: d.storeId,
-    /* Canonicalised URL — strips tracking-only query params (utm_*,
-       gclid, fbclid, msclkid, Shopify _pos/_fid/_ss, Konga cid, etc.)
-       so the (store_id, url) uniqueness constraint sees the same
-       stable URL across cron runs. Without this, threechub stored
-       27 offers for one phone (rotating ?_pos=&_fid=&_ss=), konga
-       stored 25 per PS4 controller (rotating ?cid=). After this
-       fix, every subsequent scrape upserts the same row instead. */
-    url: canonicaliseOfferUrl(d.url),
+    /* Two URL transforms applied in order:
+
+       1. rewriteMerchantUrl — fixes known-broken merchant URLs at
+          the storeId level. User-reported May 29 2026: The Range's
+          SerpAPI link was `therange.com/lander` (wrong domain +
+          internal affiliate path that no longer routes), so every
+          click 404'd. The Range rewriter swaps to
+          `therange.co.uk/search?q=<title>` — guaranteed-valid
+          domain + search hits the right product reliably. No-op
+          for stores without a registered rewriter.
+
+       2. canonicaliseOfferUrl — strips tracking-only query params
+          (utm_*, gclid, fbclid, msclkid, Shopify _pos/_fid/_ss,
+          Konga cid, etc.) so the (store_id, url) uniqueness
+          constraint sees the same stable URL across cron runs.
+          Without this, threechub stored 27 offers for one phone
+          (rotating ?_pos=&_fid=&_ss=), konga stored 25 per PS4
+          controller (rotating ?cid=).
+
+       Order matters: rewrite FIRST so the canonicaliser operates
+       on the corrected URL (the rewritten Range search URL has
+       no tracking params, so this step is effectively a no-op for
+       rewritten rows — but other stores' rewriters might leave
+       params worth normalising). */
+    url: canonicaliseOfferUrl(rewriteMerchantUrl(d.url, d.storeId, d.title)),
     current_price: d.salePrice,
     /* Store NULL for original_price when there's no actual markdown.
        Many providers (Jumia, AliExpress raw, sparse Walmart feeds)
