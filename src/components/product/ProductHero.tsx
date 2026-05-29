@@ -25,6 +25,7 @@ import {
   timeAgo,
 } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
+import { brandDisplay } from "@/lib/brand-display";
 import PriceComparisonBar from "@/components/product/PriceComparisonBar";
 import PriceAlertButton from "@/components/product/PriceAlertButton";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
@@ -340,15 +341,27 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             <span className="font-medium text-ink">{displayStore}</span>
           </div>
           {isCrossBorder && (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-300/40 text-[12px] text-amber-800 dark:text-amber-200">
-              <Globe size={12} aria-hidden="true" />
+            /* Same shape as the store + brand pills next to it —
+               neutral surface, neutral border. The amber tint lives
+               only on the Globe icon now, which is enough signal
+               for a status tag (vs. a warning that needs to be
+               read). When the eyebrow runs store + brand + International,
+               keeping all three pills visually identical reads as a
+               consistent metadata row, not "one of these is a problem."
+               May 29 2026 trust-signal refinement. */
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 border border-border text-[12px] text-ink-2">
+              <Globe size={12} className="text-amber-600 dark:text-amber-400" aria-hidden="true" />
               <span>International</span>
             </div>
           )}
           {offer.brand && (
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 border border-border text-[12px] text-ink-2">
               <Tag size={12} aria-hidden="true" />
-              <span>{offer.brand}</span>
+              {/* brandDisplay handles the casing — DB stores brand
+                  lowercase ("apple"), display wants "Apple" / "LG" /
+                  "iRobot". Shared helper across hero + ProductAbout
+                  so the same input renders the same string. */}
+              <span>{brandDisplay(offer.brand)}</span>
             </div>
           )}
         </div>

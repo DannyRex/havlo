@@ -35,6 +35,8 @@
 import { useState } from "react";
 import type { ProductSignature } from "@/lib/search/normalize";
 import { buildSignature } from "@/lib/search/normalize";
+import { brandDisplay } from "@/lib/brand-display";
+import { displayStoreName } from "@/lib/store-display";
 
 interface Props {
   /** Raw product title (offer.title). Shown verbatim only inside
@@ -65,46 +67,9 @@ interface Props {
    number only controls what the visitor sees without expanding. */
 const TRUNCATE_AT = 320;
 
-/* Brand display map — DB stores brand lowercase ("apple", "lg") but
-   visitors expect display casing. Multi-cap brands ("LG", "HP") and
-   stylised ones ("iRobot", "L'Oréal") get explicit entries; the rest
-   fall through to title-case. */
-const BRAND_DISPLAY: Record<string, string> = {
-  apple:     "Apple",
-  samsung:   "Samsung",
-  google:    "Google",
-  microsoft: "Microsoft",
-  sony:      "Sony",
-  lg:        "LG",
-  hp:        "HP",
-  dell:      "Dell",
-  asus:      "Asus",
-  lenovo:    "Lenovo",
-  bose:      "Bose",
-  jbl:       "JBL",
-  beats:     "Beats",
-  nike:      "Nike",
-  adidas:    "Adidas",
-  puma:      "Puma",
-  fenty:     "Fenty",
-  maybelline:"Maybelline",
-  loreal:    "L'Oréal",
-  oraimo:    "Oraimo",
-  xiaomi:    "Xiaomi",
-  tecno:     "Tecno",
-  infinix:   "Infinix",
-  itel:      "Itel",
-  irobot:    "iRobot",
-  bang:      "Bang & Olufsen",
-  harman:    "Harman Kardon",
-};
-
-function brandDisplay(raw: string | null): string | null {
-  if (!raw) return null;
-  const k = raw.toLowerCase().trim();
-  if (BRAND_DISPLAY[k]) return BRAND_DISPLAY[k];
-  return k.charAt(0).toUpperCase() + k.slice(1);
-}
+/* Brand display now comes from the shared @/lib/brand-display
+   module so the ProductHero eyebrow pill and this section render
+   the same string for the same raw DB value. */
 
 /* Category label map — controls the noun in the intro line. Kept
    in sync with the categorisation in src/lib/categorize.ts; each
@@ -199,17 +164,25 @@ export default function ProductAbout({
   const brandLabel    = brandDisplay(brand ?? sig.brand);
   const categoryLabel = categoryLabelFor(categorySlug);
   const article       = indefiniteArticle(categoryLabel);
+  const storeLabel    = displayStoreName(storeName);
 
   /* Factual intro — no claims, no superlatives, no "flagship" or
-     "premium". One sentence that states what the product is, one
-     tail line that grounds it in Havlo's coverage scope. */
+     "premium". Three forms:
+       1. Brand known:    "{Brand} {categoryLabel}."
+       2. No brand, just: "{Category} listed on Havlo."
+
+     The previous "This product is a smartphone from Apple" phrasing
+     read like filler — it told the visitor something they could
+     read from the title above it. Tighter, more useful when the
+     brand IS the headline signal. */
   const intro = brandLabel
-    ? `This product is ${article} ${categoryLabel} from ${brandLabel}.`
-    : `This product is ${article} ${categoryLabel}.`;
+    ? `${brandLabel} ${categoryLabel}.`
+    : `${categoryLabel.charAt(0).toUpperCase() + categoryLabel.slice(1)} listed on Havlo.`;
+  void article;  // reserved for future "an electronics product" phrasing
 
   const coverage = storeCount > 1
-    ? `Havlo tracks prices for it across ${storeCount} stores in ${countryName}.`
-    : `Havlo currently tracks one store carrying this product in ${countryName}.`;
+    ? `Tracked across ${storeCount} stores in ${countryName}.`
+    : `Tracked at one store in ${countryName}.`;
 
   /* Merchant description — sanitise + decide truncation state. */
   const merchantClean = description ? stripHtml(description) : "";
@@ -221,10 +194,10 @@ export default function ProductAbout({
 
   const specs = buildSpecs(sig);
 
-  /* Edge case: section content is JUST the intro + coverage line +
-     provenance footer (no merchant text, no specs). That's still
-     useful body copy — better than the bare price page that came
-     before. So we never short-circuit the section. */
+  /* Edge case: section content is JUST the intro + coverage line
+     (no merchant text, no specs). That's still useful body copy —
+     better than the bare price page that came before. So we never
+     short-circuit the section. */
 
   return (
     <section className="mt-10 sm:mt-12">
@@ -256,28 +229,35 @@ export default function ProductAbout({
             </button>
           )}
           <p className="mt-2 text-[11px] text-ink-3 italic">
-            Description from the {storeName} listing.
+            Description from the {storeLabel} listing.
           </p>
         </div>
       )}
 
       {specs.length > 0 && (
-        <dl className="mt-5 flex flex-wrap gap-2" aria-label="Specifications">
-          {specs.map((s) => (
-            <div
-              key={s.label}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 border border-border text-[12px]"
-            >
-              <dt className="text-ink-3">{s.label}:</dt>
-              <dd className="font-semibold text-ink">{s.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <>
+          <dl className="mt-5 flex flex-wrap gap-2" aria-label="Specifications">
+            {specs.map((s) => (
+              <div
+                key={s.label}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 border border-border text-[12px]"
+              >
+                <dt className="text-ink-3">{s.label}:</dt>
+                <dd className="font-semibold text-ink">{s.value}</dd>
+              </div>
+            ))}
+          </dl>
+          {/* Provenance footer is gated on specs rendering — the
+              footer specifically says "inferred from listing titles"
+              and would be misleading on a section that shows no
+              specs (no chips => nothing was inferred). When only
+              the merchant description renders, its own "Description
+              from the X listing" cite is the provenance. */}
+          <p className="mt-4 text-[11px] text-ink-3 leading-snug">
+            Specifications are inferred from listing titles. Confirm at the store before purchase.
+          </p>
+        </>
       )}
-
-      <p className="mt-4 text-[11px] text-ink-3 leading-snug">
-        Specifications are inferred from listing titles. Confirm at the store before purchase.
-      </p>
     </section>
   );
 }
