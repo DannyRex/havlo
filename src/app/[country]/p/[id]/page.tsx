@@ -47,6 +47,7 @@ import { getCategory } from "@/lib/data/categories";
 import JsonLd from "@/components/seo/JsonLd";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
+import PdpViewTracker from "@/components/product/PdpViewTracker";
 import { getClickThroughUrl } from "@/lib/utils";
 import { appendSignature } from "@/lib/go-signing";
 import PdpBackLink from "@/components/product/PdpBackLink";
@@ -955,6 +956,13 @@ export default async function ProductPage({ params }: PageProps) {
           crawl. Switched to <JsonLd /> (raw inline <script>) May 2026
           launch-readiness pass so Rich Results pick it up. */}
       <JsonLd data={[breadcrumb, productSchema]} />
+
+      {/* PDP view event capture — May 29 2026 B2B data-tap addition.
+          Fire-and-forget client effect. Does not block render or
+          critical-path interaction. See docs/b2b-data-strategy.md
+          for the rationale; this is the foundational event stream
+          that unlocks funnel + engagement reports. */}
+      <PdpViewTracker productId={offer.product_id} offerId={offer.offer_id} />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         {/* Back link — context-aware via document.referrer.
