@@ -825,14 +825,33 @@ export default async function ProductPage({ params }: PageProps) {
     ...partition.likelyVariants.flatMap((v) => v.offers.map((o) => o.offerId)),
     ...partition.siblingVariants.flatMap((v) => v.offers.map((o) => o.offerId)),
   ]);
-  const dupesForRail = filteredDupes.filter((d) => {
-    if (variantProductIds.has(d.key)) return false;
-    /* Defensive: if any of the dupe's offers got merged into the
-       spectrum (FTS sometimes splits same-product into two
-       group rows), drop the rail entry too. */
-    if (d.offers.some((o) => variantOfferIds.has(o.offerId))) return false;
-    return true;
-  });
+  const dupesForRail = filteredDupes
+    .filter((d) => {
+      if (variantProductIds.has(d.key)) return false;
+      /* Defensive: if any of the dupe's offers got merged into the
+         spectrum (FTS sometimes splits same-product into two
+         group rows), drop the rail entry too. */
+      if (d.offers.some((o) => variantOfferIds.has(o.offerId))) return false;
+      return true;
+    })
+    /* Sort cheapest-first to match the rail's header copy
+       ("Sorted by best value, cheapest first.") — May 29 2026 user
+       report flagged the section was unsorted (filtered only). The
+       per-dupe cheapest is the min country-aware effective landed
+       price across its offers, matching the same definition the
+       band-gate and SimilarProducts card use so the order surfaced
+       in the rail is the order the user sees on each card. */
+    .sort((a, b) => {
+      const minEffective = (d: typeof a) => {
+        let lowest = Infinity;
+        for (const o of d.offers) {
+          const v = effectiveLandedPrice(o, country);
+          if (v > 0 && v < lowest) lowest = v;
+        }
+        return lowest === Infinity ? Number.MAX_SAFE_INTEGER : lowest;
+      };
+      return minEffective(a) - minEffective(b);
+    });
 
   /* Sibling rail — same brand + same model line + different sub-tier.
      Surfaces iPhone 15 Plus / Pro / Pro Max when viewing iPhone 15,
