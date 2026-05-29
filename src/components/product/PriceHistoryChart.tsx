@@ -41,7 +41,7 @@ import {
   useCallback, useEffect, useId, useLayoutEffect,
   useMemo, useRef, useState,
 } from "react";
-import { formatPriceForUser, formatPriceForUserExact, timeAgo, freshnessOf } from "@/lib/utils";
+import { formatPriceForUser, formatPriceForUserExact, timeAgo } from "@/lib/utils";
 import type { Country } from "@/lib/country";
 import type { PriceHistoryPoint } from "@/lib/search/price-history";
 import {
@@ -570,22 +570,20 @@ export default function PriceHistoryChart({
           price doesn't match. May 29 2026 trust-break report. */}
       {(() => {
         const lastDay = sliced[sliced.length - 1].day;
-        const fresh = freshnessOf(lastDay);
-        const toneCls = fresh.tone === "danger"
-          ? "text-amber-700 dark:text-amber-300 font-medium"
-          : fresh.tone === "warn"
-            ? "text-amber-700 dark:text-amber-300"
-            : "text-ink-3";
+        /* Plain provenance only — the ProductHero amber chip is the
+           single authoritative staleness warning on this page.
+           Restating it here was the third repeat in a row (chip ->
+           comparison bar -> chart strip), which the user reported
+           as visual noise. The "last refreshed Xd ago" string is
+           still useful as chart-axis annotation — it tells the
+           reader where the rightmost data point lives — but it
+           stays neutral ink-3 instead of escalating to amber. May
+           29 2026 trust-signal consolidation. */
         return (
-          <p className={`mt-3 text-[11px] ${toneCls} leading-tight`}>
+          <p className="mt-3 text-[11px] text-ink-3 leading-tight">
             Tracked across {geom.peakStoreCount} {geom.peakStoreCount === 1 ? "store" : "stores"} ·
             {" "}last refreshed{" "}
             <time suppressHydrationWarning>{timeAgo(lastDay)}</time>
-            {fresh.warn && (
-              <span className="ml-1 italic">
-                · price may have changed since
-              </span>
-            )}
           </p>
         );
       })()}

@@ -39,7 +39,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Check, Globe, AlertCircle, TrendingDown, Award, Sparkles, ArrowRight, Plane } from "lucide-react";
-import { formatPriceForUser, timeAgo, freshnessOf } from "@/lib/utils";
+import { formatPriceForUser, timeAgo } from "@/lib/utils";
 import { type Country } from "@/lib/country";
 import type { PerStoreOffer } from "@/lib/pdp-stats";
 import type { PriceHistorySummary } from "@/lib/search/price-history";
@@ -805,32 +805,20 @@ export default function PriceComparisonBar({
           <Check size={11} aria-hidden="true" />
           {confidence.label}
         </span>
-        {lastCheckedAt && (() => {
-          const fresh = freshnessOf(lastCheckedAt);
-          /* When the price is more than a week old we have no
-             grounds to claim it's still accurate (Mon+Thu scrape
-             cadence means a healthy offer should be < 4 days
-             old). Surface "Price may have changed since" in the
-             same line so the visitor doesn't trust the number
-             before clicking through. May 29 2026 trust-break
-             report. */
-          const staleToneClass = fresh.tone === "danger"
-            ? "text-amber-700 dark:text-amber-300 font-medium"
-            : fresh.tone === "warn"
-              ? "text-amber-700 dark:text-amber-300"
-              : "text-ink-3";
-          return (
-            <span className={`inline-flex items-center gap-1 ${staleToneClass}`} suppressHydrationWarning>
-              <span aria-hidden="true">·</span>
-              Verified {timeAgo(lastCheckedAt)}
-              {fresh.warn && (
-                <span className="ml-1 italic">
-                  · price may have changed
-                </span>
-              )}
-            </span>
-          );
-        })()}
+        {lastCheckedAt && (
+          /* Plain provenance only. The ProductHero amber chip above
+             is the single authoritative "price may have changed"
+             warning — naming the merchant, top of fold, loud enough
+             to actually be read. Restating the same warning here
+             (and again under the chart) was diluting the chip's
+             authority instead of reinforcing it; the user reads it
+             three times, then trusts each instance less. May 29 2026
+             trust-signal consolidation. */
+          <span className="inline-flex items-center gap-1 text-ink-3" suppressHydrationWarning>
+            <span aria-hidden="true">·</span>
+            Verified {timeAgo(lastCheckedAt)}
+          </span>
+        )}
         {!isSingleStore && cheapest && cheapest.storeId !== thisStoreId && (
           <span className="inline-flex items-center gap-1 text-ink-3">
             <span aria-hidden="true">·</span>
