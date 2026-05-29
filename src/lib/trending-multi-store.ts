@@ -348,21 +348,88 @@ async function fetchMultiStoreTitlesForCountry(countryCode: string): Promise<Mul
   return result;
 }
 
-/* unstable_cache wraps the helper with Next's request-deduped + ISR
-   cache. Multiple homepage renders within REVALIDATE_S share one DB
-   round trip; after the window expires, the next render re-fetches
-   in the background while serving the stale set.
+/* Helper: which of the supplied product IDs are currently live in the
+   country-scoped product_best_offers view. Used to validate cached chip
+   pools at READ time — every chip rail render runs this against the
+   chips it's about to ship and drops any whose productId is no longer
+   present.
 
-   Country-scoped: call as getTrendingMultiStoreTitles(countryCode).
-   The countryCode argument is part of the unstable_cache key, so each
-   market gets its own cached pool. */
-export const getTrendingMultiStoreTitles = unstable_cache(
+   Why read-time validation (vs. relying on build-time only): the chip
+   pool is cached for REVALIDATE_S, but the catalog drifts faster than
+   that window in a few cases:
+     · the Sunday stale-offer sweep flips a product's only in-stock
+       offer to out-of-stock (chip's productId still exists in `products`
+       but no longer appears in `product_best_offers`)
+     · the Option A orphan-reap trigger or a manual cleanup deletes a
+       product the chip was anchored to
+     · ingestion runs (Mon/Thu) age-out an SKU
+   Without this layer, the chip clicks into /api/compare with a pid
+   that resolves to zero offers, falls through to FTS which (post the
+   May 29 search-relevance tightening) is too strict to anchor, and the
+   user gets "Nothing found" — exactly the bug the user reported.
+
+   Cheap: two .in() queries against the indexed view, ~100 IDs at most
+   per call, ~50ms each. Mirrors the country scope used at build time
+   (country-anchored stores + true international stores). Graceful: if
+   the DB client is unavailable, returns every ID as "live" so we serve
+   the cached pool unfiltered rather than a degraded empty rail. */
+async function liveCountryProductIds(
+  ids: string[],
+  countryCode: string,
+): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const supa = getSupabaseAdmin();
+  if (!supa) return new Set(ids);
+  const cc = countryCode.toUpperCase();
+  const [localRes, intlRes] = await Promise.all([
+    supa
+      .from("product_best_offers")
+      .select("product_id")
+      .in("product_id", ids)
+      .eq("store_country", cc),
+    supa
+      .from("product_best_offers")
+      .select("product_id")
+      .in("product_id", ids)
+      .eq("is_international", true)
+      .is("store_country", null),
+  ]);
+  const live = new Set<string>();
+  for (const r of (localRes.data ?? []) as { product_id: string }[]) live.add(r.product_id);
+  for (const r of (intlRes.data  ?? []) as { product_id: string }[]) live.add(r.product_id);
+  return live;
+}
+
+/* unstable_cache wraps the heavy pool-generation helper with Next's
+   request-deduped + ISR cache. Multiple homepage renders within
+   REVALIDATE_S share one DB round trip; after the window expires, the
+   next render re-fetches in the background while serving the stale
+   set. The expensive work — 32 paginated offer queries — is what we
+   want to cache; the cheap read-time validation runs uncached on the
+   results so a 5-minute cache window can't poison the rail. */
+const getCachedChipPool = unstable_cache(
   fetchMultiStoreTitlesForCountry,
-  /* v6 cache key — bumped because the global-fallback path now
-     intersects with country-permissible product IDs so chips never
-     promise a comparison that resolves to "Nothing found." Old v5
-     entries served chips with un-permissible products; bypass them
-     so users see the corrected pool immediately on deploy. */
-  ["trending-multi-store-v6-country-permissible-fallback"],
+  /* v7 cache key — bumped because the export now runs read-time
+     validation against product_best_offers, and we want any pool that
+     was cached under v6 (pre-validation, possibly containing chips
+     whose products have since drifted out of the view) evicted on
+     deploy so the first render after the bump rebuilds cleanly. */
+  ["trending-multi-store-v7-readtime-validation"],
   { revalidate: REVALIDATE_S, tags: [CACHE_TAG] },
 );
+
+/* Public entry — call as getTrendingMultiStoreTitles(countryCode). The
+   countryCode argument is the cache key for the inner pool and the
+   scope for the read-time validation, so each market gets its own
+   pool AND its own live-set check. */
+export async function getTrendingMultiStoreTitles(
+  countryCode: string,
+): Promise<MultiStoreChip[]> {
+  const pool = await getCachedChipPool(countryCode);
+  if (pool.length === 0) return pool;
+  const live = await liveCountryProductIds(
+    pool.map((c) => c.productId),
+    countryCode,
+  );
+  return pool.filter((c) => live.has(c.productId));
+}
