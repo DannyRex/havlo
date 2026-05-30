@@ -132,6 +132,47 @@ export function buildBreadcrumbList(
   };
 }
 
+/* ── Commerce identifiers (Product JSON-LD) ───────────────────────
+   GTIN validation for schema.org. Retailer feeds carry plenty of
+   junk in the gtin column — internal SKUs zero-padded to 8/14 digits
+   (e.g. "00000523") sit right next to real barcodes. Google's Rich
+   Results validator rejects a GTIN that fails its mod-10 check digit,
+   and emitting an invalid one is worse than emitting none, so we:
+   strip to digits, require a valid GTIN length (8/12/13/14), verify
+   the check digit, and only then return it for the generic `gtin`
+   property (which subsumes gtin8/12/13/14). Leading zeros are
+   significant for GTIN identity and preserved. */
+export function canonicalGtin(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const d = raw.replace(/\D/g, "");
+  if (![8, 12, 13, 14].includes(d.length)) return null;
+  /* Mod-10 check digit, anchored at the rightmost data digit so it
+     validates zero-padded forms too: a UPC-12 padded to GTIN-14 stays
+     valid because the leading zeros contribute nothing to the weighted
+     sum regardless of their position. */
+  let sum = 0;
+  for (let i = 0; i < d.length - 1; i++) {
+    const digit = d.charCodeAt(d.length - 2 - i) - 48;
+    sum += digit * (i % 2 === 0 ? 3 : 1);
+  }
+  const check = (10 - (sum % 10)) % 10;
+  if (check !== d.charCodeAt(d.length - 1) - 48) return null;
+  return d;
+}
+
+/* MPN is a free-form manufacturer part number — there's no check
+   digit to verify, so just guard against empty / absurd values:
+   trim, require at least one alphanumeric, cap the length. Returns
+   null when unusable so the JSON-LD omits the field rather than
+   carrying noise. */
+export function cleanMpn(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const s = raw.trim();
+  if (s.length === 0 || s.length > 70) return null;
+  if (!/[a-z0-9]/i.test(s)) return null;
+  return s;
+}
+
 /* ── ItemList JSON-LD for product feeds ──────────────────────────
    When given a list of trending deals, returns an ItemList of
    Product entries. Helps Google surface the page as a product

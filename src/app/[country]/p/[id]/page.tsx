@@ -31,7 +31,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCountry } from "@/lib/country";
 import { unstable_cache } from "next/cache";
 import { COUNTRIES } from "@/lib/country";
-import { SITE_URL, buildBreadcrumbList, buildHreflangAlternates } from "@/lib/seo";
+import { SITE_URL, buildBreadcrumbList, buildHreflangAlternates, canonicalGtin, cleanMpn } from "@/lib/seo";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { pgFtsFindDupes, pgFtsAnchorOffersByProductId } from "@/lib/search/pg-fts";
 import { isOfferAllowedForCountry, filterDealsForCountry } from "@/lib/country";
@@ -46,7 +46,7 @@ import { effectiveLandedPrice } from "@/lib/landed-price";
 import { partitionDupesByVariantMatch, variantOffers } from "@/lib/search/variant-pooling";
 import { partitionDupesByVariantMatchDeep } from "@/lib/search/variant-pooling-deep";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
-import { fetchProductDescription } from "@/lib/offers/fetch-product-description";
+import { fetchProductMeta } from "@/lib/offers/fetch-product-description";
 import { usdToNgn, cleanTitle, formatPriceForUser } from "@/lib/utils";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getCategory } from "@/lib/data/categories";
@@ -380,18 +380,24 @@ export default async function ProductPage({ params }: PageProps) {
      and most surfaces don't render them. Cached 1h with the
      rest of the PDP read path; tag separately so a backfill
      run can invalidate it without busting the price caches. */
-  const fetchProductDescriptionCached = unstable_cache(
-    async (productId: string) => fetchProductDescription(productId),
-    ["pdp-product-description"],
+  const fetchProductMetaCached = unstable_cache(
+    async (productId: string) => fetchProductMeta(productId),
+    /* Cache key bumped from the old "pdp-product-description" because
+       the cached value shape changed (string → ProductMeta object); a
+       shared key would have served stale string entries as objects.
+       Tag is kept so an existing description-backfill invalidation
+       still busts this entry. */
+    ["pdp-product-meta"],
     { revalidate: 3600, tags: ["pdp-product-description"] },
   );
-  const [dupes, anchorOffers, priceHistoryRows, priceTimeseries, productDescriptionRaw] = await Promise.all([
+  const [dupes, anchorOffers, priceHistoryRows, priceTimeseries, productMeta] = await Promise.all([
     fetchDupesCached(offer.title),
     fetchAnchorOffersCached(offer.product_id),
     offer.product_id ? fetchPriceHistoryCached(offer.product_id) : Promise.resolve(null),
     offer.product_id ? fetchPriceTimeseriesCached(offer.product_id) : Promise.resolve(null),
-    offer.product_id ? fetchProductDescriptionCached(offer.product_id) : Promise.resolve(null),
+    offer.product_id ? fetchProductMetaCached(offer.product_id) : Promise.resolve(null),
   ]);
+  const productDescriptionRaw = productMeta?.description ?? null;
 
   /* ── Anchor country-relevance guard ───────────────────────────────
      If the visitor is on /<country>/p/<offerId> but the offer's
@@ -973,7 +979,17 @@ export default async function ProductPage({ params }: PageProps) {
                               ranges instead of a single store's
                               number
        • dateModified      — most recent scrape timestamp; Google uses
-                              this as a freshness signal */
+                              this as a freshness signal
+       • gtin / mpn        — real commerce identifiers, emitted only
+                              when the products row carries a value that
+                              passes validation (GTIN check digit; MPN
+                              non-empty). Lets Google match the PDP to a
+                              catalog entry. Sparse today but honest.
+
+     Deliberately NOT emitted: aggregateRating / review. Havlo has no
+     first-party review corpus (the compare API returns rating: 0), and
+     fabricating ratings violates Google's policy and our own honesty
+     bar. Add these only once real review data exists. */
   const productUrl = `${SITE_URL}/${country.code}/p/${offer.offer_id}`;
   /* JSON-LD description: prefer the real merchant body when we have
      one (richer, on-topic prose Google's NLP weights highly), fall
@@ -1026,6 +1042,14 @@ export default async function ProductPage({ params }: PageProps) {
         priceValidUntil,
       };
 
+  /* Validated commerce identifiers. canonicalGtin rejects junk in the
+     gtin column (internal SKUs that fail the GTIN check digit);
+     cleanMpn drops empty/oversized part numbers. Both return null when
+     unusable so the spread omits the field entirely rather than
+     emitting an identifier Google would flag. */
+  const gtin = canonicalGtin(productMeta?.gtin);
+  const mpn  = cleanMpn(productMeta?.mpn);
+
   const productSchema = {
     "@context":         "https://schema.org",
     "@type":            "Product",
@@ -1037,6 +1061,8 @@ export default async function ProductPage({ params }: PageProps) {
     category:           offer.category_slug ?? undefined,
     sku:                offer.offer_id,
     productID:          offer.offer_id,
+    ...(gtin ? { gtin } : {}),
+    ...(mpn  ? { mpn }  : {}),
     mainEntityOfPage:   productUrl,
     dateModified:       offer.scraped_at,
     offers:             offerBlock,
@@ -1159,12 +1185,13 @@ export default async function ProductPage({ params }: PageProps) {
             shows up on only some PDPs created an inconsistent shape.
             The page now flows chart → "You may also like" cleanly.
 
-            products.description is still fetched (productDescriptionRaw)
-            because the JSON-LD descriptor enrichment from 71b3858
-            uses it — real merchant prose in structured data is a
-            free SEO win, and search engines see it regardless of
-            visible rendering. fetchProductDescription stays for that
-            consumer; ProductAbout.tsx is deleted. */}
+            products.description is still fetched (productDescriptionRaw,
+            now via fetchProductMeta) because the JSON-LD descriptor
+            enrichment from 71b3858 uses it — real merchant prose in
+            structured data is a free SEO win, and search engines see it
+            regardless of visible rendering. fetchProductMeta also pulls
+            gtin/mpn for the Product schema in the same round trip;
+            ProductAbout.tsx is deleted. */}
 
         {dupesForRail.length > 0 ? (
           /* Cheaper alternatives section — moved ABOVE the sibling
