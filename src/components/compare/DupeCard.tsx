@@ -10,9 +10,70 @@ import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import { effectiveLandedPrice } from "@/lib/landed-price";
 import { displayStoreName } from "@/lib/store-display";
-import { storeLogoInvertClass } from "@/lib/store-logo-invert";
+import { storeLogoInvertOnLight } from "@/lib/store-logo-invert";
 import { trackClick } from "@/lib/trackClick";
 import type { DupeResult, StoreOffer } from "@/lib/search";
+
+/* Store-logo chip for the cheaper-alternatives card CTAs.
+
+   Rendered on a CONSTANT white plate (never theme-flipping) for one
+   reason: it makes every store logo visible in BOTH light and dark
+   mode without a per-store registry. Dark + full-colour wordmarks
+   read on white in either theme; the only marks that would vanish on
+   white are the light-on-transparent ones (3C Hub), which
+   storeLogoInvertOnLight flips to dark.
+
+   A letter badge is ALWAYS painted underneath, so a 404 / blank
+   favicon / hidden image never leaves an empty box — the store's
+   initial shows through instead. Replaces the previous bespoke <img>
+   that hid itself on error (empty chip) and used the theme-flipping
+   invert, under which dozens of dark-on-transparent logos (adidas,
+   shein, eBay, …) were invisible in dark mode. */
+function LogoChip({
+  storeId,
+  storeName,
+  storeLogoUrl,
+  size = 16,
+}: {
+  storeId: string;
+  storeName: string;
+  storeLogoUrl: string;
+  size?: number;
+}) {
+  const [failed, setFailed] = useState(false);
+  const initial = storeName.trim().charAt(0).toUpperCase() || "•";
+  return (
+    <span
+      className="relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded bg-white ring-1 ring-black/[0.08]"
+      style={{ width: size, height: size }}
+    >
+      <span
+        aria-hidden="true"
+        className="absolute inset-0 flex items-center justify-center font-bold leading-none text-gray-500 select-none"
+        style={{ fontSize: Math.max(8, Math.round(size * 0.58)) }}
+      >
+        {initial}
+      </span>
+      {storeLogoUrl && !failed && (
+        /* Plain <img> — 16px store logos don't benefit from
+           next/image's optimizer enough to justify a transform each
+           (Vercel cap). storeLogoInvertOnLight is theme-independent
+           because the plate is a constant white. */
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={storeLogoUrl}
+          alt=""
+          width={size}
+          height={size}
+          loading="lazy"
+          decoding="async"
+          className={`absolute inset-0 m-auto h-full w-full object-contain p-[1.5px] ${storeLogoInvertOnLight(storeId)}`}
+          onError={() => setFailed(true)}
+        />
+      )}
+    </span>
+  );
+}
 
 export default function DupeCard({
   dupe,
@@ -145,26 +206,11 @@ export default function DupeCard({
             className="mt-3 inline-flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-ink text-bg text-xs font-semibold group-hover:opacity-90 transition-opacity"
           >
             <span className="inline-flex items-center gap-1.5 min-w-0">
-              <span className="w-4 h-4 rounded overflow-hidden bg-surface-2 shrink-0 flex items-center justify-center">
-                {/* Theme-aware invert for white-on-transparent wordmarks
-                    (3C Hub, etc.) so the logo stays visible inside the
-                    light bg-surface-2 chip in light mode. Shared util
-                    keeps DupeCard / PriceResults / StoreLogo in sync. */}
-                {/* Plain <img> — 16×16 store logos don't benefit
-                    enough from next/image's optimizer to justify
-                    a transformation each. Avoids the Vercel cap. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={bestOffer.storeLogoUrl}
-                  alt=""
-                  width={16}
-                  height={16}
-                  loading="lazy"
-                  decoding="async"
-                  className={`object-contain ${storeLogoInvertClass(bestOffer.storeId)}`}
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                />
-              </span>
+              <LogoChip
+                storeId={bestOffer.storeId}
+                storeName={bestOffer.storeName}
+                storeLogoUrl={bestOffer.storeLogoUrl}
+              />
               <span className="truncate">View product</span>
               {isIntlForUser(bestOffer) && bestOffer.landedCostExtra > 0 && (
                 <Plane size={11} className="text-amber-300 shrink-0" />
@@ -225,21 +271,11 @@ export default function DupeCard({
                     onClick={() => trackClick(dupe.key, query, rank, mode)}
                     className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border hover:border-border-strong hover:bg-surface-2 transition-colors text-[11px]"
                   >
-                    <div className="w-4 h-4 rounded overflow-hidden bg-surface-2 shrink-0 flex items-center justify-center">
-                      {/* Same invert rule as the primary CTA above.
-                          Plain <img> to skip Vercel transform cap. */}
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={offer.storeLogoUrl}
-                        alt=""
-                        width={16}
-                        height={16}
-                        loading="lazy"
-                        decoding="async"
-                        className={`object-contain ${storeLogoInvertClass(offer.storeId)}`}
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                      />
-                    </div>
+                    <LogoChip
+                      storeId={offer.storeId}
+                      storeName={offer.storeName}
+                      storeLogoUrl={offer.storeLogoUrl}
+                    />
                     <span className="text-ink-2 truncate flex-1">{displayStoreName(offer.storeName)}</span>
                     {/* Country-aware price — match the headline above
                         (line ~135). Was bare `offer.price`, which read
