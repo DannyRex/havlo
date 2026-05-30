@@ -40,6 +40,8 @@ try {
 import { getSupabaseAdmin } from "../src/lib/providers/db-client";
 import { sendEmail } from "../src/lib/email/send";
 import { shellMarketing, tokens, escapeHtml as esc, spacer } from "../src/lib/email/templates/_layout";
+import { merchantSearchUrl, smartFallbackUrl, merchantHomepage } from "../src/lib/merchant-search-urls";
+import { isGoogleRelay } from "../src/lib/url-helpers";
 
 const ALWAYS_EMAIL = process.argv.includes("--always-email");
 const DRY_RUN      = process.argv.includes("--dry-run");
@@ -66,6 +68,11 @@ interface Baseline {
   totalOffers:     number;
   inStockOffers:   number;
   totalStores:     number;
+  /** Where an in-stock click actually lands, mirroring the /api/go
+      resolution chain. pdp = direct passthrough; search = curated
+      search page; home = bare merchant homepage (floor/guess);
+      bounce = no merchant signal, falls through to Havlo /compare. */
+  landing:         { pdp: number; search: number; home: number; bounce: number };
 }
 
 /* ── Shared helpers ──────────────────────────────────────────────── */
@@ -153,6 +160,34 @@ const THRESHOLDS = {
   /* Catastrophic drop guard. In-stock offers below this floor
      suggests a mass-sweep or DB issue. */
   minInStockOffers: 8000,
+
+  /* ── Outbound landing-split guards (added after the v8-v11 merchant
+     curation pass that took CURATED relay coverage to 3,018/3,642 and
+     cut Havlo bounces to 62). These catch the split regressing as new
+     stores get ingested. ── */
+
+  /* In-stock clicks that bounce to Havlo /compare because the store
+     has no MERCHANTS entry AND no usable homepage guess. The worst
+     UX tier. Sat at 62 after v11. A rise past 100 means new stores
+     ingested without any merchant signal — usually a batch from one
+     new high-volume store (see uncurated_head_store finding). */
+  bounceOffers: 100,
+
+  /* % of in-stock clicks landing on a bare merchant HOMEPAGE instead
+     of a product or search page. Sat at ~5.9% after v11. Percentage
+     (not absolute) so it stays meaningful as the catalog grows. A
+     rise past 9% means either a curated searchUrl rotted (search ->
+     home drift) or many new stores landed with only a homepage floor. */
+  homeOffersPct: 9,
+
+  /* Per-store trigger: a SINGLE store sending this many relay clicks
+     to a fallback (homepage or bounce) is a high-value curation
+     target. 10 is above the steady-state tail (post-v11 the worst
+     uncurated store is in single digits) so this stays quiet until a
+     genuinely new high-volume store appears — exactly the "new store
+     just got ingested" signal. Names the store so the fix is a
+     one-line MERCHANTS addition. */
+  headStoreRelayOffers: 10,
 };
 
 /* ── Checks ──────────────────────────────────────────────────────
@@ -169,7 +204,93 @@ async function runChecks(supa: NonNullable<ReturnType<typeof getSupabaseAdmin>>)
   const totalOffers   = await count(supa, "offers",   (q) => q);
   const inStockOffers = await count(supa, "offers",   (q) => q.eq("in_stock", true));
   const totalStores   = await count(supa, "stores",   (q) => q);
-  const baseline: Baseline = { totalProducts, totalOffers, inStockOffers, totalStores };
+
+  /* Outbound landing split — where every in-stock click actually goes,
+     replaying the /api/go resolution order per offer:
+       not a Google relay url          -> PDP (direct passthrough)
+       merchantSearchUrl returns a url
+         embedding the sentinel query   -> SEARCH (real search page)
+         else (homepage floor)          -> HOME
+       smartFallbackUrl / merchantHomepage hit -> HOME (guess)
+       nothing                          -> BOUNCE (Havlo /compare)
+     A fixed sentinel query lets us tell a real search URL (which embeds
+     the query) from a homepage floor (which does not) without depending
+     on any particular product title. */
+  const landingRows = await fetchPaged<{ url: string; store_id: string; stores: { name: string } | { name: string }[] | null }>(
+    supa, "offers", "url, store_id, stores(name)", (q) => q.eq("in_stock", true),
+  );
+  const SENTINEL = "Zq9SENTINELq9Z";
+  const land = { pdp: 0, search: 0, home: 0, bounce: 0 };
+  const offenders = new Map<string, { name: string; home: number; bounce: number }>();
+  for (const r of landingRows) {
+    const sf = r.stores; const store = Array.isArray(sf) ? sf[0] : sf;
+    const name = store?.name ?? r.store_id;
+    let where: "pdp" | "search" | "home" | "bounce";
+    if (!r.url || !isGoogleRelay(r.url)) {
+      where = "pdp";
+    } else {
+      const s = merchantSearchUrl(r.store_id, name, SENTINEL);
+      if (s) where = s.url.includes(SENTINEL) ? "search" : "home";
+      else if (smartFallbackUrl(r.store_id, name, SENTINEL)) where = "home";
+      else if (merchantHomepage(r.store_id, name)) where = "home";
+      else where = "bounce";
+    }
+    land[where] += 1;
+    if (where === "home" || where === "bounce") {
+      const cur = offenders.get(r.store_id) ?? { name, home: 0, bounce: 0 };
+      cur[where] += 1; offenders.set(r.store_id, cur);
+    }
+  }
+
+  const baseline: Baseline = { totalProducts, totalOffers, inStockOffers, totalStores, landing: land };
+
+  /* Landing A — bounce volume (no merchant route at all). */
+  if (land.bounce > THRESHOLDS.bounceOffers) {
+    findings.push({
+      severity:  "WARN",
+      id:        "outbound_bounce",
+      headline:  `In-stock clicks bouncing to Havlo /compare (no merchant route)`,
+      value:     land.bounce,
+      threshold: THRESHOLDS.bounceOffers,
+      detail:    `These relay offers have no MERCHANTS entry and no usable homepage guess, so the click lands on Havlo's own compare page instead of the merchant. Usually means a new store was ingested with no merchant signal — see the uncurated_head_store finding for which one.`,
+    });
+  }
+
+  /* Landing B — homepage drift (search -> home, or many uncurated stores). */
+  const homePct = baseline.inStockOffers > 0 ? (land.home / baseline.inStockOffers) * 100 : 0;
+  if (homePct > THRESHOLDS.homeOffersPct) {
+    findings.push({
+      severity:  "WARN",
+      id:        "outbound_home_drift",
+      headline:  `In-stock clicks landing on a bare merchant homepage`,
+      value:     land.home,
+      threshold: Math.round((baseline.inStockOffers * THRESHOLDS.homeOffersPct) / 100),
+      detail:    `${homePct.toFixed(1)}% of in-stock clicks hit a homepage instead of a product or search page (bar: ${THRESHOLDS.homeOffersPct}%). A curated searchUrl may have rotted (search -> home), or many new stores landed with only a homepage floor. Check recent MERCHANTS entries and re-probe their search URLs.`,
+    });
+  }
+
+  /* Landing C — per-store worklist: the actionable "go curate this" signal.
+     Quiet until one store crosses headStoreRelayOffers, then names the
+     top offenders so the fix is a one-line MERCHANTS addition. */
+  const ranked = [...offenders.entries()]
+    .map(([id, v]) => ({ id, relay: v.home + v.bounce, home: v.home, bounce: v.bounce }))
+    .sort((a, b) => b.relay - a.relay);
+  const worst = ranked[0];
+  if (worst && worst.relay >= THRESHOLDS.headStoreRelayOffers) {
+    const list = ranked
+      .filter((o) => o.relay >= THRESHOLDS.headStoreRelayOffers)
+      .slice(0, 6)
+      .map((o) => `${o.id} (${o.relay} relay: ${o.bounce} bounce / ${o.home} home)`)
+      .join(", ");
+    findings.push({
+      severity:  "WARN",
+      id:        "uncurated_head_store",
+      headline:  `Store(s) sending ${THRESHOLDS.headStoreRelayOffers}+ relay clicks to a fallback`,
+      value:     worst.relay,
+      threshold: THRESHOLDS.headStoreRelayOffers,
+      detail:    `Add a MERCHANTS entry in src/lib/merchant-search-urls.ts (probe the search URL live first): ${list}.`,
+    });
+  }
 
   /* Catastrophic-drop floor. */
   if (inStockOffers < THRESHOLDS.minInStockOffers) {
@@ -374,6 +495,27 @@ function metricTile(label: string, value: number): string {
     </td>`;
 }
 
+/* Landing tile — like metricTile but with a percent-of-in-stock sub-figure,
+   since "929 homepages" only means something next to the total. */
+function landingTile(label: string, value: number, total: number): string {
+  const pct = total > 0 ? ((value / total) * 100).toFixed(1) : "0.0";
+  return `
+    <td width="50%" style="padding:8px;" valign="top">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:${tokens.surface};border:1px solid ${tokens.border};border-radius:10px;" class="bg-card border">
+        <tr>
+          <td style="padding:14px 16px;">
+            <div style="font-family:${tokens.fontFamily};font-size:10px;font-weight:600;color:${tokens.ink3};text-transform:uppercase;letter-spacing:0.1em;line-height:1.2;" class="text-ink-3">
+              ${esc(label)}
+            </div>
+            <div style="font-family:${tokens.fontFamily};font-size:22px;font-weight:700;color:${tokens.ink};letter-spacing:-0.01em;line-height:1.2;margin-top:6px;" class="text-ink">
+              ${value.toLocaleString()}<span style="font-size:13px;font-weight:600;color:${tokens.ink3};margin-left:6px;" class="text-ink-3">${pct}%</span>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </td>`;
+}
+
 /* One finding card. Inline color tone per severity stays legible in
    both light + dark mode because the foreground colors are hand-picked
    for sufficient contrast against the surface background. */
@@ -463,6 +605,32 @@ function buildEmailHtml(baseline: Baseline, findings: Finding[]): string {
       </td>
     </tr>`;
 
+  /* Outbound landing split — always shown so the PDP/search/home/bounce
+     trend is visible at a glance even on an otherwise-green week. */
+  const total = baseline.inStockOffers;
+  const landingMetrics = `
+    <tr>
+      <td class="px-mobile" style="padding:14px 32px 2px 32px;">
+        <div style="font-family:${tokens.fontFamily};font-size:11px;font-weight:700;color:${tokens.ink3};text-transform:uppercase;letter-spacing:0.08em;" class="text-ink-3">
+          Where in-stock clicks land
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td class="px-mobile" style="padding:0 24px 4px 24px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+          <tr>
+            ${landingTile("Product page",      baseline.landing.pdp,    total)}
+            ${landingTile("Search results",    baseline.landing.search, total)}
+          </tr>
+          <tr>
+            ${landingTile("Merchant homepage", baseline.landing.home,   total)}
+            ${landingTile("Bounce to /compare", baseline.landing.bounce, total)}
+          </tr>
+        </table>
+      </td>
+    </tr>`;
+
   /* Findings section — only rendered when there's something to show.
      When all-clear, we replace the findings block with a single
      reassuring confirmation paragraph. */
@@ -471,7 +639,7 @@ function buildEmailHtml(baseline: Baseline, findings: Finding[]): string {
       <tr>
         <td class="px-mobile" style="padding:20px 32px 8px 32px;">
           <p class="text-ink" style="margin:0;font-family:${tokens.fontFamily};font-size:15px;line-height:1.55;color:${tokens.ink};">
-            All eight integrity checks passed against current thresholds. Catalog is healthy.
+            All integrity and outbound-routing checks passed against current thresholds. Catalog is healthy.
           </p>
         </td>
       </tr>`
@@ -500,6 +668,7 @@ function buildEmailHtml(baseline: Baseline, findings: Finding[]): string {
     heading +
     meta +
     metrics +
+    landingMetrics +
     spacer(8) +
     findingsSection +
     spacer(8) +
@@ -507,7 +676,7 @@ function buildEmailHtml(baseline: Baseline, findings: Finding[]): string {
 
   return shellMarketing({
     preheader: findings.length === 0
-      ? `All eight integrity checks passed. ${baseline.totalProducts.toLocaleString()} products, ${baseline.inStockOffers.toLocaleString()} in-stock offers.`
+      ? `All integrity and outbound-routing checks passed. ${baseline.totalProducts.toLocaleString()} products, ${baseline.inStockOffers.toLocaleString()} in-stock offers.`
       : `${findings.length} finding${findings.length === 1 ? "" : "s"} in this week's health check — ${findings.filter((f) => f.severity === "ERROR").length} error, ${findings.filter((f) => f.severity === "WARN").length} warn.`,
     body,
   });
@@ -523,6 +692,14 @@ function buildEmailText(baseline: Baseline, findings: Finding[]): string {
   lines.push(`  offers:      ${baseline.totalOffers.toLocaleString()}`);
   lines.push(`  in-stock:    ${baseline.inStockOffers.toLocaleString()}`);
   lines.push(`  stores:      ${baseline.totalStores.toLocaleString()}`);
+  lines.push("");
+  const landTotal = baseline.inStockOffers || 1;
+  const landPct = (n: number) => `${((n / landTotal) * 100).toFixed(1)}%`;
+  lines.push(`Where in-stock clicks land:`);
+  lines.push(`  product page:       ${baseline.landing.pdp.toLocaleString()}\t${landPct(baseline.landing.pdp)}`);
+  lines.push(`  search results:     ${baseline.landing.search.toLocaleString()}\t${landPct(baseline.landing.search)}`);
+  lines.push(`  merchant homepage:  ${baseline.landing.home.toLocaleString()}\t${landPct(baseline.landing.home)}`);
+  lines.push(`  bounce to /compare: ${baseline.landing.bounce.toLocaleString()}\t${landPct(baseline.landing.bounce)}`);
   lines.push("");
   if (findings.length === 0) {
     lines.push("✓ All checks passed against current thresholds.");
