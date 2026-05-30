@@ -733,6 +733,34 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "starmobile-de":     { name: "Starmobile",       searchUrl: () => null, homepage: "https://www.starmobile.de" },
   "mresell-de":        { name: "mResell",          searchUrl: () => null, homepage: "https://www.mresell.de" },
   "beautyonline":      { name: "BeautyOnline",     searchUrl: () => null, homepage: "https://www.beautyonline.co.za" },
+
+  /* v11 — recognizable NONE-tier brands lifted off the Havlo bounce onto their
+     real storefront. Search URLs probed live (200); floors are storefronts that
+     bot-wall the datacenter IP (403, still reachable for real users) or 404 on
+     every search pattern, pinned to a verified-alive homepage. Skipped: feel
+     (domain parked at registrar), sun-sand-sports x2 (redirect-loop, unverifiable). */
+  "on":                      { name: "On",                  searchUrl: (q) => `https://www.on.com/en-gb/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.on.com" },
+  "game-4u":                 { name: "Game4U",              searchUrl: (q) => `https://www.game4u.com/catalogsearch/result/?q=${encodeURIComponent(q)}`, homepage: "https://www.game4u.com" },
+  "bulk":                    { name: "Bulk",                searchUrl: (q) => `https://www.bulk.com/uk/search?q=${encodeURIComponent(q)}`,               homepage: "https://www.bulk.com" },
+  "dusk":                    { name: "DUSK",                searchUrl: (q) => `https://www.dusk.com/search?q=${encodeURIComponent(q)}`,                  homepage: "https://www.dusk.com" },
+  "lyko":                    { name: "Lyko",                searchUrl: (q) => `https://www.lyko.com/en/search?query=${encodeURIComponent(q)}`,           homepage: "https://www.lyko.com" },
+  "no7-beauty":              { name: "No7 Beauty",          searchUrl: (q) => `https://www.no7beauty.co.uk/search?q=${encodeURIComponent(q)}`,           homepage: "https://www.no7beauty.co.uk" },
+  "motorola-united-kingdom": { name: "Motorola UK",         searchUrl: (q) => `https://www.motorola.co.uk/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.motorola.co.uk" },
+  "sport-2000":              { name: "Sport 2000",          searchUrl: (q) => `https://www.sport2000.de/search?q=${encodeURIComponent(q)}`,              homepage: "https://www.sport2000.de" },
+  "ernsting-s-family":       { name: "Ernsting's Family",   searchUrl: (q) => `https://www.ernstings-family.de/suche?q=${encodeURIComponent(q)}`,        homepage: "https://www.ernstings-family.de" },
+  "claudia-julia":           { name: "Claudia & Julia",     searchUrl: (q) => `https://www.claudiaandjulia.com/search?q=${encodeURIComponent(q)}`,       homepage: "https://www.claudiaandjulia.com" },
+  "john-bell-croyden":       { name: "John Bell & Croyden", searchUrl: (q) => `https://www.johnbellcroyden.co.uk/search?q=${encodeURIComponent(q)}`,     homepage: "https://www.johnbellcroyden.co.uk" },
+  "cloud-10-beauty":         { name: "Cloud 10 Beauty",     searchUrl: (q) => `https://www.cloud10beauty.com/search?q=${encodeURIComponent(q)}`,         homepage: "https://www.cloud10beauty.com" },
+  "sony-world-south-africa": { name: "Sony World SA",       searchUrl: (q) => `https://www.sonyworld.co.za/search?q=${encodeURIComponent(q)}`,           homepage: "https://www.sonyworld.co.za" },
+  "istore-pre-owned":        { name: "iStore Pre-Owned",    searchUrl: (q) => `https://www.istore.co.za/search?q=${encodeURIComponent(q)}`,              homepage: "https://www.istore.co.za" },
+  "ray-ban":                 { name: "Ray-Ban",             searchUrl: () => null, homepage: "https://www.ray-ban.com" },
+  "size":                    { name: "size?",               searchUrl: () => null, homepage: "https://www.size.co.uk" },
+  "game":                    { name: "GAME",                searchUrl: () => null, homepage: "https://www.game.co.uk" },
+  "netto-online-shop":       { name: "Netto Online",        searchUrl: () => null, homepage: "https://www.netto-online.de" },
+  "kiehl-s-de":              { name: "Kiehl's DE",          searchUrl: () => null, homepage: "https://www.kiehls.de" },
+  "official-f1-store-uk":    { name: "F1 Store",            searchUrl: () => null, homepage: "https://f1store.formula1.com" },
+  "mohd":                    { name: "Mohd",                searchUrl: () => null, homepage: "https://www.mohd.it" },
+  "check24":                 { name: "Check24",             searchUrl: () => null, homepage: "https://www.check24.de" },
 };
 
 /* Boundary-aware substring test for the merchant matcher. A plain
