@@ -196,8 +196,11 @@ export default function Navbar() {
         )}
       />
 
-      {/* Drawer panel */}
-      <aside
+      {/* Drawer panel — a <div>, not <aside>: ARIA forbids role="dialog"
+          on <aside> (its implicit `complementary` role can't be
+          overridden to dialog), which Lighthouse flags as
+          aria-allowed-role. A plain <div> takes role="dialog" cleanly. */}
+      <div
         role="dialog"
         aria-modal="true"
         aria-label="Navigation menu"
@@ -287,7 +290,7 @@ export default function Navbar() {
             </Link>
           </div>
         </div>
-      </aside>
+      </div>
     </>
   );
 }

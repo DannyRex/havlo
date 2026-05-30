@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import ReactDOM from "react-dom";
 import Hero from "@/components/landing/Hero";
-import TrendingDeals from "@/components/landing/TrendingDeals";
+import TrendingDeals, { getTrendingBuckets } from "@/components/landing/TrendingDeals";
+import { composePicks } from "@/components/landing/trending-compose";
 import CashbackTeaser from "@/components/landing/CashbackTeaser";
 import CategoryGrid from "@/components/landing/CategoryGrid";
 import StoreLogos, { getStoreCountForCountry } from "@/components/landing/StoreLogos";
@@ -14,6 +16,7 @@ import DealUnavailableBanner from "@/components/feedback/DealUnavailableBanner";
 import { COUNTRIES, getCountry } from "@/lib/country";
 import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList } from "@/lib/seo";
 import { getPopularPlaceholderExamples } from "@/lib/popular-placeholder-examples";
+import { proxiedImageUrl, downscaleCardImageUrl } from "@/lib/utils";
 
 /* Revalidate this page server-side every 30 min. Was 300s (5 min);
    pushed out to 1800s on May 2026 after PSI flagged "Document request
@@ -101,34 +104,18 @@ export async function generateMetadata({
   };
 }
 
-/* ── Skeleton fallbacks for streamed sections ──────────────────────
+/* ── Skeleton fallback for the streamed CategoryGrid section ────────
    Kept inline (vs imported from a separate file) so the relationship
    between the real section's layout and the placeholder stays
    obvious during future edits. Heights tuned to roughly match the
-   real components so the page doesn't jump when content resolves. */
+   real component so the page doesn't jump when content resolves.
 
-function TrendingDealsSkeleton() {
-  return (
-    <section className="py-12 sm:py-20 bg-bg" aria-hidden="true">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-baseline justify-between mb-6 sm:mb-8 px-1 sm:px-0">
-          <div className="skeleton h-8 sm:h-10 w-64 rounded-lg" />
-          <div className="skeleton h-5 w-20 rounded hidden sm:block" />
-        </div>
-        <div className="flex gap-3 sm:gap-5 overflow-hidden">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="shrink-0 w-44 sm:w-60">
-              <div className="skeleton aspect-[4/5] rounded-xl sm:rounded-2xl mb-2.5" />
-              <div className="skeleton h-3 w-1/3 rounded mb-1.5" />
-              <div className="skeleton h-3.5 w-3/4 rounded mb-1.5" />
-              <div className="skeleton h-3 w-1/2 rounded" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
+   The TrendingDeals skeleton that used to live here was removed in the
+   May 2026 LCP rework v5: TrendingDeals no longer streams behind a
+   Suspense boundary. Its buckets are awaited in the page shell (cheap,
+   unstable_cache-backed) and the grid renders in the first SSR flush so
+   the LCP product image ships in the initial HTML next to its
+   <link rel=preload>, instead of arriving in a later streaming chunk. */
 
 function CategoryGridSkeleton() {
   return (
@@ -186,6 +173,34 @@ export default async function HomePage({ params }: { params: { country: string }
      transparently. */
   const placeholderExamples = await getPopularPlaceholderExamples(country.code);
 
+  /* Trending buckets are fetched HERE in the shell (LCP rework v5, May
+     2026) rather than inside a Suspense-wrapped async component. Awaiting
+     them is cheap on the warm path — every fetch under getTrendingBuckets
+     is unstable_cache-backed (30-min TTL) — and it never blocks a real
+     visitor: the route is ISR (stale-while-revalidate), so only a
+     background revalidation pays the cold DB cost, and no user waits on
+     that render. The payoff is that the trending grid renders in the
+     first SSR flush, so the first product image (the mobile LCP element)
+     ships in the initial HTML instead of a later streaming chunk. */
+  const trendingBuckets = await getTrendingBuckets(country);
+
+  /* Preload the exact LCP image. composePicks(buckets, false)[0] is the
+     deterministic HEAD[0] the client grid renders first (pure, no
+     Math.random when randomize=false), and the URL is built with the
+     identical proxiedImageUrl(downscaleCardImageUrl()) pipeline
+     MasonryCard uses — so the <link rel=preload> and the streamed
+     <img src> match byte-for-byte and the browser collapses them into a
+     single fetch that starts during head parse. Skipped when the lead
+     card has no image (the card renders the Havlo mark fallback, so
+     there's nothing to preload). */
+  const leadDeal = trendingBuckets ? composePicks(trendingBuckets, false)[0] : null;
+  if (leadDeal?.imageUrl) {
+    ReactDOM.preload(proxiedImageUrl(downscaleCardImageUrl(leadDeal.imageUrl)), {
+      as: "image",
+      fetchPriority: "high",
+    });
+  }
+
   return (
     <>
       <JsonLd data={breadcrumb} />
@@ -198,12 +213,13 @@ export default async function HomePage({ params }: { params: { country: string }
         <DealUnavailableBanner />
       </Suspense>
       <Hero storeCount={storeCount} countryCode={country.code} countryName={country.name} placeholderExamples={placeholderExamples} />
-      {/* TrendingDeals + CategoryGrid both fan out to several DB
-          queries to assemble their content (3-10 parallel reads
-          each). Wrapping them in Suspense lets the page shell +
-          Hero stream to the browser immediately — the visitor sees
-          the search input and the trust pill within ~200ms instead
-          of waiting 1-3s for every section to resolve.
+      {/* TrendingDeals renders SYNCHRONOUSLY in the shell now — its
+          buckets were awaited above and its first card carries the LCP
+          image, so it must ship in the initial SSR flush (not behind a
+          Suspense chunk) for the preload to pay off. CategoryGrid below
+          still streams behind Suspense: it fans out to its own DB reads
+          and sits below the fold, so deferring it keeps shell TTFB low
+          without touching the LCP.
 
           Country is passed as a PROP (not read via cookies()) so the
           page stays statically renderable per /[country]/ segment.
@@ -212,9 +228,9 @@ export default async function HomePage({ params }: { params: { country: string }
           SSR + ~70 Supabase queries per visit. URL-as-source-of-
           truth eliminates the cookie read and unlocks the
           revalidate=1800 ISR caching that was already declared. */}
-      <Suspense fallback={<TrendingDealsSkeleton />}>
-        <TrendingDeals country={country} />
-      </Suspense>
+      {trendingBuckets && (
+        <TrendingDeals buckets={trendingBuckets} countryCode={country.code} />
+      )}
       {/* Cashback teaser — restores the pre-launch signup hook that
           was previously a hero strip (removed in c9954c9 because it
           duplicated the nav link and pushed the search input down).

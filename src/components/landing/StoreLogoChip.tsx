@@ -44,6 +44,13 @@ export interface StoreEntry {
       readable. Without this, object-contain shrinks them to a few
       pixels tall in the standard square chip. */
   wideLogo?:  boolean;
+  /** Skip the Google s2 favicon lookup even though `domain` is set.
+      For stores whose domain has no indexed favicon (s2 returns a
+      404/blank), the network request just logs a console error and
+      the letter chip shows anyway — so we suppress the doomed request
+      and go straight to the letter chip. `domain` is KEPT for the
+      store-count helper; this only governs the logo fetch. */
+  noFavicon?: boolean;
 }
 
 /** Build a Google s2 favicon URL for a store's domain. Returns a
@@ -61,7 +68,7 @@ export function StoreLogoChip({
 }) {
   const [imgFailed, setImgFailed] = useState(false);
 
-  const src = store.logo ?? (store.domain ? faviconUrl(store.domain) : null);
+  const src = store.logo ?? (store.domain && !store.noFavicon ? faviconUrl(store.domain) : null);
   const isRemote = src?.startsWith("http") ?? false;
   const showLetter = !src || imgFailed;
 

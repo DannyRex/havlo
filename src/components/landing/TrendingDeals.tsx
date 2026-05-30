@@ -4,7 +4,8 @@ import { getActiveBrowseProvider } from "@/lib/providers";
 import { filterDealsForCountry, type Country } from "@/lib/country";
 import { classifyDeal } from "@/lib/providers/curated-helper";
 import type { Deal, OriginFilter, SortOption } from "@/types";
-import TrendingDealsGrid, { type TrendingBuckets } from "@/components/landing/TrendingDealsGrid";
+import TrendingDealsGrid from "@/components/landing/TrendingDealsGrid";
+import type { TrendingBuckets } from "@/components/landing/trending-compose";
 
 /* Shared pool cache across ISR builds.
 
@@ -127,10 +128,22 @@ function composeBuckets(pool: Deal[], isNG: boolean): TrendingBuckets {
   };
 }
 
-/* `country` arrives as a prop from the page so this component stays
-   statically renderable per /[country]/. Removing the cookies() read
-   here was part of the May 2026 perf fix that unlocked ISR caching. */
-export default async function TrendingDeals({ country }: { country: Country }) {
+/* ── getTrendingBuckets ─────────────────────────────────────────────
+   The fetch + compose pipeline, lifted out of the component (LCP
+   rework v5, May 2026) so the PAGE SHELL can await it and render the
+   grid in the first SSR flush instead of behind a Suspense chunk.
+   Awaiting it in the shell is cheap on warm renders (every fetch is
+   unstable_cache-backed, 30-min TTL) and never blocks a real visitor:
+   the route is ISR (stale-while-revalidate), so the only render that
+   pays the cold DB cost is a background revalidation no user waits on.
+
+   Returns null when the pool / candidate set is empty so the caller
+   can skip the section (and its image preload) entirely.
+
+   `country` arrives as a param (not a cookies() read) so the page
+   stays statically renderable per /[country]/. Removing the cookies()
+   read was part of the May 2026 perf fix that unlocked ISR caching. */
+export async function getTrendingBuckets(country: Country): Promise<TrendingBuckets | null> {
   const isNG = country.code === "ng";
 
   const qualityFilter = (d: Deal) =>
@@ -193,6 +206,23 @@ export default async function TrendingDeals({ country }: { country: Country }) {
     buckets.aliexpress.length + buckets.intlOther.length;
   if (totalCandidates === 0) return null;
 
+  return buckets;
+}
+
+/* ── TrendingDeals (presentational) ─────────────────────────────────
+   Takes the pre-fetched buckets from getTrendingBuckets (awaited in
+   the page shell) so this renders synchronously in the first flush —
+   the LCP product image now ships in the initial SSR HTML alongside
+   the document + its <link rel=preload>, instead of arriving in a
+   second Suspense streaming chunk. countryCode is passed instead of
+   the full Country so the component stays a thin presentational leaf. */
+export default function TrendingDeals({
+  buckets,
+  countryCode,
+}: {
+  buckets: TrendingBuckets;
+  countryCode: string;
+}) {
   return (
     <section className="py-12 sm:py-20 bg-bg">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
@@ -219,10 +249,10 @@ export default async function TrendingDeals({ country }: { country: Country }) {
               there's no URL country segment. A stale cookie (the
               visitor was on /uk last week, is on /ng today) then
               redirects them to the WRONG country's deals page. Always
-              carry country.code from this component's prop so the
-              link is country-correct for the surface it renders on. */}
+              carry countryCode from the prop so the link is
+              country-correct for the surface it renders on. */}
           <Link
-            href={`/${country.code}/deals`}
+            href={`/${countryCode}/deals`}
             className="text-sm font-medium text-ink-2 hover:text-ink transition-colors hidden sm:inline-flex items-center gap-1 shrink-0"
           >
             See all →
@@ -232,11 +262,12 @@ export default async function TrendingDeals({ country }: { country: Country }) {
         {/* Card grid is a client component: it picks 16 randomly from
             the buckets on every fresh page load, so per-visit variety
             isn't capped by the ISR window the way the old 6-variant
-            composition was. */}
+            composition was. The first HEAD cards are deterministic +
+            eager so one owns the LCP. */}
         <TrendingDealsGrid buckets={buckets} />
 
         <div className="mt-8 text-center sm:hidden">
-          <Link href={`/${country.code}/deals`} className="btn-secondary">
+          <Link href={`/${countryCode}/deals`} className="btn-secondary">
             See all deals →
           </Link>
         </div>

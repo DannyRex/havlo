@@ -137,14 +137,17 @@ export default function DupeCard({
         <div
           className="absolute top-2.5 right-2.5 z-10 w-12 h-12 sm:w-14 sm:h-14 rounded-full flex flex-col items-center justify-center text-white select-none"
           style={{
-            background: "#16a34a",
+            /* #16a34a → #15803d (green-700): white text on the brighter
+               green was only 3.30:1 (WCAG AA fail). green-700 lifts the
+               "−X% less" to 5.0:1 white-on-fill. Shadow tint left as-is. */
+            background: "#15803d",
             boxShadow: "0 4px 12px rgba(22,163,74,0.35), 0 0 0 3px rgba(255,255,255,0.85)",
           }}
         >
           <span className="text-[14px] sm:text-[17px] font-black leading-none tracking-tight">
             −{dupe.savingsPercent}%
           </span>
-          <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.1em] mt-0.5 opacity-90">
+          <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.1em] mt-0.5">
             less
           </span>
         </div>

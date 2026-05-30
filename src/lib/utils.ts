@@ -260,7 +260,17 @@ const DIRECT_LOAD_IMAGE_HOSTS = new Set([
   "localhost",
   "www-konga-com-res.cloudinary.com",
   "www.3chub.com",
-  "ng.jumia.is",
+  /* ng.jumia.is — REMOVED from direct-load May 2026 (Best Practices).
+     Jumia's image CDN is Cloudflare-fronted, so a direct cross-origin
+     hotlink sets the `__cf_bm` bot-management cookie in the browser.
+     Lighthouse flags that as a third-party cookie (third-party-cookies
+     audit, weight 5) and also surfaces an inspector-issue, dropping
+     Best Practices to ~79 whenever a Jumia card lands in the random
+     mix. Routing Jumia through /api/img-proxy fixes it cleanly: the
+     proxy fetches server-side and strips Set-Cookie, so no __cf_bm
+     ever reaches the browser. Edge-cached 30 days so the extra hop is
+     amortised. (Entry intentionally NOT re-added — tombstone for any
+     future maintainer tempted to whitelist it for the saved hop.) */
   "i.imgur.com",
   "upload.wikimedia.org",
   "www.google.com",
@@ -343,6 +353,42 @@ export function proxiedImageUrl(rawUrl: string | null | undefined): string {
   }
   if (isDirectLoadHost(u.hostname)) return rawUrl;
   return `/api/img-proxy?url=${encodeURIComponent(rawUrl)}`;
+}
+
+/* Shrink an oversized product-image URL to a card-appropriate width by
+   rewriting the CDN's own size token — NO server transform involved.
+
+   Why this exists: deal cards render plain <img> (next/image's optimizer
+   is off to stay under Vercel's 5K/mo transform cap), and img-proxy is
+   edge runtime so it streams raw bytes without resizing. That left a
+   ~180px masonry cell downloading whatever full-res asset the merchant
+   stored — often a 1500px Amazon hero (~150-300 KiB) when ~640px would
+   be pixel-identical on screen. Rewriting the size token in the URL is
+   the only resize lever we have left, and it costs nothing at runtime.
+
+   Two CDN dialects cover the bulk of the catalogue:
+     · Amazon media — `_SL1500_`, `_SX679_`, `_UY741_` etc. The letter
+       pair is S/U + L/X/Y (Scale/fix-X/fix-Y) and the digits are the
+       px bound. Clamp any > maxW down to maxW.
+     · Cloudinary — `…/upload/w_2000/…` transform segments. Clamp w_ down.
+
+   Downsize-ONLY (never upscales a smaller asset), and the Cloudinary
+   branch is host-gated so a stray `w_1234` in some other URL's path
+   isn't touched. Unknown URL shapes pass through unchanged. Safe even
+   if a rewrite ever misses: ResilientImage falls back to the Havlo mark
+   on load error. */
+export function downscaleCardImageUrl(url: string | null | undefined, maxW = 640): string {
+  if (!url) return url ?? "";
+  let out = url;
+  /* Amazon size codes: _SL1000_, _SX679_, _SY741_, _UL1500_, _UX_, _UY_.
+     Capture the 2-letter code + the number; clamp when over maxW. */
+  out = out.replace(/_((?:S|U)[LXY])(\d{3,5})_/g, (m, code, n) =>
+    Number(n) > maxW ? `_${code}${maxW}_` : m);
+  if (/\bcloudinary\.com\//.test(out)) {
+    out = out.replace(/(^|[,/])w_(\d{3,5})\b/g, (m, pre, n) =>
+      Number(n) > maxW ? `${pre}w_${maxW}` : m);
+  }
+  return out;
 }
 
 export function formatNaira(amount: number): string {

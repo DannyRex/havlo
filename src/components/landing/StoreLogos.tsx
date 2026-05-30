@@ -1,4 +1,5 @@
-import { StoreLogoChip, type StoreEntry } from "./StoreLogoChip";
+import type { StoreEntry } from "./StoreLogoChip";
+import StoreLogosMarquee from "./StoreLogosMarquee";
 import { crossBorderSlugsForCountry } from "@/lib/country";
 
 /* Per-country marquee rosters.
@@ -48,10 +49,14 @@ const ROSTERS: Record<string, StoreEntry[]> = {
     { name: "Supermart",  domain: "supermart.ng" },
     { name: "Essenza",    domain: "essenza.ng" },
     /* v3 NG additions (May 2026): Ajebomarket (WooCommerce
-       marketplace) + Bitmarte (SaaS storefront). Logos resolve via
-       Google s2 favicon — both have indexed domains. */
+       marketplace) + Bitmarte (SaaS storefront). Ajebomarket's logo
+       resolves via Google s2 favicon. Bitmarte's domain has no
+       indexed favicon, so s2 returns a 404 that surfaced in the
+       Lighthouse console-errors audit — noFavicon skips that doomed
+       request and shows the "B" letter chip instead. The domain stays
+       so getStoreCountForCountry still credits the store. */
     { name: "Ajebomarket",domain: "ajebomarket.com" },
-    { name: "Bitmarte",   domain: "bitmarte.com" },
+    { name: "Bitmarte",   domain: "bitmarte.com", noFavicon: true },
     // Cross-border, in NG-shopper preference order
     { name: "Temu",       domain: "temu.com" },
     { name: "AliExpress", domain: "aliexpress.com" },
@@ -252,20 +257,6 @@ export function getTotalStoreCount(): number {
   return seen.size;
 }
 
-function Track({ stores, ariaHidden = false }: { stores: StoreEntry[]; ariaHidden?: boolean }) {
-  return (
-    <div className="flex items-center gap-8 sm:gap-14 px-4 sm:px-7 shrink-0" aria-hidden={ariaHidden}>
-      {stores.map((store) => (
-        <StoreLogoChip
-          key={store.name + (ariaHidden ? "-clone" : "")}
-          store={store}
-          ariaHidden={ariaHidden}
-        />
-      ))}
-    </div>
-  );
-}
-
 /* `country` arrives as a prop from the page so this component stays
    statically renderable per /[country]/. The cookies() read here
    would otherwise force the homepage out of ISR (May 2026 perf fix). */
@@ -290,22 +281,11 @@ export default function StoreLogos({ country }: { country: import("@/lib/country
           </h2>
         </div>
 
-        {/* Marquee — greyscale loop, fade edges */}
-        <div className="relative overflow-hidden">
-          <div
-            className="pointer-events-none absolute inset-y-0 left-0 w-12 sm:w-24 z-10"
-            style={{ background: "linear-gradient(to right, rgb(var(--bg-rgb)) 0%, transparent 100%)" }}
-          />
-          <div
-            className="pointer-events-none absolute inset-y-0 right-0 w-12 sm:w-24 z-10"
-            style={{ background: "linear-gradient(to left, rgb(var(--bg-rgb)) 0%, transparent 100%)" }}
-          />
-
-          <div className="marquee-track flex">
-            <Track stores={stores} />
-            <Track stores={stores} ariaHidden />
-          </div>
-        </div>
+        {/* Marquee — greyscale loop, fade edges. Lazy-mounted (mounts on
+            near-viewport scroll) so its ~48 favicon images stay out of
+            the initial SSR document and don't weigh down the homepage's
+            LCP render. See StoreLogosMarquee. */}
+        <StoreLogosMarquee stores={stores} />
 
       </div>
     </section>

@@ -82,7 +82,11 @@ export default function InfoTip({
           setOpen((v) => !v);
         }}
         className={`inline-flex items-center justify-center rounded-full hover:bg-surface-2 active:bg-surface-2 transition-colors ${iconColor} cursor-pointer`}
-        style={{ width: size + 6, height: size + 6 }}
+        /* Min 24px hit target (WCAG 2.5.8 / Lighthouse target-size).
+           A size=11 icon would render an 17px button otherwise — the
+           Math.max floors it to 24 while the icon stays visually small;
+           the extra padding is invisible (transparent) but tappable. */
+        style={{ width: Math.max(24, size + 6), height: Math.max(24, size + 6) }}
       >
         <Info size={size} strokeWidth={2.25} aria-hidden="true" />
       </button>

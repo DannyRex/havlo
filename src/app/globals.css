@@ -17,7 +17,11 @@
   /* Ink (text) — bumped contrast in light mode */
   --ink-rgb:   15 23 42;     /* slate-900, slightly cooler */
   --ink-2-rgb: 71 85 105;    /* slate-600 */
-  --ink-3-rgb: 148 163 184;  /* slate-400 */
+  /* Darkened 148 163 184 (slate-400, 2.56:1 — failed WCAG AA) →
+     94 106 126 May 2026. ~5.3:1 on white, ~4.95:1 on surface-2, so
+     the muted ink-3 captions/labels now pass AA for small text while
+     staying visibly lighter than ink-2. */
+  --ink-3-rgb: 94 106 126;
 
   /* iOS safe-area */
   --safe-bottom: env(safe-area-inset-bottom, 0px);

@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   cleanTitle,
+  downscaleCardImageUrl,
   formatCompact,
   formatUSDPrice,
   isStoreSearchUrl,
@@ -95,7 +96,14 @@ function ResilientImage({ deal, priority }: { deal: Deal; priority: boolean }) {
      so the upstream CDN sees a request from its own merchant
      domain. Direct-load whitelist (Konga, 3C Hub, Cloudinary, etc.)
      skips the proxy. */
-  const imgSrc = proxiedImageUrl(deal.imageUrl);
+  /* downscaleCardImageUrl rewrites oversized CDN size tokens (Amazon
+     _SL1500_, Cloudinary w_2000) down to ≤640px BEFORE proxying, so a
+     ~180px masonry cell stops downloading a full-res hero image. Pure
+     URL rewrite, downsize-only, host-gated — and ResilientImage already
+     falls back to the Havlo mark if a rewritten URL ever 404s, so the
+     downside is bounded. This is the lever that actually trims LCP/page
+     weight now that next/image's optimizer is off (Vercel cap). */
+  const imgSrc = proxiedImageUrl(downscaleCardImageUrl(deal.imageUrl));
 
   /* Was next/image (PSI flagged ~157 KiB savings from AVIF/WebP).
      Switched to plain <img> May 2026 v3 after the Vercel free-tier
@@ -296,7 +304,11 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
             <span className="text-[14px] sm:text-[17px] font-black leading-none tracking-tight">
               {deal.discountPercent}%
             </span>
-            <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.1em] mt-0.5 opacity-90">
+            {/* No opacity-90: at 90% the white "off" blended to #fce9e9
+                over the red and dropped to 4.13:1 (WCAG AA fail). Full
+                white on #dc2626 is 4.83:1. The number above was already
+                full-white; this matches it. */}
+            <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.1em] mt-0.5">
               off
             </span>
           </div>
@@ -334,7 +346,9 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
               });
               router.push(`/${country.code}/cashback`);
             }}
-            className="absolute left-2 top-2 group/cashback inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-white shadow-sm hover:brightness-110 hover:shadow-md active:brightness-95 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:outline-none"
+            /* min-h-[24px] floors the tap target to the WCAG 2.5.8 /
+               Lighthouse target-size minimum (was ~23px tall at py-1). */
+            className="absolute left-2 top-2 group/cashback inline-flex min-h-[24px] items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-white shadow-sm hover:brightness-110 hover:shadow-md active:brightness-95 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:outline-none"
             style={{ background: "rgba(16, 185, 129, 0.95)" }}
             aria-label={`Earn ${cashback.percent}% cashback. Open cashback details.`}
           >
