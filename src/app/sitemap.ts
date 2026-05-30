@@ -4,6 +4,24 @@ import { SITE_URL, buildHreflangAlternates } from "@/lib/seo";
 import { posts } from "@/lib/blog/posts";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 
+/* Regenerate on a 6h ISR cycle instead of per request. Building ~12k
+   product URLs (each with 6 hreflang alternates) on top of ~12
+   paginated Supabase round-trips is too heavy to run on every
+   Googlebot fetch — the on-request version intermittently surfaced a
+   "Temporary processing error" in Search Console (audit C2, May 2026).
+   ISR serves a cached file and refreshes it in the background; 6h
+   matches the PDP revalidate cadence so newly-ingested products enter
+   the sitemap inside a crawl-relevant window. */
+export const revalidate = 21600;
+
+/* Per-file ceiling. The sitemap protocol caps a single file at 50,000
+   URLs; stay well below. Once the catalog approaches this, split into a
+   sitemap index via Next's generateSitemaps(). */
+const MAX_SITEMAP_URLS = 45_000;
+/* PostgREST returns at most 1,000 rows per response regardless of a
+   larger .limit(), so paginate in 1,000-row pages. */
+const SITEMAP_PAGE = 1_000;
+
 /* Pull the canonical (cheapest in-stock) offer_id per product so
    each product PDP gets ONE sitemap entry. We don't multiply by
    country — emitting all 14k products × 6 countries (~84k URLs)
@@ -19,22 +37,33 @@ import { getSupabaseAdmin } from "@/lib/providers/db-client";
 async function fetchProductSitemapRows(): Promise<Array<{ offerId: string; updatedAt: string }>> {
   const supa = getSupabaseAdmin();
   if (!supa) return [];
-  /* Top-N cap because Google's per-file limit is 50,000 entries
-     and we have ~14,800 products today — well under. The cap
-     guards against future growth: bumping past 45k would require
-     splitting into multiple files via a sitemap index. When that
-     becomes urgent, switch to Next.js's generateSitemaps() pattern
-     so each sub-sitemap stays under the limit. */
-  const { data, error } = await supa
-    .from("product_best_offers")
-    .select("offer_id, scraped_at")
-    .order("scraped_at", { ascending: false })
-    .limit(45_000);
-  if (error || !data) return [];
-  return (data as Array<{ offer_id: string; scraped_at: string }>).map((r) => ({
-    offerId:   r.offer_id,
-    updatedAt: r.scraped_at,
-  }));
+  /* Paginate with .range(). The previous .limit(45_000) was silently
+     truncated to PostgREST's 1,000-row response cap, so the live
+     sitemap carried only the 1,000 most-recently-scraped products —
+     ~91% of the ~12k catalog was missing (GSC audit C1, May 2026).
+     Walk 1,000-row pages until the catalog is exhausted or we reach
+     MAX_SITEMAP_URLS. Dedupe offer_ids: the best-offer view can list
+     the same offer under sibling product rows, which would otherwise
+     emit duplicate <url> entries. */
+  const seen = new Set<string>();
+  const out: Array<{ offerId: string; updatedAt: string }> = [];
+  for (let from = 0; from < MAX_SITEMAP_URLS; from += SITEMAP_PAGE) {
+    const { data, error } = await supa
+      .from("product_best_offers")
+      .select("offer_id, scraped_at")
+      .order("scraped_at", { ascending: false })
+      .range(from, from + SITEMAP_PAGE - 1);
+    if (error || !data) break;
+    const batch = data as Array<{ offer_id: string; scraped_at: string }>;
+    for (const r of batch) {
+      if (!r.offer_id || seen.has(r.offer_id)) continue;
+      seen.add(r.offer_id);
+      out.push({ offerId: r.offer_id, updatedAt: r.scraped_at });
+    }
+    /* Short page = last page. */
+    if (batch.length < SITEMAP_PAGE) break;
+  }
+  return out;
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
