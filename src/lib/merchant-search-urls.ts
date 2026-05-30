@@ -494,12 +494,12 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   /* Ernest Jones (UK jeweller, Signet group) — EVERY offer is a Google
      relay, so with no entry all clicks were hitting the dead
      ernestjones.com guess. Domain verified live (site 403s automation);
-     search param unverified → homepage floor. */
-  "ernest-jones":      { name: "Ernest Jones",      searchUrl: () => null, homepage: "https://www.ernestjones.co.uk" },
+     /search?q= probed 200 (2026-05). */
+  "ernest-jones":      { name: "Ernest Jones",      searchUrl: (q) => `https://www.ernestjones.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.ernestjones.co.uk" },
   /* H Samuel (UK jeweller, Signet group). Most offers are direct PDPs
      (passthrough); this is the relay-fallback safety net. The old guess
-     hsamuel.com is dead; hsamuel.co.uk verified live. */
-  "h-samuel":          { name: "H Samuel",          searchUrl: () => null, homepage: "https://www.hsamuel.co.uk" },
+     hsamuel.com is dead; hsamuel.co.uk /search?q= probed 200 (2026-05). */
+  "h-samuel":          { name: "H Samuel",          searchUrl: (q) => `https://www.hsamuel.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.hsamuel.co.uk" },
   /* Appliances Direct (UK, Buy It Direct group). smartFallback stripped
      "Direct" → appliances.com, a DIFFERENT (US) retailer. Real domain
      verified; /search?q= returns 404 and /search/<q> returns no-match,
@@ -663,7 +663,7 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "goat":              { name: "GOAT",             searchUrl: (q) => `https://www.goat.com/search?query=${encodeURIComponent(q)}`, homepage: "https://www.goat.com" },
   "novelship":         { name: "Novelship",        searchUrl: (q) => `https://www.novelship.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.novelship.com" },
   "tower-housewares":  { name: "Tower Housewares", searchUrl: (q) => `https://www.towerhousewares.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.towerhousewares.co.uk" },
-  "sportsdirect-de":   { name: "Sports Direct",    searchUrl: (q) => `https://www.sportsdirect.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.sportsdirect.com" }, // /de/search 404s; bare /search 200
+  "sportsdirect-de":   { name: "Sports Direct",    searchUrl: () => null, homepage: "https://www.sportsdirect.com" }, // SPA: /search?q= now 404s (re-probed 2026-05) → homepage floor
   "sweetcare":         { name: "SweetCare",        searchUrl: (q) => `https://www.sweetcare.com/en/search?q=${encodeURIComponent(q)}`, homepage: "https://www.sweetcare.com" },
   "armedangels":       { name: "ARMEDANGELS",      searchUrl: (q) => `https://www.armedangels.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.armedangels.com" }, // /en-gb/search 404s; bare /search 200
   "new-balance-south-africa": { name: "New Balance South Africa", searchUrl: (q) => `https://www.newbalance.co.za/search?q=${encodeURIComponent(q)}`, homepage: "https://www.newbalance.co.za" }, // bot-walls 403
@@ -676,9 +676,9 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "myrunway":          { name: "MyRunway",         searchUrl: (q) => `https://www.myrunway.co.za/search?q=${encodeURIComponent(q)}`, homepage: "https://www.myrunway.co.za" },
   "net-a-porter":      { name: "NET-A-PORTER",     searchUrl: (q) => `https://www.net-a-porter.com/en-gb/shop/search/?keywords=${encodeURIComponent(q)}`, homepage: "https://www.net-a-porter.com" }, // YNAP keywords; /search?q= cleanly 404s
   "the-outnet":        { name: "THE OUTNET",       searchUrl: (q) => `https://www.theoutnet.com/en-gb/shop/search/?keywords=${encodeURIComponent(q)}`, homepage: "https://www.theoutnet.com" }, // YNAP keywords pattern (bot-walls 403)
+  "joybuy-de":         { name: "Joybuy",           searchUrl: (q) => `https://www.joybuy.de/s?k=${encodeURIComponent(q)}`, homepage: "https://www.joybuy.de" }, // /s?k= probed 200 (2026-05; JD marketplace pattern)
   // Homepage floors — every search candidate cleanly 404'd, or bot-walls on an
   // unverifiable path. Each homepage was probed reachable (200 or 403 bot-wall).
-  "joybuy-de":         { name: "Joybuy",           searchUrl: () => null, homepage: "https://www.joybuy.de" },
   "m-s":               { name: "M&S",              searchUrl: () => null, homepage: "https://www.marksandspencer.com" },
   "myprotein":         { name: "Myprotein",        searchUrl: () => null, homepage: "https://www.myprotein.com" },
   "myprotein-india":   { name: "Myprotein India",  searchUrl: () => null, homepage: "https://www.myprotein.co.in" },

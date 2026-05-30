@@ -173,12 +173,17 @@ const THRESHOLDS = {
      new high-volume store (see uncurated_head_store finding). */
   bounceOffers: 100,
 
-  /* % of in-stock clicks landing on a bare merchant HOMEPAGE instead
-     of a product or search page. Sat at ~5.9% after v11. Percentage
-     (not absolute) so it stays meaningful as the catalog grows. A
-     rise past 9% means either a curated searchUrl rotted (search ->
-     home drift) or many new stores landed with only a homepage floor. */
-  homeOffersPct: 9,
+  /* % of in-stock clicks reaching an UNCURATED fallback — a guessed
+     homepage (store has no MERCHANTS entry) OR a /compare bounce.
+     Deliberate homepage floors (triaged SPA stores) are EXCLUDED, so
+     this measures only genuinely-uncurated drift. Aggregate counterpart
+     to the per-store headStoreRelayOffers worklist: catches many small
+     uncurated stores accumulating under the per-store bar. Percentage
+     (not absolute) so it stays meaningful as the catalog grows.
+     Measured 4.0% on 2026-05 (homeGuess 564 + bounce 65 of 15,703
+     in-stock); bar at 6% gives ~2pt headroom so routine ingest noise
+     does not trip it but a ~50% rise in the uncurated tail does. */
+  untriagedPct: 6,
 
   /* Per-store trigger: a SINGLE store sending this many relay clicks
      to a fallback (homepage or bounce) is a high-value curation
@@ -220,29 +225,45 @@ async function runChecks(supa: NonNullable<ReturnType<typeof getSupabaseAdmin>>)
     supa, "offers", "url, store_id, stores(name)", (q) => q.eq("in_stock", true),
   );
   const SENTINEL = "Zq9SENTINELq9Z";
-  const land = { pdp: 0, search: 0, home: 0, bounce: 0 };
-  const offenders = new Map<string, { name: string; home: number; bounce: number }>();
+  /* Five internal buckets. homeFloor vs homeGuess is the key split:
+       homeFloor — store HAS a MERCHANTS entry whose searchUrl deliberately
+                   returns null (a triaged SPA / no-search-route floor).
+                   Intentional, already curated, must NOT be flagged.
+       homeGuess — store has NO MERCHANTS entry; the homepage is only a
+                   smartFallback / merchantHomepage guess. This IS uncurated
+                   and is the actionable "go add an entry" signal.
+     The email still shows one combined "home" tile (floor + guess). */
+  const land = { pdp: 0, search: 0, homeFloor: 0, homeGuess: 0, bounce: 0 };
+  /* Per-store tally of UNCURATED fallbacks only (homeGuess + bounce);
+     deliberate floors never enter this map, so the worklist stays quiet
+     for stores we have already triaged. */
+  const offenders = new Map<string, { name: string; homeGuess: number; bounce: number }>();
   for (const r of landingRows) {
     const sf = r.stores; const store = Array.isArray(sf) ? sf[0] : sf;
     const name = store?.name ?? r.store_id;
-    let where: "pdp" | "search" | "home" | "bounce";
+    let where: "pdp" | "search" | "homeFloor" | "homeGuess" | "bounce";
     if (!r.url || !isGoogleRelay(r.url)) {
       where = "pdp";
     } else {
       const s = merchantSearchUrl(r.store_id, name, SENTINEL);
-      if (s) where = s.url.includes(SENTINEL) ? "search" : "home";
-      else if (smartFallbackUrl(r.store_id, name, SENTINEL)) where = "home";
-      else if (merchantHomepage(r.store_id, name)) where = "home";
+      if (s) where = s.url.includes(SENTINEL) ? "search" : "homeFloor";
+      else if (smartFallbackUrl(r.store_id, name, SENTINEL)) where = "homeGuess";
+      else if (merchantHomepage(r.store_id, name)) where = "homeGuess";
       else where = "bounce";
     }
     land[where] += 1;
-    if (where === "home" || where === "bounce") {
-      const cur = offenders.get(r.store_id) ?? { name, home: 0, bounce: 0 };
+    if (where === "homeGuess" || where === "bounce") {
+      const cur = offenders.get(r.store_id) ?? { name, homeGuess: 0, bounce: 0 };
       cur[where] += 1; offenders.set(r.store_id, cur);
     }
   }
+  const homeTotal = land.homeFloor + land.homeGuess;
+  const untriaged = land.homeGuess + land.bounce;
 
-  const baseline: Baseline = { totalProducts, totalOffers, inStockOffers, totalStores, landing: land };
+  const baseline: Baseline = {
+    totalProducts, totalOffers, inStockOffers, totalStores,
+    landing: { pdp: land.pdp, search: land.search, home: homeTotal, bounce: land.bounce },
+  };
 
   /* Landing A — bounce volume (no merchant route at all). */
   if (land.bounce > THRESHOLDS.bounceOffers) {
@@ -256,16 +277,20 @@ async function runChecks(supa: NonNullable<ReturnType<typeof getSupabaseAdmin>>)
     });
   }
 
-  /* Landing B — homepage drift (search -> home, or many uncurated stores). */
-  const homePct = baseline.inStockOffers > 0 ? (land.home / baseline.inStockOffers) * 100 : 0;
-  if (homePct > THRESHOLDS.homeOffersPct) {
+  /* Landing B — uncurated drift: the AGGREGATE ratio of in-stock clicks
+     reaching an UNCURATED fallback (a guessed homepage or a /compare
+     bounce). Deliberate homepage floors are excluded, so this only rises
+     when genuinely-uncurated stores accumulate — the slow-erosion
+     counterpart to the single-store worklist below. */
+  const untriagedPct = baseline.inStockOffers > 0 ? (untriaged / baseline.inStockOffers) * 100 : 0;
+  if (untriagedPct > THRESHOLDS.untriagedPct) {
     findings.push({
       severity:  "WARN",
-      id:        "outbound_home_drift",
-      headline:  `In-stock clicks landing on a bare merchant homepage`,
-      value:     land.home,
-      threshold: Math.round((baseline.inStockOffers * THRESHOLDS.homeOffersPct) / 100),
-      detail:    `${homePct.toFixed(1)}% of in-stock clicks hit a homepage instead of a product or search page (bar: ${THRESHOLDS.homeOffersPct}%). A curated searchUrl may have rotted (search -> home), or many new stores landed with only a homepage floor. Check recent MERCHANTS entries and re-probe their search URLs.`,
+      id:        "outbound_uncurated_drift",
+      headline:  `In-stock clicks reaching an uncurated fallback (guessed homepage or bounce)`,
+      value:     untriaged,
+      threshold: Math.round((baseline.inStockOffers * THRESHOLDS.untriagedPct) / 100),
+      detail:    `${untriagedPct.toFixed(1)}% of in-stock clicks reach a store with no MERCHANTS entry, landing on a guessed homepage or bouncing to /compare (bar: ${THRESHOLDS.untriagedPct}%). Deliberate homepage floors are excluded. Means uncurated stores are accumulating — check recent ingests and add MERCHANTS entries (see uncurated_head_store for the worst single store).`,
     });
   }
 
@@ -273,22 +298,22 @@ async function runChecks(supa: NonNullable<ReturnType<typeof getSupabaseAdmin>>)
      Quiet until one store crosses headStoreRelayOffers, then names the
      top offenders so the fix is a one-line MERCHANTS addition. */
   const ranked = [...offenders.entries()]
-    .map(([id, v]) => ({ id, relay: v.home + v.bounce, home: v.home, bounce: v.bounce }))
+    .map(([id, v]) => ({ id, relay: v.homeGuess + v.bounce, homeGuess: v.homeGuess, bounce: v.bounce }))
     .sort((a, b) => b.relay - a.relay);
   const worst = ranked[0];
   if (worst && worst.relay >= THRESHOLDS.headStoreRelayOffers) {
     const list = ranked
       .filter((o) => o.relay >= THRESHOLDS.headStoreRelayOffers)
       .slice(0, 6)
-      .map((o) => `${o.id} (${o.relay} relay: ${o.bounce} bounce / ${o.home} home)`)
+      .map((o) => `${o.id} (${o.relay} relay: ${o.bounce} bounce / ${o.homeGuess} guessed-home)`)
       .join(", ");
     findings.push({
       severity:  "WARN",
       id:        "uncurated_head_store",
-      headline:  `Store(s) sending ${THRESHOLDS.headStoreRelayOffers}+ relay clicks to a fallback`,
+      headline:  `Store(s) sending ${THRESHOLDS.headStoreRelayOffers}+ relay clicks to an uncurated fallback`,
       value:     worst.relay,
       threshold: THRESHOLDS.headStoreRelayOffers,
-      detail:    `Add a MERCHANTS entry in src/lib/merchant-search-urls.ts (probe the search URL live first): ${list}.`,
+      detail:    `These stores have NO MERCHANTS entry and high relay volume — add one in src/lib/merchant-search-urls.ts (probe the search URL live first): ${list}.`,
     });
   }
 
