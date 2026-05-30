@@ -14,6 +14,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { buildHreflangAlternates } from "@/lib/seo";
+import JsonLd from "@/components/seo/JsonLd";
 import Link from "next/link";
 import { ArrowLeft, Clock } from "lucide-react";
 import { getPostBySlug, posts as allPosts } from "@/lib/blog/posts";
@@ -115,8 +116,36 @@ export default function CountryBlogPostPage({
     || post.countries.includes("all");
   if (!isRelevant) notFound();
 
+  /* BlogPosting JSON-LD. Canonical points at the post's primary
+     country (mirrors generateMetadata) so all country variants credit
+     one URL. publishedAt doubles as dateModified — the registry has no
+     separate revised date, and claiming a fresher one we can't prove
+     would be dishonest. author/publisher resolve to the Organization
+     emitted globally in the root layout. Image is the post's own
+     1200x630 OG card route. */
+  const primaryCountry = post.countries?.find((c) => c !== "all") ?? country.code;
+  const canonicalUrl = `${SITE_URL}/${primaryCountry}/blog/${post.slug}`;
+  const ogImageUrl = `${canonicalUrl}/opengraph-image`;
+  const blogPosting = {
+    "@context":         "https://schema.org",
+    "@type":            "BlogPosting",
+    "@id":              canonicalUrl,
+    headline:           post.title,
+    description:        post.description,
+    datePublished:      post.publishedAt,
+    dateModified:       post.publishedAt,
+    author:             { "@type": "Organization", name: "Havlo", url: SITE_URL },
+    publisher:          { "@id": `${SITE_URL}#organization` },
+    mainEntityOfPage:   canonicalUrl,
+    url:                canonicalUrl,
+    inLanguage:         "en",
+    image:              { "@type": "ImageObject", url: ogImageUrl, width: 1200, height: 630 },
+    ...(post.tags && post.tags.length > 0 ? { keywords: post.tags.join(", ") } : {}),
+  };
+
   return (
     <main className="bg-bg">
+      <JsonLd data={blogPosting} />
       <article className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
 
         <Link

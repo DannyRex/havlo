@@ -27,6 +27,7 @@ import {
   CheckCircle2, Mail, Globe2,
 } from "lucide-react";
 import MerchantInquiryForm from "@/components/merchants/MerchantInquiryForm";
+import JsonLd from "@/components/seo/JsonLd";
 
 const SITE_URL = "https://havlo.io";
 
@@ -92,9 +93,25 @@ const FAQ = [
   },
 ];
 
+/* FAQPage JSON-LD built from the SAME FAQ array rendered visibly
+   below, so the structured Q&A matches on-page content exactly (the
+   condition Google requires for FAQ markup). One source of truth,
+   no drift. */
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type":    "FAQPage",
+  "@id":      `${SITE_URL}/for-merchants#faq`,
+  mainEntity: FAQ.map(({ q, a }) => ({
+    "@type":          "Question",
+    name:             q,
+    acceptedAnswer:   { "@type": "Answer", text: a },
+  })),
+};
+
 export default function ForMerchantsPage() {
   return (
     <main className="bg-bg">
+      <JsonLd data={faqJsonLd} />
       <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
 
         {/* Hero */}

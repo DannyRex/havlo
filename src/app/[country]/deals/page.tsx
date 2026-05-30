@@ -5,7 +5,9 @@ import DealFeed from "@/components/deals/DealFeed";
 import JsonLd from "@/components/seo/JsonLd";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import { getCountry } from "@/lib/country";
-import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList } from "@/lib/seo";
+import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList, buildItemListJsonLd } from "@/lib/seo";
+import type { SeoDeal } from "@/lib/seo";
+import { isSyntheticId } from "@/lib/pdp-url";
 import type { Deal } from "@/types";
 
 export async function generateMetadata({
@@ -184,9 +186,35 @@ export default async function DealsPage({
     stores:   pickFirst("stores"),
   });
 
+  /* ItemList JSON-LD over the SSR'd first page, so the structured
+     product list matches the cards actually present in the initial
+     HTML. Skip synthetic/live rows (their /p/live URLs are query-param
+     PDPs, not canonical product pages) and map each real deal to its
+     canonical /[country]/p/[id] URL. Deal has no brand field, so brand
+     is left null — the builder omits it rather than misrepresenting the
+     store as the brand. Emitted only when the page actually rendered
+     deals, so a degraded SSR fetch doesn't ship an empty ItemList. */
+  const seoDeals: SeoDeal[] = (initial?.items ?? [])
+    .filter((d) => !isSyntheticId(d.id))
+    .slice(0, 24)
+    .map((d) => ({
+      title:           d.title,
+      url:             `${SITE_URL}/${country.code}/p/${d.id}`,
+      imageUrl:        d.imageUrl,
+      storeName:       d.storeName,
+      salePrice:       d.salePrice,
+      originalPrice:   d.originalPrice,
+      currency:        d.currency,
+      discountPercent: d.discountPercent,
+      brand:           null,
+    }));
+  const itemList = seoDeals.length > 0
+    ? buildItemListJsonLd(seoDeals, `Deals in ${country.name} on Havlo`)
+    : null;
+
   return (
     <>
-      <JsonLd data={breadcrumb} />
+      <JsonLd data={itemList ? [breadcrumb, itemList] : breadcrumb} />
       <Suspense>
         {/* `key={country.code}` forces React to UN-mount + RE-mount
             DealFeed when the visitor switches countries. Without

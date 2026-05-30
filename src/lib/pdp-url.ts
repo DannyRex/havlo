@@ -31,7 +31,7 @@ import type { StoreOffer } from "@/lib/search";
     search providers in src/lib/providers/search-*.ts. */
 const SYNTHETIC_PROVIDER_PREFIXES = ["serp-", "aliex-", "paapi-", "konga-"];
 
-function isSyntheticId(id: string | null | undefined): boolean {
+export function isSyntheticId(id: string | null | undefined): boolean {
   if (!id) return true;
   for (const prefix of SYNTHETIC_PROVIDER_PREFIXES) {
     if (id.startsWith(prefix)) return true;

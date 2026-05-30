@@ -16,6 +16,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import CountryFlag from "@/components/ui/CountryFlag";
+import JsonLd from "@/components/seo/JsonLd";
 
 const SITE_URL = "https://havlo.io";
 
@@ -48,9 +49,57 @@ const COVERAGE = [
   { code: "za", name: "South Africa" },
 ];
 
+/* Structured data for /about:
+   - AboutPage is the semantically correct type for an "about us"
+     page; mainEntity links it to the Organization emitted globally in
+     the root layout, reinforcing the brand entity for the knowledge
+     panel.
+   - A short FAQPage covers the two genuinely answerable questions on
+     this page. Both answers are grounded in visible content (the
+     COVERAGE list; the "free for shoppers / no account required, no
+     paywall" copy) rather than invented, and they intentionally don't
+     duplicate the monetisation FAQ on /how-we-make-money. */
+const aboutJsonLd = [
+  {
+    "@context":   "https://schema.org",
+    "@type":      "AboutPage",
+    "@id":        `${SITE_URL}/about`,
+    url:          `${SITE_URL}/about`,
+    name:         "About Havlo",
+    description:  "Havlo is an independent price comparison platform helping shoppers in six countries find similar products for less.",
+    inLanguage:   "en",
+    isPartOf:     { "@id": `${SITE_URL}#website` },
+    mainEntity:   { "@id": `${SITE_URL}#organization` },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type":    "FAQPage",
+    "@id":      `${SITE_URL}/about#faq`,
+    mainEntity: [
+      {
+        "@type":        "Question",
+        name:           "Which countries can I use Havlo in?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text:    `Havlo is live in six countries today: ${COVERAGE.map((c) => c.name).join(", ")}.`,
+        },
+      },
+      {
+        "@type":        "Question",
+        name:           "Is Havlo free to use?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text:    "Yes. Havlo is free for shoppers, with no account required and no paywall. You search or paste a link and see who has it cheapest.",
+        },
+      },
+    ],
+  },
+];
+
 export default function AboutPage() {
   return (
     <main className="bg-bg">
+      <JsonLd data={aboutJsonLd} />
       <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
 
         {/* Hero */}
