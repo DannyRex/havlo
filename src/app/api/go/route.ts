@@ -326,6 +326,20 @@ async function probeLiveness(url: string): Promise<Liveness> {
   } finally { clearTimeout(t); }
 }
 
+/* Gate a SYNTHESISED fallback (a smartFallbackUrl brand-domain guess) behind
+   a liveness probe before we emit it. smartFallbackUrl only ever guesses a
+   homepage from the store's name/slug, and for long-tail merchants that guess
+   can land on a wrong-TLD or parked domain — exactly the "broken / unknown
+   URL" we must never send a shopper to. Probe it: keep the guess unless it is
+   UNAMBIGUOUSLY dead (404/410, NXDOMAIN/refused, or a parking page). Fail-open
+   like probeLiveness — bot-wall 403/429, 5xx, and timeouts pass through, so a
+   live-but-defensive homepage is never discarded. Returns the url to use, or
+   null to skip to the next fallback (curated homepage → Havlo /compare). */
+async function liveFallback(url: string): Promise<string | null> {
+  const v = await probeLiveness(url);
+  return v === "dead_path" || v === "dead_host" ? null : url;
+}
+
 /* Passthrough-specific cache read with split TTL (see probeLiveness):
    rescues (resolved != source) live 30 days, alive passthroughs
    (resolved == source) only 3 days. */
@@ -526,10 +540,15 @@ export async function GET(req: NextRequest) {
         return sendOut(root, "liveness_rescue");
       }
     }
-    // 4. smart-fallback brand-slug domain guess
+    // 4. smart-fallback brand-slug domain guess — only if it's live (a
+    //    parked/wrong-TLD guess must not replace a dead PDP with a second
+    //    dead link; fall through to Havlo /compare instead).
     if (storeIdHint || storeNameHint) {
       const sf = smartFallbackUrl(storeIdHint, storeNameHint, titleHint);
-      if (sf) { void writeCache(target, sf.url); return sendOut(sf.url, "liveness_rescue"); }
+      if (sf) {
+        const good = await liveFallback(sf.url);
+        if (good) { void writeCache(target, good); return sendOut(good, "liveness_rescue"); }
+      }
     }
     // 5. Havlo /compare (title only) — not cached (origin-relative)
     if (titleHint) {
@@ -639,7 +658,17 @@ export async function GET(req: NextRequest) {
      When neither fires, fall through to Havlo /compare. */
   if (storeIdHint || storeNameHint) {
     const m = smartFallbackUrl(storeIdHint, storeNameHint, titleHint);
-    if (m) return sendOut(m.url, "smart_fallback", { serpapiAttempted: false, serpapiResolved: false });
+    if (m) {
+      /* Verify the guess is live before emitting it — a parked or
+         wrong-TLD brand-domain guess must fall through to the curated
+         homepage / Havlo, never become a broken outbound link. Cache the
+         relay→guess mapping on success so the probe is paid once. */
+      const good = await liveFallback(m.url);
+      if (good) {
+        void writeCache(target, good);
+        return sendOut(good, "smart_fallback", { serpapiAttempted: false, serpapiResolved: false });
+      }
+    }
   }
 
   /* Step 3: merchant homepage from the curated table when we have a
