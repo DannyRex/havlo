@@ -451,22 +451,38 @@ export const dbBrowseProvider: BrowseProvider = {
       ),
     ]);
 
-    /* Stop on Pass A error (most critical). Pass B/C errors are
-       non-fatal — degraded pool is better than no pool. */
+    /* Pass A error handling. Historically a Pass A error short-
+       circuited the whole fetch and returned the curated-Amazon-only
+       pool. That is wrong for local-origin views in non-US markets.
+       Pass C (the 0%-discount local fallback, country-scoped, up to
+       1500 rows) frequently SUCCEEDS even when Pass A times out, and
+       it carries the bulk of a market's local inventory (NG pharmacy,
+       grocery, and Jumia feeds). Dumping straight to curated discarded
+       those rows, so the NG "Local" tab rendered an empty grid while
+       the separate head-count pill still showed thousands (the pill
+       comes from getOriginCounts, a different query). Now a Pass A
+       error logs and falls through, letting the merge below keep
+       whatever Pass B and Pass C returned. The curated catalog is
+       already merged in at the end, so a TOTAL failure (every pass
+       empty) still degrades to curated naturally. Only a PARTIAL
+       failure now preserves the surviving local rows.
+
+       Pass B/C errors were already non-fatal; this aligns Pass A with
+       them for the /api/deals path. */
     if (passAResult.error) {
-      console.warn("[browse-db] browse_deals Pass A RPC error:", passAResult.error.message);
+      console.warn("[browse-db] browse_deals Pass A RPC error (continuing with Pass B/C):", passAResult.error.message);
       /* noCuratedFallback (homepage trending pool): the caller is
-         unstable_cache-wrapped, so returning the curated-Amazon-only
-         pool here would get persisted for the full 30-min TTL and
-         render "Trending" as 5 amazon cards for half an hour. Throw
-         instead — Next does NOT cache a rejected cached fn, so the
-         transient blip stays out of the cache and the next render
-         retries cleanly. /api/deals leaves this unset and keeps the
-         graceful curated fallback below. */
+         unstable_cache-wrapped, so persisting a degraded pool would
+         render "Trending" as stale curated cards for the full TTL.
+         Throw instead. Next does NOT cache a rejected cached fn, so
+         the transient blip stays out of the cache and the next render
+         retries cleanly. /api/deals leaves this unset and falls
+         through to the graceful curated merge below. */
       if (opts?.noCuratedFallback) {
         throw new Error(`[browse-db] Pass A RPC failed (no curated fallback): ${passAResult.error.message}`);
       }
-      return getCuratedDeals(q);
+      /* Intentionally NO early return. Fall through so Pass B (intl)
+         and Pass C (0%-local) rows survive a Pass A timeout. */
     }
     if (passBResult.error) {
       console.warn("[browse-db] browse_deals Pass B RPC error:", passBResult.error.message);
