@@ -47,13 +47,14 @@ import { partitionDupesByVariantMatch, variantOffers } from "@/lib/search/varian
 import { partitionDupesByVariantMatchDeep } from "@/lib/search/variant-pooling-deep";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
 import { fetchProductDescription } from "@/lib/offers/fetch-product-description";
-import { usdToNgn } from "@/lib/utils";
+import { usdToNgn, cleanTitle, formatPriceForUser } from "@/lib/utils";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getCategory } from "@/lib/data/categories";
 import JsonLd from "@/components/seo/JsonLd";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import { merchantTrust } from "@/lib/merchant-trust";
+import { displayStoreName } from "@/lib/store-display";
 import PdpViewTracker from "@/components/product/PdpViewTracker";
 import { getClickThroughUrl } from "@/lib/utils";
 import { appendSignature } from "@/lib/go-signing";
@@ -160,28 +161,65 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const url   = `${SITE_URL}/${country.code}/p/${offer.offer_id}`;
-  const title = `${offer.title} at ${offer.store_name}`;
-  const desc  = `Find ${offer.title} at ${offer.store_name} on Havlo. See cheaper alternatives across other stores in ${country.name}.`;
+  /* Use the same cleaned title + display store name the hero renders,
+     so the SERP entry matches the page (no raw "Amazon.co.uk -
+     Amazon.co.uk-Seller" strings leaking into Google). */
+  const name  = cleanTitle(offer.title);
+  const store = displayStoreName(offer.store_name);
+  /* offer.currency is normalised to NGN|USD by the time it reaches the
+     PDP (OfferData.currency). Map anything else to NGN — the same
+     default convertToUserCurrency uses — so this price matches the
+     hero's displayed price exactly. */
+  const srcCcy = offer.currency === "USD" ? "USD" : "NGN";
+  const price  = formatPriceForUser(offer.current_price, country, srcCcy);
+
+  /* Title leads with the product (primary keyword) + local price
+     intent + brand. We deliberately do NOT bake a live store COUNT
+     into the title: the visible "compare N stores" number comes from a
+     multi-stage dupes/partition/country-filter pipeline in the page
+     body, and a title asserting a count that disagrees with the
+     rendered page would be worse than a count-free frame (and clashes
+     with the honest single-store framing the PDP already does). The
+     price leads the description instead, where it survives the SERP
+     cap and carries the most CTR. The root layout's title template
+     ("%s · Havlo") appends the brand, so we don't add it here. */
+  const title = `${name} Price in ${country.name}`;
+
+  /* Price-led description, value front-loaded so the price + store +
+     comparison promise survive the 158-char SERP cap even when the
+     product name is long. "From {price}" keeps the price-as-observed
+     framing honest (there may be a cheaper store). Out-of-stock PDPs
+     are noindex below, so the in-stock branch owns the indexable copy;
+     the OOS branch leans on the price-alert hook instead of a price
+     that may no longer be buyable. */
+  const desc = offer.in_stock
+    ? `From ${price} at ${store}. Compare live prices for ${name} across ${country.name} stores and find the cheapest place to buy. Prices updated daily on Havlo.`
+    : `Compare live prices for ${name} across ${country.name} stores on Havlo. Track the price and get alerted the moment it drops.`;
+  /* Trim on a word boundary with an ellipsis rather than a hard
+     mid-word slice. U+2026, not an em dash. */
+  const metaDesc = desc.length > 158
+    ? `${desc.slice(0, 157).replace(/\s+\S*$/, "")}…`
+    : desc;
 
   return {
     title,
-    description: desc.slice(0, 158),
+    description: metaDesc,
     alternates: {
       canonical: url,
       languages: buildHreflangAlternates(`p/${offer.offer_id}`),
     },
     openGraph: {
       type: "website",
-      title: `${offer.title} · Havlo`,
-      description: desc,
+      title: `${name} · Havlo`,
+      description: metaDesc,
       url,
       siteName: "Havlo",
-      images: offer.image_url ? [{ url: offer.image_url, width: 800, height: 800, alt: offer.title }] : undefined,
+      images: offer.image_url ? [{ url: offer.image_url, width: 800, height: 800, alt: name }] : undefined,
     },
     twitter: {
       card: "summary_large_image",
-      title,
-      description: desc,
+      title: `${name} · Havlo`,
+      description: metaDesc,
       images: offer.image_url ? [offer.image_url] : undefined,
     },
     robots: {
