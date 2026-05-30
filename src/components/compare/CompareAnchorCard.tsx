@@ -329,6 +329,16 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                 Final total varies by carrier and customs assessment.
               </p>
             )}
+            {/* Price-as-last-seen honesty (Spoken learning #4). Prices
+                are scraped on a cadence, not live, so frame them as
+                last-recorded rather than guaranteed-current. Quiet,
+                always-on cue for the at-a-glance comparison; the PDP
+                carries the louder per-offer staleness warning at the
+                actual click-out. Out-of-stock offers are already
+                dropped upstream (buildAnchorGroup in pg-fts.ts). */}
+            <p className="mt-3 text-[11px] text-ink-3 leading-relaxed">
+              Prices are the latest we recorded and may have changed at the store.
+            </p>
           </div>
         )}
       </div>
