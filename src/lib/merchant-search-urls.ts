@@ -679,6 +679,12 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "joybuy-de":         { name: "Joybuy",           searchUrl: (q) => `https://www.joybuy.de/s?k=${encodeURIComponent(q)}`, homepage: "https://www.joybuy.de" }, // /s?k= probed 200 (2026-05; JD marketplace pattern)
   // Homepage floors — every search candidate cleanly 404'd, or bot-walls on an
   // unverifiable path. Each homepage was probed reachable (200 or 403 bot-wall).
+  /* addmecart (IN, "Bharat's Shopping Portal"): real storefront but a thin
+     client-rendered SPA — homepage, /search?q= and even /catalogsearch/result/
+     all return the SAME 2.7KB shell (query not echoed server-side), so there is
+     no server-verifiable search route. Homepage floor. Surfaced by the
+     health-check worklist 2026-05 (10 relay offers, all Google-Shopping relays). */
+  "addmecart":         { name: "AddMeCart",        searchUrl: () => null, homepage: "https://addmecart.com" },
   "m-s":               { name: "M&S",              searchUrl: () => null, homepage: "https://www.marksandspencer.com" },
   "myprotein":         { name: "Myprotein",        searchUrl: () => null, homepage: "https://www.myprotein.com" },
   "myprotein-india":   { name: "Myprotein India",  searchUrl: () => null, homepage: "https://www.myprotein.co.in" },
