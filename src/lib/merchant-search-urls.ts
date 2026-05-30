@@ -626,6 +626,77 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "coolshop-de":       { name: "Coolshop",          searchUrl: () => null, homepage: "https://www.coolshop.de" },
   "mandm":             { name: "MandM Direct",      searchUrl: () => null, homepage: "https://www.mandmdirect.com" },
   "hughes":            { name: "Hughes",            searchUrl: () => null, homepage: "https://www.hughes.co.uk" },
+
+  /* ── v9 additions (2026-05) — next curation tier: recognizable brands still
+     on a homepage-guess (GUESS) or Havlo bounce (NONE). Every searchUrl below
+     was probed live (200/3xx, or a 403/429 bot-wall whose path was confirmed
+     by a clean-404 on the wrong sibling pattern). Stores whose every candidate
+     cleanly 404'd, or that bot-wall on an unverifiable path, get a verified
+     homepage floor (correct brand domain, never a slug guess). */
+  "playstation-store": { name: "PlayStation Store", searchUrl: (q) => `https://store.playstation.com/en-gb/search/${encodeURIComponent(q)}`, homepage: "https://store.playstation.com" },
+  "ee":                { name: "EE",               searchUrl: (q) => `https://ee.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://ee.co.uk" },
+  "wilson-emea-united-kingdom": { name: "Wilson",  searchUrl: (q) => `https://www.wilson.com/en-gb/search?q=${encodeURIComponent(q)}`, homepage: "https://www.wilson.com" },
+  "lyst":              { name: "Lyst",             searchUrl: (q) => `https://www.lyst.com/search/?q=${encodeURIComponent(q)}`, homepage: "https://www.lyst.com" },
+  "waitrose-partners": { name: "Waitrose & Partners", searchUrl: (q) => `https://www.waitrose.com/ecom/shop/search?searchTerm=${encodeURIComponent(q)}`, homepage: "https://www.waitrose.com" }, // home bot-walls 403; search 200
+  "afnan-perfumes":    { name: "Afnan Perfumes",   searchUrl: (q) => `https://afnanperfumes.com/search?q=${encodeURIComponent(q)}`, homepage: "https://afnanperfumes.com" }, // Shopify standard
+  "samsung":           { name: "Samsung",          searchUrl: (q) => `https://www.samsung.com/uk/search/?searchvalue=${encodeURIComponent(q)}`, homepage: "https://www.samsung.com" },
+  "samsung-official-store": { name: "Samsung",     searchUrl: (q) => `https://www.samsung.com/uk/search/?searchvalue=${encodeURIComponent(q)}`, homepage: "https://www.samsung.com" },
+  "tommy-hilfiger":    { name: "Tommy Hilfiger",   searchUrl: (q) => `https://uk.tommy.com/search?q=${encodeURIComponent(q)}`, homepage: "https://uk.tommy.com" },
+  "estee-lauder":      { name: "Estee Lauder",     searchUrl: (q) => `https://www.esteelauder.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.esteelauder.co.uk" },
+  "clinique":          { name: "Clinique",         searchUrl: (q) => `https://www.clinique.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.clinique.co.uk" },
+  "harrods":           { name: "Harrods",          searchUrl: (q) => `https://www.harrods.com/en-gb/shopping/search?q=${encodeURIComponent(q)}`, homepage: "https://www.harrods.com" },
+  "iceland":           { name: "Iceland",          searchUrl: (q) => `https://www.iceland.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.iceland.co.uk" }, // bot-walls 403
+  "littlewoods":       { name: "Littlewoods",      searchUrl: (q) => `https://www.littlewoods.com/search/keyword/${encodeURIComponent(q)}`, homepage: "https://www.littlewoods.com" }, // path-based; /search?q= cleanly 404s
+  "tu-clothing":       { name: "Tu Clothing",      searchUrl: (q) => `https://tuclothing.sainsburys.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://tuclothing.sainsburys.co.uk" },
+  "goldsmiths":        { name: "Goldsmiths",       searchUrl: (q) => `https://www.goldsmiths.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.goldsmiths.co.uk" },
+  "richer-sounds":     { name: "Richer Sounds",    searchUrl: (q) => `https://www.richersounds.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.richersounds.com" },
+  "galaxus":           { name: "Galaxus",          searchUrl: (q) => `https://www.galaxus.de/en/search?query=${encodeURIComponent(q)}`, homepage: "https://www.galaxus.de" },
+  "reverb":            { name: "Reverb",           searchUrl: (q) => `https://reverb.com/marketplace?query=${encodeURIComponent(q)}`, homepage: "https://reverb.com" }, // bot-walls 403
+  "thomann":           { name: "Thomann",          searchUrl: (q) => `https://www.thomann.de/gb/search_dir.html?sw=${encodeURIComponent(q)}`, homepage: "https://www.thomann.de" },
+  "toolstation":       { name: "Toolstation",      searchUrl: (q) => `https://www.toolstation.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.toolstation.com" },
+  "clicks":            { name: "Clicks",           searchUrl: (q) => `https://clicks.co.za/search?q=${encodeURIComponent(q)}`, homepage: "https://clicks.co.za" },
+  "dis-chem":          { name: "Dis-Chem",         searchUrl: (q) => `https://www.dischem.co.za/catalogsearch/result/?q=${encodeURIComponent(q)}`, homepage: "https://www.dischem.co.za" }, // Magento; bot-walls 403
+  "1mg":               { name: "1mg",              searchUrl: (q) => `https://www.1mg.com/search/all?name=${encodeURIComponent(q)}`, homepage: "https://www.1mg.com" },
+  "jarir-bookstore":   { name: "Jarir Bookstore",  searchUrl: (q) => `https://www.jarir.com/catalogsearch/result/?q=${encodeURIComponent(q)}`, homepage: "https://www.jarir.com" },
+  "shop-apotheke":     { name: "Shop Apotheke",    searchUrl: (q) => `https://www.shop-apotheke.com/search.htm?q=${encodeURIComponent(q)}`, homepage: "https://www.shop-apotheke.com" },
+  "cruise-fashion":    { name: "Cruise Fashion",   searchUrl: (q) => `https://www.cruisefashion.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.cruisefashion.com" },
+  "goat":              { name: "GOAT",             searchUrl: (q) => `https://www.goat.com/search?query=${encodeURIComponent(q)}`, homepage: "https://www.goat.com" },
+  "novelship":         { name: "Novelship",        searchUrl: (q) => `https://www.novelship.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.novelship.com" },
+  "tower-housewares":  { name: "Tower Housewares", searchUrl: (q) => `https://www.towerhousewares.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.towerhousewares.co.uk" },
+  "sportsdirect-de":   { name: "Sports Direct",    searchUrl: (q) => `https://www.sportsdirect.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.sportsdirect.com" }, // /de/search 404s; bare /search 200
+  "sweetcare":         { name: "SweetCare",        searchUrl: (q) => `https://www.sweetcare.com/en/search?q=${encodeURIComponent(q)}`, homepage: "https://www.sweetcare.com" },
+  "armedangels":       { name: "ARMEDANGELS",      searchUrl: (q) => `https://www.armedangels.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.armedangels.com" }, // /en-gb/search 404s; bare /search 200
+  "new-balance-south-africa": { name: "New Balance South Africa", searchUrl: (q) => `https://www.newbalance.co.za/search?q=${encodeURIComponent(q)}`, homepage: "https://www.newbalance.co.za" }, // bot-walls 403
+  "sally-beauty":      { name: "Sally Beauty",     searchUrl: (q) => `https://www.sallybeauty.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.sallybeauty.co.uk" }, // .com 410; .co.uk 200
+  "liz-earle":         { name: "Liz Earle",        searchUrl: (q) => `https://www.lizearle.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.lizearle.com" },
+  "g-star":            { name: "G-Star RAW",       searchUrl: (q) => `https://www.g-star.com/en_gb/search?q=${encodeURIComponent(q)}`, homepage: "https://www.g-star.com" },
+  "microsoft-store":   { name: "Microsoft Store",  searchUrl: (q) => `https://www.microsoft.com/en-us/search?q=${encodeURIComponent(q)}`, homepage: "https://www.microsoft.com" },
+  "google-store":      { name: "Google Store",     searchUrl: (q) => `https://store.google.com/us/search?q=${encodeURIComponent(q)}`, homepage: "https://store.google.com" },
+  "twinings":          { name: "Twinings",         searchUrl: (q) => `https://www.twinings.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.twinings.co.uk" },
+  "myrunway":          { name: "MyRunway",         searchUrl: (q) => `https://www.myrunway.co.za/search?q=${encodeURIComponent(q)}`, homepage: "https://www.myrunway.co.za" },
+  "net-a-porter":      { name: "NET-A-PORTER",     searchUrl: (q) => `https://www.net-a-porter.com/en-gb/shop/search/?keywords=${encodeURIComponent(q)}`, homepage: "https://www.net-a-porter.com" }, // YNAP keywords; /search?q= cleanly 404s
+  "the-outnet":        { name: "THE OUTNET",       searchUrl: (q) => `https://www.theoutnet.com/en-gb/shop/search/?keywords=${encodeURIComponent(q)}`, homepage: "https://www.theoutnet.com" }, // YNAP keywords pattern (bot-walls 403)
+  // Homepage floors — every search candidate cleanly 404'd, or bot-walls on an
+  // unverifiable path. Each homepage was probed reachable (200 or 403 bot-wall).
+  "joybuy-de":         { name: "Joybuy",           searchUrl: () => null, homepage: "https://www.joybuy.de" },
+  "m-s":               { name: "M&S",              searchUrl: () => null, homepage: "https://www.marksandspencer.com" },
+  "myprotein":         { name: "Myprotein",        searchUrl: () => null, homepage: "https://www.myprotein.com" },
+  "myprotein-india":   { name: "Myprotein India",  searchUrl: () => null, homepage: "https://www.myprotein.co.in" },
+  "studio":            { name: "Studio",           searchUrl: () => null, homepage: "https://www.studio.co.uk" },
+  "oliver-bonas":      { name: "Oliver Bonas",     searchUrl: () => null, homepage: "https://www.oliverbonas.com" },
+  "f-hinds":           { name: "F.Hinds",          searchUrl: () => null, homepage: "https://www.fhinds.co.uk" },
+  "apollo247":         { name: "Apollo 247",       searchUrl: () => null, homepage: "https://www.apollo247.com" },
+  "pharmacy2u":        { name: "Pharmacy2U",       searchUrl: () => null, homepage: "https://www.pharmacy2u.co.uk" }, // bot-walls 403
+  "nespresso-za":      { name: "Nespresso",        searchUrl: () => null, homepage: "https://www.nespresso.com" },
+  "swisse":            { name: "Swisse",           searchUrl: () => null, homepage: "https://www.swisse.com" },
+  "revolution-beauty": { name: "Revolution Beauty", searchUrl: () => null, homepage: "https://www.revolutionbeauty.com" },
+  "beaverbrooks":      { name: "Beaverbrooks",     searchUrl: () => null, homepage: "https://www.beaverbrooks.co.uk" },
+  "offspring":         { name: "Offspring",        searchUrl: () => null, homepage: "https://www.offspring.co.uk" }, // bot-walls 403
+  "levi-s":            { name: "Levi's",           searchUrl: () => null, homepage: "https://www.levi.com" }, // bot-walls 403
+  "la-redoute":        { name: "La Redoute",       searchUrl: () => null, homepage: "https://www.laredoute.co.uk" }, // bot-walls 403
+  "shoppers-stop":     { name: "Shoppers Stop",    searchUrl: () => null, homepage: "https://www.shoppersstop.com" }, // bot-walls 403
+  "home-centre":       { name: "Home Centre",      searchUrl: () => null, homepage: "https://www.homecentre.com" }, // bot-walls 403
+  "la-roche-posay-official-website": { name: "La Roche-Posay", searchUrl: () => null, homepage: "https://www.laroche-posay.co.uk" }, // bot-walls 403
 };
 
 /* Boundary-aware substring test for the merchant matcher. A plain
