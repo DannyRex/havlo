@@ -1,26 +1,21 @@
 /* Instant skeleton for /[country]/compare.
-   The compare page is `"use client"` so SSR doesn't actually fetch
-   the data — but Next.js still streams the route shell during
-   chunk-load, and without a loading.tsx the user sees a blank
-   white frame for ~200-800ms while the page JS hydrates.
+   Shown while the route segment is busy: for a bare /compare landing
+   that's the brief JS-hydration window; for a deep-linked query
+   (?q=…, ?key=…, ?oid=…) it's the short server-side /api/compare fetch
+   the page now awaits before streaming real anchor + dupes (see
+   page.tsx → fetchInitialCompare). Either way it replaces the blank
+   white frame the user used to see.
 
-   The empty state (no query yet) is also what most users see when
-   they land on /compare directly, so the skeleton's shape mirrors
-   it: a big search bar at the top, a chip rail underneath for
-   "popular comparisons", and a quiet placeholder where results
-   will eventually render.
-
-   When a query IS present in the URL (?q=…), the page renders
-   anchor + dupes after the API call. This skeleton stops short of
-   modelling that loaded shape because:
-     (a) the chip rail + search bar shape is what 80% of arrivals
-         see (direct landing, no query)
-     (b) once the query fetches, the page's own internal loading
-         spinner takes over (a one-off ring near the search bar)
-     (c) modelling the loaded anchor-card + dupe-grid shape would
-         require a long-shaped skeleton that flashes wrong when
-         results arrive at a different shape (single store, many
-         dupes, no dupes, etc.) */
+   The skeleton models the EMPTY state — a big search bar, a chip rail
+   for "popular comparisons", and a quiet results placeholder — for two
+   reasons:
+     (a) the bare landing (no query) is what most arrivals see, and
+     (b) loading.tsx receives no searchParams, so it can't know whether
+         a query is present or what shape its result will take (single
+         store, many dupes, none); a loaded anchor+dupe skeleton would
+         flash wrong when the real result arrives at a different shape.
+         The search bar shape stays constant across both states, so the
+         swap into real content never moves the primary control. */
 
 export default function CompareLoading() {
   return (
