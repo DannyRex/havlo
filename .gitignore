@@ -47,3 +47,7 @@ data/ai-search/cost-log.json
 # (the server-imported src/lib/data/deals.ts is now a small
 # hand-curated seed, ~12KB). Re-generate with `npm run scrape`.
 scripts/data-cache/
+
+# Generated marketing artefacts (price-gap social cards + manifest).
+# Re-generate with scripts/generate-price-gap-cards.ts.
+scripts/output/
