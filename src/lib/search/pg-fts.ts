@@ -19,6 +19,7 @@ import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { usdToNgn } from "@/lib/utils";
 import { isUsableMerchantUrl } from "@/lib/url-helpers";
 import { resolveStoreLogoUrl } from "@/lib/store-logo";
+import { merchantTrust } from "@/lib/merchant-trust";
 import { partitionDupesByVariantMatch, variantOffers } from "./variant-pooling";
 import { partitionDupesByVariantMatchDeep } from "./variant-pooling-deep";
 import type {
@@ -268,6 +269,10 @@ function offerToStoreOffer(o: NestedOffer, productTitle?: string): StoreOffer {
        use storeCountry as primary signal (covers stores backfilled
        by 0037 that aren't in the JS COUNTRY_STORES roster). */
     storeCountry:   store?.country ?? null,
+    /* Curated/link-verified retailer? Drives the subtle "Verified"
+       cue on /compare rows. Resolved here (server-side) so the
+       MERCHANTS table never reaches the client. */
+    trust:          merchantTrust(o.store_id, store?.name ?? o.store_id),
   };
 }
 
@@ -295,6 +300,8 @@ function ftsRowToSingleOffer(r: FtsRow): StoreOffer {
     /* DB-authoritative country tag from migration 0041's expanded
        search_products_fts return shape. */
     storeCountry:   r.store_country ?? null,
+    /* See offerToStoreOffer — same server-side trust resolution. */
+    trust:          merchantTrust(r.store_id, r.store_name),
   };
 }
 

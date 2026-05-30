@@ -23,6 +23,7 @@ import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { resolveStoreLogoUrl } from "@/lib/store-logo";
 import { isOfferAllowedForCountry, type Country } from "@/lib/country";
 import { isSignatureTightEnoughForPooling } from "./pg-fts";
+import type { MerchantTrust } from "@/lib/merchant-trust";
 
 /* ── Public types ─────────────────────────────────────────────────── */
 
@@ -62,6 +63,11 @@ export interface StoreOffer {
       stores backfilled by migration 0037 that aren't in
       COUNTRY_STORES. */
   storeCountry?: string | null;
+  /** Per-merchant trust tier (merchant-trust.ts), resolved server-
+      side. "established" => curated, link-verified official retailer
+      and drives the subtle "Verified" cue on /compare rows. Absent
+      for live SerpAPI rows and lesser-known stores (no badge shown). */
+  trust?: MerchantTrust;
 }
 
 export interface ProductGroup {

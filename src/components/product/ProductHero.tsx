@@ -29,7 +29,9 @@ import { brandDisplay } from "@/lib/brand-display";
 import PriceComparisonBar from "@/components/product/PriceComparisonBar";
 import PriceAlertButton from "@/components/product/PriceAlertButton";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
+import MerchantVerifiedChip from "@/components/ui/MerchantVerifiedChip";
 import InfoTip from "@/components/ui/InfoTip";
+import type { MerchantTrust } from "@/lib/merchant-trust";
 import type { PerStoreOffer } from "@/lib/pdp-stats";
 import type { PriceHistorySummary } from "@/lib/search/price-history";
 import {
@@ -65,6 +67,11 @@ export interface OfferData {
       would otherwise misfire the out-of-stock badge on every PDP. */
   inStock:         boolean | undefined;
   scrapedAt:       string;
+  /** Per-merchant trust tier (merchant-trust.ts), resolved server-
+      side in the PDP page. "established" => curated, link-verified
+      retailer; drives the "Verified" eyebrow pill. Absent / undefined
+      for synthetic /p/live offers and lesser-known stores (no pill). */
+  trust?:          MerchantTrust;
 }
 
 interface Props {
@@ -340,6 +347,10 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             <StoreIcon size={12} aria-hidden="true" />
             <span className="font-medium text-ink">{displayStore}</span>
           </div>
+          {/* Per-merchant trust pill — only for curated, link-verified
+              retailers. Matches the sibling store / brand / Intl pills
+              so it reads as quiet metadata, not a loud badge. */}
+          <MerchantVerifiedChip trust={offer.trust} variant="pill" />
           {isCrossBorder && (
             /* Same shape as the store + brand pills next to it —
                neutral surface, neutral border. The amber tint lives

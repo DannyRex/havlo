@@ -53,6 +53,7 @@ import { getCategory } from "@/lib/data/categories";
 import JsonLd from "@/components/seo/JsonLd";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
+import { merchantTrust } from "@/lib/merchant-trust";
 import PdpViewTracker from "@/components/product/PdpViewTracker";
 import { getClickThroughUrl } from "@/lib/utils";
 import { appendSignature } from "@/lib/go-signing";
@@ -125,6 +126,9 @@ function offerRowToHero(row: OfferRow): OfferData {
     currency:        row.currency,
     inStock:         row.in_stock,
     scrapedAt:       row.scraped_at,
+    /* Resolve trust server-side so the MERCHANTS table stays out of
+       the client bundle. Drives the "Verified" eyebrow pill. */
+    trust:           merchantTrust(row.store_id, row.store_name),
   };
 }
 

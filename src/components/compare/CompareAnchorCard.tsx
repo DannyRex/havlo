@@ -22,7 +22,7 @@
    Audit May 2026 caught that mismatch. */
 
 import Link from "next/link";
-import { Star, Plane, ChevronRight, ArrowDown } from "lucide-react";
+import { Star, Plane, ChevronRight, ArrowDown, ShieldCheck } from "lucide-react";
 import { formatPriceForUser } from "@/lib/utils";
 import { pdpUrlForOffer } from "@/lib/pdp-url";
 import {
@@ -35,6 +35,7 @@ import { isOfferAllowedForCountry } from "@/lib/country";
 import { trackClick } from "@/lib/trackClick";
 import StoreLogo from "@/components/compare/StoreLogo";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
+import MerchantVerifiedChip from "@/components/ui/MerchantVerifiedChip";
 import type { Country } from "@/lib/country";
 import type { ProductGroup, DupeResult } from "@/lib/search";
 
@@ -162,9 +163,28 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                   : `Across ${sortedRows.length.toLocaleString()} stores`}
               </p>
               {!isSingleStore && (
-                <p className="text-[11px] text-ink-3">
-                  Sorted cheapest first
-                </p>
+                /* Payout-neutral ranking promise, surfaced AT the
+                   decision point (top of the store rows) rather than
+                   buried in a footer. Still tells the user the list is
+                   price-ordered ("by price") while making the
+                   neutrality claim the headline and linking to the
+                   full explanation. Turns /how-we-make-money into a
+                   trust asset (Spoken learning #1). */
+                <Link
+                  href="/how-we-make-money"
+                  className="group inline-flex items-center gap-1 text-[11px] text-ink-3 hover:text-ink transition-colors"
+                  title="How Havlo makes money"
+                >
+                  <ShieldCheck
+                    size={12}
+                    strokeWidth={2}
+                    className="text-success/80 group-hover:text-success transition-colors"
+                    aria-hidden="true"
+                  />
+                  <span className="underline-offset-2 group-hover:underline">
+                    Sorted by price, not payout
+                  </span>
+                </Link>
               )}
             </div>
             {/* FTC affiliate-disclosure inline at the store-row surface
@@ -237,6 +257,11 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                           <span className="text-sm font-semibold text-ink truncate">
                             {offer.storeName}
                           </span>
+                          {/* Per-merchant trust cue — icon-only here to
+                              keep dense rows uncluttered. Shows only for
+                              curated, link-verified retailers; lesser-
+                              known stores get nothing (not penalised). */}
+                          <MerchantVerifiedChip trust={offer.trust} />
                           {/* Cross-border tag — uses isCrossBorderForUser
                               (visitor-aware) rather than the raw
                               isInternational DB flag, so a UK retailer
@@ -304,12 +329,6 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                 Final total varies by carrier and customs assessment.
               </p>
             )}
-            {/* Affiliate disclosure — inline at the click-out point,
-                FTC clear-and-conspicuous standard. Tiny visual weight
-                but always present on every comparison surface. */}
-            <p className="mt-2 text-[10px] text-ink-3/85 leading-relaxed">
-              The price you pay doesn&apos;t change, and we never adjust ranking based on who pays us.{" "}
-            </p>
           </div>
         )}
       </div>
