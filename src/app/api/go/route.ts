@@ -30,6 +30,7 @@ import { merchantSearchUrl, merchantHomepage, smartFallbackUrl, rewriteUbuyHostF
    convenience view (click_resolutions_recent_by_store). */
 type ResolutionStep =
   | "passthrough"
+  | "liveness_rescue"
   | "cache_hit"
   | "serpapi_resolved"
   | "merchant_search"
@@ -256,6 +257,101 @@ async function resolveViaSerpApi(_googleUrl: string): Promise<string | null> {
   return null;
 }
 
+/* ── Runtime liveness fallback for passthrough (direct) PDPs ─────────
+   The passthrough branch sends the stored merchant URL straight to the
+   user with no liveness check. Catalogs go stale: a product page that
+   was live at ingest can later 404, or its whole domain can lapse to a
+   registrar parking page. This probes the destination at click time
+   and, when it is DEFINITIVELY dead, rescues the click to the SAME
+   merchant's search / homepage (or, as a last resort, Havlo /compare)
+   instead of dumping the user on a dead page.
+
+   Fail-open by design — we only rescue on unambiguous death:
+     · 404 / 410                  → dead_path (host alive, the page is gone)
+     · DNS / connection failure   → dead_host (the whole domain is gone)
+     · recognised parking page    → dead_host (domain lapsed / for sale)
+   Everything else passes straight through:
+     · 403 / 429  bot-wall (merchant blocks datacenter IPs but serves
+                  real users — eBay, Macy's, H&M…) → treat as alive
+     · 5xx        transient server hiccup → unknown → pass through
+     · timeout    slow merchant → unknown → pass through (never make the
+                  user wait past the probe budget)
+
+   Verdicts are cached in resolved_clicks so the cost is paid once:
+   a rescue (resolved_url != source) for 30 days, an alive passthrough
+   (resolved_url == source) for only 3 days so a link that dies later
+   gets re-checked within the shorter window. */
+const PROBE_BUDGET_MS = 2000;
+const PROBE_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+const PARK_HOSTS = /(sedoparking|parkingcrew|hugedomains|bodis\.com|above\.com|dan\.com|afternic|undeveloped|domainmarket|cashparking|porkbun-?parking|sav\.com|parklogic|fastpark)/i;
+const PARK_BODY = /(domain (is|may be) for sale|buy this domain|this domain is for sale|the domain .{0,40} is for sale|inquire about this domain|domain parking|parked free, courtesy|checkout the full domain details)/i;
+
+type Liveness = "alive" | "dead_path" | "dead_host" | "unknown";
+
+async function probeLiveness(url: string): Promise<Liveness> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), PROBE_BUDGET_MS);
+  try {
+    const res = await fetch(url, {
+      method: "GET", redirect: "follow", signal: ctrl.signal,
+      headers: { "user-agent": PROBE_UA, "accept": "text/html,application/xhtml+xml,*/*;q=0.8", "accept-language": "en-US,en;q=0.9" },
+    });
+    let finalHost = ""; try { finalHost = new URL(res.url || url).hostname.toLowerCase(); } catch {/* keep "" */}
+    if (PARK_HOSTS.test(finalHost)) return "dead_host";
+    const s = res.status;
+    if (s === 404 || s === 410) return "dead_path";
+    if (s === 403 || s === 429) return "alive";   // bot-wall — works for real users
+    if (s >= 500) return "unknown";                // transient — pass through
+    if (s >= 200 && s < 400) {
+      try {
+        const body = (await res.text()).slice(0, 4000).toLowerCase();
+        if (PARK_BODY.test(body)) return "dead_host";
+      } catch {/* body read failed — assume alive */}
+      return "alive";
+    }
+    return "unknown";
+  } catch (e) {
+    /* undici wraps low-level failures as `TypeError: fetch failed` and
+       puts the real reason on `e.cause` (e.g. getaddrinfo ENOTFOUND), so
+       we must inspect the cause, not just the top-level message. Only
+       the two UNAMBIGUOUS dead-host signals trigger a rescue; EAI_AGAIN
+       (transient DNS), TLS/cert quirks, resets, and timeouts all fail
+       open (pass through) so a momentary blip never downgrades a click. */
+    const err = e as { name?: string; message?: string; cause?: { message?: string; code?: string | number } };
+    if (err?.name === "AbortError") return "unknown";                          // timeout
+    const parts = [err?.message, err?.cause?.message, err?.cause?.code != null ? String(err.cause.code) : ""].join(" ").toLowerCase();
+    if (/enotfound/.test(parts)) return "dead_host";                           // domain does not resolve
+    if (/econnrefused/.test(parts)) return "dead_host";                        // nothing listening on the host
+    return "unknown"; // EAI_AGAIN / TLS / reset / other → fail-open
+  } finally { clearTimeout(t); }
+}
+
+/* Passthrough-specific cache read with split TTL (see probeLiveness):
+   rescues (resolved != source) live 30 days, alive passthroughs
+   (resolved == source) only 3 days. */
+async function readPassthroughCache(sourceUrl: string): Promise<{ url: string; rescued: boolean } | null> {
+  const supa = getSupabaseAdmin();
+  if (!supa) return null;
+  const { data } = await supa
+    .from("resolved_clicks")
+    .select("resolved_url, resolved_at")
+    .eq("source_url", sourceUrl)
+    .maybeSingle();
+  if (!data) return null;
+  const row = data as ResolvedRow;
+  const rescued = row.resolved_url !== sourceUrl;
+  const ttlMs = (rescued ? 30 : 3) * 86400 * 1000;
+  if (Date.now() - new Date(row.resolved_at).getTime() > ttlMs) return null;
+  return { url: row.resolved_url, rescued };
+}
+
+/* scheme://host/ for a URL — the clicked merchant's own front door,
+   used to rescue a 404'd PDP to its homepage when the host still
+   resolves (so the user stays on the EXACT merchant they clicked). */
+function originRoot(url: string): string | null {
+  try { const u = new URL(url); return `${u.protocol}//${u.host}/`; } catch { return null; }
+}
+
 export async function GET(req: NextRequest) {
   const target = req.nextUrl.searchParams.get("url");
   /* Optional title hint passed through from the deal card click. When
@@ -389,7 +485,63 @@ export async function GET(req: NextRequest) {
       }
       // API call failed → fall through to wrapWithAffiliate fallback
     }
-    return sendOut(target, "passthrough");
+    /* AliExpress still passes straight through — the converter above is
+       the only special case, and the s.click attribution layer handles
+       its links. Skip the liveness probe for it. */
+    if (isAliexpress(target)) return sendOut(target, "passthrough");
+
+    /* Liveness check + same-merchant rescue for stale/parked PDPs. */
+    const pc = await readPassthroughCache(target);
+    if (pc) return sendOut(pc.url, pc.rescued ? "liveness_rescue" : "passthrough");
+
+    const live = await probeLiveness(target);
+    if (live === "alive") {
+      void writeCache(target, target);            // cache alive (3-day TTL on read)
+      return sendOut(target, "passthrough");
+    }
+    if (live === "unknown") {
+      return sendOut(target, "passthrough");        // fail-open, don't cache a transient
+    }
+
+    /* DEAD (dead_path = 404/410, host still resolves; dead_host = DNS
+       failure or parking page). Rescue to the same merchant first, then
+       a domain guess, then Havlo. Merchant rescues are cached; Havlo
+       rescues are origin-relative so we recompute them each time. */
+    const hostUsable = live === "dead_path";
+    // 1. curated search page (store + title both known + in the table)
+    if (titleHint && (storeIdHint || storeNameHint)) {
+      const m = merchantSearchUrl(storeIdHint, storeNameHint, titleHint, country.code);
+      if (m) { void writeCache(target, m.url); return sendOut(m.url, "liveness_rescue"); }
+    }
+    // 2. curated (hand-verified) merchant homepage
+    if (storeIdHint || storeNameHint) {
+      const hp = merchantHomepage(storeIdHint, storeNameHint);
+      if (hp) { void writeCache(target, hp.url); return sendOut(hp.url, "liveness_rescue"); }
+    }
+    // 3. the clicked host's own root — exact merchant, only when it still resolves
+    if (hostUsable) {
+      const root = originRoot(target);
+      if (root && root.replace(/\/+$/, "") !== target.replace(/\/+$/, "")) {
+        void writeCache(target, root);
+        return sendOut(root, "liveness_rescue");
+      }
+    }
+    // 4. smart-fallback brand-slug domain guess
+    if (storeIdHint || storeNameHint) {
+      const sf = smartFallbackUrl(storeIdHint, storeNameHint, titleHint);
+      if (sf) { void writeCache(target, sf.url); return sendOut(sf.url, "liveness_rescue"); }
+    }
+    // 5. Havlo /compare (title only) — not cached (origin-relative)
+    if (titleHint) {
+      const compareUrl = new URL(`/${country.code}/compare`, req.nextUrl.origin);
+      compareUrl.searchParams.set("q", titleHint);
+      logResolution({ ...baseLog, resolvedUrl: compareUrl.toString(), step: "havlo_compare", serpapiAttempted: false, serpapiResolved: false });
+      return NextResponse.redirect(compareUrl, 307);
+    }
+    // 6. Havlo /deals — absolute last resort
+    const dealsFallback = new URL(`/${country.code}/deals`, req.nextUrl.origin).toString();
+    logResolution({ ...baseLog, resolvedUrl: dealsFallback, step: "havlo_deals", serpapiAttempted: false, serpapiResolved: false });
+    return NextResponse.redirect(dealsFallback, 307);
   }
 
   /* Google relay — try cache first, then SerpAPI. */
