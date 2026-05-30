@@ -107,6 +107,12 @@ interface Props {
       computed. Undefined for normal in-country offers. */
   localAlternative?: {
     offerId:   string;
+    /** Price is in NGN. The compare/anchor matcher
+        (pgFtsAnchorOffersByProductId -> offerToStoreOffer) normalises
+        every StoreOffer.price to NGN regardless of the offer's native
+        currency, and the PDP passes that value straight through. The
+        banner MUST convert NGN -> visitor currency before display
+        (see convertToUserCurrency at the render site). */
     storeName: string;
     price:     number;
     url:       string;
@@ -269,7 +275,15 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
               </div>
               <div className="text-xs text-ink-2">
                 {localAlternative
-                  ? <><span className="font-semibold text-ink">{displayStore}</span> may not ship directly to {country.name}. The same product is available locally at <span className="font-semibold text-ink">{localAlternative.storeName}</span> for <span className="font-semibold text-ink">{formatLocal(localAlternative.price, country)}</span>.</>
+                  /* localAlternative.price is NGN (matcher-normalised).
+                     Convert to the visitor's currency before formatting,
+                     same path the primary price takes. Bare formatLocal
+                     here previously printed the raw NGN integer with the
+                     local symbol: a 111.75 USD Frasers offer became
+                     178,800 NGN and rendered as "£178,800" on /uk
+                     (user-reported). NG pages looked correct only because
+                     NGN already matches the page currency. */
+                  ? <><span className="font-semibold text-ink">{displayStore}</span> may not ship directly to {country.name}. The same product is available locally at <span className="font-semibold text-ink">{localAlternative.storeName}</span> for <span className="font-semibold text-ink">{formatLocal(convertToUserCurrency(localAlternative.price, "NGN", country), country)}</span>.</>
                   : <><span className="font-semibold text-ink">{displayStore}</span> may not ship directly to {country.name} - visit the store to confirm shipping options before ordering.</>}
               </div>
             </div>
