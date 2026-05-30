@@ -463,6 +463,66 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "kohl":                       { name: "Kohl's",            searchUrl: (q) => `https://www.kohls.com/search.jsp?search=${encodeURIComponent(q)}`,              homepage: "https://www.kohls.com" },
   "kohl-s":                     { name: "Kohl's",            searchUrl: (q) => `https://www.kohls.com/search.jsp?search=${encodeURIComponent(q)}`,              homepage: "https://www.kohls.com" },
   "jcpenney":                   { name: "JCPenney",          searchUrl: (q) => `https://www.jcpenney.com/s?Ntt=${encodeURIComponent(q)}`,                       homepage: "https://www.jcpenney.com" },
+
+  /* ── v6 additions (May 2026) — outbound-URL validity audit ──────────
+       A catalog-wide pass (scripts/audit-merchant-url-coverage.ts) found
+       ~994 of 1,625 stores had no curated entry and fell through to
+       smartFallbackUrl, which only ever returns a GUESSED HOMEPAGE (never
+       a search page) and gets the TLD wrong for UK/regional brands — e.g.
+       "Appliance City" → appliancecity.com (a parked non-UK domain)
+       instead of the real appliancecity.co.uk. These were the
+       highest-impact offenders (user-reported + all-relay stores whose
+       every click was hitting a dead guess).
+
+       Per-entry verification:
+         · searchUrl present  → endpoint fetched live, returned 200 with
+           product results, so the user lands on a real search page.
+         · searchUrl: () => null → domain verified live, but the site
+           403s/blocks every automated check so the search param can't be
+           confirmed. We deliberately land the user on the correct
+           merchant HOMEPAGE (the worst-case floor) rather than ship an
+           unverified ?q= that might 404 — appliancesdirect.co.uk/search?q=
+           returns 404, proving the "obvious" pattern is NOT safe to
+           assume. Refine to a real search URL once verified in a browser. */
+
+  /* Appliance City (UK kitchen appliances) — USER-REPORTED 404. Its
+     in-stock offers arrive as Google Shopping relays; with no curated
+     entry they fell to smartFallback → appliancecity.com (wrong/parked,
+     not the real store). WooCommerce search verified live:
+     /?s=<q>&post_type=product returns product cards. */
+  "appliance-city":    { name: "Appliance City",    searchUrl: (q) => `https://www.appliancecity.co.uk/?s=${encodeURIComponent(q)}&post_type=product`, homepage: "https://www.appliancecity.co.uk" },
+  /* Ernest Jones (UK jeweller, Signet group) — EVERY offer is a Google
+     relay, so with no entry all clicks were hitting the dead
+     ernestjones.com guess. Domain verified live (site 403s automation);
+     search param unverified → homepage floor. */
+  "ernest-jones":      { name: "Ernest Jones",      searchUrl: () => null, homepage: "https://www.ernestjones.co.uk" },
+  /* H Samuel (UK jeweller, Signet group). Most offers are direct PDPs
+     (passthrough); this is the relay-fallback safety net. The old guess
+     hsamuel.com is dead; hsamuel.co.uk verified live. */
+  "h-samuel":          { name: "H Samuel",          searchUrl: () => null, homepage: "https://www.hsamuel.co.uk" },
+  /* Appliances Direct (UK, Buy It Direct group). smartFallback stripped
+     "Direct" → appliances.com, a DIFFERENT (US) retailer. Real domain
+     verified; /search?q= returns 404 and /search/<q> returns no-match,
+     so the search param is left unverified → homepage floor. */
+  "appliances-direct": { name: "Appliances Direct", searchUrl: () => null, homepage: "https://www.appliancesdirect.co.uk" },
+  /* Coast (UK occasionwear) — now a Shopify store on coastfashion.com,
+     NOT the guessed coast.com (a different site). Shopify search
+     verified live. */
+  "coast":             { name: "Coast",             searchUrl: (q) => `https://www.coastfashion.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.coastfashion.com" },
+  /* The Range (UK home + leisure). Has an ingest-time rewriter
+     (merchant-url-rewrite.ts) for stored therange.com URLs, but the
+     relay-fallback path had no curated entry and guessed therange.com.
+     Search pattern matches that rewriter's verified /search?q=. */
+  "the-range":         { name: "The Range",         searchUrl: (q) => `https://www.therange.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.therange.co.uk" },
+  /* JD Williams (UK fashion, N Brown group). jdwilliams.co.uk verified
+     live; site 403s automation → homepage floor until the search param
+     is verified in a browser. */
+  "jd-williams":       { name: "JD Williams",       searchUrl: () => null, homepage: "https://www.jdwilliams.co.uk" },
+  /* Payporte (NG fashion) — the single highest-volume store in the guess
+     bucket (~1.4k offers). Most are direct PDPs (passthrough); the
+     curated entry adds the relay-fallback safety net and upgrades the
+     homepage guess to the real Shopify search (verified live). */
+  "payporte":          { name: "Payporte",          searchUrl: (q) => `https://payporte.com/search?q=${encodeURIComponent(q)}`, homepage: "https://payporte.com" },
 };
 
 /** Resolve a search URL for a given store id / name + product title.
@@ -606,11 +666,22 @@ const COUNTRY_SUFFIX_TLDS: Array<[RegExp, string]> = [
     brand domain. "OPPO Official Store" → "OPPO" (oppo.com),
     "Ulefone Global" → "Ulefone" (ulefone.com), "Microsoft Store
     Online" → "Microsoft" (microsoft.com). Returns the cleaned
-    brand name, or the input unchanged when no suffix matches. */
+    brand name, or the input unchanged when no suffix matches.
+
+    NOTE: "direct" is deliberately NOT stripped. For the Buy It Direct
+    group of UK retailers ("Appliances Direct", "Laptops Direct",
+    "Drones Direct", "Mobiles Direct"…) the word is brand-defining: the
+    company owns appliancesdirect.co.uk, NOT appliances.com — which is a
+    DIFFERENT (US) retailer. Stripping "Direct" therefore guessed a
+    competitor's domain. Keeping it makes the synthesised slug
+    "appliancesdirect" → appliancesdirect.com, the right brand (and one
+    that redirects to the real store) rather than a wrong company.
+    "outlet" IS still stripped because brand outlets live on the parent
+    domain ("Nike Outlet" → nike.com is correct). */
 function stripGenericSuffix(s: string): string {
   return s
     .replace(/\s+(official\s+store|online\s+store|store\s+online|web\s+store|brand\s+store|outlet\s+store|flagship\s+store)\s*$/i, "")
-    .replace(/\s+(official|outlet|flagship|store|online|web|shop|direct|global|international|hq)\s*$/i, "")
+    .replace(/\s+(official|outlet|flagship|store|online|web|shop|global|international|hq)\s*$/i, "")
     .trim();
 }
 
