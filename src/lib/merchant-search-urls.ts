@@ -542,6 +542,90 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
      match, and this explicit entry lands them on the real limango.de.
      Deals-club SPA, search unverified → verified homepage floor. */
   "limango":           { name: "Limango",           searchUrl: () => null, homepage: "https://www.limango.de" },
+
+  /* ── v8 additions (2026-05) — head of the relay-fallback "below-bar"
+       distribution. Every search URL below was probed live against the real
+       site (scripts/_tmp-probe-search-urls*.ts); stores are ordered by
+       in-stock relay-offer count. This converts the largest GUESS/NONE blocks
+       (homepage guess / Havlo bounce) into a verified merchant SEARCH, so the
+       outbound click lands on the retailer's own results for the product.
+       Notes: entries flagged "bot-walls 403" return 403 to our datacenter IP
+       but the path is the merchant's real, documented search endpoint and
+       works for ordinary visitors; SPA/headless-search merchants with no
+       GET-addressable results page get a verified homepage floor instead. */
+  "refurbed-de":       { name: "Refurbed",          searchUrl: (q) => `https://www.refurbed.de/search/?query=${encodeURIComponent(q)}`, homepage: "https://www.refurbed.de" },
+  "care-to-beauty":    { name: "Care to Beauty",    searchUrl: (q) => `https://www.caretobeauty.com/catalogsearch/result/?q=${encodeURIComponent(q)}`, homepage: "https://www.caretobeauty.com" },
+  "bigbasket":         { name: "bigbasket",         searchUrl: (q) => `https://www.bigbasket.com/ps/?q=${encodeURIComponent(q)}`, homepage: "https://www.bigbasket.com" },
+  "superkicks":        { name: "Superkicks",        searchUrl: (q) => `https://www.superkicks.in/search?q=${encodeURIComponent(q)}`, homepage: "https://www.superkicks.in" },
+  "vlebazaar-in":      { name: "VLE Bazaar",        searchUrl: (q) => `https://www.vlebazaar.in/?s=${encodeURIComponent(q)}`, homepage: "https://www.vlebazaar.in" },
+  "trendyol":          { name: "Trendyol",          searchUrl: (q) => `https://www.trendyol.com/sr?q=${encodeURIComponent(q)}`, homepage: "https://www.trendyol.com" }, // bot-walls 403; /sr?q= is Trendyol's real search
+  "dorothy-perkins-uk":{ name: "Dorothy Perkins",   searchUrl: (q) => `https://www.dorothyperkins.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.dorothyperkins.com" },
+  "frasers":           { name: "House of Fraser",   searchUrl: (q) => `https://www.houseoffraser.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.houseoffraser.co.uk" },
+  "moss":              { name: "Moss",              searchUrl: (q) => `https://www.moss.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.moss.co.uk" },
+  "back-market":       { name: "Back Market",       searchUrl: (q, c) => `https://www.backmarket.com/${c === "uk" ? "en-gb" : c === "de" ? "de-de" : c === "fr" ? "fr-fr" : "en-us"}/search?q=${encodeURIComponent(q)}`, homepage: "https://www.backmarket.com" }, // bot-walls 403; /<locale>/search?q= is Back Market's real path
+  "hp-store":          { name: "HP Store",          searchUrl: (q) => `https://www.hp.com/us-en/shop/sitesearch?keyword=${encodeURIComponent(q)}`, homepage: "https://www.hp.com/us-en/shop" },
+  "stockx":            { name: "StockX",            searchUrl: (q) => `https://stockx.com/search?s=${encodeURIComponent(q)}`, homepage: "https://stockx.com" }, // bot-walls 403; /search?s= is StockX's real search
+  "jolie-moi":         { name: "Jolie Moi",         searchUrl: (q) => `https://joliemoi.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://joliemoi.co.uk" }, // slug guess joliemoi.com is a PARKED HugeDomains page; real store is joliemoi.co.uk (Shopify)
+  "mamaearth":         { name: "Mamaearth",         searchUrl: (q) => `https://mamaearth.in/search?q=${encodeURIComponent(q)}`, homepage: "https://mamaearth.in" },
+  "ocado":             { name: "Ocado",             searchUrl: (q) => `https://www.ocado.com/search?entry=${encodeURIComponent(q)}`, homepage: "https://www.ocado.com" },
+  "boozt-de":          { name: "Boozt",             searchUrl: (q) => `https://www.boozt.com/de/de/search?q=${encodeURIComponent(q)}`, homepage: "https://www.boozt.com/de/de" },
+  "decathlon-uk":      { name: "Decathlon UK",      searchUrl: (q) => `https://www.decathlon.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.decathlon.co.uk" }, // bot-walls 403
+  "green-man-gaming":  { name: "Green Man Gaming",  searchUrl: (q) => `https://www.greenmangaming.com/search/?query=${encodeURIComponent(q)}`, homepage: "https://www.greenmangaming.com" },
+  "hyugalife":         { name: "HyugaLife",         searchUrl: (q) => `https://www.hyugalife.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.hyugalife.com" },
+  "dover-street-market":{ name: "Dover Street Market", searchUrl: (q) => `https://shop.doverstreetmarket.com/search?q=${encodeURIComponent(q)}`, homepage: "https://shop.doverstreetmarket.com" },
+  "warehouse-fashion": { name: "Warehouse",         searchUrl: (q) => `https://www.warehousefashion.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.warehousefashion.com" },
+  "razer":             { name: "Razer",             searchUrl: (q) => `https://www.razer.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.razer.com" },
+  "wellbeing-nutrition":{ name: "Wellbeing Nutrition", searchUrl: (q) => `https://wellbeingnutrition.com/search?q=${encodeURIComponent(q)}`, homepage: "https://wellbeingnutrition.com" },
+  "kitlocker":         { name: "Kitlocker",         searchUrl: (q) => `https://www.kitlocker.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.kitlocker.com" },
+  "flannels":          { name: "Flannels",          searchUrl: (q) => `https://www.flannels.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.flannels.com" },
+  "wellness-warehouse":{ name: "Wellness Warehouse", searchUrl: (q) => `https://www.wellnesswarehouse.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.wellnesswarehouse.com" },
+  "virgin-megastore":  { name: "Virgin Megastore",  searchUrl: (q) => `https://www.virginmegastore.ae/en/search/?q=${encodeURIComponent(q)}`, homepage: "https://www.virginmegastore.ae" },
+  "boat":              { name: "boAt",              searchUrl: (q) => `https://www.boat-lifestyle.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.boat-lifestyle.com" },
+  "lg-deutschland":    { name: "LG Deutschland",    searchUrl: (q) => `https://www.lg.com/de/search/?search=${encodeURIComponent(q)}`, homepage: "https://www.lg.com/de" },
+  "justmylook":        { name: "Just My Look",      searchUrl: (q) => `https://www.justmylook.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.justmylook.com" },
+  "harvey-norman":     { name: "Harvey Norman",     searchUrl: (q) => `https://www.harveynorman.com.au/catalogsearch/result/?q=${encodeURIComponent(q)}`, homepage: "https://www.harveynorman.com.au" },
+  "iherb":             { name: "iHerb",             searchUrl: (q) => `https://www.iherb.com/search?kw=${encodeURIComponent(q)}`, homepage: "https://www.iherb.com" },
+  "farfetch":          { name: "FARFETCH",          searchUrl: (q) => `https://www.farfetch.com/uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.farfetch.com" },
+  "snipes":            { name: "Snipes",            searchUrl: (q) => `https://www.snipes.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.snipes.com" }, // bot-walls 403
+  "robert-dyas":       { name: "Robert Dyas",       searchUrl: (q) => `https://www.robertdyas.co.uk/catalogsearch/result/?q=${encodeURIComponent(q)}`, homepage: "https://www.robertdyas.co.uk" }, // Magento; plain /search 404s, /catalogsearch is the real path (bot-walls 403)
+  "stylevana-de":      { name: "Stylevana",         searchUrl: (q) => `https://www.stylevana.com/catalogsearch/result/?q=${encodeURIComponent(q)}`, homepage: "https://www.stylevana.com" },
+  "laptops-direct":    { name: "Laptops Direct",    searchUrl: (q) => `https://www.laptopsdirect.co.uk/search/${encodeURIComponent(q)}`, homepage: "https://www.laptopsdirect.co.uk" },
+  "smytten":           { name: "Smytten",           searchUrl: (q) => `https://www.smytten.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.smytten.com" },
+  "sportspar-de":      { name: "SportSpar",         searchUrl: (q) => `https://www.sportspar.de/search?sSearch=${encodeURIComponent(q)}`, homepage: "https://www.sportspar.de" },
+  "nordicnest-de":     { name: "Nordic Nest",       searchUrl: (q) => `https://www.nordicnest.de/suche?q=${encodeURIComponent(q)}`, homepage: "https://www.nordicnest.de" },
+  "zepto":             { name: "Zepto",             searchUrl: (q) => `https://www.zeptonow.com/search?query=${encodeURIComponent(q)}`, homepage: "https://www.zeptonow.com" },
+  "baur-versand":      { name: "BAUR",              searchUrl: (q) => `https://www.baur.de/s/${encodeURIComponent(q)}`, homepage: "https://www.baur.de" },
+  "lg-official-online-shop": { name: "LG Online Shop", searchUrl: (q) => `https://www.lg.com/uk/search/?search=${encodeURIComponent(q)}`, homepage: "https://www.lg.com/uk" },
+  "desertcart-in":     { name: "Desertcart",        searchUrl: (q) => `https://www.desertcart.in/search?q=${encodeURIComponent(q)}`, homepage: "https://www.desertcart.in" },
+  "asphaltgold":       { name: "Asphaltgold",       searchUrl: (q) => `https://www.asphaltgold.com/en/search?q=${encodeURIComponent(q)}`, homepage: "https://www.asphaltgold.com" },
+  "incredible":        { name: "Incredible",        searchUrl: (q) => `https://www.incredible.co.za/search?q=${encodeURIComponent(q)}`, homepage: "https://www.incredible.co.za" },
+  "techinn":           { name: "Techinn",           searchUrl: (q) => `https://www.techinn.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.techinn.com" },
+  "blue-vanilla":      { name: "Blue Vanilla",      searchUrl: (q) => `https://www.bluevanilla.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.bluevanilla.com" },
+  "sigma-sports":      { name: "Sigma Sports",      searchUrl: (q) => `https://www.sigmasports.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.sigmasports.com" },
+  "oasis-fashions":    { name: "Oasis",             searchUrl: (q) => `https://www.oasis-fashion.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.oasis-fashion.com" },
+  "logitech-g":        { name: "Logitech G",        searchUrl: (q) => `https://www.logitechg.com/en-us/search.html?query=${encodeURIComponent(q)}`, homepage: "https://www.logitechg.com" },
+  "lenovo":            { name: "Lenovo",            searchUrl: (q) => `https://www.lenovo.com/us/en/search?text=${encodeURIComponent(q)}`, homepage: "https://www.lenovo.com" },
+  "reiss":             { name: "Reiss",             searchUrl: (q) => `https://www.reiss.com/search/?q=${encodeURIComponent(q)}`, homepage: "https://www.reiss.com" },
+  "play-asia":         { name: "Play-Asia",         searchUrl: (q) => `https://www.play-asia.com/search/${encodeURIComponent(q)}`, homepage: "https://www.play-asia.com" }, // bot-walls 403
+  "about-you":         { name: "ABOUT YOU",         searchUrl: (q) => `https://www.aboutyou.de/search?term=${encodeURIComponent(q)}`, homepage: "https://www.aboutyou.de" }, // bot-walls 403
+  "jacamo":            { name: "Jacamo",            searchUrl: (q) => `https://www.jacamo.co.uk/shop/search?q=${encodeURIComponent(q)}`, homepage: "https://www.jacamo.co.uk" }, // bot-walls 403; /shop/search is the real path (/search 404s)
+  /* Homepage floors — NONE-tier stores that were bouncing to Havlo /compare,
+     plus high-volume merchants whose search is SPA/headless or bot-walls
+     unverifiably. Each homepage was probed live; pins the correct domain so
+     the slug-guess can't drift to a wrong TLD or a parked page. */
+  "bash":              { name: "Bash",              searchUrl: () => null, homepage: "https://bash.com" }, // TFG South Africa; search SPA (all GET patterns 404) → homepage floor
+  "end-clothing":      { name: "END.",              searchUrl: () => null, homepage: "https://www.endclothing.com" }, // headless Algolia search, no GET URL → homepage floor
+  "pro-direct-soccer": { name: "Pro:Direct Soccer", searchUrl: () => null, homepage: "https://www.prodirectsoccer.com" },
+  "garmin-united-kingdom": { name: "Garmin",        searchUrl: () => null, homepage: "https://www.garmin.com" },
+  "george-at-asda":    { name: "George at Asda",    searchUrl: () => null, homepage: "https://www.asda.com/george" }, // George left direct.asda.com (410 / DNS gone); current home is asda.com/george
+  "maxfashion":        { name: "Max Fashion",       searchUrl: () => null, homepage: "https://www.maxfashion.com" }, // Landmark; search bot-walls 403, unverifiable → homepage floor
+  "charlotte-tilbury": { name: "Charlotte Tilbury", searchUrl: () => null, homepage: "https://www.charlottetilbury.com" }, // SFCC; no GET-addressable search page → homepage floor
+  "footasylum":        { name: "Footasylum",        searchUrl: () => null, homepage: "https://www.footasylum.com" },
+  "pantaloons":        { name: "Pantaloons",        searchUrl: () => null, homepage: "https://www.pantaloons.com" },
+  "footlocker":        { name: "Foot Locker",       searchUrl: () => null, homepage: "https://www.footlocker.co.uk" }, // search endpoint 400s to bots → homepage floor
+  "coolshop-de":       { name: "Coolshop",          searchUrl: () => null, homepage: "https://www.coolshop.de" },
+  "mandm":             { name: "MandM Direct",      searchUrl: () => null, homepage: "https://www.mandmdirect.com" },
+  "hughes":            { name: "Hughes",            searchUrl: () => null, homepage: "https://www.hughes.co.uk" },
 };
 
 /* Boundary-aware substring test for the merchant matcher. A plain
