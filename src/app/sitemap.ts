@@ -2,6 +2,8 @@ import type { MetadataRoute } from "next";
 import { ACTIVE_COUNTRIES } from "@/lib/country";
 import { SITE_URL, buildHreflangAlternates } from "@/lib/seo";
 import { posts } from "@/lib/blog/posts";
+import { categories } from "@/lib/data/categories";
+import { listIndexableBrands, listCategoriesWithInventory } from "@/lib/hubs";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 
 /* Regenerate on a 6h ISR cycle instead of per request. Building ~12k
@@ -204,6 +206,77 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error("[sitemap] failed to fetch product rows:", (err as Error).message);
   }
 
+  /* Hub pages — M2 internal-linking de-orphan surfaces (May 2026).
+     Three families, each emitted per ACTIVE country:
+       • /[cc]/brands        — the brand index (crawl entry point)
+       • /[cc]/deals/[slug]   — category hubs
+       • /[cc]/brand/[slug]   — brand hubs
+
+     Each hub self-canonicalizes per country (unlike ?category= filter
+     URLs, which canonical back to /deals and are deliberately kept OUT
+     of the sitemap above). We submit ONLY hubs that will be indexable,
+     to keep "Submitted URL marked noindex" out of Search Console:
+       - brand index: only when the country has >= 1 indexable brand
+         (the page noindexes an empty index).
+       - category hubs: only categories with country-shoppable inventory
+         (the page noindexes an empty category).
+       - brand hubs: only the threshold-cleared, capped indexable set.
+
+     Brand hubs carry NO hreflang alternates: brand presence varies by
+     market (a brand indexable in NG may be absent in ZA), so a fixed
+     6-country cluster would declare siblings that 404. Category hubs and
+     the brand index DO carry hreflang — those structures are consistent
+     across every market. */
+  const hubRoutes: MetadataRoute.Sitemap = [];
+  try {
+    for (const c of ACTIVE_COUNTRIES) {
+      const [indexableBrands, categoriesWithInventory] = await Promise.all([
+        listIndexableBrands(c.code),
+        listCategoriesWithInventory(c.code),
+      ]);
+
+      /* Brand index — only when there's something to list. */
+      if (indexableBrands.length > 0) {
+        hubRoutes.push({
+          url:             `${SITE_URL}/${c.code}/brands`,
+          priority:        0.6,
+          changeFrequency: "weekly",
+          lastModified:    now,
+          alternates:      { languages: buildHreflangAlternates("brands") },
+        });
+      }
+
+      /* Category hubs — only categories with inventory in this market. */
+      for (const cat of categories) {
+        if (cat.slug === "all") continue;
+        if (!categoriesWithInventory.has(cat.slug)) continue;
+        hubRoutes.push({
+          url:             `${SITE_URL}/${c.code}/deals/${cat.slug}`,
+          priority:        0.7,
+          changeFrequency: "daily",
+          lastModified:    now,
+          alternates:      { languages: buildHreflangAlternates(`deals/${cat.slug}`) },
+        });
+      }
+
+      /* Brand hubs — threshold-cleared, capped set. No hreflang (see
+         the block comment above). */
+      for (const b of indexableBrands) {
+        hubRoutes.push({
+          url:             `${SITE_URL}/${c.code}/brand/${b.slug}`,
+          priority:        0.6,
+          changeFrequency: "weekly",
+          lastModified:    now,
+        });
+      }
+    }
+  } catch (err) {
+    /* Same posture as productRoutes — a hub-data fetch failure should
+       degrade to a partial sitemap, not fail the build. The hubs
+       reappear on the next successful regeneration. */
+    console.error("[sitemap] failed to build hub routes:", (err as Error).message);
+  }
+
   return [
     ...homepages,
     ...dealsPages,
@@ -211,6 +284,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...globalRoutes,
     ...blogIndexRoutes,
     ...blogPostRoutes,
+    ...hubRoutes,
     ...productRoutes,
   ];
 }

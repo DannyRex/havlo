@@ -1,10 +1,12 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import Link from "next/link";
 import DealFeed from "@/components/deals/DealFeed";
 import JsonLd from "@/components/seo/JsonLd";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import { getCountry } from "@/lib/country";
+import { categories } from "@/lib/data/categories";
 import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList, buildItemListJsonLd } from "@/lib/seo";
 import type { SeoDeal } from "@/lib/seo";
 import { isSyntheticId } from "@/lib/pdp-url";
@@ -242,6 +244,41 @@ export default async function DealsPage({
           initialStoreOptions={initial?.storeOptions}
         />
       </Suspense>
+
+      {/* Crawlable category + brand hub links. The feed's own CategoryNav
+          is button-driven (JS filter, no href) so it doesn't de-orphan
+          anything. This section emits REAL anchors to the per-category
+          hub pages (/[cc]/deals/[slug]) and the brand index, which is
+          how the GSC-flagged orphaned PDP corpus gets discovered: feed
+          (footer + homepage linked) → category/brand hubs → PDPs.
+          Rendered server-side so it's in the SSR HTML crawlers see. */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        <div className="pt-10 border-t border-border">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.1em] text-ink-3 mb-4">
+            Browse {country.name} deals by category
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {categories
+              .filter((c) => c.slug !== "all")
+              .map((c) => (
+                <Link
+                  key={c.slug}
+                  href={`/${country.code}/deals/${c.slug}`}
+                  className="px-3.5 py-2 rounded-full bg-surface-2 border border-border text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
+                >
+                  {c.name}
+                </Link>
+              ))}
+            <Link
+              href={`/${country.code}/brands`}
+              className="px-3.5 py-2 rounded-full bg-surface-2 border border-border text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
+            >
+              Shop by brand
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Newsletter signup at the bottom of the feed. Added May 2026
           launch-readiness pass — was previously homepage-only. A
           visitor who scrolls the whole /deals feed without finding

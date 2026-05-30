@@ -27,6 +27,7 @@
      SimilarProducts a thin masonry around MasonryCard. */
 
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCountry } from "@/lib/country";
 import { unstable_cache } from "next/cache";
@@ -50,6 +51,7 @@ import { fetchProductMeta } from "@/lib/offers/fetch-product-description";
 import { usdToNgn, cleanTitle, formatPriceForUser } from "@/lib/utils";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getCategory } from "@/lib/data/categories";
+import { slugifyBrand } from "@/lib/hubs";
 import JsonLd from "@/components/seo/JsonLd";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
@@ -778,6 +780,14 @@ export default async function ProductPage({ params }: PageProps) {
       offer.category_slug.charAt(0).toUpperCase() + offer.category_slug.slice(1)
     : null;
 
+  /* Brand-hub slug for the keep-browsing rail (M2 de-orphaning).
+     Empty when the offer has no usable brand — slugifyBrand trims +
+     normalises, so a whitespace-only brand collapses to "" and the
+     rail link is suppressed rather than pointing at /[cc]/brand/ with
+     an empty slug. Same slugifyBrand the brand aggregation uses, so
+     this href resolves to the exact hub the brand index links to. */
+  const brandHubSlug = offer.brand ? slugifyBrand(offer.brand) : "";
+
   /* JSON-LD: Product schema (with offers) + BreadcrumbList. Google
      Rich Results use these for the price + availability badge in
      SERPs. Image, brand, category, price, currency, availability —
@@ -961,6 +971,18 @@ export default async function ProductPage({ params }: PageProps) {
     { name: "Havlo",          url: `${SITE_URL}/${country.code}` },
     { name: country.name,     url: `${SITE_URL}/${country.code}` },
     { name: "Products",       url: `${SITE_URL}/${country.code}/deals` },
+    /* Category crumb — links the PDP UP to its category hub
+       (/[cc]/deals/[slug]). Part of the M2 de-orphaning chain: a
+       crawler (or shopper) walking the breadcrumb reaches the
+       indexable hub that lists this product's siblings, and the hub
+       is itself footer-reachable. Emitted only when the offer carries
+       a category slug we can name. */
+    ...(offer.category_slug && fallbackCategoryName
+      ? [{
+          name: fallbackCategoryName,
+          url:  `${SITE_URL}/${country.code}/deals/${offer.category_slug}`,
+        }]
+      : []),
     { name: offer.title,      url: `${SITE_URL}/${country.code}/p/${offer.offer_id}` },
   ]);
 
@@ -1271,6 +1293,49 @@ export default async function ProductPage({ params }: PageProps) {
             The LiveAlternatives component file stays in the
             codebase — keep it around in case we want to revive the
             pattern as an opt-in toggle later. */}
+
+        {/* Keep-browsing rail — crawlable hub links (M2 de-orphaning).
+            The breadcrumb already points UP to the category hub; this
+            visible row reinforces that AND adds the brand hub (which the
+            breadcrumb doesn't carry), giving every PDP a strong in-content
+            anchor back up to the two indexable hub surfaces that list its
+            siblings. Server-rendered <Link>s so they sit in the crawlable
+            HTML, not behind hydration. */}
+        <nav aria-label="Keep browsing" className="mt-12 sm:mt-16 pt-8 border-t border-border">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.1em] text-ink-3 mb-4">
+            Keep browsing
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {offer.category_slug && fallbackCategoryName ? (
+              <Link
+                href={`/${country.code}/deals/${offer.category_slug}`}
+                className="px-3.5 py-2 rounded-full bg-surface-2 border border-border text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
+              >
+                More {fallbackCategoryName} deals
+              </Link>
+            ) : null}
+            {brandHubSlug ? (
+              <Link
+                href={`/${country.code}/brand/${brandHubSlug}`}
+                className="px-3.5 py-2 rounded-full bg-surface-2 border border-border text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
+              >
+                All {offer.brand} prices
+              </Link>
+            ) : null}
+            <Link
+              href={`/${country.code}/deals`}
+              className="px-3.5 py-2 rounded-full bg-surface-2 border border-border text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
+            >
+              All {country.name} deals
+            </Link>
+            <Link
+              href={`/${country.code}/brands`}
+              className="px-3.5 py-2 rounded-full bg-surface-2 border border-border text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
+            >
+              Shop by brand
+            </Link>
+          </div>
+        </nav>
       </div>
       {/* Newsletter signup at the bottom of the PDP. Added May 2026
           launch-readiness pass — was previously homepage-only. */}

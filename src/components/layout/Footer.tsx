@@ -24,6 +24,10 @@ const footerSections = [
     links: [
       { label: "Browse deals",  href: "/deals" },
       { label: "Find for less", href: "/compare" },
+      /* Shop by brand — entry point into the brand-hub system (M2 SEO
+         de-orphaning). Root-relative; middleware countrifies to
+         /[cc]/brands (registered in COUNTRY_SCOPED). */
+      { label: "Shop by brand", href: "/brands" },
       /* Barcode scanner — public utility surface (F5 build). In the
          Product column rather than a tucked-away link because it's
          a primary shopper feature, not back-of-house. */

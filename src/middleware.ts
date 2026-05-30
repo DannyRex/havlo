@@ -70,7 +70,7 @@ function inferGeoCountry(req: NextRequest): string | null {
    so internal Links don't have to be country-aware. The legacy
    /blog page-level redirect is now redundant but kept so old
    Google-indexed /blog/{slug} URLs also work via that route. */
-const COUNTRY_SCOPED = new Set(["", "deals", "compare", "blog", "cashback"]);
+const COUNTRY_SCOPED = new Set(["", "deals", "compare", "blog", "cashback", "brands", "brand"]);
 
 /* Pages that exist OUTSIDE /[country]/ — global, no redirect. */
 const GLOBAL_PAGES = new Set([
