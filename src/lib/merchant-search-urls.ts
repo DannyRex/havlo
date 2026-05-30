@@ -697,6 +697,42 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "shoppers-stop":     { name: "Shoppers Stop",    searchUrl: () => null, homepage: "https://www.shoppersstop.com" }, // bot-walls 403
   "home-centre":       { name: "Home Centre",      searchUrl: () => null, homepage: "https://www.homecentre.com" }, // bot-walls 403
   "la-roche-posay-official-website": { name: "La Roche-Posay", searchUrl: () => null, homepage: "https://www.laroche-posay.co.uk" }, // bot-walls 403
+
+  /* ── v10 additions (2026-05) — recognizable real storefronts in the residual
+     >=3-offer tail. Search paths probed live; homepage floors where every
+     candidate cleanly 404'd or the search path bot-walls unverifiably. */
+  "mi-com-uk":         { name: "Xiaomi UK",        searchUrl: (q) => `https://www.mi.com/uk/search/?keyword=${encodeURIComponent(q)}`, homepage: "https://www.mi.com/uk" },
+  "crate-barrel-me":   { name: "Crate & Barrel ME", searchUrl: (q) => `https://www.crateandbarrel.me/search?q=${encodeURIComponent(q)}`, homepage: "https://www.crateandbarrel.me" },
+  "hawes-curtis-uk":   { name: "Hawes & Curtis",   searchUrl: (q) => `https://www.hawesandcurtis.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.hawesandcurtis.co.uk" },
+  "tjc":               { name: "TJC",              searchUrl: (q) => `https://www.tjc.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.tjc.co.uk" },
+  "purplle-com-purplle-shop": { name: "Purplle",   searchUrl: (q) => `https://www.purplle.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.purplle.com" },
+  "flyeralarm-sports": { name: "FlyerAlarm Sports", searchUrl: (q) => `https://www.flyeralarm-sports.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.flyeralarm-sports.com" },
+  "joom":              { name: "Joom",             searchUrl: (q) => `https://www.joom.com/en/search/q.${encodeURIComponent(q)}`, homepage: "https://www.joom.com" }, // path-based; ?q= times out
+  "tradeindia":        { name: "TradeIndia",       searchUrl: (q) => `https://www.tradeindia.com/search.html?keyword=${encodeURIComponent(q)}`, homepage: "https://www.tradeindia.com" },
+  "mcgrocer":          { name: "McGrocer",         searchUrl: (q) => `https://www.mcgrocer.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.mcgrocer.com" },
+  "healf":             { name: "Healf",            searchUrl: (q) => `https://www.healf.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.healf.com" },
+  "uk-healf":          { name: "Healf",            searchUrl: (q) => `https://uk.healf.com/search?q=${encodeURIComponent(q)}`, homepage: "https://uk.healf.com" },
+  "db-domestics":      { name: "DB Domestics",     searchUrl: (q) => `https://www.dbdomestics.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.dbdomestics.co.uk" },
+  "good-monk":         { name: "Good Monk",        searchUrl: (q) => `https://goodmonk.in/search?q=${encodeURIComponent(q)}`, homepage: "https://goodmonk.in" },
+  "revibe-za":         { name: "Revibe ZA",        searchUrl: (q) => `https://revibe.co.za/search?q=${encodeURIComponent(q)}`, homepage: "https://revibe.co.za" },
+  "sports-palace":     { name: "Sports Palace",    searchUrl: (q) => `https://www.sportspalace.in/search?q=${encodeURIComponent(q)}`, homepage: "https://www.sportspalace.in" },
+  "pollin-electronic-de": { name: "Pollin Electronic", searchUrl: (q) => `https://www.pollin.de/search?query=${encodeURIComponent(q)}`, homepage: "https://www.pollin.de" },
+  // Homepage floors — search candidates cleanly 404'd or bot-wall unverifiably;
+  // each homepage probed reachable (200 or 403 bot-wall).
+  "asus-store-uk":     { name: "ASUS Store UK",    searchUrl: () => null, homepage: "https://www.asus.com/uk" },
+  "bechtle":           { name: "Bechtle",          searchUrl: () => null, homepage: "https://www.bechtle.com" },
+  "owala":             { name: "Owala",            searchUrl: () => null, homepage: "https://owala.com" },
+  "ninja-uae":         { name: "Ninja UAE",        searchUrl: () => null, homepage: "https://www.ninjakitchen.ae" },
+  "voelkner-de-voelkner": { name: "Voelkner",      searchUrl: () => null, homepage: "https://www.voelkner.de" }, // bot-walls 403
+  "43einhalb":         { name: "43einhalb",        searchUrl: () => null, homepage: "https://www.43einhalb.com" }, // bot-walls 403
+  "svd-sivasdescalzo": { name: "sivasdescalzo",    searchUrl: () => null, homepage: "https://www.sivasdescalzo.com" }, // bot-walls 403
+  "cherry":            { name: "Cherry",           searchUrl: () => null, homepage: "https://www.cherry.de" }, // bot-walls 403
+  "asda-george":       { name: "George at Asda",   searchUrl: () => null, homepage: "https://www.asda.com/george" }, // bot-walls 403; direct.asda.com gone (410)
+  "eschuhe-de":        { name: "eSchuhe",          searchUrl: () => null, homepage: "https://www.eschuhe.de" },
+  "euroskateshop-de":  { name: "EuroSkateShop",    searchUrl: () => null, homepage: "https://www.euroskateshop.de" },
+  "starmobile-de":     { name: "Starmobile",       searchUrl: () => null, homepage: "https://www.starmobile.de" },
+  "mresell-de":        { name: "mResell",          searchUrl: () => null, homepage: "https://www.mresell.de" },
+  "beautyonline":      { name: "BeautyOnline",     searchUrl: () => null, homepage: "https://www.beautyonline.co.za" },
 };
 
 /* Boundary-aware substring test for the merchant matcher. A plain
