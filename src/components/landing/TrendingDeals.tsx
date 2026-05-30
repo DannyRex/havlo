@@ -31,6 +31,17 @@ import type { TrendingBuckets } from "@/components/landing/trending-compose";
    TTL: 30 minutes. Same shape as the rest of the PDP data caches and
    half the homepage's revalidate window, so the pool can't drift more
    than half an ISR cycle behind. */
+/* Longer RPC budget for the trending pool fetch than /api/deals' 2.5s
+   default. This fetch only runs on a background ISR revalidation (the
+   route is stale-while-revalidate, so no visitor ever waits on it), and
+   on a cold serverless instance the first Supabase RPC can take >2.5s
+   just to open the connection. At the tight default it trips the
+   timeout → curated-Amazon-only fallback → capPerStore collapses it to
+   one amazon store → the homepage renders 5 cards instead of 16, and
+   that thin pool then poisons this 30-min cache. 6s clears a cold
+   connection while staying well under Vercel's 30s function ceiling. */
+const TRENDING_FETCH_TIMEOUT_MS = 6000;
+
 const fetchPoolCached = unstable_cache(
   async (params: {
     sort:        SortOption;
@@ -40,15 +51,25 @@ const fetchPoolCached = unstable_cache(
     stores?:     string[];
   }): Promise<Deal[]> => {
     const provider = await getActiveBrowseProvider();
-    return provider.fetchDeals({
-      sort:         params.sort,
-      minDiscount:  params.minDiscount,
-      origin:       params.origin,
-      country:      params.country,
-      stores:       params.stores,
-    });
+    /* noCuratedFallback: on a Pass A RPC failure, fetchDeals THROWS
+       instead of returning the curated-only pool. Next does not persist
+       a rejected cached fn, so a transient DB blip stays out of this
+       cache (getTrendingBuckets catches it per-pool) and self-heals on
+       the next render — instead of caching 5 curated cards for 30 min. */
+    return provider.fetchDeals(
+      {
+        sort:         params.sort,
+        minDiscount:  params.minDiscount,
+        origin:       params.origin,
+        country:      params.country,
+        stores:       params.stores,
+      },
+      { timeoutMs: TRENDING_FETCH_TIMEOUT_MS, noCuratedFallback: true },
+    );
   },
-  ["trending-pool-v1"],
+  /* v2 (May 2026): bumped from v1 to evict any 5-card degraded pools
+     persisted by the pre-fix timeout fallback on first render after deploy. */
+  ["trending-pool-v2"],
   { revalidate: 1800, tags: ["trending-pool"] },
 );
 
@@ -172,20 +193,28 @@ export async function getTrendingBuckets(country: Country): Promise<TrendingBuck
      cache key so per-market shards stay isolated. */
   let pool: Deal[];
   if (!isNG) {
+    /* .catch(→[]) per pool: a Pass A RPC failure THROWS out of
+       fetchPoolCached (so the blip isn't cached). Swallow it to an
+       empty pool for THIS render so one failing fetch can't 500 the
+       page — the other pool still supplies real cards, and the cache
+       stays clean for the next render to retry. */
     const [discountPool, freshPool] = await Promise.all([
-      fetchPoolCached({ sort: "discount", minDiscount: 15, origin: "intl", country: country.code }),
-      fetchPoolCached({ sort: "newest",   minDiscount: 0,  origin: "intl", country: country.code }),
+      fetchPoolCached({ sort: "discount", minDiscount: 15, origin: "intl", country: country.code }).catch(() => [] as Deal[]),
+      fetchPoolCached({ sort: "newest",   minDiscount: 0,  origin: "intl", country: country.code }).catch(() => [] as Deal[]),
     ]);
     pool = filterDealsForCountry(
       [...discountPool, ...freshPool].filter(qualityFilter),
       country,
     );
   } else {
+    /* .catch(→[]) per pool — see the non-NG branch above. A thrown
+       (uncached) Pass A failure degrades to an empty pool for this
+       render instead of 500ing; the surviving pools still fill the grid. */
     const [localPool, intlPool, localFreshPool, jumiaOnlyPool] = await Promise.all([
-      fetchPoolCached({ sort: "discount", minDiscount: 15, origin: "local", country: country.code }),
-      fetchPoolCached({ sort: "discount", minDiscount: 15, origin: "intl",  country: country.code }),
-      fetchPoolCached({ sort: "newest",   minDiscount: 0,  origin: "local", country: country.code }),
-      fetchPoolCached({ sort: "newest",   minDiscount: 0,  origin: "local", country: country.code, stores: ["jumia"] }),
+      fetchPoolCached({ sort: "discount", minDiscount: 15, origin: "local", country: country.code }).catch(() => [] as Deal[]),
+      fetchPoolCached({ sort: "discount", minDiscount: 15, origin: "intl",  country: country.code }).catch(() => [] as Deal[]),
+      fetchPoolCached({ sort: "newest",   minDiscount: 0,  origin: "local", country: country.code }).catch(() => [] as Deal[]),
+      fetchPoolCached({ sort: "newest",   minDiscount: 0,  origin: "local", country: country.code, stores: ["jumia"] }).catch(() => [] as Deal[]),
     ]);
     pool = [
       ...localPool.filter(qualityFilter),

@@ -6,7 +6,7 @@
    the helpers `getOriginCounts` / origin-aware filtering live here so
    the static module stays a pure data file. */
 
-import type { BrowseProvider, BrowseQuery, OriginCounts } from "./types";
+import type { BrowseProvider, BrowseQuery, OriginCounts, FetchDealsOptions } from "./types";
 import { getDeals } from "@/lib/data/deals";
 import { deals } from "@/lib/data/deals";
 import { getCuratedDeals, sortDeals } from "./curated-helper";
@@ -55,7 +55,7 @@ export const staticBrowseProvider: BrowseProvider = {
     return true;
   },
 
-  async fetchDeals(q: BrowseQuery): Promise<Deal[]> {
+  async fetchDeals(q: BrowseQuery, _opts?: FetchDealsOptions): Promise<Deal[]> {
     const base = getDeals({
       categorySlug: q.categorySlug,
       minDiscount: q.minDiscount,

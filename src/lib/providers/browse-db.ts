@@ -2,7 +2,7 @@
    Reads from products + offers (populated by the ingestion cron).
    Activates only when the DB has rows, so it gracefully no-ops in dev. */
 
-import type { BrowseProvider, BrowseQuery, OriginCounts } from "./types";
+import type { BrowseProvider, BrowseQuery, OriginCounts, FetchDealsOptions } from "./types";
 import type { Deal } from "@/types";
 import { getSupabaseAdmin } from "./db-client";
 import { getCuratedDeals, sortDeals } from "./curated-helper";
@@ -242,7 +242,7 @@ export const dbBrowseProvider: BrowseProvider = {
     return supa !== null;
   },
 
-  async fetchDeals(q: BrowseQuery): Promise<Deal[]> {
+  async fetchDeals(q: BrowseQuery, opts?: FetchDealsOptions): Promise<Deal[]> {
     const supa = getSupabaseAdmin();
     if (!supa) return [];
 
@@ -427,7 +427,12 @@ export const dbBrowseProvider: BrowseProvider = {
        provide. 2.5s budget is comfortably above the p95 healthy
        latency (~300ms) but well below the 30s ceiling. */
     type RpcResp = { data: unknown; error: { message: string } | null };
-    const TIMEOUT_MS = 2500;
+    /* Default 2.5s budget (comfortably above the ~300ms healthy p95,
+       well below Vercel's 30s ceiling). Callers on a non-blocking
+       background path — the homepage trending pool — pass a longer
+       budget via opts so a cold serverless connection doesn't trip the
+       bar and degrade to the curated-only fallback. See FetchDealsOptions. */
+    const TIMEOUT_MS = opts?.timeoutMs ?? 2500;
     const TIMEOUT_FALLBACK: RpcResp = { data: null, error: { message: "timeout" } };
     const [passAResult, passBResult, passCResult, popularity] = await Promise.all([
       withTimeout(supa.rpc("browse_deals", passAArgs) as unknown as Promise<RpcResp>, TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(local)"),
@@ -450,6 +455,17 @@ export const dbBrowseProvider: BrowseProvider = {
        non-fatal — degraded pool is better than no pool. */
     if (passAResult.error) {
       console.warn("[browse-db] browse_deals Pass A RPC error:", passAResult.error.message);
+      /* noCuratedFallback (homepage trending pool): the caller is
+         unstable_cache-wrapped, so returning the curated-Amazon-only
+         pool here would get persisted for the full 30-min TTL and
+         render "Trending" as 5 amazon cards for half an hour. Throw
+         instead — Next does NOT cache a rejected cached fn, so the
+         transient blip stays out of the cache and the next render
+         retries cleanly. /api/deals leaves this unset and keeps the
+         graceful curated fallback below. */
+      if (opts?.noCuratedFallback) {
+        throw new Error(`[browse-db] Pass A RPC failed (no curated fallback): ${passAResult.error.message}`);
+      }
       return getCuratedDeals(q);
     }
     if (passBResult.error) {

@@ -34,6 +34,34 @@ export interface BrowseQuery {
   country?: string;
 }
 
+/* ── Per-call execution options ───────────────────────────────────── */
+
+export interface FetchDealsOptions {
+  /** Override the per-RPC timeout budget (ms). Defaults to 2500.
+
+      The homepage "Trending" pool fetch passes a longer budget. That
+      fetch is a NON-BLOCKING ISR background job (the route is
+      stale-while-revalidate, so no visitor waits on it), and on a cold
+      serverless instance the first Supabase RPC can take >2.5s just to
+      establish the connection. At the tight default it trips the
+      timeout, falls back to the curated-Amazon-only pool, and the
+      homepage renders 5 cards instead of 16. User-facing /api/deals
+      keeps the tight default because there a real visitor IS waiting. */
+  timeoutMs?: number;
+
+  /** When true, a Pass A RPC failure THROWS instead of returning the
+      curated-Amazon-only fallback.
+
+      The trending pool fetch is wrapped in unstable_cache. Returning a
+      thin curated-only pool on a transient DB blip would get persisted
+      for the full 30-min TTL — amplifying one unlucky cold render into
+      30 minutes of a 5-card homepage. Throwing keeps the bad result
+      OUT of the cache (Next does not persist a rejected cached fn), so
+      the next render retries cleanly. The latency-sensitive /api/deals
+      path leaves this unset and keeps the graceful curated fallback. */
+  noCuratedFallback?: boolean;
+}
+
 export interface SearchQuery {
   /** Free-text query — product name, model, or category */
   q: string;
@@ -79,7 +107,7 @@ export interface BrowseProvider {
   /** Should this provider be used? Typically checks env config. */
   isActive(): boolean;
   /** Filtered + sorted deals (NOT yet paginated — caller slices) */
-  fetchDeals(q: BrowseQuery): Promise<Deal[]>;
+  fetchDeals(q: BrowseQuery, opts?: FetchDealsOptions): Promise<Deal[]>;
   /** Counts per origin bucket — cheap O(n) over filtered set */
   getOriginCounts(q: Omit<BrowseQuery, "origin" | "limit" | "offset">): Promise<OriginCounts>;
   /** Map of category slug → count of products in that category. Used for
