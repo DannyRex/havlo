@@ -130,7 +130,7 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "currys":         { name: "Currys",           searchUrl: (q) => `https://www.currys.co.uk/search?q=${encodeURIComponent(q)}`,                                 homepage: "https://www.currys.co.uk" },
   "john-lewis":     { name: "John Lewis",       searchUrl: (q) => `https://www.johnlewis.com/search?search-term=${encodeURIComponent(q)}`,                       homepage: "https://www.johnlewis.com" },
   "johnlewis":      { name: "John Lewis",       searchUrl: (q) => `https://www.johnlewis.com/search?search-term=${encodeURIComponent(q)}`,                       homepage: "https://www.johnlewis.com" },
-  "very":           { name: "Very",             searchUrl: (q) => `https://www.very.co.uk/search?keyword=${encodeURIComponent(q)}`,                              homepage: "https://www.very.co.uk" },
+  "very":           { name: "Very",             searchUrl: (q) => `https://www.very.co.uk/e/q/${encodeURIComponent(q)}.end`,                              homepage: "https://www.very.co.uk" },
   "ao":             { name: "AO.com",           searchUrl: (q) => `https://ao.com/search?q=${encodeURIComponent(q)}`,                                            homepage: "https://ao.com" },
   "boots":          { name: "Boots",            searchUrl: (q) => `https://www.boots.com/sitesearch?searchTerm=${encodeURIComponent(q)}`,                        homepage: "https://www.boots.com" },
   "marks-spencer":  { name: "Marks & Spencer",  searchUrl: (q) => `https://www.marksandspencer.com/s/q-${encodeURIComponent(q)}`,                                homepage: "https://www.marksandspencer.com" },
@@ -144,7 +144,7 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
      the failure mode so users land on a clearly-broken state
      instead of a subtly-wrong one. */
   "selfridges":     { name: "Selfridges",       searchUrl: (q) => `https://www.selfridges.com/GB/en/cat/?qz=${encodeURIComponent(q)}`,                           homepage: "https://www.selfridges.com" },
-  "sports-direct":  { name: "Sports Direct",    searchUrl: (q) => `https://www.sportsdirect.com/searchresults.html?DescriptionFilter=${encodeURIComponent(q)}`, homepage: "https://www.sportsdirect.com" },
+  "sports-direct":  { name: "Sports Direct",    searchUrl: () => null, homepage: "https://www.sportsdirect.com" }, // SPA: /search?q=, /SearchResults.aspx, searchresults.html all 404 (audit 2026-05) → verified homepage floor
   "asos":           { name: "ASOS",             searchUrl: (q) => `https://www.asos.com/search/?q=${encodeURIComponent(q)}`,                                     homepage: "https://www.asos.com" },
   "matalan":        { name: "Matalan",          searchUrl: (q) => `https://www.matalan.co.uk/search?q=${encodeURIComponent(q)}`,                                 homepage: "https://www.matalan.co.uk" },
 
@@ -249,7 +249,7 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "mediamarkt":     { name: "MediaMarkt",    searchUrl: (q) => `https://www.mediamarkt.de/de/search.html?query=${encodeURIComponent(q)}`,         homepage: "https://www.mediamarkt.de" },
   "saturn":         { name: "Saturn",        searchUrl: (q) => `https://www.saturn.de/de/search.html?query=${encodeURIComponent(q)}`,             homepage: "https://www.saturn.de" },
   "otto":           { name: "Otto",          searchUrl: (q) => `https://www.otto.de/suche/${encodeURIComponent(q)}/`,                             homepage: "https://www.otto.de" },
-  "zalando":        { name: "Zalando",       searchUrl: (q) => `https://www.zalando.de/catalog/?q=${encodeURIComponent(q)}`,                      homepage: "https://www.zalando.de" },
+  "zalando":        { name: "Zalando",       searchUrl: () => null, homepage: "https://www.zalando.de" }, // SPA: /catalog/?q= and /search?q= both 404 (audit 2026-05) → verified homepage floor
 
   // ── Cross-border / global ──────────────────────────────────────
   "aliexpress":     { name: "AliExpress",    searchUrl: (q) => `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(q)}`,        homepage: "https://www.aliexpress.com" },
@@ -264,9 +264,9 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "ae":                         { name: "American Eagle", searchUrl: (q) => `https://www.ae.com/us/en/search/${encodeURIComponent(q)}`,             homepage: "https://www.ae.com" },
   "oppo":                       { name: "OPPO",           searchUrl: (q) => `https://www.oppo.com/en/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.oppo.com" },
   "ulefone":                    { name: "Ulefone",        searchUrl: (q) => `https://www.ulefone.com/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.ulefone.com" },
-  "mango":                      { name: "Mango",          searchUrl: (q) => `https://shop.mango.com/gb/search?kw=${encodeURIComponent(q)}`,         homepage: "https://shop.mango.com" },
+  "mango":                      { name: "Mango",          searchUrl: () => null, homepage: "https://shop.mango.com" }, // SPA: /gb/search?kw=, /gb/en/search?kw= 404/500 (audit 2026-05) → verified homepage floor
   "wallis":                     { name: "Wallis",         searchUrl: (q) => `https://www.wallis.co.uk/search?text=${encodeURIComponent(q)}`,        homepage: "https://www.wallis.co.uk" },
-  "simply-be":                  { name: "Simply Be",      searchUrl: (q) => `https://www.simplybe.co.uk/search?q=${encodeURIComponent(q)}`,         homepage: "https://www.simplybe.co.uk" },
+  "simply-be":                  { name: "Simply Be",      searchUrl: () => null, homepage: "https://www.simplybe.co.uk" }, // search /search?q=, /shop/search?q= 404/403 (audit 2026-05) → verified homepage floor
   "peacocks":                   { name: "Peacocks",       searchUrl: (q) => `https://www.peacocks.co.uk/search?q=${encodeURIComponent(q)}`,         homepage: "https://www.peacocks.co.uk" },
   "torrid":                     { name: "Torrid",         searchUrl: (q) => `https://www.torrid.com/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.torrid.com" },
   "mobile-phones-direct":       { name: "Mobile Phones Direct", searchUrl: (q) => `https://www.mobilephonesdirect.co.uk/search?q=${encodeURIComponent(q)}`, homepage: "https://www.mobilephonesdirect.co.uk" },
@@ -287,7 +287,7 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   /* (eBay already in the table above; user just wanted the LOGO sourced.) */
   "poshmark":                   { name: "Poshmark",            searchUrl: (q) => `https://poshmark.com/search?query=${encodeURIComponent(q)}`,        homepage: "https://poshmark.com" },
   "dell":                       { name: "Dell",                searchUrl: (q) => `https://www.dell.com/en-us/search/${encodeURIComponent(q)}`,        homepage: "https://www.dell.com" },
-  "qvc":                        { name: "QVC",                 searchUrl: (q) => `https://www.qvc.com/keywordsearch.html?keyword=${encodeURIComponent(q)}`, homepage: "https://www.qvc.com" },
+  "qvc":                        { name: "QVC",                 searchUrl: () => null, homepage: "https://www.qvc.com" }, // SPA: keywordsearch.html + content/search.html + 2 more all 404 (audit 2026-05) → verified homepage floor
   "nfm":                        { name: "NFM",                 searchUrl: (q) => `https://www.nfm.com/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.nfm.com" },
   "dick-s-sporting-goods":      { name: "DICK'S Sporting Goods", searchUrl: (q) => `https://www.dickssportinggoods.com/search/SearchDisplay?searchTerm=${encodeURIComponent(q)}`, homepage: "https://www.dickssportinggoods.com" },
   "b-h-photo-video-audio":      { name: "B&H Photo",           searchUrl: (q) => `https://www.bhphotovideo.com/c/search?Ntt=${encodeURIComponent(q)}`, homepage: "https://www.bhphotovideo.com" },
@@ -319,7 +319,7 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
      so the smart-fallback's looksLikeSimpleBrand check rejects it. */
   "93mobiles":                  { name: "93mobiles",           searchUrl: (q) => `https://www.93mobiles.com/search?q=${encodeURIComponent(q)}`,        homepage: "https://www.93mobiles.com" },
   "snapklik":                   { name: "Snapklik",       searchUrl: (q) => `https://uae.snapklik.com/en-AE/search?q=${encodeURIComponent(q)}`,     homepage: "https://uae.snapklik.com" },
-  "wonderprice":                { name: "WonderPrice",    searchUrl: (q) => `https://wonderprice.co.uk/search?q=${encodeURIComponent(q)}`,          homepage: "https://wonderprice.co.uk" },
+  "wonderprice":                { name: "WonderPrice",    searchUrl: (q) => `https://wonderprice.co.uk/?s=${encodeURIComponent(q)}`,          homepage: "https://wonderprice.co.uk" },
   "verizon":                    { name: "Verizon",        searchUrl: (q) => `https://www.verizon.com/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.verizon.com" },
   "at-t":                       { name: "AT&T",           searchUrl: (q) => `https://www.att.com/search/?q=${encodeURIComponent(q)}`,               homepage: "https://www.att.com" },
   "t-mobile":                   { name: "T-Mobile",       searchUrl: (q) => `https://www.t-mobile.com/search?q=${encodeURIComponent(q)}`,           homepage: "https://www.t-mobile.com" },
@@ -352,9 +352,9 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "old-navy":                   { name: "Old Navy",          searchUrl: (q) => `https://oldnavy.gap.com/browse/search.do?searchText=${encodeURIComponent(q)}`, homepage: "https://oldnavy.gap.com" },
   "gap":                        { name: "Gap",               searchUrl: (q) => `https://www.gap.com/browse/search.do?searchText=${encodeURIComponent(q)}`,  homepage: "https://www.gap.com" },
   "abercrombie-fitch":          { name: "Abercrombie & Fitch", searchUrl: (q) => `https://www.abercrombie.com/shop/us/search?searchTerm=${encodeURIComponent(q)}`, homepage: "https://www.abercrombie.com" },
-  "academy-sports-outdoors":    { name: "Academy Sports + Outdoors", searchUrl: (q) => `https://www.academy.com/c/sl?q=${encodeURIComponent(q)}`,             homepage: "https://www.academy.com" },
+  "academy-sports-outdoors":    { name: "Academy Sports + Outdoors", searchUrl: (q) => `https://www.academy.com/shop/browse?q=${encodeURIComponent(q)}`,             homepage: "https://www.academy.com" },
   "coach":                      { name: "Coach",             searchUrl: (q) => `https://www.coach.com/shop/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.coach.com" },
-  "crocs":                      { name: "Crocs",             searchUrl: (q) => `https://www.crocs.com/search?q=${encodeURIComponent(q)}`,                   homepage: "https://www.crocs.com" },
+  "crocs":                      { name: "Crocs",             searchUrl: () => null, homepage: "https://www.crocs.com" }, // /search?q= 410, /c/search?q= 403; only fragile US-region Demandware endpoint 200s (audit 2026-05) → verified homepage floor
   "accessorize":                { name: "Accessorize",       searchUrl: (q) => `https://us.accessorize.com/search?q=${encodeURIComponent(q)}`,              homepage: "https://us.accessorize.com" },
   "boohoo-usa":                 { name: "Boohoo USA",        searchUrl: (q) => `https://us.boohoo.com/search?q=${encodeURIComponent(q)}`,                   homepage: "https://us.boohoo.com" },
   "boohoo":                     { name: "Boohoo",            searchUrl: (q) => `https://www.boohoo.com/search?q=${encodeURIComponent(q)}`,                  homepage: "https://www.boohoo.com" },
@@ -385,7 +385,7 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
      Cotton On's edge router picks the right storefront for the
      visitor (cottonon.com routes to /AU/ /US/ /NZ/ /ZA/ /UK/ by
      IP). Lands on the right region without us picking wrong. */
-  "cotton-on":                  { name: "Cotton On",         searchUrl: (q) => `https://cottonon.com/search/?q=${encodeURIComponent(q)}`,                    homepage: "https://cottonon.com" },
+  "cotton-on":                  { name: "Cotton On",         searchUrl: (q) => `https://cottonon.com/search?q=${encodeURIComponent(q)}`,                    homepage: "https://cottonon.com" },
 
   /* — AE ─────────────────────────────────────────── */
   "lulu-hypermarket":           { name: "LuLu Hypermarket",  searchUrl: (q) => `https://www.luluhypermarket.com/en-ae/search/?q=${encodeURIComponent(q)}`,    homepage: "https://www.luluhypermarket.com" },
@@ -396,7 +396,7 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
 
   /* — IN ─────────────────────────────────────────── */
   "nykaa":                      { name: "Nykaa",             searchUrl: (q) => `https://www.nykaa.com/search/result/?q=${encodeURIComponent(q)}`,             homepage: "https://www.nykaa.com" },
-  "nykaa-fashion":              { name: "Nykaa Fashion",     searchUrl: (q) => `https://www.nykaafashion.com/search?q=${encodeURIComponent(q)}`,             homepage: "https://www.nykaafashion.com" },
+  "nykaa-fashion":              { name: "Nykaa Fashion",     searchUrl: (q) => `https://www.nykaafashion.com/catalogsearch/result/?q=${encodeURIComponent(q)}`,             homepage: "https://www.nykaafashion.com" },
   "meesho":                     { name: "Meesho",            searchUrl: (q) => `https://www.meesho.com/search?q=${encodeURIComponent(q)}`,                   homepage: "https://www.meesho.com" },
   "firstcry":                   { name: "FirstCry",          searchUrl: (q) => `https://www.firstcry.com/search?q=${encodeURIComponent(q)}`,                 homepage: "https://www.firstcry.com" },
   "snapdeal":                   { name: "Snapdeal",          searchUrl: (q) => `https://www.snapdeal.com/search?keyword=${encodeURIComponent(q)}`,           homepage: "https://www.snapdeal.com" },
@@ -430,8 +430,8 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
      UK + US merchants Havlo's SerpAPI feed surfaces but our v1-v4
      batches missed. Verified search URL pattern per merchant. */
   "debenhams":                  { name: "Debenhams",         searchUrl: (q) => `https://www.debenhams.com/search?q=${encodeURIComponent(q)}`,                homepage: "https://www.debenhams.com" },
-  "prettylittlething":          { name: "PrettyLittleThing", searchUrl: (q) => `https://www.prettylittlething.com/catalogsearch/result/?q=${encodeURIComponent(q)}`, homepage: "https://www.prettylittlething.com" },
-  "pretty-little-thing":        { name: "PrettyLittleThing", searchUrl: (q) => `https://www.prettylittlething.com/catalogsearch/result/?q=${encodeURIComponent(q)}`, homepage: "https://www.prettylittlething.com" },
+  "prettylittlething":          { name: "PrettyLittleThing", searchUrl: (q) => `https://www.prettylittlething.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.prettylittlething.com" },
+  "pretty-little-thing":        { name: "PrettyLittleThing", searchUrl: (q) => `https://www.prettylittlething.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.prettylittlething.com" },
   "new-look":                   { name: "New Look",          searchUrl: (q) => `https://www.newlook.com/uk/search?q=${encodeURIComponent(q)}`,                homepage: "https://www.newlook.com" },
   "newlook":                    { name: "New Look",          searchUrl: (q) => `https://www.newlook.com/uk/search?q=${encodeURIComponent(q)}`,                homepage: "https://www.newlook.com" },
   "schuh":                      { name: "Schuh",             searchUrl: (q) => `https://www.schuh.co.uk/search/?q=${encodeURIComponent(q)}`,                  homepage: "https://www.schuh.co.uk" },
@@ -523,7 +523,51 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
      curated entry adds the relay-fallback safety net and upgrades the
      homepage guess to the real Shopify search (verified live). */
   "payporte":          { name: "Payporte",          searchUrl: (q) => `https://payporte.com/search?q=${encodeURIComponent(q)}`, homepage: "https://payporte.com" },
+
+  /* ── v7 additions (May 2026) — link-health probe of every in-stock
+       store (scripts/_tmp-merchant-link-health.ts). Two classes of fix:
+       (a) downgraded six JS-SPA merchants whose curated ?q= search URLs
+           404/500'd to a verified homepage floor (qvc, sports-direct,
+           zalando, mango, simply-be, crocs — edited in place above), and
+       (b) the two explicit entries below, which existed only as
+           substring COLLISIONS with another merchant's key. */
+  /* QVC UK — store id "qvc-uk" substring-matched the US "qvc" entry in
+     Pass 2 and sent UK users to qvc.com. Explicit entry pins the correct
+     qvcuk.com. Search SPA (all GET patterns 404 on .com and .co.uk,
+     audit 2026-05) → verified homepage floor. */
+  "qvc-uk":            { name: "QVC UK",            searchUrl: () => null, homepage: "https://www.qvcuk.com" },
+  /* Limango DE — store id "limango-de" greedily substring-matched
+     "mango" in Pass 2 and routed users to shop.mango.com (which then
+     500'd). Boundary-aware tokenIncludes() now rejects that glued
+     match, and this explicit entry lands them on the real limango.de.
+     Deals-club SPA, search unverified → verified homepage floor. */
+  "limango":           { name: "Limango",           searchUrl: () => null, homepage: "https://www.limango.de" },
 };
+
+/* Boundary-aware substring test for the merchant matcher. A plain
+   String.includes() caused confident WRONG-merchant routing: store id
+   "everymonday" contains "very" and "limango-de" contains "mango", so a
+   raw includes() sent those users to very.co.uk / shop.mango.com. We
+   only accept a key match when the needle sits on a token boundary — the
+   flanking characters are non-alphanumeric, or the string ends. Escape
+   hatch: keys >= 8 chars are distinctive enough that a glued substring
+   is almost certainly a real match (e.g. a store id that concatenates
+   the merchant slug with a suffix, "prettylittlethinguk"), so plain
+   includes() is kept for those. */
+function tokenIncludes(haystack: string, needle: string): boolean {
+  if (!needle) return false;
+  if (needle.length >= 8 && haystack.includes(needle)) return true;
+  for (let from = 0; ; ) {
+    const i = haystack.indexOf(needle, from);
+    if (i < 0) return false;
+    const before = i === 0 ? "" : haystack[i - 1];
+    const after = i + needle.length >= haystack.length ? "" : haystack[i + needle.length];
+    const okBefore = before === "" || !/[a-z0-9]/i.test(before);
+    const okAfter = after === "" || !/[a-z0-9]/i.test(after);
+    if (okBefore && okAfter) return true;
+    from = i + 1;
+  }
+}
 
 /** Resolve a search URL for a given store id / name + product title.
     Returns null if we don't know the merchant at all — caller can
@@ -551,7 +595,7 @@ export function merchantSearchUrl(
   if (sid) {
     const keys = Object.keys(MERCHANTS).sort((a, b) => b.length - a.length);
     for (const key of keys) {
-      if (sid.includes(key)) {
+      if (tokenIncludes(sid, key)) {
         const m = MERCHANTS[key];
         const url = m.searchUrl(query, country) ?? m.homepage;
         return { url, merchantName: m.name };
@@ -562,7 +606,7 @@ export function merchantSearchUrl(
   /* Pass 3: substring match on storeName. */
   if (sname) {
     for (const [key, m] of Object.entries(MERCHANTS)) {
-      if (sname.includes(key) || sname.includes(m.name.toLowerCase())) {
+      if (tokenIncludes(sname, key) || tokenIncludes(sname, m.name.toLowerCase())) {
         const url = m.searchUrl(query, country) ?? m.homepage;
         return { url, merchantName: m.name };
       }
@@ -584,7 +628,7 @@ export function merchantHomepage(
   if (sid && MERCHANTS[sid]) return { url: MERCHANTS[sid].homepage, merchantName: MERCHANTS[sid].name };
   const keys = Object.keys(MERCHANTS).sort((a, b) => b.length - a.length);
   for (const key of keys) {
-    if (sid.includes(key) || sname.includes(key)) {
+    if (tokenIncludes(sid, key) || tokenIncludes(sname, key)) {
       return { url: MERCHANTS[key].homepage, merchantName: MERCHANTS[key].name };
     }
   }
