@@ -17,6 +17,7 @@ import { ExternalLink, Tag, Store as StoreIcon, Globe, AlertTriangle } from "luc
 import {
   cleanTitle,
   proxiedImageUrl,
+  downscaleCardImageUrl,
   getClickThroughUrl,
   formatUSDPrice,
   formatCompact,
@@ -154,7 +155,25 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
      time canonicalisation (older DB rows). Pure function, idempotent,
      so calling on already-clean names ("Currys") is a no-op. */
   const displayStore = displayStoreName(offer.storeName);
-  const imgSrc       = offer.imageUrl ? proxiedImageUrl(offer.imageUrl) : null;
+  /* Hero image source. We clamp the RAW CDN url BEFORE wrapping it in
+     the proxy: the Amazon/Cloudinary size tokens downscaleCardImageUrl
+     rewrites only survive on the bare url — once it's URL-encoded inside
+     /api/img-proxy?url=… the token is opaque and can't be rewritten.
+     The proxy itself is a referer-rewriting pass-through (no resize),
+     so a real width-based srcset is only possible via the token rewrite. */
+  const rawImg = offer.imageUrl ?? null;
+  const imgSrc = rawImg ? proxiedImageUrl(rawImg) : null;
+  /* Emit a 2-width srcset ONLY when the clamp produces distinct urls
+     (i.e. the source is a token-bearing Amazon/Cloudinary CDN). For
+     small/un-rewritable sources w640 === w1280, so we drop srcSet and
+     keep the proven single-src path untouched — no broken descriptors. */
+  const heroSrcSet = (() => {
+    if (!rawImg) return undefined;
+    const w640  = downscaleCardImageUrl(rawImg, 640);
+    const w1280 = downscaleCardImageUrl(rawImg, 1280);
+    if (w640 === w1280) return undefined;
+    return `${proxiedImageUrl(w640)} 640w, ${proxiedImageUrl(w1280)} 1280w`;
+  })();
 
   /* Primary price in the user's currency. */
   const primaryAmount = convertToUserCurrency(offer.currentPrice, offer.currency, country);
@@ -320,11 +339,21 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
           <img
             src={imgSrc}
             alt={cleanedTitle.slice(0, 120)}
+            /* Intrinsic dims are advisory only — the aspect-ratio
+               container + w-full/h-full object-contain drive actual
+               layout (so CLS is already reserved). 4:5 matches the
+               md:aspect-[4/5] hero ratio; gives the SEO/Lighthouse
+               "explicit width/height" check a value to read. */
+            width={1000}
+            height={1250}
             loading="eager"
             fetchPriority="high"
             decoding="async"
             onError={() => setImgFailed(true)}
             className="absolute inset-0 w-full h-full object-contain p-3 sm:p-4"
+            {...(heroSrcSet
+              ? { srcSet: heroSrcSet, sizes: "(max-width: 767px) 92vw, 520px" }
+              : {})}
           />
         ) : (
           /* Havlo logo fallback matches MasonryCard's ResilientImage
