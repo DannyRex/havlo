@@ -767,6 +767,18 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
   "official-f1-store-uk":    { name: "F1 Store",            searchUrl: () => null, homepage: "https://f1store.formula1.com" },
   "mohd":                    { name: "Mohd",                searchUrl: () => null, homepage: "https://www.mohd.it" },
   "check24":                 { name: "Check24",             searchUrl: () => null, homepage: "https://www.check24.de" },
+
+  /* v12 — surfaced by the health-check worklist 2026-05 (uncurated_head_store:
+     12 relay clicks, all guessed-home, no MERCHANTS entry). Gymshark is a custom
+     Astro storefront (generator: Astro, NOT Shopify — products.json 403,
+     suggest.json returns the app shell), Algolia-backed search. Live probe:
+     /search?q=leggings → 200 with the query preserved; sibling patterns
+     (/pages/search-results-page?q=, /collections/all?q=) → 404. The store's own
+     regional alternates (au/ca/ch/de/dk/eu/fi/fr/nl) all route through /search,
+     confirming it as the canonical search path. Results are client-rendered so
+     they aren't curl-visible (same as the Marks Electrical precedent above), but
+     a real browser lands on the live query page. */
+  "gymshark":                { name: "Gymshark",            searchUrl: (q) => `https://www.gymshark.com/search?q=${encodeURIComponent(q)}`,              homepage: "https://www.gymshark.com" },
 };
 
 /* Boundary-aware substring test for the merchant matcher. A plain
