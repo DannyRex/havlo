@@ -31,16 +31,12 @@ const config: Config = {
         "ink-2":      "rgb(var(--ink-2-rgb) / <alpha-value>)",
         "ink-3":      "rgb(var(--ink-3-rgb) / <alpha-value>)",
         // Status
-        /* DEFAULT bumped #16a34a → #166534 (green-800) May 2026 for
-           WCAG AA. The old green failed on white (3.29:1). green-700
-           (#15803d) cleared white (5.0:1) but STILL failed where
-           text-success sits on the pale success/10 fill (the homepage
-           "Cashback · coming soon" pill, the /compare "Best" badge):
-           4.38:1 on #e8f2ec. green-800 clears all of them — 7.1:1 on
-           white, 6.2:1 on success/10, 5.7:1 on success/20 — while
-           staying unmistakably green. `subtle` (the 10%/20% fills) is
-           a background wash, not text, so it's intentionally unchanged. */
-        success: { DEFAULT: "#166534", subtle: "rgba(22, 163, 74, 0.10)" },
+        /* Vibrant deal-green, mode-aware via --success-rgb (globals.css):
+           green-600 (22 163 74) on light, green-400 (74 222 128) on dark,
+           matching the price + verified badges. Vibrance restored May 2026
+           after a WCAG-driven green-800 value read as muted/damp. `subtle`
+           is the 10% fill, now also mode-aware. */
+        success: { DEFAULT: "rgb(var(--success-rgb) / <alpha-value>)", subtle: "rgb(var(--success-rgb) / 0.1)" },
         danger:  { DEFAULT: "#dc2626", subtle: "rgba(220, 38, 38, 0.10)" },
         warn:    { DEFAULT: "#ca8a04", subtle: "rgba(202, 138, 4, 0.10)" },
       },

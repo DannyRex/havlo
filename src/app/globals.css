@@ -26,6 +26,9 @@
      Still ~5.7:1 on white, comfortably AA. */
   --ink-3-rgb: 86 98 119;
 
+  /* Status — vibrant deal-green (green-600). Brighter override in .dark. */
+  --success-rgb: 22 163 74;
+
   /* iOS safe-area */
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -44,6 +47,9 @@
   --ink-rgb:   246 248 251;
   --ink-2-rgb: 178 184 196;   /* was 163 neutral — brighter + cooler */
   --ink-3-rgb: 122 130 144;   /* was 82 (near-invisible) — now legible */
+
+  /* Status — brighter green (green-400) so it stays vibrant on dark. */
+  --success-rgb: 74 222 128;
 }
 
 * { box-sizing: border-box; }
