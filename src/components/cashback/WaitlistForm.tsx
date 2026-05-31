@@ -202,7 +202,14 @@ export default function WaitlistForm({ country, source = "cashback-page", compac
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col sm:flex-row gap-3" noValidate>
+    /* flex-wrap is load-bearing on sm+: the error alert below carries
+       `sm:basis-full` so it wraps onto its OWN full-width line beneath
+       the input + button. Without flex-wrap the alert stayed on the
+       same no-wrap row and got crushed into a narrow pill jammed to
+       the right of the button (user report May 2026: the "Email
+       required." box sat beside the Join-the-waitlist button instead
+       of below the field). */
+    <form onSubmit={onSubmit} className="flex flex-col sm:flex-row sm:flex-wrap gap-3" noValidate>
       <input
         type="email"
         name="email"
