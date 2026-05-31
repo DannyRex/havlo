@@ -10,17 +10,17 @@
   /* Surfaces */
   --bg-rgb:            255 255 255;
   --surface-rgb:       255 255 255;
-  --surface-2-rgb:     240 242 247;     /* deepened so cards/sections read distinct from white (was 247 248 250, almost invisible against bg) */
-  --border-rgb:        216 220 228;     /* crisper card edges on white (was 228 230 235, too soft) */
-  --border-strong-rgb: 184 190 201;     /* stronger dividers (was 199 203 211) */
+  --surface-2-rgb:     247 248 250;     /* slightly cooler than gray-50 */
+  --border-rgb:        228 230 235;     /* a touch darker — visible on white */
+  --border-strong-rgb: 199 203 211;
 
   /* Ink (text) — bumped contrast in light mode */
   --ink-rgb:   15 23 42;     /* slate-900, slightly cooler */
   --ink-2-rgb: 71 85 105;    /* slate-600 */
-  /* Darkened 148 163 184 (slate-400, 2.56:1, failed WCAG AA) to
-     94 106 126 May 2026. ~5.47:1 on white, ~4.9:1 on the deepened
-     surface-2, so the muted ink-3 captions/labels still pass AA for
-     small text while staying visibly lighter than ink-2. */
+  /* Darkened 148 163 184 (slate-400, 2.56:1 — failed WCAG AA) →
+     94 106 126 May 2026. ~5.3:1 on white, ~4.95:1 on surface-2, so
+     the muted ink-3 captions/labels now pass AA for small text while
+     staying visibly lighter than ink-2. */
   --ink-3-rgb: 94 106 126;
 
   /* iOS safe-area */
@@ -29,18 +29,14 @@
 
 .dark {
   --bg-rgb:            10 10 10;
-  --surface-rgb:       24 24 24;        /* lifted from 17 so cards separate from the bg */
-  --surface-2-rgb:     33 33 33;        /* lifted from 26 for a clear 3rd layer */
-  --border-rgb:        48 48 48;        /* was 38 38 38, nearly invisible on the dark surface */
-  --border-strong-rgb: 78 78 78;        /* stronger dividers + scrollbar thumb (was 64) */
+  --surface-rgb:       17 17 17;
+  --surface-2-rgb:     26 26 26;
+  --border-rgb:        38 38 38;
+  --border-strong-rgb: 64 64 64;
 
   --ink-rgb:   245 245 245;
-  --ink-2-rgb: 178 178 180;             /* slightly brighter secondary text (was 163) for more punch, 9.35:1 on bg */
-  /* Mirror of the light-mode ink-3 AA fix: 82 82 82 (#525252) scored
-     just 2.53:1 on the dark bg, failing WCAG AA for muted captions.
-     142 142 146 now clears it (~6.07:1 on bg, ~4.93:1 on surface-2)
-     while staying clearly dimmer than ink-2. */
-  --ink-3-rgb: 142 142 146;
+  --ink-2-rgb: 163 163 163;
+  --ink-3-rgb: 82 82 82;
 }
 
 * { box-sizing: border-box; }
