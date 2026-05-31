@@ -15,7 +15,6 @@ const sections = [
       "Email address: only when you submit a form on Havlo (notify-me, cashback waitlist, contact, price alert, merchant inquiry). Never collected silently.",
       "Price alert preferences: when you set a price alert on a product page, we store your email, the product, your target price, and your country. Used only to email you when the trigger condition is met. Each row carries a unique token so you can cancel with one click from any of our emails.",
       "Merchant inquiry submissions: when you apply on /for-merchants we store your store name, contact name, email, store URL, optional product feed URL, target markets, SKU count, and notes. Used to evaluate the partnership request.",
-      "Barcode scanner: the camera-scan flow on /scan runs entirely in your browser using the native BarcodeDetector API. The video stream never leaves your device. Only the resulting barcode number is sent to our server to look the product up in our catalog.",
       "Technical data: browser type, device, referrer, and your IP address (truncated to a /24 range in our logs so individual users can't be re-identified).",
     ],
   },
