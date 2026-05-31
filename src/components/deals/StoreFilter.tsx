@@ -101,6 +101,10 @@ export default function StoreFilter({ stores, selected, onChange, fillRow = fals
   const triggerRef       = useRef<HTMLButtonElement | null>(null);
   const desktopPanelRef  = useRef<HTMLDivElement | null>(null);
   const sheetPanelRef    = useRef<HTMLDivElement | null>(null);
+  /* Pins the desktop autofocus (see the focus effect below) to one
+     shot per open, so the scroll/resize re-measures that also update
+     triggerRect don't keep yanking focus back into the search box. */
+  const hasFocusedRef    = useRef(false);
 
   /* Trigger's viewport rect. Computed when the popover opens so the
      portalled desktop panel can position itself directly under the
@@ -125,6 +129,43 @@ export default function StoreFilter({ stores, selected, onChange, fillRow = fals
       window.removeEventListener("resize", updateRect);
     };
   }, [open]);
+
+  /* Desktop-only autofocus. When the popover opens on md+ screens,
+     drop the cursor straight into the store-search input so a long
+     roster (UK carries ~27 stores) is filterable by typing right
+     away. Gated on the SAME md breakpoint that splits the desktop
+     popover from the mobile bottom sheet, so opening the sheet on a
+     phone never pops the on-screen keyboard — the sheet stays put
+     until the user taps the field.
+
+     Keyed on triggerRect (not a bare rAF) because the desktop panel
+     only mounts once the trigger's rect is measured by the effect
+     above; waiting for triggerRect guarantees desktopPanelRef is
+     populated by the time we focus. hasFocusedRef pins this to one
+     focus per open so the scroll/resize re-measures that also update
+     triggerRect don't steal focus back mid-scroll. The query is
+     scoped to desktopPanelRef because panelBody renders in BOTH the
+     desktop popover and the mobile sheet, so a shared ref on the
+     input would resolve to whichever mounted last. */
+  useEffect(() => {
+    if (!open) {
+      hasFocusedRef.current = false;
+      return;
+    }
+    if (hasFocusedRef.current) return;
+    if (!triggerRect) return;            // desktop panel not mounted yet
+    if (typeof window === "undefined") return;
+    if (!window.matchMedia("(min-width: 768px)").matches) {
+      /* Mobile sheet — leave focus alone. Mark handled so we don't
+         re-check on every triggerRect tick. */
+      hasFocusedRef.current = true;
+      return;
+    }
+    desktopPanelRef.current
+      ?.querySelector<HTMLInputElement>('input[type="text"]')
+      ?.focus();
+    hasFocusedRef.current = true;
+  }, [open, triggerRect]);
 
   /* Close on outside click. Treats the trigger wrapper, the
      desktop popover panel, and the mobile sheet panel as "inside"

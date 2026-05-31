@@ -340,21 +340,17 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
       aria-label="Search for products"
       className="relative bg-bg pt-12 pb-10 sm:pt-24 sm:pb-16"
     >
-      {/* Subtle radial wash — light enough to read non-AI.
-          NOTE: dropped section-level `overflow-hidden` — was clipping
-          the autocomplete dropdown when it extended past the
-          section's bottom padding. The wash itself is already
-          bounded by `absolute inset-0` (same box as the section), so
-          the clip wasn't load-bearing for the background. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-60 dark:opacity-40 overflow-hidden"
-        style={{
-          backgroundImage:
-            "radial-gradient(60% 50% at 50% 0%, rgba(0,87,255,0.05) 0%, transparent 70%)",
-        }}
-      />
+      {/* Hero sits on a FLAT bg-bg so it reads as one continuous
+          white surface with the opaque white navbar above it. A faint
+          blue radial wash used to live here (rgba(0,87,255,0.05)); at
+          the top of the page it tinted the body a subtle grey-blue
+          that broke the unity with the pure-white navbar — user report
+          May 2026: "the navbar is white and the main body seems grey
+          or with a gradient. unify it, make all white." Removed.
 
+          The section deliberately keeps NO `overflow-hidden` so the
+          composer's autocomplete dropdown can extend past the
+          section's bottom padding without being clipped. */}
       <div className="relative max-w-3xl mx-auto px-4 sm:px-6 text-center">
 
         {/* Trust pill — copy splits short / long across breakpoints
