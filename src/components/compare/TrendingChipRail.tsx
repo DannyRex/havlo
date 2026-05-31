@@ -26,7 +26,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Sparkles, Loader2 } from "lucide-react";
+import { TrendingUp, Loader2 } from "lucide-react";
 import type { MultiStoreChip } from "@/lib/trending-multi-store";
 
 interface Props {
@@ -186,7 +186,7 @@ export default function TrendingChipRail({
     return (
       <section className="mt-6 sm:mt-8" aria-label="Popular comparisons (loading)">
         <div className="flex items-center gap-1.5 mb-3">
-          <Sparkles size={12} className="text-ink-3" aria-hidden="true" />
+          <TrendingUp size={12} className="text-ink-3" aria-hidden="true" />
           <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3">
             Popular comparisons
           </span>
@@ -219,7 +219,7 @@ export default function TrendingChipRail({
   return (
     <section className="mt-6 sm:mt-8" aria-label="Popular comparisons">
       <div className="flex items-center gap-1.5 mb-3">
-        <Sparkles size={12} className="text-ink-3" aria-hidden="true" />
+        <TrendingUp size={12} className="text-ink-3" aria-hidden="true" />
         <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3">
           Popular comparisons
         </span>

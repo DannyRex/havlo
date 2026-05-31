@@ -23,7 +23,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  ArrowRight, ShoppingBag, FileCode, Sparkles,
+  ArrowRight, ShoppingBag, FileCode, TrendingUp,
   CheckCircle2, Mail, Globe2,
 } from "lucide-react";
 import MerchantInquiryForm from "@/components/merchants/MerchantInquiryForm";
@@ -57,7 +57,7 @@ const STEPS = [
     body: "We check the feed for completeness and category fit, then index your products into Havlo. Most stores go live within 3 business days.",
   },
   {
-    icon: Sparkles,
+    icon: TrendingUp,
     title: "You start receiving traffic",
     body: "Shoppers who reach a product page see your store as one of the options. When they click through, we send them straight to you. No checkout layer.",
   },

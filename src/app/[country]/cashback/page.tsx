@@ -211,7 +211,7 @@ export default function CashbackPage({
         <header className="mb-12">
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-3 mb-3 inline-flex items-center gap-1.5">
             <Coins size={12} />
-            <span>Cashback · Coming Soon</span>
+            <span>Cashback · coming soon</span>
           </p>
           {/* H1 + subhead aligned with the founder-voice rules: no
               "Get paid to shop" genre cliché in the headline, no

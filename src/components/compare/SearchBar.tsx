@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, X, Sparkles, Link2, ArrowUp } from "lucide-react";
+import { Search, X, TrendingDown, Link2, ArrowUp } from "lucide-react";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { track, extractDomain } from "@/lib/analytics";
 
@@ -359,14 +359,14 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
             ) : isUrlInput ? (
               <>
                 <Link2 size={14} className="sm:hidden" />
-                <span className="hidden sm:inline">Smart switch</span>
+                <span className="hidden sm:inline">Find this</span>
                 <Link2 size={14} className="hidden sm:inline" />
               </>
             ) : (
               <>
                 <ArrowUp size={16} className="sm:hidden" strokeWidth={2.5} />
                 <span className="hidden sm:inline">Find cheaper</span>
-                <Sparkles size={14} className="hidden sm:inline" />
+                <TrendingDown size={14} className="hidden sm:inline" />
               </>
             )}
           </button>

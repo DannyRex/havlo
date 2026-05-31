@@ -38,7 +38,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Check, Globe, AlertCircle, TrendingDown, Award, Sparkles, ArrowRight, Plane, RotateCcw } from "lucide-react";
+import { Check, Globe, AlertCircle, TrendingDown, Award, History, ArrowRight, Plane, RotateCcw } from "lucide-react";
 import { formatPriceForUser, timeAgo } from "@/lib/utils";
 import { type Country } from "@/lib/country";
 import type { PerStoreOffer } from "@/lib/pdp-stats";
@@ -825,7 +825,7 @@ export default function PriceComparisonBar({
       {priceHistory && !isHistoricalLow && (
         <div className="mb-3 px-3.5 py-2 rounded-xl bg-surface-2 border border-border">
           <p className="text-[11px] text-ink-2 leading-relaxed">
-            <Sparkles size={11} className="inline-block mr-1 -mt-0.5 text-ink-3" aria-hidden="true" />
+            <History size={11} className="inline-block mr-1 -mt-0.5 text-ink-3" aria-hidden="true" />
             Lowest tracked: <span className="font-semibold text-ink tabular-nums">
               {formatPriceForUser(priceHistory.allTimeLowNgn, country)}
             </span>
