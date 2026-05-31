@@ -268,17 +268,32 @@ h1, h2, h3, h4, h5, h6 {
     color: rgb(var(--ink-2-rgb));
   }
 
-  /* Skeleton — flat surface, no shimmer.
-     Per founder direction May 2026: "make the skeleton flat and
-     not with gradient." The shimmer animation drew attention to
-     the loading state instead of just placeholding the space,
-     and reads as visual noise on routes that render multiple
-     skeletons in parallel (deals grid, masonry, dupes rail).
-     Flat surface-2 still communicates "something will appear
-     here" via its shape, without competing with adjacent
-     real content for attention. */
+  /* Skeleton — flat surface-2 with a gentle opacity pulse.
+
+     History: the original shimmer (a gradient highlight swept across
+     the block via background-position) was removed on founder
+     direction May 2026 — "make the skeleton flat and not with
+     gradient" — because the moving sweep pulled the eye to the
+     loading state and read as visual noise on routes that render
+     many skeletons at once (deals grid, masonry, dupes rail).
+
+     Re-added May 2026 (founder follow-up: "add the normal animation
+     for the skeleton only if it doesn't impact page load time"): the
+     standard skeleton breathing cue, but as an OPACITY pulse rather
+     than the gradient shimmer. Animating opacity is compositor-only
+     (GPU-composited — no paint, no layout, off the main thread), so
+     it costs nothing at load and has zero effect on load time, LCP,
+     or CLS. It just gently fades to signal "content is coming,"
+     without the distracting highlight sweep the flat direction
+     removed. prefers-reduced-motion (below) freezes it for users who
+     opt out. */
   .skeleton {
     background: rgb(var(--surface-2-rgb));
+    /* Mirrors Tailwind's animate-pulse exactly (2s, same easing, 1→0.5
+       opacity) — the de-facto "normal" skeleton cue, and already what
+       the /compare chip-rail placeholder uses, so the two stay in
+       sync. */
+    animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 }
 
@@ -294,6 +309,15 @@ h1, h2, h3, h4, h5, h6 {
   width: max-content;
 }
 .marquee-track:hover { animation-play-state: paused; }
+
+/* Skeleton breathing pulse — opacity only (see .skeleton above).
+   1 → 0.5 → 1 fade, matching Tailwind's animate-pulse. Compositor-
+   thread, no paint/layout cost, so it never competes with content
+   load. */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
 
 /* ──────────────────────────────────────────────────────────────────
    Reduced motion respect

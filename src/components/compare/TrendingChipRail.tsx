@@ -23,9 +23,10 @@
    /compare page so a first-time visitor sees an immediate
    "here's what to click" affordance before they have to type. */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Sparkles, Loader2 } from "lucide-react";
 import type { MultiStoreChip } from "@/lib/trending-multi-store";
 
 interface Props {
@@ -77,6 +78,26 @@ export default function TrendingChipRail({
      evaluates whenever this changes. */
   const [tick, setTick] = useState(0);
 
+  const router = useRouter();
+  /* Per-chip pending state. Each chip is a <Link> to /compare?q=…, and
+     that navigation does an RSC round-trip (the server SSR-seeds
+     /api/compare) before the parent's results skeleton appears — a
+     window where the rail previously sat frozen with no feedback after
+     a click (founder report May 2026: "let them be some loader … to
+     show that it's loading"). startTransition ties isPending to the
+     navigation so a spinner can show for exactly that duration;
+     pendingId tracks WHICH chip so only the clicked one spins. */
+  const [isPending, startTransition] = useTransition();
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
+  /* Clear the spinner once the transition settles. Normally moot — the
+     parent (CompareContent) unmounts this whole rail the instant its
+     own `loading` flips true — but this also resets cleanly if a
+     navigation is interrupted (back button) and the rail survives. */
+  useEffect(() => {
+    if (!isPending) setPendingId(null);
+  }, [isPending]);
+
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/trending-chips?country=${encodeURIComponent(countryCode)}`)
@@ -100,9 +121,13 @@ export default function TrendingChipRail({
   useEffect(() => {
     if (rotateEveryMs <= 0) return;
     if (items.length <= limit) return;
+    /* Freeze the rail while a chip click is navigating — otherwise a
+       rotation tick could swap the chips out from under the spinner
+       mid-click. Resumes once the transition settles. */
+    if (isPending) return;
     const id = setInterval(() => setTick((t) => t + 1), rotateEveryMs);
     return () => clearInterval(id);
-  }, [items.length, limit, rotateEveryMs]);
+  }, [items.length, limit, rotateEveryMs, isPending]);
 
   /* Visible chips. Only products carried by 2 or more distinct stores
      belong in a "Popular comparisons" rail; the storeCount filter is a
@@ -209,30 +234,57 @@ export default function TrendingChipRail({
           Acceptable because the value of each chip is the product
           name being legible at a glance. */}
       <div className="flex flex-wrap gap-2">
-        {visible.map((chip) => (
-          <Link
-            /* Key includes the rotation tick so each rotation mounts
-               a fresh DOM node and re-plays the fade-in animation.
-               Same pattern as the SearchBar "Try:" chips. */
-            key={`${chip.title}-${tick}`}
-            /* searchQuery is the RAW DB title (better FTS hit) used
-               for display + URL sharing. pid is the product_id
-               backstop — if the catalog shifts between chip-pool
-               generation and this click (orphan cleanup, signature
-               merge), /api/compare falls back to direct lookup so
-               the user ALWAYS sees the comparison the chip promised.
-               Round-4 QA: user clicked a chip and got "Nothing in
-               our local index" because of exactly that timing gap. */
-            href={`/${countryCode}/compare?q=${encodeURIComponent(chip.searchQuery)}&pid=${chip.productId}&mode=similar`}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface border border-border hover:border-border-strong hover:shadow-card transition-all whitespace-nowrap active:scale-95 animate-fade-in"
-            aria-label={`${chip.title}, available across ${chip.storeCount.toLocaleString()} stores`}
-          >
-            <span className="text-[13px] font-medium text-ink">{chip.title}</span>
-            <span className="text-[10px] font-semibold text-ink-3 tabular-nums">
-              {chip.storeCount}
-            </span>
-          </Link>
-        ))}
+        {visible.map((chip) => {
+          const href = `/${countryCode}/compare?q=${encodeURIComponent(chip.searchQuery)}&pid=${chip.productId}&mode=similar`;
+          const isThisPending = pendingId === chip.productId;
+          return (
+            <Link
+              /* Key includes the rotation tick so each rotation mounts
+                 a fresh DOM node and re-plays the fade-in animation.
+                 Same pattern as the SearchBar "Try:" chips. */
+              key={`${chip.title}-${tick}`}
+              /* searchQuery is the RAW DB title (better FTS hit) used
+                 for display + URL sharing. pid is the product_id
+                 backstop — if the catalog shifts between chip-pool
+                 generation and this click (orphan cleanup, signature
+                 merge), /api/compare falls back to direct lookup so
+                 the user ALWAYS sees the comparison the chip promised.
+                 Round-4 QA: user clicked a chip and got "Nothing in
+                 our local index" because of exactly that timing gap. */
+              href={href}
+              /* Keep the real href (crawlable internal link + native
+                 cmd/ctrl/middle-click new-tab) but intercept a plain
+                 left-click to drive the nav through startTransition,
+                 which lets us show an instant per-chip spinner for the
+                 RSC round-trip before the parent results skeleton
+                 takes over. */
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                e.preventDefault();
+                setPendingId(chip.productId);
+                startTransition(() => router.push(href));
+              }}
+              aria-busy={isThisPending}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border whitespace-nowrap animate-fade-in transition-all ${
+                isThisPending
+                  ? "bg-surface border-border-strong shadow-card pointer-events-none"
+                  : isPending
+                    ? "bg-surface border-border opacity-50 pointer-events-none"
+                    : "bg-surface border-border hover:border-border-strong hover:shadow-card active:scale-95"
+              }`}
+              aria-label={`${chip.title}, available across ${chip.storeCount.toLocaleString()} stores`}
+            >
+              <span className="text-[13px] font-medium text-ink">{chip.title}</span>
+              {isThisPending ? (
+                <Loader2 size={12} className="animate-spin text-ink-3 shrink-0" aria-hidden="true" />
+              ) : (
+                <span className="text-[10px] font-semibold text-ink-3 tabular-nums">
+                  {chip.storeCount}
+                </span>
+              )}
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
