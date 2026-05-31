@@ -7,36 +7,43 @@
    Colors stored as RGB triplets so Tailwind's <alpha-value> works.
    ────────────────────────────────────────────────────────────────── */
 :root {
-  /* Surfaces */
+  /* Surfaces — keep white/near-white, lift the dull greys.
+     surface-2 carries a faint cool-blue undertone (b > r,g) so secondary
+     fills read "clean" rather than "dingy grey", and it sits brighter than
+     the old 247/248/250. Borders are tightened (a touch darker + cooler)
+     for crisper edge definition — more contrast, more alive. May 2026. */
   --bg-rgb:            255 255 255;
   --surface-rgb:       255 255 255;
-  --surface-2-rgb:     247 248 250;     /* slightly cooler than gray-50 */
-  --border-rgb:        228 230 235;     /* a touch darker — visible on white */
-  --border-strong-rgb: 199 203 211;
+  --surface-2-rgb:     248 250 255;     /* brighter + faint cool undertone */
+  --border-rgb:        222 226 234;     /* crisper edges */
+  --border-strong-rgb: 190 196 207;
 
-  /* Ink (text) — bumped contrast in light mode */
+  /* Ink (text) — richer secondary tones for stronger contrast on white */
   --ink-rgb:   15 23 42;     /* slate-900, slightly cooler */
-  --ink-2-rgb: 71 85 105;    /* slate-600 */
-  /* Darkened 148 163 184 (slate-400, 2.56:1 — failed WCAG AA) →
-     94 106 126 May 2026. ~5.3:1 on white, ~4.95:1 on surface-2, so
-     the muted ink-3 captions/labels now pass AA for small text while
-     staying visibly lighter than ink-2. */
-  --ink-3-rgb: 94 106 126;
+  --ink-2-rgb: 61 75 96;     /* deepened from slate-600 for more pop */
+  /* ink-3 deepened 94 106 126 → 86 98 119 May 2026: captions/labels read
+     with a bit more authority while staying clearly lighter than ink-2.
+     Still ~5.7:1 on white, comfortably AA. */
+  --ink-3-rgb: 86 98 119;
 
   /* iOS safe-area */
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .dark {
-  --bg-rgb:            10 10 10;
-  --surface-rgb:       17 17 17;
-  --surface-2-rgb:     26 26 26;
-  --border-rgb:        38 38 38;
-  --border-strong-rgb: 64 64 64;
+  /* Dark mode was flat neutral grey (r=g=b) — reads dead. Lift the
+     surfaces with a subtle cool-blue undertone for depth, brighten the
+     borders for crisper separation, and pull the secondary/muted inks up
+     so text is legible and the whole surface feels alive. May 2026. */
+  --bg-rgb:            10 12 16;
+  --surface-rgb:       19 22 29;
+  --surface-2-rgb:     27 31 40;
+  --border-rgb:        44 49 60;
+  --border-strong-rgb: 72 79 94;
 
-  --ink-rgb:   245 245 245;
-  --ink-2-rgb: 163 163 163;
-  --ink-3-rgb: 82 82 82;
+  --ink-rgb:   246 248 251;
+  --ink-2-rgb: 178 184 196;   /* was 163 neutral — brighter + cooler */
+  --ink-3-rgb: 122 130 144;   /* was 82 (near-invisible) — now legible */
 }
 
 * { box-sizing: border-box; }
