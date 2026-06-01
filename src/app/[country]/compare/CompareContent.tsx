@@ -7,6 +7,7 @@ import Link from "next/link";
 import SearchBar from "@/components/compare/SearchBar";
 import PriceResults from "@/components/compare/PriceResults";
 import CompareAnchorCard from "@/components/compare/CompareAnchorCard";
+import ImageSearchButton from "@/components/search/ImageSearchButton";
 import DupeMasonry from "@/components/compare/DupeMasonry";
 import LiveResults from "@/components/compare/LiveResults";
 import EmptySearchState from "@/components/empty/EmptySearchState";
@@ -336,6 +337,14 @@ export default function CompareContent({
           router.replace(`/${country.code}/compare`, { scroll: false });
         }}
       />
+
+      {/* Search-by-image — a second doorway to the same comparison.
+          The upload is matched against the local dHash perceptual-hash
+          index (no paid vision API); a confident match routes to
+          /compare?pid= for that product. */}
+      <div className="mt-3 flex justify-center">
+        <ImageSearchButton variant="compare" countryCode={country.code} />
+      </div>
 
       {/* Popular comparisons chip rail. Visible ONLY in the empty
           state (no query yet) so it doesn't compete with active

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/CategoryIcons";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { logSearchEvent } from "@/lib/search/log-search";
+import ImageSearchButton from "@/components/search/ImageSearchButton";
 import type { ComponentType } from "react";
 
 /* Autocomplete suggestion shape — matches /api/suggest's response.
@@ -497,14 +498,12 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
                     Link detected
                   </span>
                 ) : (
-                  /* Subtle hint — replaces the disabled "Image search
-                     · soon" button QA flagged. We don't ship UI for
-                     features that don't exist; the "soon" tag also
-                     read as marketing-fluff in the founder voice
-                     review. When image search lands, restore here. */
-                  <span className="text-ink-3">
-                    Search anything, or paste a link.
-                  </span>
+                  /* Image search (restored). Uploads match against the
+                     local dHash perceptual-hash index built in Phase 2
+                     — no paid vision API. This is the spot the prior
+                     "Image search · soon" affordance was removed from;
+                     the feature has now landed. */
+                  <ImageSearchButton variant="hero" countryCode={country.code} />
                 )}
               </div>
 
