@@ -44,7 +44,7 @@ import {
   sanitisePriceTimeseries,
 } from "@/lib/search/price-history";
 import { effectiveLandedPrice } from "@/lib/landed-price";
-import { partitionDupesByVariantMatch, variantOffers } from "@/lib/search/variant-pooling";
+import { partitionDupesByVariantMatch, variantOffers, type PartitionResult } from "@/lib/search/variant-pooling";
 import { partitionDupesByVariantMatchDeep } from "@/lib/search/variant-pooling-deep";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
 import { fetchProductMeta } from "@/lib/offers/fetch-product-description";
@@ -859,17 +859,60 @@ export default async function ProductPage({ params }: PageProps) {
      anchor + every dupe's enrichment. Cold-cache LLM consultations
      add ~200-500ms each but only fire in the JUDGE_BAND (0.55-0.85)
      and cache forever in match_decisions. */
-  const supaForDeepPartition = offer.product_id ? getSupabaseAdmin() : null;
-  const partition = supaForDeepPartition && offer.product_id
-    ? await partitionDupesByVariantMatchDeep(
-        supaForDeepPartition,
-        { id: offer.product_id, title: offer.title, brand: offer.brand, priceNgn: anchorPriceNgn, family: offer.category_slug ?? null },
-        countryFilteredDupes,
-      )
-    : partitionDupesByVariantMatch(
-        { title: offer.title, brand: offer.brand, priceNgn: anchorPriceNgn, family: offer.category_slug ?? null },
-        countryFilteredDupes,
-      );
+  /* ISR-CRITICAL: the variant partition is wrapped in unstable_cache.
+     The DEEP path (partitionDupesByVariantMatchDeep) does UNCACHEABLE IO
+     during render: pgvector embedding lookups, an OpenAI LLM judge POST
+     on ambiguous pairs (see match-judge.ts), and a match_decisions write
+     that memoises each verdict. Any uncached fetch/write in a render path
+     opts the WHOLE /[country]/p/[id] route OUT of static rendering, so
+     the `export const revalidate = 21600` above silently never took
+     effect: every PDP hit rendered dynamically (x-vercel-cache: MISS,
+     private, no-store), ran the full Supabase fan-out, and paid 3-5s
+     TTFB on the single highest-traffic page type on the site. It was the
+     PDP-scoped twin of the root layout's headers() regression (see
+     src/app/layout.tsx).
+
+     unstable_cache moves that IO inside a cache boundary: the route is
+     static again (ISR), the heavy match work runs once per (product,
+     dupe-set, country) per 30-min window instead of on every request,
+     and the verdict-memoisation write still happens on cache miss. The
+     candidate pool is passed as an argument so a changed dupe set
+     re-partitions; the 30-min TTL stays tighter than the page's 6h ISR
+     so the rail can't drift further than the page itself.
+
+     DO NOT call partitionDupesByVariantMatchDeep (or any other uncached
+     fetch / DB write) directly in this render path. It will defeat the
+     ISR again. Keep new heavy reads behind unstable_cache. */
+  const fetchPartitionCached = unstable_cache(
+    async (
+      productId: string | null,
+      title: string,
+      brand: string | null,
+      priceNgn: number,
+      family: string | null,
+      dupes: typeof countryFilteredDupes,
+    ): Promise<PartitionResult> => {
+      const supa = productId ? getSupabaseAdmin() : null;
+      if (supa && productId) {
+        return partitionDupesByVariantMatchDeep(
+          supa,
+          { id: productId, title, brand, priceNgn, family },
+          dupes,
+        );
+      }
+      return partitionDupesByVariantMatch({ title, brand, priceNgn, family }, dupes);
+    },
+    ["pdp-variant-partition-v1"],
+    { revalidate: 1800, tags: ["pdp-partition"] },
+  );
+  const partition = await fetchPartitionCached(
+    offer.product_id,
+    offer.title,
+    offer.brand,
+    anchorPriceNgn,
+    offer.category_slug ?? null,
+    countryFilteredDupes,
+  );
   const augmentedAnchorOffers = [
     ...anchorOffers,
     ...variantOffers(partition.likelyVariants),
