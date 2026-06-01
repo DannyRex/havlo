@@ -241,7 +241,20 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
   let secondaryStr: string | null = null;
   if (isCrossBorderForUser && !sameCcy) {
     if (dealCcy === "NGN") secondaryStr = `≈ ${formatCompact(deal.salePrice)}`;
-    else if (dealCcy === "USD") secondaryStr = `≈ ${formatUSDPrice(deal.salePrice)}`;
+    else if (dealCcy === "USD") {
+      /* The stored "USD" is only the store's REAL currency for
+         genuinely dollar-native sources: global-intl marketplaces
+         (AliExpress / DHgate, which have no country anchor) and
+         US-anchored stores. For a store anchored to a specific non-US
+         country (a UK or DE retailer whose listing SerpAPI normalised
+         to USD at ingest), "≈ $X" wrongly implies that store prices in
+         dollars — the same class of bug the isCrossBorderForUser gate
+         already fixed for LOCAL stores. Suppress the native hint there;
+         the primary user-currency line + landed total still carry the
+         price honestly. */
+      const usdIsNative = dealStoreCountry === null || dealStoreCountry.toLowerCase() === "us";
+      secondaryStr = usdIsNative ? `≈ ${formatUSDPrice(deal.salePrice)}` : null;
+    }
     else secondaryStr = `≈ ${formatLocal(deal.salePrice, { ...country, currency: dealCcy } as Country)}`;
   }
 
@@ -350,10 +363,10 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
                Lighthouse target-size minimum (was ~23px tall at py-1). */
             className="absolute left-2 top-2 group/cashback inline-flex min-h-[24px] items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-white shadow-sm hover:brightness-110 hover:shadow-md active:brightness-95 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:outline-none"
             style={{ background: "rgba(16, 185, 129, 0.95)" }}
-            aria-label={`Earn ${cashback.percent}% cashback. Open cashback details.`}
+            aria-label={`Earn ${cashback.percent}% cashback when it launches. Open cashback details.`}
           >
             <span className="group-hover/cashback:underline underline-offset-2 decoration-white/80">
-              Earn {cashback.percent}%
+              Earn {cashback.percent}% soon
             </span>
             <svg
               width="10"
