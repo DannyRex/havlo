@@ -11,6 +11,7 @@ import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList, buildItemListJs
 import type { SeoDeal } from "@/lib/seo";
 import { isSyntheticId } from "@/lib/pdp-url";
 import type { Deal } from "@/types";
+import type { ProductGroup } from "@/lib/search";
 
 export async function generateMetadata({
   params,
@@ -150,6 +151,67 @@ async function fetchInitialDeals(
   }
 }
 
+/* Confidence gate for the best-price header.
+
+   A Hero freeform search lands on /deals?search=…; we only want the
+   "Best price across stores" comparison card when the query clearly
+   denotes ONE product, not when it's a bare category or brand
+   ("sneakers", "laptops", "adidas"). Two cheap, deterministic signals:
+     1. >= 2 meaningful tokens. Single-token queries at this surface
+        are overwhelmingly categories/brands — too broad for a single-
+        product price claim.
+     2. The anchor title contains a strong majority of the query
+        tokens, i.e. the FTS top hit actually IS what they searched —
+        guards against FTS latching onto a tangential product via one
+        shared word. */
+function isConfidentProductQuery(search: string, anchorTitle: string): boolean {
+  const STOP = new Set([
+    "the", "a", "an", "for", "with", "and", "of", "in", "on", "new",
+    "best", "cheap", "cheapest", "price", "prices", "deal", "deals", "buy", "sale",
+  ]);
+  const tokenize = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  const qTokens = tokenize(search).filter((t) => !STOP.has(t));
+  if (qTokens.length < 2) return false;
+  const titleTokens = new Set(tokenize(anchorTitle));
+  const hits = qTokens.filter((t) => titleTokens.has(t)).length;
+  return hits >= Math.ceil(qTokens.length * 0.6);
+}
+
+/* Resolve the landing search to a confident cross-store comparison
+   anchor, or null. Calls our own /api/compare on its FTS q-path —
+   which does NOT fan out to live-search (that's a separate client-side
+   /api/live-search call) and does NOT invoke the LLM judge (that lives
+   only on the pid path, pgFtsFindByProductId). So this stays cheap and
+   reuses /api/compare's 1h edge cache. The anchor is returned only
+   when it's a genuine multi-store comparison (>= 2 DISTINCT stores)
+   for a confident product query. */
+async function fetchComparisonForSearch(
+  search: string,
+  countryCode: string,
+): Promise<{ anchor: ProductGroup; query: string } | null> {
+  const q = search.trim();
+  if (!q) return null;
+  try {
+    const h = headers();
+    const host  = h.get("x-forwarded-host") ?? h.get("host") ?? "havlo.io";
+    const proto = h.get("x-forwarded-proto") ?? "https";
+    const url = `${proto}://${host}/api/compare?q=${encodeURIComponent(q)}&country=${encodeURIComponent(countryCode)}`;
+    const res = await fetch(url, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data?.mode !== "similar" || !data.anchor) return null;
+    const anchor = data.anchor as ProductGroup;
+    const distinctStores = new Set((anchor.offers ?? []).map((o) => o.storeId)).size;
+    if (distinctStores < 2) return null;
+    if (!isConfidentProductQuery(q, anchor.title)) return null;
+    return { anchor, query: q };
+  } catch (err) {
+    console.error("[fetchComparisonForSearch] threw", (err as Error).message);
+    return null;
+  }
+}
+
 export default async function DealsPage({
   params,
   searchParams,
@@ -178,15 +240,25 @@ export default async function DealsPage({
      founder direction May 2026 to revert to local-first). When the
      URL has no ?origin=, we fetch the local pool server-side so
      SSR + client first-paint agree. */
-  const initial = await fetchInitialDeals({
-    country:  country.code,
-    category: pickFirst("category"),
-    tier:     pickFirst("minDiscount"),
-    sort:     pickFirst("sort"),
-    search:   pickFirst("search"),
-    origin:   pickFirst("origin") ?? "local",
-    stores:   pickFirst("stores"),
-  });
+  const searchParam = pickFirst("search");
+  /* Resolve the feed AND (only for a freeform text search) a possible
+     cross-store best-price header in parallel, so the comparison probe
+     adds no serial latency to the page. fetchComparisonForSearch is
+     self-gating: it returns null for ambiguous/category queries and
+     anything without >= 2 distinct stores, so we always attempt it when
+     a search is present and let it decide. */
+  const [initial, comparison] = await Promise.all([
+    fetchInitialDeals({
+      country:  country.code,
+      category: pickFirst("category"),
+      tier:     pickFirst("minDiscount"),
+      sort:     pickFirst("sort"),
+      search:   searchParam,
+      origin:   pickFirst("origin") ?? "local",
+      stores:   pickFirst("stores"),
+    }),
+    searchParam ? fetchComparisonForSearch(searchParam, country.code) : Promise.resolve(null),
+  ]);
 
   /* ItemList JSON-LD over the SSR'd first page, so the structured
      product list matches the cards actually present in the initial
@@ -242,6 +314,7 @@ export default async function DealsPage({
           initialHasMore={initial?.hasMore}
           initialOriginCounts={initial?.originCounts}
           initialStoreOptions={initial?.storeOptions}
+          initialComparison={comparison}
         />
       </Suspense>
 

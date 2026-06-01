@@ -12,11 +12,13 @@ import AnimateIn from "@/components/ui/AnimateIn";
 import EmptySearchState from "@/components/empty/EmptySearchState";
 import CategorySubscribe from "./CategorySubscribe";
 import LiveResults from "@/components/compare/LiveResults";
+import CompareAnchorCard from "@/components/compare/CompareAnchorCard";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { cn } from "@/lib/utils";
 import { categories } from "@/lib/data/categories";
 import { logSearchEvent } from "@/lib/search/log-search";
 import type { Deal, DiscountTier, OriginFilter, SortOption } from "@/types";
+import type { ProductGroup } from "@/lib/search";
 
 type ViewMode = "grid" | "list";
 const VIEW_STORAGE_KEY = "havlo:deals:viewMode";
@@ -99,6 +101,14 @@ interface DealFeedProps {
      parses the URL ?stores=… into a Set<string> for the selected-
      stores state below. */
   initialStoreOptions?: Array<{ id: string; name: string; count: number }>;
+  /* Server-computed best-price comparison for the landing search
+     query (Hero freeform search → /deals?search=). Present only when
+     the FTS top hit is a confident single product with >=2 store
+     offers — the gate lives in deals/page.tsx so the cost is paid
+     once, server-side, with the /api/compare edge cache. Rendered as
+     a CompareAnchorCard header above the grid while the on-page search
+     still matches this query. null/absent → grid only. */
+  initialComparison?: { anchor: ProductGroup; query: string } | null;
 }
 
 export default function DealFeed({
@@ -107,6 +117,7 @@ export default function DealFeed({
   initialHasMore,
   initialOriginCounts,
   initialStoreOptions,
+  initialComparison,
 }: DealFeedProps = {}) {
   /* Read initial filter state from URL params so /deals?category=phones
      (linked from homepage CategoryGrid tiles) lands on the correct
@@ -668,6 +679,15 @@ export default function DealFeed({
           ? { total: originCounts.intl, deals: originCounts.intlDeals }
           : { total: originCounts.all, deals: originCounts.allDeals };
 
+  /* Show the best-price comparison header only while the on-page
+     search box still holds the landing query the server resolved the
+     comparison from. Editing the search (or clearing it) drops the
+     now-stale card and hands filtering back to the grid. Trimmed +
+     lower-cased so trivial differences don't flicker the card. */
+  const showComparisonHeader =
+    !!initialComparison &&
+    searchDebounced.trim().toLowerCase() === initialComparison.query.trim().toLowerCase();
+
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-8 sm:py-12">
 
@@ -791,6 +811,28 @@ export default function DealFeed({
       <p className="text-[11px] text-ink-3 mb-4 px-4">
         Filter the deals shown below by typing. Use the Stores button to narrow by retailer.
       </p>
+
+      {/* Best-price-across-stores header. Appears when the visitor
+          arrived from a Hero freeform search that the server resolved
+          to a confident single product (gate in deals/page.tsx) and
+          the filter box still holds that landing query. Reuses the
+          /compare anchor card; dupes are [] here because the grid below
+          already IS the "more matches" surface, so the card stays a
+          pure price-comparison header rather than sprouting its own
+          alternatives connector. */}
+      {showComparisonHeader && initialComparison && (
+        <div className="mb-2">
+          <p className="max-w-3xl mx-auto text-[11px] font-bold uppercase tracking-[0.12em] text-ink-3 mb-3 px-1">
+            Best price across stores
+          </p>
+          <CompareAnchorCard
+            anchor={initialComparison.anchor}
+            dupes={[]}
+            country={country}
+            query={initialComparison.query}
+          />
+        </div>
+      )}
 
       {/* Invalid-category info chip — addresses Bucket 2#17 from QA
           audit. When the URL ?category= param doesn't match any
