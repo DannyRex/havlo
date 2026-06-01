@@ -8,9 +8,12 @@
         Only ~60 of those files are actually bundled, so long-tail
         SerpAPI stores (jacamo, mercari, it-net, …) 404 here.
      2. The store's favicon via Google's s2 service, keyed on the
-        hostname of one of its merchant URLs. This is the same service
-        the homepage marquee (StoreLogoChip) uses and it renders real
-        logos for the vast majority of retailers.
+        store's CURATED canonical domain (resolveStoreDomain) when we
+        know it, else the hostname of one of its merchant URLs. Keying
+        on the curated domain first is the Finding #7 fix: the raw
+        merchant host could be a relay / Google-Shopping redirect /
+        mis-parsed URL, which made s2 hand back a generic Google globe
+        instead of the retailer's mark.
      3. A letter badge with the store's first character.
 
    The letter badge is ALWAYS rendered as the base layer; the logo
@@ -20,7 +23,7 @@
 
 import { useState } from "react";
 import { storeLogoInvertClass } from "@/lib/store-logo-invert";
-import { toAbsoluteMerchantUrl } from "@/lib/pdp-url";
+import { resolveStoreDomain } from "@/lib/store-domains";
 
 interface Props {
   storeId:      string;
@@ -38,22 +41,6 @@ interface Props {
   pad?: number;
 }
 
-/* Google s2 favicon for the store's own domain, derived from one of
-   its merchant URLs. Returns null for relay / internal / unparseable
-   URLs — those have no useful favicon (google.com would just give a
-   generic Google mark). toAbsoluteMerchantUrl unwraps the /api/go
-   relay wrapper so we read the real merchant hostname. */
-function faviconFromMerchantUrl(merchantUrl?: string): string | null {
-  if (!merchantUrl) return null;
-  try {
-    const host = new URL(toAbsoluteMerchantUrl(merchantUrl)).hostname.toLowerCase();
-    if (!host || host === "google.com" || host.endsWith(".google.com")) return null;
-    return `https://www.google.com/s2/favicons?domain=${host}&sz=64`;
-  } catch {
-    return null;
-  }
-}
-
 export default function StoreLogo({
   storeId,
   storeName,
@@ -62,7 +49,15 @@ export default function StoreLogo({
   size = 40,
   pad = 6,
 }: Props) {
-  const favicon = faviconFromMerchantUrl(merchantUrl);
+  /* Favicon source for the fallback tier. resolveStoreDomain prefers
+     the store's curated canonical domain (reliable brand icon) and only
+     falls back to the offer's own merchant host, returning null for
+     relay / Google / ad-redirect hosts so we degrade to the letter
+     badge rather than a wrong logo. Finding #7. */
+  const domain = resolveStoreDomain(storeId, storeName, merchantUrl);
+  const favicon = domain
+    ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+    : null;
 
   type Tier = "primary" | "favicon" | "letter";
   const [tier, setTier] = useState<Tier>(
