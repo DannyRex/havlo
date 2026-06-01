@@ -12,6 +12,7 @@ import { getPopularityRecord, type PopularityRecord } from "@/lib/popularity";
 import { searchCandidates } from "@/lib/search/query-expand";
 import { fetchOffersAt30dLow } from "@/lib/search/price-history";
 import { withTimeout } from "@/lib/promise-timeout";
+import { isCrossBorderStore } from "@/lib/country";
 
 interface BestOfferRow {
   product_id: string;
@@ -855,4 +856,71 @@ export async function listCountryStoresWithCounts(opts: {
     return [];
   }
   return (data ?? []) as DropdownStoreRow[];
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Shoppable-store universe per country.
+
+   "All stores you can shop with from {country}" = stores ANCHORED in
+   the country ∪ the cross-border globals reachable from it that
+   currently carry a live qualifying offer. Powers the homepage hero's
+   "scanning prices across N stores" so the headline reflects the real
+   per-market universe (NG ~75, IN ~132, ZA ~120, AE ~62, UK ~267,
+   US ~319) instead of the old hand-curated roster estimate (~28-38),
+   which read as inconsistent next to the per-country deals counts
+   immediately below the hero.
+
+   Built as the union of two RPC slices because
+   list_country_stores_with_counts is country-scoped ONLY for
+   origin="local"; for origin="all" it returns a GLOBAL roster (~900
+   stores, blind to p_country — a SQL-function bug, and the DB is
+   read-only so we correct it in app code):
+     • local  → trust as-is (country-scoped, untruncated, ≤ ~310).
+     • global → keep only rows on this country's cross-border allowlist
+                (isCrossBorderStore reads store id + name only). These
+                are high-volume so they survive the RPC's 1000-row cap.
+   Deduped by canonical display name. Held in lock-step with the /deals
+   "all" tab store count (countryCorrectDropdownRows in the deals route),
+   which computes the identical union, so the two surfaces agree on the
+   default view.
+
+   Plain Map cache (NOT unstable_cache — that throws "incrementalCache
+   missing" outside its narrow supported contexts here, same reason
+   getStoreCanonicalMap / fetchPoolCached use a Map). 15-min TTL ≈ the
+   homepage ISR window. A zero result (transient RPC failure) is NOT
+   cached, so the next render retries and the caller can fall back to
+   the static roster estimate. */
+const SHOPPABLE_COUNT_TTL_MS = 15 * 60 * 1000;
+const shoppableCountCache = new Map<string, { value: number; expires: number }>();
+
+export async function getShoppableStoreCount(countryCode: string): Promise<number> {
+  const key = countryCode.toLowerCase();
+  const now = Date.now();
+  const hit = shoppableCountCache.get(key);
+  if (hit && hit.expires > now) return hit.value;
+
+  const [localRows, globalRows] = await Promise.all([
+    listCountryStoresWithCounts({ country: countryCode, origin: "local" }),
+    listCountryStoresWithCounts({ country: countryCode, origin: "all" }),
+  ]);
+
+  const names = new Set<string>();
+  for (const r of localRows) {
+    if (r.store_name) names.add(displayStoreName(r.store_name).toLowerCase());
+  }
+  for (const r of globalRows) {
+    if (!r.store_name) continue;
+    if (isCrossBorderStore(
+      { storeId: r.store_id, storeName: r.store_name, currency: "", tags: [] },
+      countryCode,
+    )) {
+      names.add(displayStoreName(r.store_name).toLowerCase());
+    }
+  }
+
+  const value = names.size;
+  /* Don't cache a transient 0 — let the next render retry and the caller
+     fall back to the static roster estimate in the meantime. */
+  if (value > 0) shoppableCountCache.set(key, { value, expires: now + SHOPPABLE_COUNT_TTL_MS });
+  return value;
 }

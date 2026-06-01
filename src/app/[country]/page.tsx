@@ -16,6 +16,7 @@ import DealUnavailableBanner from "@/components/feedback/DealUnavailableBanner";
 import { COUNTRIES, getCountry } from "@/lib/country";
 import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList } from "@/lib/seo";
 import { getPopularPlaceholderExamples } from "@/lib/popular-placeholder-examples";
+import { getShoppableStoreCount } from "@/lib/providers/browse-db";
 import { proxiedImageUrl, downscaleCardImageUrl } from "@/lib/utils";
 
 /* Revalidate this page server-side every 30 min. Was 300s (5 min);
@@ -157,12 +158,22 @@ export default async function HomePage({ params }: { params: { country: string }
      so a flat 87 stores reads as inconsistent).
 
      The ROSTERS in StoreLogos.tsx are hand-curated per country
-     (NG=22, UK=22, US=21, DE=11, AE=12, IN=11, ZA=10). They are
-     the same dataset the marquee renders. If the live DB has more
-     stores than the roster (audit showed UK ~32 distinct stores
-     in DB vs 22 in roster), upgrade ROSTERS rather than swap this
-     to a DB query — keeps a single source of truth. */
-  const storeCount = getStoreCountForCountry(country.code);
+     (NG=22, UK=22, US=21, DE=11, AE=12, IN=11, ZA=10) and drive the
+     marquee. They under-counted the real shoppable universe, though:
+     a NG visitor can shop ~75 stores (12 NG-local + 63 cross-border
+     globals), a UK visitor ~267 — and a flat ~28-38 roster estimate
+     read as inconsistent next to the per-country deals counts below.
+
+     Per the May 2026 finding-3 directive ("homepage should be all
+     stores you're capable of shopping with on havlo"), the pill now
+     reads the live shoppable universe = stores anchored in this
+     country ∪ the cross-border globals carrying a live offer. This is
+     the IDENTICAL union the /deals "all" tab counts, so the two agree
+     on the default view. getStoreCountForCountry stays as the static
+     fallback when the RPC is unavailable during ISR regeneration
+     (helper returns 0 and declines to cache it). */
+  const shoppableCount = await getShoppableStoreCount(country.code);
+  const storeCount = shoppableCount > 0 ? shoppableCount : getStoreCountForCountry(country.code);
 
   /* Dynamic placeholder examples — pulled from the live catalog via
      suggest_diverse_popular_products RPC. One popular multi-store

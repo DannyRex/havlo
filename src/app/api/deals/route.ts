@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { spaceByStore } from "@/lib/providers/curated-helper";
 import { getServerCountry } from "@/lib/country-server";
-import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
+import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore, isCrossBorderStore } from "@/lib/country";
 import { isStoreSearchUrl } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import { fetchSearchSuggestions } from "@/lib/search/suggestions";
-import { listCountryStoresWithCounts, resolveCanonicalStoreFilter } from "@/lib/providers/browse-db";
+import { listCountryStoresWithCounts, resolveCanonicalStoreFilter, type DropdownStoreRow } from "@/lib/providers/browse-db";
 import type { Deal, OriginFilter, SortOption } from "@/types";
 
 /* Cached pool fetch — the heaviest part of /api/deals.
@@ -210,6 +210,69 @@ async function fetchPoolCached(params: {
    Route still behaves dynamically because of the searchParams read
    — no caching regression, just a header reconciliation. */
 
+/* Country-correct dropdown rows for the /deals store filter.
+
+   list_country_stores_with_counts is country-scoped ONLY for
+   origin="local"; for "all"/"intl" it returns a GLOBAL roster blind to
+   p_country (SQL-function bug; DB is read-only so we correct it here).
+   Left unfixed, a UK visitor's store filter lists Jumia / Flipkart /
+   Konga — NG/IN-anchored stores the country-filtered items grid never
+   shows — and the "N stores" pill reads ~900 for every market,
+   contradicting the homepage hero's per-country "scanning prices
+   across N stores".
+
+   We rebuild the country-correct slice app-side:
+     • local → the RPC as-is (already country-scoped, untruncated).
+     • intl  → the global roster narrowed to this country's cross-border
+               allowlist (isCrossBorderStore needs store id + name only).
+     • all   → local ∪ intl, deduped by store_id so a store surfacing in
+               both isn't summed twice by the canonical-name aggregator
+               downstream.
+   The "all" union matches getShoppableStoreCount (homepage hero), so the
+   two surfaces agree on the default (unfiltered) view. */
+async function countryCorrectDropdownRows(opts: {
+  countryCode: string;
+  category:    string | null | undefined;
+  minDiscount: number;
+  search:      string | null;
+  origin:      OriginFilter;
+}): Promise<DropdownStoreRow[]> {
+  const { countryCode, category, minDiscount, search, origin } = opts;
+  const base = { country: countryCode, category, minDiscount, search };
+  const onlyCrossBorder = (rows: DropdownStoreRow[]) =>
+    rows.filter((r) =>
+      isCrossBorderStore(
+        { storeId: r.store_id, storeName: r.store_name, currency: "", tags: [] },
+        countryCode,
+      ),
+    );
+
+  if (origin === "local") {
+    return listCountryStoresWithCounts({ ...base, origin: "local" });
+  }
+
+  if (origin === "intl") {
+    // The RPC's intl slice is the country-blind global roster; narrow it.
+    return onlyCrossBorder(await listCountryStoresWithCounts({ ...base, origin: "all" }));
+  }
+
+  // origin === "all": local ∪ cross-border, deduped by store_id. Both RPC
+  // slices fire in parallel (the global slice is country-blind, the local
+  // slice is country-scoped + untruncated).
+  const [global, local] = await Promise.all([
+    listCountryStoresWithCounts({ ...base, origin: "all" }),
+    listCountryStoresWithCounts({ ...base, origin: "local" }),
+  ]);
+  const seen = new Set<string>();
+  const out: DropdownStoreRow[] = [];
+  for (const r of [...local, ...onlyCrossBorder(global)]) {
+    if (seen.has(r.store_id)) continue;
+    seen.add(r.store_id);
+    out.push(r);
+  }
+  return out;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
@@ -353,8 +416,8 @@ export async function GET(req: NextRequest) {
         country: country.code,
         stores: realStoreIds,
       }),
-      listCountryStoresWithCounts({
-        country:     country.code,
+      countryCorrectDropdownRows({
+        countryCode: country.code,
         category:    category,
         minDiscount: userMinDiscount,
         search:      search ?? null,
@@ -362,7 +425,14 @@ export async function GET(req: NextRequest) {
            anchored stores, "Cross-border" shows only intl, "All"
            shows the union. Avoids dead-end UX where the user picks
            AliExpress from the Local tab and the items grid returns
-           zero results because the local filter excludes intl rows. */
+           zero results because the local filter excludes intl rows.
+
+           Wrapped in countryCorrectDropdownRows (above) because the
+           RPC is country-BLIND for origin all/intl — it would
+           otherwise list ~900 global stores (Jumia/Flipkart for a UK
+           visitor) and make the "N stores" pill disagree with the
+           homepage hero. The wrapper narrows all/intl to this
+           country's local roster ∪ cross-border allowlist. */
         origin:      origin,
       }),
       provider.getOriginCounts({
