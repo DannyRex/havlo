@@ -782,11 +782,14 @@ async function main() {
   }
 
   /* Exit code reflects severity so the GH Actions UI flags failed runs.
-     Non-zero exit + a failure-notification configured at repo level
-     gives the operator the "this needs attention" signal even outside
-     the email channel. */
+     ONLY an ERROR fails the run — those are data-integrity breaches
+     (sentinel leaks, broken is_deal prices, catastrophic in-stock drop)
+     that genuinely need a human. WARN findings (stale offers, uncurated
+     routing drift, orphan products) are "worth a look" trend signals,
+     not breakages: they still get emailed, but failing CI on them would
+     train the operator to ignore a perpetually-red check. Green-unless-
+     broken keeps the red X meaningful. */
   if (findings.some((f) => f.severity === "ERROR")) process.exit(1);
-  if (findings.some((f) => f.severity === "WARN"))  process.exit(1);
   process.exit(0);
 }
 
