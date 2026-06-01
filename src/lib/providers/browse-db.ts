@@ -232,6 +232,16 @@ async function searchDealsViaFts(
   return finalDeals.map((d) => lowSet.has(d.id) ? { ...d, at30DayLow: true } : d);
 }
 
+/* Browse-path cache for getOriginCounts — see the note inside the method.
+   The browse path fires 4-6 exact-count scans per /deals request; the
+   result only moves on ingest, so a short TTL spares Supabase that IO.
+   The search path is excluded (unbounded keyspace, already shares the
+   FTS pipeline). Size-capped with FIFO eviction so it can't grow without
+   bound under arbitrary ?minDiscount= values. */
+const ORIGIN_COUNTS_TTL_MS = 5 * 60 * 1000;
+const ORIGIN_COUNTS_MAX_ENTRIES = 200;
+const originCountsCache = new Map<string, { value: OriginCounts; expires: number }>();
+
 export const dbBrowseProvider: BrowseProvider = {
   id: "db-products",
   name: "DB (live ingested products)",
@@ -610,6 +620,29 @@ export const dbBrowseProvider: BrowseProvider = {
       return { all: rows.length, local, intl };
     }
 
+    /* Browse path is deterministic for a given filter and runs on every
+       /deals request — memoise it (see originCountsCache note above) so
+       Supabase doesn't re-scan for the 4-6 exact head-counts each time.
+       The homepage and the deals dropdown share these filter keys, so one
+       render warms the cache the other reuses. */
+    const countsKey = [
+      q.country?.toUpperCase() ?? "",
+      (q.categorySlug && q.categorySlug !== "all") ? q.categorySlug : "",
+      typeof q.minDiscount === "number" && q.minDiscount > 0 ? q.minDiscount : 0,
+      (q.stores && q.stores.length > 0) ? [...q.stores].sort().join(",") : "",
+    ].join("|");
+    const countsNow = Date.now();
+    const cachedCounts = originCountsCache.get(countsKey);
+    if (cachedCounts && cachedCounts.expires > countsNow) return cachedCounts.value;
+    const cacheCounts = (value: OriginCounts): OriginCounts => {
+      if (originCountsCache.size >= ORIGIN_COUNTS_MAX_ENTRIES) {
+        const oldest = originCountsCache.keys().next().value;
+        if (oldest !== undefined) originCountsCache.delete(oldest);
+      }
+      originCountsCache.set(countsKey, { value, expires: countsNow + ORIGIN_COUNTS_TTL_MS });
+      return value;
+    };
+
     /* BROWSE PATH: no search query. Head-count queries — cheap,
        exact, no row payload, NOT subject to the db-max-rows=1000
        cap that affects ROW responses.
@@ -681,7 +714,7 @@ export const dbBrowseProvider: BrowseProvider = {
       const localDeals = localDealsRes.error ? undefined : (localDealsRes.count ?? 0);
       const intlDeals  = intlDealsRes.error  ? undefined : (intlDealsRes.count  ?? 0);
       const allDeals   = (localDeals !== undefined && intlDeals !== undefined) ? localDeals + intlDeals : undefined;
-      return { all: local + intl, local, intl, allDeals, localDeals, intlDeals };
+      return cacheCounts({ all: local + intl, local, intl, allDeals, localDeals, intlDeals });
     }
 
     const [allRes, localRes, intlRes, allDealsRes, localDealsRes, intlDealsRes] = await Promise.all([
@@ -696,14 +729,14 @@ export const dbBrowseProvider: BrowseProvider = {
       baseFilter(supa.from("product_best_offers")).eq("is_international", true).gt("discount_percent", 0),
     ]);
 
-    return {
+    return cacheCounts({
       all:        allRes.count        ?? 0,
       local:      localRes.count      ?? 0,
       intl:       intlRes.count       ?? 0,
       allDeals:   allDealsRes.error   ? undefined : (allDealsRes.count   ?? 0),
       localDeals: localDealsRes.error ? undefined : (localDealsRes.count ?? 0),
       intlDeals:  intlDealsRes.error  ? undefined : (intlDealsRes.count  ?? 0),
-    };
+    });
   },
 };
 
@@ -830,6 +863,30 @@ export async function resolveCanonicalStoreFilter(
   return out;
 }
 
+/* Per-instance cache for the dropdown RPC.
+
+   Why: this RPC runs on every /deals request, and Finding 3's
+   country-correct union now issues it TWICE for the default origin=all
+   tab (local ∪ cross-border). getShoppableStoreCount (homepage hero)
+   calls it twice more. Supabase flagged the project for Disk IO budget
+   depletion, so the browse path (no free-text search) is memoised here.
+
+   The cache key intentionally omits search: search varies per
+   keystroke-driven request, so caching it would grow the Map without
+   bound for a near-zero hit rate — those requests bypass the cache.
+   Everything else (country/category/minDiscount/origin) is a small,
+   discrete keyspace shared across the homepage hero and the deals
+   dropdown, so a homepage render warms the cache the deals page reuses
+   and vice versa.
+
+   5-min TTL: store rosters and qualifying counts only move on ingest
+   (cron-driven, infrequent), so brief staleness in a store dropdown is
+   imperceptible. Size-capped (FIFO eviction) so an adversarial
+   ?minDiscount=<arbitrary> can't grow it without bound. */
+const COUNTRY_STORES_TTL_MS = 5 * 60 * 1000;
+const COUNTRY_STORES_MAX_ENTRIES = 300;
+const countryStoresCache = new Map<string, { rows: DropdownStoreRow[]; expires: number }>();
+
 export async function listCountryStoresWithCounts(opts: {
   country:     string;
   category?:   string | null;
@@ -844,18 +901,40 @@ export async function listCountryStoresWithCounts(opts: {
 }): Promise<DropdownStoreRow[]> {
   const supa = getSupabaseAdmin();
   if (!supa) return [];
+
+  const country     = opts.country.toUpperCase();
+  const category    = (opts.category && opts.category !== "all") ? opts.category : null;
+  const minDiscount = opts.minDiscount ?? 0;
+  const origin      = opts.origin ?? "all";
+  const search      = opts.search?.trim() || null;
+
+  const cacheKey = search ? null : `${country}|${category ?? ""}|${minDiscount}|${origin}`;
+  const now = Date.now();
+  if (cacheKey) {
+    const hit = countryStoresCache.get(cacheKey);
+    if (hit && hit.expires > now) return hit.rows;
+  }
+
   const { data, error } = await supa.rpc("list_country_stores_with_counts", {
-    p_country:      opts.country.toUpperCase(),
-    p_category:     (opts.category && opts.category !== "all") ? opts.category : null,
-    p_min_discount: opts.minDiscount ?? 0,
-    p_search:       opts.search?.trim() || null,
-    p_origin:       opts.origin ?? "all",
+    p_country:      country,
+    p_category:     category,
+    p_min_discount: minDiscount,
+    p_search:       search,
+    p_origin:       origin,
   });
   if (error) {
     console.warn("[browse-db] list_country_stores_with_counts RPC error:", error.message);
     return [];
   }
-  return (data ?? []) as DropdownStoreRow[];
+  const rows = (data ?? []) as DropdownStoreRow[];
+  if (cacheKey && rows.length > 0) {
+    if (countryStoresCache.size >= COUNTRY_STORES_MAX_ENTRIES) {
+      const oldest = countryStoresCache.keys().next().value;
+      if (oldest !== undefined) countryStoresCache.delete(oldest);
+    }
+    countryStoresCache.set(cacheKey, { rows, expires: now + COUNTRY_STORES_TTL_MS });
+  }
+  return rows;
 }
 
 /* ──────────────────────────────────────────────────────────────────
