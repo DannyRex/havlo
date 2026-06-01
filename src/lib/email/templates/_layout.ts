@@ -283,6 +283,19 @@ export function paragraph(html: string): string {
   </tr>`;
 }
 
+/* Footnote — small muted line for secondary notes, e.g. the one-click
+   unsubscribe link under the digest signature. 12px / ink-3 so it reads
+   as fine print, not body copy. Caller may pass raw HTML (links). */
+export function footnote(html: string): string {
+  return `<tr>
+    <td class="px-mobile" style="padding:0 32px 8px 32px;">
+      <p class="text-ink-3" style="margin:0;font-family:${tokens.fontFamily};font-size:12px;line-height:1.5;color:${tokens.ink3};">
+        ${html}
+      </p>
+    </td>
+  </tr>`;
+}
+
 /* Signature line — author name + brand on a second line. */
 export function signature(name: string): string {
   return `<tr>

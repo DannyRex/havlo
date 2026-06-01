@@ -39,6 +39,10 @@ interface SendOptions {
   replyTo?:  string;
   /** Resend tags for dashboard filtering / analytics. */
   tags?:     { name: string; value: string }[];
+  /** Custom SMTP headers. Used for RFC 8058 List-Unsubscribe /
+      List-Unsubscribe-Post on the newsletter digest so mailbox
+      providers surface a native one-click unsubscribe. */
+  headers?:  Record<string, string>;
 }
 
 interface SendResult {
@@ -78,6 +82,7 @@ export async function sendEmail(opts: SendOptions): Promise<SendResult> {
       text: opts.text,
       replyTo,
       tags: opts.tags,
+      headers: opts.headers,
     });
 
     if (error) {

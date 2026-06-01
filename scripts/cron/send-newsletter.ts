@@ -41,6 +41,7 @@ import { getActiveBrowseProvider } from "../../src/lib/providers";
 import { filterDealsForCountry, getCountry, inferStoreCountry, formatLocal, USD_FX } from "../../src/lib/country";
 import { newsletterDigest } from "../../src/lib/email/templates/newsletter-digest";
 import { sendEmail } from "../../src/lib/email/send";
+import { unsubscribeLink, unsubscribeHeaders } from "../../src/lib/email/unsubscribe-token";
 import { categories } from "../../src/lib/data/categories";
 import { getClickThroughUrl } from "../../src/lib/utils";
 import { appendSignature } from "../../src/lib/go-signing";
@@ -258,11 +259,16 @@ async function main() {
     const catLabel = cat
       ? categories.find((c) => c.slug === cat)?.name ?? cat
       : undefined;
+    /* Per-recipient unsubscribe. The deal DATA is cached per (country,
+       category) bucket, but the digest itself is rendered fresh for
+       each subscriber here, so signing the link with THIS inbox's
+       address is safe — no cross-recipient leakage. */
     const email = newsletterDigest({
-      country:       cc,
-      category:      cat || null,
-      categoryLabel: catLabel,
+      country:        cc,
+      category:       cat || null,
+      categoryLabel:  catLabel,
       deals,
+      unsubscribeUrl: unsubscribeLink(sub.email),
     });
 
     if (args.dryRun) {
@@ -281,6 +287,10 @@ async function main() {
         { name: "country",  value: cc },
         { name: "slug",     value: cat || "all" },
       ],
+      /* RFC 8058 one-click unsubscribe. Gmail / Apple Mail / Yahoo
+         surface a native "Unsubscribe" control from these and POST the
+         signed https target — required for bulk-sender compliance. */
+      headers: unsubscribeHeaders(sub.email),
     });
     if (result.ok) {
       console.log(`   ✓ ${sub.email}`);

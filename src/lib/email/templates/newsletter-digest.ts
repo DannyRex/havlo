@@ -20,6 +20,7 @@ import {
   button,
   signature,
   spacer,
+  footnote,
   escapeHtml,
   plainTextShell,
   type DealCardData,
@@ -36,6 +37,12 @@ interface Args {
   categoryLabel?: string;
   /** The deals themselves — pre-filtered and ranked by the cron. */
   deals: DealCardData[];
+  /** Per-recipient one-click unsubscribe URL (HMAC-signed, from
+      src/lib/email/unsubscribe-token.ts). When set, the digest renders
+      a footer unsubscribe link in both HTML and plain text. The cron
+      builds this fresh for each subscriber, so it must never be cached
+      across recipients. */
+  unsubscribeUrl?: string;
 }
 
 interface Email {
@@ -57,7 +64,7 @@ function opener(category: string | null): string {
   return `Here's today's strongest price drops across the stores you already know. We pulled these from this morning's scrape.`;
 }
 
-export function newsletterDigest({ country, category, categoryLabel, deals }: Args): Email {
+export function newsletterDigest({ country, category, categoryLabel, deals, unsubscribeUrl }: Args): Email {
   const cc = (country ?? "ng").toLowerCase();
   const dealsUrl = `${SITE_URL}/${cc}/deals`;
 
@@ -84,6 +91,18 @@ export function newsletterDigest({ country, category, categoryLabel, deals }: Ar
 
   const dealsHtml = deals.map(dealCard).join("\n");
 
+  /* Footer unsubscribe line. Only rendered when the cron supplies a
+     per-recipient signed URL. The visible link lands on the branded
+     /unsubscribe-newsletter page; the mailbox-native one-click control
+     is driven separately by the List-Unsubscribe headers the cron sets
+     on the send. */
+  const unsubFootnote = unsubscribeUrl
+    ? footnote(
+        `You're getting this because you signed up for Havlo deal alerts. ` +
+        `<a href="${escapeHtml(unsubscribeUrl)}" style="color:inherit;text-decoration:underline;">Unsubscribe in one click</a>.`,
+      )
+    : "";
+
   const body = `
 ${heading1(headlineH1)}
 ${paragraph(escapeHtml(intro))}
@@ -93,6 +112,7 @@ ${spacer(8)}
 ${button({ url: dealsUrl, label: `See all today's deals` })}
 ${signature("Danny")}
 ${spacer(8)}
+${unsubFootnote}
 `;
 
   const html = shellMarketing({ preheader, body });
@@ -115,6 +135,9 @@ ${spacer(8)}
       ``,
       ...dealLines,
       `See all: ${dealsUrl}`,
+      ...(unsubscribeUrl
+        ? [``, `Unsubscribe in one click: ${unsubscribeUrl}`]
+        : []),
     ],
   });
 
