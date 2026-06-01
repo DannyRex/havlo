@@ -447,6 +447,74 @@ export function shareAllSizeTokens(a: string, b: string): boolean {
   return true;
 }
 
+/* ── Fashion identity: audience + explicit size ────────────────
+   Finding #6 (May 2026 QA): fashion pooling was too loose on two
+   axes the existing gates ignore.
+
+     1. SIZE. extractSizeTokens only recognises oz/ml/gb/inch style
+        units, so apparel + footwear sizing (S/M/L/XL, UK 8, EU 42,
+        "size 10") never registered — and the lenient family skips
+        the size gate entirely anyway. A UK 6 trainer therefore
+        shared a spectrum with a UK 11, and the "cheapest across N
+        stores" number could be quoting a size the shopper can't buy.
+     2. AUDIENCE. men/women/kids live in STOP_WORDS (stripped before
+        token overlap) with no dedicated gate, so a men's hoodie
+        pooled with a women's hoodie — genuinely different SKUs with
+        different cuts.
+
+   Both new gates are deliberately HIGH-PRECISION: they only bite when
+   BOTH sides carry the signal, so the common title that omits size or
+   gender still pools (no return to the "1 store" collapse the lenient
+   family was created to avoid). The bias matches every prior pooling
+   fix — under-pool (honest) over over-pool (misleading). */
+
+/* Audience/gender of an apparel item. `unisex` is a wildcard
+   (returns null so it matches anything). women is checked before men
+   so the "men" substring inside "women" can never win; kids folds in
+   boys/girls/children/junior. Word-boundaried so brand/model noise
+   ("OMEN", "Germany") can't trip it. */
+export function extractAudience(title: string): "men" | "women" | "kids" | null {
+  const lc = title.toLowerCase();
+  if (/\bunisex\b/.test(lc)) return null;
+  if (/\b(?:women|woman|womens|ladies|female)\b/.test(lc)) return "women";
+  if (/\b(?:kids?|child|children|boys?|girls?|toddler|infant|junior|youth)\b/.test(lc)) return "kids";
+  if (/\b(?:men|man|mens|male|gents?)\b/.test(lc)) return "men";
+  return null;
+}
+
+/* Explicit fashion size tokens, namespaced by scale so different
+   scales never accidentally match:
+     "size 10" / "sz 9.5"        → n10 / n9.5   (numeric clothing/shoe)
+     "size XL" / standalone XXL  → axl / axxl   (letter clothing)
+     "UK 8" / "EU 42" / "US 9.5" → uk8 / eu42 / us9.5  (region shoe)
+   Bare single letters S/M/L are intentionally NOT matched standalone
+   (too ambiguous against model letters) — only when prefixed by the
+   literal word "size"/"sz", or the unambiguous XS/XL/XXL+ forms. */
+export function extractFashionSize(title: string): string[] {
+  const lc = title.toLowerCase();
+  const out = new Set<string>();
+  for (const m of Array.from(lc.matchAll(/\b(?:size|sz)\s*[:.]?\s*(\d{1,2}(?:\.5)?)\b/g))) out.add(`n${m[1]}`);
+  for (const m of Array.from(lc.matchAll(/\b(?:size|sz)\s*[:.]?\s*(xxs|xs|s|m|l|xl|xxl|xxxl|[234]xl)\b/g))) out.add(`a${m[1]}`);
+  for (const m of Array.from(lc.matchAll(/\b(uk|eu|us)\s?(\d{1,2}(?:\.5)?)\b/g))) out.add(`${m[1]}${m[2]}`);
+  for (const m of Array.from(lc.matchAll(/\b(xxs|xs|xl|xxl|xxxl|[234]xl)\b/g))) out.add(`a${m[1]}`);
+  return Array.from(out);
+}
+
+/* True when BOTH titles declare an explicit fashion size and the two
+   sets are fully DISJOINT — i.e. there is no size they share. Disjoint
+   (rather than the strict set-equality shareAllSizeTokens uses) so a
+   multi-size listing ("Nike Tee S M L XL") still pools with a single
+   "Nike Tee XL", while "UK 6" vs "UK 11" correctly splits. Returns
+   false (no conflict) whenever either side omits size, preserving the
+   lenient-family pooling for untagged titles. */
+export function fashionSizesConflict(a: string, b: string): boolean {
+  const sa = extractFashionSize(a);
+  const sb = extractFashionSize(b);
+  if (sa.length === 0 || sb.length === 0) return false;
+  const setB = new Set(sb);
+  return !sa.some((s) => setB.has(s));
+}
+
 /* ── Variant-aware same-product detection ──────────────────────
    Decides whether a search-result candidate is likely the SAME
    product as the anchor, not just a similar one. Used by the
@@ -736,6 +804,17 @@ export function isLikelySameProduct(
   const cType = extractProductType(candidate.title);
   if (aType && cType && aType !== cType) return false;
 
+  /* Audience/gender discriminator (Finding #6). A men's garment and a
+     women's garment of the otherwise-identical line are different
+     products with different cuts + SKUs; kids vs adult likewise.
+     High-precision: only rejects when BOTH titles state an audience
+     and they differ. unisex resolves to null (wildcard) so it never
+     blocks a match. Bites fashion mostly, but also correctly splits
+     "gents" vs "ladies" watches. */
+  const aAud = extractAudience(anchor.title);
+  const cAud = extractAudience(candidate.title);
+  if (aAud && cAud && aAud !== cAud) return false;
+
   /* Token-overlap sanity gate. The type gate above catches the
      cap/shorts/shoe/jacket class, but same-type same-brand pairs
      can still be DIFFERENT products: "Nike running shoes" vs "Nike
@@ -785,8 +864,25 @@ export function isLikelySameProduct(
      accepted because that's "candidate lacks anchor's identity",
      which the bidirectional fail above already covers via
      candidateHasAllNumbers. */
-  const aNumbers = extractRequiredNumbers(anchor.title);
-  const cNumbers = extractRequiredNumbers(candidate.title);
+  /* Strip apparel/footwear size numbers before the digits are read as
+     model-identity markers. In "Nike Air Max 95 UK 6" the "6" is a
+     SIZE, not a model number, so it must NOT be required of a base
+     "Nike Air Max 95" listing — one side omitting the size cannot prove
+     a different SKU (the disjoint-size case is already rejected by
+     fashionSizesConflict above). extractFashionSize only matches
+     size/sz/UK/EU/US-glued and standalone S-XL patterns and returns []
+     for electronics titles, so this strip is inert outside fashion and
+     leaves true model numbers (Air Max 95, Ultraboost 22, iPhone 15)
+     fully enforced. Applied to both sides so the asymmetric case works
+     in either direction. Finding #6. */
+  const stripSizeNums = (title: string, nums: string[]): string[] => {
+    const sizeNums = new Set(
+      extractFashionSize(title).map((t) => t.replace(/[^0-9.]/g, "")).filter(Boolean),
+    );
+    return sizeNums.size === 0 ? nums : nums.filter((n) => !sizeNums.has(n));
+  };
+  const aNumbers = stripSizeNums(anchor.title, extractRequiredNumbers(anchor.title));
+  const cNumbers = stripSizeNums(candidate.title, extractRequiredNumbers(candidate.title));
   if (!candidateHasAllNumbers(candidate.title, aNumbers)) return false;
   if (aNumbers.length === 0 && cNumbers.length > 0) return false;
 
@@ -852,6 +948,14 @@ export function isLikelySameProduct(
         return false;
       }
     }
+  } else if (fashionSizesConflict(anchor.title, candidate.title)) {
+    /* Lenient family (fashion/beauty/sports): the numeric+unit size
+       gate above is skipped because apparel sizing (S/M/L, UK 8) never
+       matched that regex. But when BOTH titles name an explicit
+       apparel/footwear size and the sets are disjoint (UK 6 vs UK 11,
+       "size M" vs "size XL"), they are different SKUs and must not
+       share a spectrum. Finding #6. */
+    return false;
   }
 
   /* Price band — wider for non-electronics families because
