@@ -17,6 +17,11 @@
   --surface-2-rgb:     248 250 255;     /* brighter + faint cool undertone */
   --border-rgb:        222 226 234;     /* crisper edges */
   --border-strong-rgb: 190 196 207;
+  /* Skeleton fill — surface-2 (248/250/255) was only ~7 units off white and
+     read as invisible. This sits clearly darker than the border so loading
+     placeholders are legible, while keeping the cool undertone. Stays visible
+     across the full opacity pulse (≈236/238/242 at the 0.5 trough). */
+  --skeleton-rgb:      216 221 230;
 
   /* Ink (text) — richer secondary tones for stronger contrast on white */
   --ink-rgb:   15 23 42;     /* slate-900, slightly cooler */
@@ -43,6 +48,10 @@
   --surface-2-rgb:     27 31 40;
   --border-rgb:        44 49 60;
   --border-strong-rgb: 72 79 94;
+  /* Skeleton fill — lifted above surface-2 so placeholders separate clearly
+     from the cards they sit on (surface 19/22/29), staying legible through
+     the opacity pulse. */
+  --skeleton-rgb:      40 46 58;
 
   --ink-rgb:   246 248 251;
   --ink-2-rgb: 178 184 196;   /* was 163 neutral — brighter + cooler */
@@ -288,7 +297,7 @@ h1, h2, h3, h4, h5, h6 {
      removed. prefers-reduced-motion (below) freezes it for users who
      opt out. */
   .skeleton {
-    background: rgb(var(--surface-2-rgb));
+    background: rgb(var(--skeleton-rgb));
     /* Mirrors Tailwind's animate-pulse exactly (2s, same easing, 1→0.5
        opacity) — the de-facto "normal" skeleton cue, and already what
        the /compare chip-rail placeholder uses, so the two stay in
