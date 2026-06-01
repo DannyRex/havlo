@@ -57,6 +57,12 @@ function dupeToDeal(d: DupeResult): Deal {
     salePrice:       best.price,
     discountPercent: best.discountPercent || 0,
     currency:        best.currency,
+    /* Thread the DB-authoritative store_country through so MasonryCard's
+       cross-border check (resolveStoreCountry) classifies the alt rail
+       by the store's real market, not the USD-normalised currency. Was
+       dropped before June 2026, so long-tail UK/DE stores on a UK PDP's
+       "You may also like" rail leaked ≈ $X / INTL badges. */
+    storeCountry:    best.storeCountry ?? null,
     imageUrl:        d.imageUrl ?? best.imageUrl,
     url:             best.url,
     expiresAt:       null,

@@ -23,7 +23,7 @@
    client components, server components, or scripts. */
 
 import type { Country } from "./country";
-import { inferStoreCountry, isGlobalIntlStore } from "./country";
+import { isGlobalIntlStore, resolveStoreCountry } from "./country";
 
 /* Minimal offer shape we need to make the call. Subset of StoreOffer
    so the helper accepts both the dupes-engine StoreOffer AND any
@@ -33,6 +33,11 @@ export interface OfferLike {
   storeName:       string;
   currency:        "NGN" | "USD";
   isInternational: boolean;
+  /** DB-authoritative anchor market (stores.country, uppercase ISO).
+      Preferred over the JS roster when present — see
+      resolveStoreCountry. Optional so older call sites that don't
+      thread it through keep the inferStoreCountry-only behaviour. */
+  storeCountry?:   string | null;
   /** Base merchant price in NGN (the dupes engine normalises every
       offer to NGN regardless of source currency). */
   price:           number;
@@ -51,7 +56,7 @@ export interface OfferLike {
      3. Fall back to the currency-mismatch heuristic for unknown
         long-tail stores. */
 export function isCrossBorderForUser(offer: OfferLike, country: Country): boolean {
-  const storeCountry = inferStoreCountry(offer.storeId, offer.storeName);
+  const storeCountry = resolveStoreCountry(offer.storeId, offer.storeName, offer.storeCountry);
   if (storeCountry !== null) {
     return storeCountry.toLowerCase() !== country.code.toLowerCase();
   }

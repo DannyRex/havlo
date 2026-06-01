@@ -40,42 +40,39 @@ export function CountryProvider({ initialCode, children }: Props) {
   const router   = useRouter();
   const pathname = usePathname();
 
-  /* Resolution order: URL pathname → initialCode → cookie → default.
+  /* First-render resolution order: URL pathname → initialCode →
+     default. The cookie is resolved LATER, in the post-mount effect
+     below — NOT here.
 
-     CRITICAL: this runs during the useState initialiser, NOT in a
-     post-mount useEffect. The previous useEffect-based approach
-     left the OUTER root-layout CountryProvider rendering NG on
-     first paint (root layout has no initialCode, so initial state
-     was DEFAULT_COUNTRY). Users saw an NG flag briefly flash in
-     the navbar on country-scoped pages until the useEffect tick
-     ran — visible to the user as a wrong-country flash.
+     CRITICAL (hydration): the useState initialiser runs on BOTH the
+     server and the client's first render, so it MUST produce the same
+     value on both or every country-derived node (currency, flags,
+     country copy, conditional store rows) mismatches and React tears
+     the tree down (#418 / #425 / #423) on the client's first paint.
+     The previous version read window.location + document.cookie here,
+     which are unavailable during SSR: the server emitted NG while the
+     client's first render resolved the URL/cookie country, crashing
+     hydration site-wide on every non-NG PDP and on / with a saved
+     cookie. suppressHydrationWarning on the navbar flag can't absorb
+     that — it only covers one element, and structural diffs throw.
 
-     With the resolution in useState's lazy initialiser, the FIRST
-     client render already has the right country. SSR still emits
-     HTML using DEFAULT_COUNTRY (server has no window/cookie
-     access in this provider; cookies() would break ISR), so the
-     hydration produces a mismatch on country-derived UI — handled
-     by suppressHydrationWarning on the navbar flag wrapper.
+     The fix is to read the path via Next's usePathname() (NOT
+     window.location): usePathname() returns the SAME value during SSR
+     and the client's first render, so /uk/… resolves "uk" on both
+     sides — correct country in the initial HTML, no flash, no
+     hydration mismatch. Bare/global paths (/, /about) have no country
+     segment, so they fall back to initialCode/default for the first
+     render and pick up the saved cookie in the effect below (a single
+     post-hydration flag update on those surfaces only). usePathname()
+     does NOT opt the route into dynamic server rendering the way
+     cookies()/headers() would, so ISR is preserved.
 
-     May 2026 launch-readiness audit bug: URL pathname now wins
-     over initialCode. Previously `if (initialCode) return
-     initialCode` short-circuited the URL check, so a visitor on
-     /us with an NG cookie saw the NG flag persistently in the
-     navbar (root layout's initialCode = getServerCountry().code
-     = "ng" from the cookie). URL is the strongest signal — a
-     user on /us is definitionally browsing US, regardless of
-     their cookie state. */
+     URL wins over initialCode: a user on /us is definitionally
+     browsing US regardless of a stale cookie/initialCode. */
   const [code, setCode] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      const seg = window.location.pathname.split("/")[1]?.toLowerCase();
-      if (seg && COUNTRY_CODES.has(seg)) return seg;
-    }
-    if (initialCode) return initialCode;
-    if (typeof window !== "undefined") {
-      const cookie = readCookie(COUNTRY_COOKIE);
-      if (cookie && COUNTRY_CODES.has(cookie)) return cookie;
-    }
-    return DEFAULT_COUNTRY;
+    const seg = pathname.split("/")[1]?.toLowerCase();
+    if (seg && COUNTRY_CODES.has(seg)) return seg;
+    return initialCode ?? DEFAULT_COUNTRY;
   });
 
   /* Pathname-tracked re-sync. Without this, an in-app client
@@ -103,11 +100,30 @@ export function CountryProvider({ initialCode, children }: Props) {
      anything that doesn't (global pages like /about). */
   useEffect(() => {
     const seg = pathname.split("/")[1]?.toLowerCase();
-    if (seg && COUNTRY_CODES.has(seg) && seg !== code) {
-      setCode(seg);
-      writeCookie(COUNTRY_COOKIE, seg, 365);
+    if (seg && COUNTRY_CODES.has(seg)) {
+      /* URL carries a country — the strongest signal. Re-sync on every
+         navigation and keep the cookie in lockstep (middleware uses it
+         to resolve bare-path links). */
+      if (seg !== code) {
+        setCode(seg);
+        writeCookie(COUNTRY_COOKIE, seg, 365);
+      }
+      return;
     }
-  }, [pathname, code]);
+    /* Bare/global path (/, /about, legal pages): no country segment, so
+       honor a returning visitor's saved cookie preference. This runs
+       AFTER hydration, so it can't desync the server HTML — the cost is
+       a single post-mount flag update on these surfaces for non-default
+       visitors (absorbed by suppressHydrationWarning on the flag). The
+       guard keeps it a no-op for the inner [country] provider
+       (initialCode set) and when the cookie names the current country. */
+    if (!initialCode) {
+      const cookie = readCookie(COUNTRY_COOKIE);
+      if (cookie && COUNTRY_CODES.has(cookie) && cookie !== code) {
+        setCode(cookie);
+      }
+    }
+  }, [pathname, code, initialCode]);
 
   const setCountry = useCallback(
     (next: string) => {

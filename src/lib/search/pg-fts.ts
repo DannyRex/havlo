@@ -23,6 +23,7 @@ import { merchantTrust } from "@/lib/merchant-trust";
 import { partitionDupesByVariantMatch, variantOffers } from "./variant-pooling";
 import { partitionDupesByVariantMatchDeep } from "./variant-pooling-deep";
 import { priceLooksPlausible } from "./price-floor";
+import { isLooseCategoryModel } from "./normalize";
 import type {
   SearchOutput, ProductGroup, StoreOffer, DupeResult, SearchSuggestion,
 } from "./index";
@@ -244,6 +245,17 @@ export function isSignatureTightEnoughForPooling(sig: string | null | undefined)
      it's a refinement, not a primary identifier. */
   const [brand, model] = parts;
   if (!brand || brand === "?" || !model || model === "?") return false;
+  /* Reject brand|<category> signatures whose "model" is just a
+     Fashion / Beauty / personal-care category fallback (jacket,
+     mascara, sneakers, …). Those pool an entire category as if it
+     were one product and were over-claiming "compare across N stores
+     / save £X" on unrelated items — May 2026 E2E audit found one Next
+     jacket PDP pooling 17 stores at £24–£78 while its own price
+     history tracked a single store. Such products now resolve to a
+     solo pool (their own per-store offers, matched tightly via
+     GTIN/MPN/title_key at ingest) so the comparison count is honest.
+     They still surface in the dupes-based "you may also like" rail. */
+  if (isLooseCategoryModel(model)) return false;
   return true;
 }
 

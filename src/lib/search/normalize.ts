@@ -292,6 +292,65 @@ const PRODUCT_TYPES: string[] = [
 ];
 const PRODUCT_TYPES_BY_LENGTH = PRODUCT_TYPES.slice().sort((a, b) => b.length - a.length);
 
+/* LOOSE_CATEGORY_TYPES — the subset of PRODUCT_TYPES that are pure
+   category words (apparel, footwear, accessories, beauty, personal
+   care, health consumables). When findModel falls back to one of
+   these, the signature becomes brand|<category> — e.g. "next|jacket",
+   "maybelline|mascara" — which clusters an ENTIRE category, not a
+   single product.
+
+   That coarse cluster is fine for loose "you may also like" discovery
+   (a separate, dupes-based path), but it must NEVER drive a same-
+   product "compare prices across N stores / save £X" claim. May 2026
+   E2E audit caught one Next own-brand jacket PDP pooling 17 stores at
+   £24–£78 (3.25x spread) while its own price history showed a single
+   tracked store — proof the pool was a category over-merge, not one
+   product across 17 sellers.
+
+   Deliberately EXCLUDES the electronics / appliance type words (tv,
+   laptop, switch, watch, monitor, console, camera, …): several double
+   as legitimate model-line anchors ("nintendo|switch", "apple|watch")
+   and their rarer bare-type pools are already bounded by
+   computeAnchorStats' family-aware outlier band. Listing only the
+   unambiguous category words avoids false-blocking a real electronics
+   pool. */
+const LOOSE_CATEGORY_TYPES = new Set<string>([
+  /* Fashion — apparel */
+  "dress", "skirt", "shirt", "blouse", "pants", "trousers", "jeans",
+  "shorts", "jacket", "blazer", "coat", "sweater", "hoodie",
+  "tshirt", "tank", "top", "bodysuit", "jumpsuit", "playsuit",
+  "suit", "lingerie", "swimsuit", "bikini", "bra",
+  /* Fashion — footwear */
+  "sneakers", "shoes", "boots", "heels", "sandals", "slippers",
+  "loafers", "flats", "wedges", "trainers",
+  /* Fashion — accessories (watch excluded: doubles as Apple Watch) */
+  "bag", "handbag", "purse", "wallet", "backpack", "tote", "clutch",
+  "hat", "scarf", "gloves", "belt", "sunglasses",
+  /* Beauty — colour cosmetics */
+  "mascara", "lipstick", "foundation", "concealer", "eyeliner",
+  "primer", "blush", "bronzer", "highlighter", "eyeshadow",
+  "lipgloss", "lipbalm",
+  /* Beauty — skincare */
+  "moisturizer", "moisturiser", "serum", "cream", "lotion", "mask",
+  "cleanser", "toner", "sunscreen", "exfoliant", "essence",
+  /* Personal care */
+  "perfume", "cologne", "deodorant", "soap", "bodywash", "shampoo",
+  "conditioner", "razor", "trimmer", "toothpaste", "toothbrush",
+  /* Health consumables */
+  "vitamin", "supplement", "tablets", "capsules", "syrup",
+]);
+
+/* True when a signature's model slot is one of the pure-category
+   fallback words above (so the signature is brand|<category>, not
+   brand|<real model>). isSignatureTightEnoughForPooling uses this to
+   keep category over-merges out of same-product cross-store
+   comparison claims while still allowing them to cluster loosely
+   elsewhere. */
+export function isLooseCategoryModel(model: string | null | undefined): boolean {
+  if (!model) return false;
+  return LOOSE_CATEGORY_TYPES.has(model.toLowerCase().trim());
+}
+
 function findProductType(norm: string): string | null {
   /* Some titles concatenate words ("mini skirt" → "miniskirt"). The
      normalised string has spaces preserved, so we match on word

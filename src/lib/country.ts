@@ -1000,6 +1000,36 @@ export function inferStoreCountry(storeId: string, storeName: string): string | 
   return bestCountry;
 }
 
+/** DB-authoritative resolution of a store's anchor market.
+
+    Prefers stores.country (uppercase ISO, e.g. "UK" / "US" / "NG")
+    when present — it covers the ~600 long-tail stores backfilled by
+    migration 0037 (lookfantastic, refurbed-de, onbuy, asus-store-uk,
+    …) that the hardcoded JS rosters miss — and falls back to
+    inferStoreCountry (NG_STORES + COUNTRY_STORES roster matching) when
+    the DB value is absent (global stores like AliExpress, or surfaces
+    that don't carry store_country).
+
+    Mirrors the DB-first short-circuit in isOfferAllowedForCountry so
+    the DISPLAY layer (INTL badge, secondary-currency line, landed-cost
+    estimate) classifies a store the SAME way the pool gate does.
+
+    Before this, the display helpers used inferStoreCountry alone plus
+    a `!sameCcy` last-resort heuristic that misfired for UK / US / DE
+    stores whose SerpAPI rows are USD-normalised: a UK Currys offer
+    viewed by a UK user carried currency="USD" (not GBP) and, being
+    absent from the JS roster, fell through to the currency hint and
+    was wrongly tagged cross-border — surfacing an INTL badge and a
+    "≈ $X" / "≈ ₦X" secondary-currency leak on /uk rails. */
+export function resolveStoreCountry(
+  storeId: string,
+  storeName: string,
+  storeCountry?: string | null,
+): string | null {
+  if (storeCountry && storeCountry.trim()) return storeCountry.toUpperCase();
+  return inferStoreCountry(storeId, storeName);
+}
+
 /** Filter a deals list for the given country preference.
     - For NG: drop nothing locally, but still trim cross-border noise
       (Indian Flipkart shouldn't show on a Nigerian homepage)

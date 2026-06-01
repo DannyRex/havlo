@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   cleanTitle,
+  displayDiscountPct,
   downscaleCardImageUrl,
   formatCompact,
   formatUSDPrice,
@@ -24,7 +25,7 @@ import {
 import { displayStoreName } from "@/lib/store-display";
 import { useCountry } from "@/components/providers/CountryProvider";
 import {
-  USD_FX, formatLocal, inferStoreCountry, isGlobalIntlStore, type Country,
+  USD_FX, formatLocal, resolveStoreCountry, isGlobalIntlStore, type Country,
 } from "@/lib/country";
 import { getCashbackForStore } from "@/lib/cashback";
 import InfoTip from "@/components/ui/InfoTip";
@@ -145,7 +146,16 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
 
   const cleanedTitle = cleanTitle(deal.title);
   const saved = savings(deal.originalPrice, deal.salePrice);
-  const hasDiscount = deal.originalPrice > deal.salePrice && deal.discountPercent > 0;
+  /* OFF% derived from the prices actually shown (struck original →
+     sale), NOT the provider's deal.discountPercent. The two are
+     independent DB columns, so the provider % can be computed off a
+     pre-import list price we never display — surfacing e.g. "30% off"
+     above a struck pair whose real gap is 20%. Deriving keeps the
+     badge, the struck-through price, and the −save line consistent;
+     displayDiscountPct also suppresses implausible (> 95%) markdowns
+     that signal a bad feed original_price. */
+  const derivedPct  = displayDiscountPct(deal.originalPrice, deal.salePrice);
+  const hasDiscount = derivedPct > 0;
   /* Cashback rate for the deal's store — null when no rate is set
      (no badge shown). Phase 1 is display-only; Phase 2 wires this
      to actual user accounts + payouts. */
@@ -191,7 +201,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
     ?? (deal.url ? isStoreSearchUrl(deal.url) : false);
 
   /* Cross-border classification — three-step decision:
-       1. If inferStoreCountry returns a country, store is local
+       1. If resolveStoreCountry returns a country, store is local
           IFF it matches the user's country. If it's anchored to a
           DIFFERENT country, the visitor will pay cross-border
           shipping regardless of whether currencies happen to match.
@@ -209,8 +219,17 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
      `sameCcy` was true and the OR shortcut returned false. The
      extra `dealStoreCountry !== null` clause closes that hole so
      every cross-country browse on the deals page now shows the
-     landed total. */
-  const dealStoreCountry = inferStoreCountry(deal.storeId, deal.storeName);
+     landed total.
+     June 2026: resolution now prefers the DB-authoritative
+     deal.storeCountry (stores.country) over the JS roster via
+     resolveStoreCountry. The ~600 long-tail UK/US/DE stores that the
+     hardcoded roster misses (lookfantastic, onbuy, refurbed-de, …)
+     were USD-normalised at ingest and, absent from the roster, fell
+     to the `!sameCcy` hint below and got wrongly flagged INTL on
+     their own market's rails (the "₦/$ leak on /uk" report). The DB
+     value resolves them to their real market, so a UK store reads
+     local for a UK user. */
+  const dealStoreCountry = resolveStoreCountry(deal.storeId, deal.storeName, deal.storeCountry);
   const storeIsLocalToUser = dealStoreCountry !== null && dealStoreCountry.toLowerCase() === country.code.toLowerCase();
   const storeIsGlobalIntl  = dealStoreCountry === null && isGlobalIntlStore(deal.storeId, deal.storeName);
   const isCrossBorderForUser = !storeIsLocalToUser && (
@@ -315,7 +334,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
             }}
           >
             <span className="text-[14px] sm:text-[17px] font-black leading-none tracking-tight">
-              {deal.discountPercent}%
+              {derivedPct}%
             </span>
             {/* No opacity-90: at 90% the white "off" blended to #fce9e9
                 over the red and dropped to 4.13:1 (WCAG AA fail). Full
@@ -417,7 +436,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
           {hasDiscount && (
             <span className="text-[10px] sm:text-[11px] text-ink-3 line-through">{origFmt}</span>
           )}
-          {saveFmt && (
+          {hasDiscount && saveFmt && (
             <span className="ml-auto text-[10px] sm:text-[11px] font-semibold text-success">
               −{saveFmt}
             </span>

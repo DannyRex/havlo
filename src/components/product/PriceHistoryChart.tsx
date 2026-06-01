@@ -267,8 +267,15 @@ export default function PriceHistoryChart({
   );
 
   /* Lowest-date callout — shown both in the header pill (verdict
-     when applicable) and in the lowest tile. */
-  const lowestDate = dateFmt.format(new Date(sliced[geom.lowestIdx].day));
+     when applicable) and in the lowest tile. When the live price has
+     undercut the entire tracked history, computeGeometryFull folds
+     geom.lowestNgn down to the current price; in that case caption it
+     "right now" so we never stamp today's price with a stale history
+     date (geom.lowestIdx still points at the lowest tracked day). */
+  const currentIsLowest = currentNgn <= geom.lowestNgn;
+  const lowestDate = currentIsLowest
+    ? "right now"
+    : dateFmt.format(new Date(sliced[geom.lowestIdx].day));
 
   /* Reference-line label that floats on the right edge. Slight
      dim so it doesn't compete with the line. */
@@ -283,7 +290,7 @@ export default function PriceHistoryChart({
 
   /* ── Screen-reader summary ────────────────────────────────── */
   const a11ySummary = buildAriaSummary({
-    range, sliced, geom, currentNgn, country, lowestDate,
+    range, sliced, geom, currentNgn, country, lowestDate, currentIsLowest,
   });
 
   return (
@@ -1030,6 +1037,15 @@ function computeGeometryFull(
   const refRaw   = PAD_TOP + ((yMax - currentNgn) / (yMax - yMin)) * chartH;
   return {
     ...g,
+    /* Fold the live "right now" price into the headline min/max so the
+       Cheapest / Highest tiles and the screen-reader summary can never
+       contradict the current price (e.g. show "Cheapest £31" beside
+       "Right now £30"). Only these two scalar stats widen — the drawn
+       path, fill area, lowest-marker dot and the y-domain all stay
+       history-only (computed inside computeGeometry), and lowestIdx /
+       lowestX / lowestY keep pointing at the lowest *tracked* point. */
+    lowestNgn:  Math.min(g.lowestNgn,  currentNgn),
+    highestNgn: Math.max(g.highestNgn, currentNgn),
     currentRefY: Math.max(PAD_TOP + 2, Math.min(CHART_HEIGHT - PAD_BOTTOM - 2, refRaw)),
   };
 }
@@ -1247,7 +1263,7 @@ function computeSpanDays(points: PriceHistoryPoint[]): number {
 /* Build a screen-reader summary that describes the chart in prose.
    Keeps the chart accessible without an interactive layer. */
 function buildAriaSummary({
-  range, sliced, geom, currentNgn, country, lowestDate,
+  range, sliced, geom, currentNgn, country, lowestDate, currentIsLowest,
 }: {
   range:      typeof RANGE_OPTIONS[number];
   sliced:     PriceHistoryPoint[];
@@ -1255,11 +1271,17 @@ function buildAriaSummary({
   currentNgn: number;
   country:    Country;
   lowestDate: string;
+  currentIsLowest: boolean;
 }): string {
   const cur  = formatPriceForUser(currentNgn,    country);
   const low  = formatPriceForUser(geom.lowestNgn, country);
   const high = formatPriceForUser(geom.highestNgn, country);
+  /* When the current price is the lowest, "on <date>" would read as a
+     stale day; phrase it as the live price instead. */
+  const lowestClause = currentIsLowest
+    ? `Lowest ${low}, which is the current price.`
+    : `Lowest ${low} on ${lowestDate}.`;
   return `Price history over ${range.label}. ${sliced.length} data points. ` +
-         `Current price ${cur}. Lowest ${low} on ${lowestDate}. Highest ${high}.`;
+         `Current price ${cur}. ${lowestClause} Highest ${high}.`;
 }
 

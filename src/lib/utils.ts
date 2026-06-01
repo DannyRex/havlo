@@ -540,6 +540,31 @@ export function savings(original: number, sale: number): number {
   return Math.round((original - sale) * 100) / 100;
 }
 
+/* Honest, displayable discount percent, derived from the two prices the
+   user actually sees: the struck-through original and the sale price.
+
+   Why not just trust deal.discountPercent / offer.discountPercent?
+   Ingestion stores original_price and discount_percent as INDEPENDENT
+   nullable columns straight from the provider (see ingestion.ts) — we
+   never derive one from the other. So the provider's percent can be
+   computed against a list price that was already stale at import time,
+   or against a price we don't display, leaving the badge ("30% off")
+   contradicting the struck pair the user can do the math on (£100 →
+   £80 = 20%). Recomputing from the shown pair keeps the badge, the
+   struck-through price, and the savings line all telling one story.
+
+   Returns 0 (no badge) when there's no genuine markdown (sale ≥
+   original, or non-positive inputs) OR when the implied discount is
+   implausibly large (> 95%) — in practice a bad feed original_price,
+   where showing "97% off" would erode trust more than showing nothing.
+   Percent is currency-invariant (a single FX factor scales both prices
+   equally), so callers may pass base or user-converted prices. */
+export function displayDiscountPct(original: number, sale: number): number {
+  if (!(original > 0) || !(sale > 0) || sale >= original) return 0;
+  const pct = Math.round(((original - sale) / original) * 100);
+  return pct > 95 ? 0 : pct;
+}
+
 /* Clean up dirty product titles from upstream scrapers (especially ASOS
    which spits out "Brand – Product – – Material" with repeated en-dashes).
    Collapses any run of separator characters (en-dash, em-dash, hyphen, |)

@@ -127,6 +127,11 @@ function offerRowToHero(row: OfferRow): OfferData {
     originalPrice:   row.original_price ?? row.current_price,
     discountPercent: row.discount_percent ?? 0,
     currency:        row.currency,
+    /* DB-authoritative anchor market (stores.country) so ProductHero's
+       cross-border check resolves a UK/DE long-tail store to its real
+       market instead of falling back to its USD-normalised currency
+       and leaking an INTL badge / "≈ $X" line on its own PDP. */
+    storeCountry:    row.store_country ?? null,
     inStock:         row.in_stock,
     scrapedAt:       row.scraped_at,
     /* Resolve trust server-side so the MERCHANTS table stays out of
@@ -193,9 +198,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
      framing honest (there may be a cheaper store). Out-of-stock PDPs
      are noindex below, so the in-stock branch owns the indexable copy;
      the OOS branch leans on the price-alert hook instead of a price
-     that may no longer be buyable. */
+     that may no longer be buyable.
+
+     "Updated multiple times a week" replaces the old "updated daily"
+     (June 2026 honesty pass): SerpAPI-sourced prices refresh Mon/Thu
+     and the free-source scrape runs daily, so the whole catalog is
+     refreshed at least twice weekly — "daily" overclaimed for the
+     SerpAPI majority. */
   const desc = offer.in_stock
-    ? `From ${price} at ${store}. Compare live prices for ${name} across ${country.name} stores and find the cheapest place to buy. Prices updated daily on Havlo.`
+    ? `From ${price} at ${store}. Compare live prices for ${name} across ${country.name} stores and find the cheapest place to buy. Prices updated multiple times a week on Havlo.`
     : `Compare live prices for ${name} across ${country.name} stores on Havlo. Track the price and get alerted the moment it drops.`;
   /* Trim on a word boundary with an ellipsis rather than a hard
      mid-word slice. U+2026, not an em dash. */

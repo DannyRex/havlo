@@ -16,6 +16,7 @@ import { useState } from "react";
 import { ExternalLink, Tag, Store as StoreIcon, Globe, AlertTriangle } from "lucide-react";
 import {
   cleanTitle,
+  displayDiscountPct,
   proxiedImageUrl,
   downscaleCardImageUrl,
   getClickThroughUrl,
@@ -38,7 +39,7 @@ import type { PriceHistorySummary } from "@/lib/search/price-history";
 import {
   USD_FX,
   formatLocal,
-  inferStoreCountry,
+  resolveStoreCountry,
   isGlobalIntlStore,
   getCountry,
   type Country,
@@ -61,6 +62,13 @@ export interface OfferData {
   originalPrice:   number;
   discountPercent: number;
   currency:        "NGN" | "USD";
+  /** DB-authoritative anchor market (stores.country, uppercase ISO).
+      Mapped from OfferRow.store_country in the PDP page's
+      offerRowToHero. Preferred over the JS roster by
+      resolveStoreCountry so the cross-border check and the
+      PriceComparisonBar "ships from" label classify the store by its
+      real market, not its USD-normalised currency. */
+  storeCountry?:   string | null;
   /** `false` only when explicitly out of stock. `undefined` /
       missing values are treated as in-stock — the product_best_offers
       view filters for in_stock=true by construction and drops the
@@ -210,8 +218,14 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
      store is anchored to ANY country other than the user's
      (not just on currency mismatch). UK Currys viewed by a US
      user with both prices normalised to USD still gets the
-     cross-border treatment. */
-  const dealStoreCountry = inferStoreCountry(offer.storeId, offer.storeName);
+     cross-border treatment.
+     June 2026: resolution prefers the DB-authoritative
+     offer.storeCountry over the JS roster (resolveStoreCountry), so
+     long-tail UK/DE stores absent from the roster no longer fall to
+     the `!sameCcy` hint and get wrongly flagged INTL on their own
+     market's PDP. Also sharpens the PriceComparisonBar "ships from"
+     label, which reads the same dealStoreCountry. */
+  const dealStoreCountry = resolveStoreCountry(offer.storeId, offer.storeName, offer.storeCountry);
   const storeIsLocalToUser = dealStoreCountry !== null && dealStoreCountry.toLowerCase() === country.code.toLowerCase();
   const storeIsGlobalIntl  = dealStoreCountry === null && isGlobalIntlStore(offer.storeId, offer.storeName);
   const isCrossBorder      = !storeIsLocalToUser && (
@@ -262,7 +276,17 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
     country:   countryCode,
   });
 
-  const hasDiscount = offer.discountPercent > 0;
+  /* OFF% derived from the prices actually shown (struck original →
+     current), NOT the provider's offer.discountPercent. The two are
+     independent DB columns, so the provider % can be computed off a
+     pre-import list price we never display — and the old gate
+     (discountPercent > 0 alone) could even badge a "20% off" with no
+     real struck markdown when original_price defaulted to current.
+     Deriving keeps the badge, the struck-through price, and the "You
+     save" line consistent; displayDiscountPct also drops implausible
+     (> 95%) markdowns that signal a bad feed original_price. */
+  const derivedPct  = displayDiscountPct(offer.originalPrice, offer.currentPrice);
+  const hasDiscount = derivedPct > 0;
   const savingsAbs  = hasDiscount ? offer.originalPrice - offer.currentPrice : 0;
 
   return (
@@ -370,10 +394,10 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
               background: "#dc2626",
               boxShadow: "0 4px 12px rgba(220,38,38,0.35), 0 0 0 3px rgba(255,255,255,0.85)",
             }}
-            aria-label={`${offer.discountPercent}% off`}
+            aria-label={`${derivedPct}% off`}
           >
             <span className="text-[20px] sm:text-[24px] font-black leading-none tracking-tight">
-              {offer.discountPercent}%
+              {derivedPct}%
             </span>
             <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.1em] mt-0.5 opacity-90">
               off
