@@ -585,15 +585,31 @@ async function fetchDidYouMean(q: string): Promise<SearchSuggestion[]> {
   const supa = getSupabaseAdmin();
   if (!supa || !q.trim() || q.trim().length < 2) return [];
 
+  /* Keep accessory listings out of the suggestions when the user isn't
+     searching for an accessory. suggest_titles ranks purely on lexical
+     similarity, so "iphone 15 pro max" surfaces "iPhone 15 Pro Max
+     Ronaldo Football Phone Case" (every query token present) ABOVE an
+     actual phone — and that accessory can even become an auto-pivot
+     target in the compare route, which only the downstream anchor guard
+     then rejects. Mirror the main candidate pipeline's
+     `queryIsAccessory ? looksLikeAccessory(t) : !looksLikeAccessory(t)`
+     rule (see pickAnchor below) so the empty-state "Did you mean" pills
+     stay on-intent. Over-fetch (6) then slice to 3 so dropping an
+     accessory doesn't thin the list. */
+  const queryIsAccessory = looksLikeAccessory(q);
+
   async function runOnce(query: string): Promise<SearchSuggestion[]> {
     try {
-      const { data, error } = await supa!.rpc("suggest_titles", { q: query, max_results: 3 });
+      const { data, error } = await supa!.rpc("suggest_titles", { q: query, max_results: 6 });
       if (error || !data) return [];
-      return (data as Array<{ product_id: string; title: string; score: number }>).map((r) => ({
-        title: r.title,
-        key:   r.product_id,
-        score: r.score,
-      }));
+      return (data as Array<{ product_id: string; title: string; score: number }>)
+        .filter((r) => queryIsAccessory || !looksLikeAccessory(r.title))
+        .slice(0, 3)
+        .map((r) => ({
+          title: r.title,
+          key:   r.product_id,
+          score: r.score,
+        }));
     } catch {
       return [];
     }
