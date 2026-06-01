@@ -138,34 +138,42 @@ export default function CompareContent({
       sniff = await res.json() as SniffResult;
       setSniffResult(sniff);
     } catch {
-      // Network error — fall through to slug fallback
+      /* Network error reaching /api/sniff — sniff stays null, so the
+         branches below find no title and settle into the empty state
+         (nothing to search with). No raw-URL search either way. */
     } finally {
       setSniffLoading(false);
     }
 
-    const searchTerm = sniff?.ok && sniff.title ? sniff.title : rawUrl;
+    /* The only usable search signal from a paste is the sniffed product
+       TITLE. A failed/blocked sniff (ok:false) or one with no title
+       leaves just the raw URL — and a URL can't FTS-match a product or
+       seed a shopping-engine query, so feeding it to either search
+       returns a guaranteed zero AND wastes a SerpAPI credit on the live
+       call. So we only search when we actually parsed a title. */
+    const sniffedTitle = sniff?.ok && sniff.title ? sniff.title : null;
 
     setLoading(true);
-    // Live search uses the sniffed title — best signal for SerpAPI
-    fetchLive(searchTerm);
 
     /* Sniff produced a usable product (title + price)? Build the anchor
        client-side from the sniff itself; ask the server only for dupes
        that undercut the sniffed price. */
     /* Gate on sniff.ok — a failed/degraded sniff (dead URL, blocked
        page) must NOT build a "Your Pick" anchor from a placeholder
-       title. ok:false falls through to the legacy path, which shows
-       the honest empty state instead (robustness report M8). */
+       title. ok:false falls through below to the honest empty state
+       (robustness report M8). */
     const sniffedAnchor = sniff?.ok ? sniffToAnchor(sniff) : null;
 
     if (sniffedAnchor) {
+      // Live search uses the sniffed title — best signal for SerpAPI.
+      fetchLive(sniffedAnchor.title);
       try {
         const url = `/api/compare/dupes?q=${encodeURIComponent(sniffedAnchor.title)}&maxPriceNgn=${sniffedAnchor.bestPrice}`;
         const res = await fetch(url);
         const data = await res.json() as { dupes: DupeResult[] };
         setResult({
           mode:   "similar",
-          query:  searchTerm,
+          query:  sniffedAnchor.title,
           anchor: sniffedAnchor,
           dupes:  data.dupes ?? [],
         });
@@ -173,7 +181,7 @@ export default function CompareContent({
         // Dupes call failed — still show the sniffed anchor on its own
         setResult({
           mode:   "similar",
-          query:  searchTerm,
+          query:  sniffedAnchor.title,
           anchor: sniffedAnchor,
           dupes:  [],
         });
@@ -183,16 +191,30 @@ export default function CompareContent({
       return;
     }
 
-    /* Sniff failed or returned no usable price → fall back to the legacy
-       title-search path so the page still renders something useful. */
-    try {
-      const res = await fetch(`/api/compare?q=${encodeURIComponent(searchTerm)}&mode=similar`);
-      setResult(await res.json() as SearchOutput);
-    } catch {
-      setResult({ mode: "empty", query: searchTerm, suggestions: [] });
-    } finally {
-      setLoading(false);
+    /* No price-bearing anchor, but the sniff DID read a title (parsed
+       the name but no usable price) → a real title-search is still
+       worthwhile, so search on the title (never the raw URL). */
+    if (sniffedTitle) {
+      fetchLive(sniffedTitle);
+      try {
+        const res = await fetch(`/api/compare?q=${encodeURIComponent(sniffedTitle)}&mode=similar`);
+        setResult(await res.json() as SearchOutput);
+      } catch {
+        setResult({ mode: "empty", query: sniffedTitle, suggestions: [] });
+      } finally {
+        setLoading(false);
+      }
+      return;
     }
+
+    /* Sniff failed (dead/blocked URL) — nothing to search WITH. The
+       honest amber "couldn't read this page, search by name" card is
+       already shown above from sniffResult.ok === false; we just settle
+       into the empty state. Deliberately NO fetchLive / FTS on the raw
+       URL: both return zero, and the live call would waste a SerpAPI
+       credit on a query that can never resolve. */
+    setResult({ mode: "empty", query: rawUrl, suggestions: [] });
+    setLoading(false);
   }, [router, fetchLive]);
 
   /* ── Text search ────────────────────────────────────────────────────── */
