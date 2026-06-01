@@ -52,7 +52,7 @@ export default function AlternativeCard({ alt }: Props) {
       <div className="p-4">
         <p className="text-[11px] text-ink-3 mb-0.5">{alt.brand}</p>
         <h3 className="text-sm font-bold text-ink mb-2 line-clamp-2 group-hover:text-brand transition-colors leading-snug">
-          {alt.title}
+          {cleanTitle(alt.title)}
         </h3>
 
         {/* Price range */}

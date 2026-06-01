@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { TrendingDown, ArrowRight, Plane, ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { formatPriceForUser } from "@/lib/utils";
+import { formatPriceForUser, cleanTitle } from "@/lib/utils";
 import { pdpUrlForOffer } from "@/lib/pdp-url";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
@@ -173,7 +173,7 @@ export default function DupeCard({
           {dupe.brand ?? dupe.category}
         </p>
         <h3 className="mt-1 text-sm font-semibold text-ink leading-snug line-clamp-2 tracking-[-0.005em]">
-          {dupe.title}
+          {cleanTitle(dupe.title)}
         </h3>
 
         {/* Price + savings line — country-aware. dupe.bestPrice is the
@@ -234,7 +234,7 @@ export default function DupeCard({
           href={cardHref}
           onClick={() => trackClick(dupe.key, query, rank, mode)}
           className="block"
-          aria-label={`View ${dupe.title} details`}
+          aria-label={`View ${cleanTitle(dupe.title)} details`}
         >
           {upperContent}
         </Link>

@@ -23,7 +23,7 @@
 
 import Link from "next/link";
 import { Star, Plane, ChevronRight, ArrowDown, ShieldCheck } from "lucide-react";
-import { formatPriceForUser, formatCount } from "@/lib/utils";
+import { formatPriceForUser, formatCount, cleanTitle } from "@/lib/utils";
 import { pdpUrlForOffer } from "@/lib/pdp-url";
 import {
   effectiveLandedPrice,
@@ -130,7 +130,7 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
               )}
             </div>
             <h2 className="text-[15px] sm:text-lg font-semibold text-ink leading-snug line-clamp-2">
-              {anchor.title}
+              {cleanTitle(anchor.title)}
             </h2>
 
             {anchor.offers.length > 0 && anchor.bestPrice > 0 && (

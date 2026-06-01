@@ -36,7 +36,7 @@ export default function GroupCard({ g }: { g: ProductGroup }) {
           {g.brand ?? g.category}
         </p>
         <h3 className="mt-0.5 text-sm text-ink leading-snug line-clamp-2 group-hover:text-brand transition-colors">
-          {g.title}
+          {cleanTitle(g.title)}
         </h3>
         <div className="mt-1.5 flex items-baseline gap-2">
           <span className="text-sm font-bold text-ink">{formatNaira(g.bestPrice)}</span>

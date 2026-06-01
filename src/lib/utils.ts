@@ -584,11 +584,32 @@ export function displayDiscountPct(original: number, sale: number): number {
   return pct > 95 ? 0 : pct;
 }
 
+/* Repair a SINGLE whitespace token that carries the classic zero-for-o
+   leetspeak corruption from scraped seller feeds — "Veat00l" → "Veatool",
+   "g00gle" → "google", "Amaz0n" → "Amazon". Finding #8 (pre-launch QA):
+   a brand whose name renders with digits embedded mid-word reads as
+   fake / counterfeit and torches trust on a price-comparison surface.
+
+   The gate is deliberately narrow so it NEVER mangles a legitimate
+   model code. It fires only when a lowercase letter sits IMMEDIATELY on
+   BOTH sides of a run of one-or-two zeros, and the whole token is
+   otherwise pure letters. A catalog audit (15.2k products) confirmed
+   every real model identifier is excluded by that shape:
+     • uppercase-adjacent zeros — "A0BK", "BA33BC0", "ZJM01"  (no lowercase
+       letter touching the zero)
+     • zeros mixed with other digits — "KM1GY-70", "HPG2 6592", "PB31PD",
+       "NN-CT55JWBPQ"  (a non-zero digit breaks the all-letters shape)
+   …so none of them match, while "Veat00l" / "g00gle" / "Amaz0n" do. */
+const ZERO_FOR_O_TOKEN = /^[A-Za-z]*[a-z]0{1,2}[a-z][A-Za-z]*$/;
+function deLeetToken(token: string): string {
+  return ZERO_FOR_O_TOKEN.test(token) ? token.replace(/0/g, "o") : token;
+}
+
 /* Clean up dirty product titles from upstream scrapers (especially ASOS
    which spits out "Brand – Product – – Material" with repeated en-dashes).
    Collapses any run of separator characters (en-dash, em-dash, hyphen, |)
    with optional whitespace into a single " – ", and strips leading/trailing
-   separators. Safe to call multiple times. */
+   separators. Safe to call multiple times (idempotent). */
 export function cleanTitle(raw: string): string {
   return raw
     /* Strip embedded HTML tags. DHgate (and some SerpAPI seller feeds)
@@ -602,6 +623,17 @@ export function cleanTitle(raw: string): string {
        tag-shaped. Five-char entity unescape isn't needed since we're
        stripping tags entirely, not interpreting them. */
     .replace(/<[^>]*>/g, "")
+    /* Drop the Unicode replacement char (U+FFFD "�") and ASCII control
+       chars — both are unambiguous encoding breakage from upstream feeds,
+       never meaningful in a product name. Control chars become a space so
+       two words don't fuse; the replacement char vanishes outright. The
+       trailing space-collapse + trim tidy up either way. Finding #8. */
+    .replace(/\uFFFD/g, "")
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    /* Repair zero-for-o brand corruption per token ("Veat00l" → "Veatool").
+       deLeetToken self-gates on a shape that excludes every real model
+       code, so this is inert on the 99.98% of titles with no corruption. */
+    .replace(/[A-Za-z0-9]+/g, deLeetToken)
     .replace(/[–—|\-]+(\s*[–—|\-]+)+/g, " – ") // collapse runs
     .replace(/^\s*[–—|\-]+\s*/, "")                       // trim leading
     .replace(/\s*[–—|\-]+\s*$/, "")                       // trim trailing

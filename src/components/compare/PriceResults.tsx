@@ -78,7 +78,7 @@ export default function PriceResults({
         )}
         <div className="min-w-0 flex-1">
           <p className="text-[11px] uppercase tracking-wide text-ink-3">{category}</p>
-          <h2 className="text-base sm:text-lg font-semibold text-ink leading-snug mt-0.5 line-clamp-2">{title}</h2>
+          <h2 className="text-base sm:text-lg font-semibold text-ink leading-snug mt-0.5 line-clamp-2">{cleanTitle(title)}</h2>
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-3">
             <div>
               <span className="text-[11px] text-ink-3">Best price · </span>
