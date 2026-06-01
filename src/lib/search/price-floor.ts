@@ -33,9 +33,10 @@ const CATEGORY_PRICE_FLOOR_NGN: Record<string, number> = {
    range for that specific product. Each entry is a lowercase
    substring → minimum NGN price.
 
-   Mirror of the FLAGSHIP_PRICE_FLOOR_NGN map in pg-fts.ts. Kept in
-   sync — when adding a new flagship, add to BOTH (or pull pg-fts
-   to import from here, but that's a bigger refactor for later).
+   SINGLE SOURCE OF TRUTH. pg-fts.ts (the /compare anchor + dupe
+   engine) and /api/live-search both import the helpers below from
+   this module, so a flagship line added here is enforced on every
+   read surface at once — there is no second map to keep in sync.
 
    Match on substring of the LOWERCASED title. First-match-wins by
    declaration order (longer / more specific keys first). */
@@ -63,6 +64,14 @@ export const FLAGSHIP_PRICE_FLOOR_NGN: Array<[string, number]> = [
   ["macbook air m2",        700_000],
   ["ipad pro m4",         1_000_000],
   ["ipad air m2",           600_000],
+  // Apple — wearables. Most-specific line first so "Apple Watch
+  // Series 11" matches "apple watch series" cleanly. Real retail:
+  // Ultra ~$799, Series ~$399, SE ~$249. Floors sit ~25-40% of
+  // retail to block the ~$18 DHgate fakes while still allowing
+  // genuine refurb / steep sales.
+  ["apple watch ultra",     300_000],
+  ["apple watch series",    150_000],
+  ["apple watch se",         80_000],
   // Samsung — flagship phones
   ["galaxy z fold 7",     1_500_000],
   ["galaxy z fold 6",     1_300_000],
@@ -77,6 +86,7 @@ export const FLAGSHIP_PRICE_FLOOR_NGN: Array<[string, number]> = [
   ["pixel 10",              500_000],
   ["pixel 9 pro",           500_000],
   // Audio — premium headphones
+  ["wh-1000xm6",            180_000],
   ["wh-1000xm5",            150_000],
   ["wh-1000xm4",            100_000],
   ["bose quietcomfort ultra",150_000],
@@ -86,7 +96,19 @@ export const FLAGSHIP_PRICE_FLOOR_NGN: Array<[string, number]> = [
   ["playstation 5",         350_000],
   ["xbox series x",         400_000],
   ["xbox series s",         200_000],
+  ["nintendo switch 2",     250_000],
   ["nintendo switch oled",  250_000],
+  // Home + personal care — Dyson (cordless vacuums + hair care).
+  // High-counterfeit lines: genuine V15 ~$650, Airwrap ~$600,
+  // Supersonic ~$430. The $15-60 "Dyson V15" listings on
+  // AliExpress / DHgate are fakes. Floors ~30% of retail. Version
+  // substrings are disjoint, so match order among them is moot.
+  ["dyson v15",             200_000],
+  ["dyson v12",             150_000],
+  ["dyson v11",             130_000],
+  ["dyson v8",              100_000],
+  ["dyson airwrap",         200_000],
+  ["dyson supersonic",      150_000],
   // Footwear flagships — real Nike retail
   ["air jordan 1",           80_000],
   ["nike dunk low",          70_000],
@@ -181,7 +203,14 @@ const ACCESSORY_HARD: RegExp[] = [
    ... Cover Screen" and "Charging Case" (parts of the actual product)
    out of the net while catching "Case for iPhone 15". */
 const ACCESSORY_SOFT_NOUN = /\b(?:case|cover|sleeve|strap|holder|stand|mount|grip|bumper|shell|guard|dock|cushion|protector)\b/;
-const FITMENT_FOR = /\bfor\b\s+\S/;
+/* Fitment connector across the marketplaces we ingest: English "for",
+   German "für"/"fuer", French "pour", Spanish/Portuguese "para". Only
+   consulted AFTER ACCESSORY_SOFT_NOUN matches, so the non-English words
+   can't misfire on unrelated titles (and \b-anchoring means "para"
+   never touches "parachute"/"paracord"). Catches "Hülle für Sony
+   WH-1000XM5", "Coque pour iPhone 15" — fitment items the English-only
+   gate used to wave through into a real product's price pool. */
+const FITMENT_FOR = /\b(?:for|für|fuer|pour|para)\b\s+\S/;
 
 export function isAccessoryListing(title?: string | null): boolean {
   if (!title) return false;

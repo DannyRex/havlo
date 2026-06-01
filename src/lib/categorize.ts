@@ -317,6 +317,15 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   { pattern: /\b(pain\s*relief|first\s*aid|antiseptic|hand\s*sanitizer|hand\s*sanitiser|antibacterial\s*gel|sanitary\s*pad|sanitary\s*towel|tampon|adhesive\s*bandage|bandage\s*(roll|gauze|tape)|wound\s*(care|bandage|dressing)|gauze\s*pad|surgical\s*tape|medical\s*tape|elastic\s*compression\s*bandage|plaster\s*(strip|cast)|crepe\s*bandage|surgical\s*mask|face\s*mask\s*medical|disposable\s*mask)\b/i, slug: "health", reason: "first aid / OTC" },
   { pattern: /\b(baby\s*lotion|baby\s*oil|baby\s*wipes?|baby\s*shampoo|baby\s*powder|baby\s*formula|infant\s*formula|formula\s*milk|diapers?|nappy|nappies)\b/i, slug: "health", reason: "baby health" },
   { pattern: /\b(cough\s*syrup|cough\s*drops?|throat\s*lozenge|nasal\s*spray|inhaler|chest\s*rub|vapor\s*rub|menthol\s*rub|mentholatum)\b/i, slug: "health", reason: "cold & flu OTC" },
+  /* Home medical / monitoring devices. June 2026 launch-audit gap:
+     "Omron M7 Blood Pressure Monitor", "Accu-Chek Blood Glucose
+     Monitor", pulse oximeters etc. inferred to null and kept whatever
+     category the source feed guessed (often "beauty"), so they were
+     mis-shelved on /compare. Each phrase here is unambiguously a
+     health device — none collides with a beauty/home/sports product.
+     Bare "monitor"/"thermometer" deliberately excluded (computer
+     monitors, kitchen/meat thermometers, baby monitors). */
+  { pattern: /\b(blood\s*pressure|sphygmomanometer|blood\s*glucose|glucose\s*(?:monitor|meter)|glucometer|pulse\s*oximeter|oximeter|nebuli[sz]er)\b/i, slug: "health", reason: "home medical device" },
 
   /* ── Beauty (cont'd): hair + personal care ────────────────────
      Split visually from the makeup/skincare/fragrance block above

@@ -98,12 +98,40 @@ const ACCESSORY_NOISE = [
    AliExpress listing pattern "Battery For Apple macbook air".
    Previous regex required brand to come directly after "for", so
    "for Apple macbook" wasn't caught — only "for macbook" would
-   have matched. */
-const FOR_BRAND_PATTERN = /\bfor\s+(?:apple\s+|samsung\s+|sony\s+|microsoft\s+|google\s+)?(stanley\s*quencher|stanley\s*ice\s*flow|stanley\s*iceflow|yeti\s+rambler|hydroflask|owala\s*freesip|airpods|iphone\s*\d|ipad|macbook|imac|galaxy\s*s\d|galaxy\s*tab|surface\s+pro|surface\s+book|pixel\s*\d|nintendo\s*switch|ps[45]|xbox|playstation)\b/i;
+   have matched.
+
+   June 2026 launch-audit fix: the model-number sub-patterns were
+   `iphone\s*\d`, `galaxy\s*s\d`, `pixel\s*\d` — a SINGLE `\d` followed
+   by the group's trailing `\b`. That silently failed on every
+   two-digit model: "for iPhone 15" matched `iphone\s*\d` against the
+   first "1", then the `\b` fell between "1" and "5" (no boundary) and
+   the whole alternative failed. Net effect: fitment accessories/parts
+   for iPhone 11-17, Galaxy S2x and Pixel 1x slipped through the net.
+   Surfaced when "iphone 15 pro max" anchored on an AliExpress
+   "Motherboard ... For IPhone 11 12 13 14 15 Pro Max Mainboard" part
+   in all six markets. `\d` → `\d+` closes the whole class. */
+const FOR_BRAND_PATTERN = /\bfor\s+(?:apple\s+|samsung\s+|sony\s+|microsoft\s+|google\s+)?(stanley\s*quencher|stanley\s*ice\s*flow|stanley\s*iceflow|yeti\s+rambler|hydroflask|owala\s*freesip|airpods|iphone\s*\d+|ipad|macbook|imac|galaxy\s*s\d+|galaxy\s*tab|surface\s+pro|surface\s+book|pixel\s*\d+|nintendo\s*switch|ps[45]|xbox|playstation)\b/i;
+
+/* Phone repair PARTS sold as standalone marketplace listings —
+   motherboards, logic boards, digitizers, flex cables, back glass.
+   Two title shapes occur:
+     (a) "Motherboard For iPhone 15"  — the "for <model>" form, already
+         caught by FOR_BRAND_PATTERN above.
+     (b) "iPhone 15 Pro Max Mainboard 256GB" — no "for" clause, so we
+         match a repair-part noun co-occurring with a phone-model token.
+   Gating on BOTH a part noun AND a phone-model token keeps a legit
+   standalone PC component ("ASUS ROG Z790 Motherboard", "MSI B650
+   Mainboard") OUT of the net — those carry no phone-model token, so
+   they remain eligible to anchor their own computing comparison. */
+const PHONE_PART_NOUN   = /\b(?:motherboard|main\s?board|logic\s?board|digitizer|flex\s?cable|back\s?glass)\b/i;
+const PHONE_MODEL_TOKEN = /\b(?:iphone|galaxy\s*s\d|galaxy\s*note|pixel\s*\d|redmi|tecno|infinix|ipad)\b/i;
 
 export function looksLikeAccessory(title: string): boolean {
   const t = title.toLowerCase();
   if (FOR_BRAND_PATTERN.test(t)) return true;
+  /* Repair-part noun + phone-model token => a spare part, not the
+     phone. Both required so PC motherboards stay eligible anchors. */
+  if (PHONE_PART_NOUN.test(t) && PHONE_MODEL_TOKEN.test(t)) return true;
   return ACCESSORY_NOISE.some((kw) => {
     const pattern = new RegExp(`(^|[^a-z])${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z]|$)`);
     return pattern.test(t);
