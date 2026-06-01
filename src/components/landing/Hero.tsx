@@ -9,6 +9,7 @@ import {
   HomeIcon, FashionIcon, BeautyIcon, SportsIcon, AppliancesIcon,
 } from "@/components/ui/CategoryIcons";
 import { useCountry } from "@/components/providers/CountryProvider";
+import { formatCount } from "@/lib/utils";
 import { logSearchEvent } from "@/lib/search/log-search";
 import ImageSearchButton from "@/components/search/ImageSearchButton";
 import type { ComponentType } from "react";
@@ -367,8 +368,8 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
             <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 animate-ping" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
           </span>
-          <span className="sm:hidden">Live · {storeCount.toLocaleString()} stores</span>
-          <span className="hidden sm:inline">Live · scanning prices across {storeCount.toLocaleString()} stores</span>
+          <span className="sm:hidden">Live · {formatCount(storeCount)} stores</span>
+          <span className="hidden sm:inline">Live · scanning prices across {formatCount(storeCount)} stores</span>
         </div>
 
         {/* Headline — large, editorial, single tone.

@@ -23,7 +23,7 @@
 
 import Link from "next/link";
 import { Star, Plane, ChevronRight, ArrowDown, ShieldCheck } from "lucide-react";
-import { formatPriceForUser } from "@/lib/utils";
+import { formatPriceForUser, formatCount } from "@/lib/utils";
 import { pdpUrlForOffer } from "@/lib/pdp-url";
 import {
   effectiveLandedPrice,
@@ -160,7 +160,7 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
               <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-3">
                 {isSingleStore
                   ? "Available at"
-                  : `Across ${sortedRows.length.toLocaleString()} stores`}
+                  : `Across ${formatCount(sortedRows.length)} stores`}
               </p>
               {!isSingleStore && (
                 /* Payout-neutral ranking promise, surfaced AT the
@@ -352,7 +352,7 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-success/10 border border-success/20">
             <ArrowDown size={12} className="text-success" />
             <span className="text-xs font-semibold text-success">
-              {dupes.length.toLocaleString()} alternative{dupes.length > 1 ? "s" : ""} found
+              {formatCount(dupes.length)} alternative{dupes.length > 1 ? "s" : ""} found
             </span>
           </div>
         </div>

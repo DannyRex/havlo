@@ -3,8 +3,9 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { categories } from "@/lib/data/categories";
 import CategoryTileLink from "./CategoryTileLink";
-import { type Country } from "@/lib/country";
+import { type Country, isCrossBorderStore } from "@/lib/country";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
+import { formatCount } from "@/lib/utils";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
   BeautyIcon, SportsIcon, EarbudsIcon, ElectronicsIcon, HealthIcon,
@@ -48,30 +49,46 @@ const browsable = categories.filter((c) => c.slug !== "all" && !c.hidden);
          capped by PostgREST's db-max-rows=1000, so any category
          with > 1000 offers reported exactly "1,000 deals" on the
          tile — a hard cap the user caught (May 2026 audit).
-     v3 (now): HEAD COUNT with SQL-side country filter. Transfers
-         ZERO rows, returns the true count via a Postgres COUNT(*).
-         No cap, no row-egress, and the count goes from
-         approximate-near-cap to fully accurate.
+     v3: HEAD COUNT with SQL-side `is_international = true OR
+         stores.country ILIKE '<cc>'`. Transferred zero rows, but the
+         is_international predicate turned out to be a near-useless
+         relevance signal: ingest stamps it on 98% of stores (983/1000),
+         INCLUDING country-anchored retailers (UK Argos, US Walmart).
+         So the OR collapsed to "is_international = true" for every
+         non-NG market — every country counted the same ~3,250-offer
+         intl pool and the `country.ilike` clause added nothing (those
+         anchored stores were already is_international=true). Result:
+         byte-for-byte identical counts across UK/US/IN/ZA/AE — a tell
+         a pre-launch QA pass correctly flagged as "looks hardcoded".
+         NG differed only because its 10 stores are is_international=false.
 
-   Trade-off: the SQL filter is a *simplification* of
-   filterDealsForCountry. The full JS filter has application-level
-   rosters (cross-border allowlists, inferStoreCountry, untagged-
-   currency-match fallback) that are difficult to mirror exactly
-   in SQL without a migration. The SQL filter captures the dominant
-   90-95% of the logic via two predicates:
+   v4 (now): HEAD COUNT keyed on the two signals that actually vary
+         per market, mirroring filterDealsForCountry's two dominant
+         branches:
 
-     a) stores.is_international = true
-        (cross-border globals — always relevant to every market)
-     b) stores.country ILIKE '<user country>'
-        (country-anchored retailers)
+           a) stores.country ILIKE '<cc>'   (anchored in this market)
+           b) stores.id IN (<cross-border set for this market>)
 
-   The 5-10% delta from the full filter is in long-tail cases
-   (untagged USD rows from foreign retailers slipping in or out)
-   that aren't material to a tile count. Users would notice a
-   30× delta (the old "ZA shows 600 / /deals shows 21" bug) but
-   not a 5% delta. The tile click still lands on /deals which
-   applies the full filter — so the visible card list will be
-   close to (within ~5% of) the tile number.
+         The cross-border set is resolved once per render from the
+         same isCrossBorderStore() allowlist /deals uses — so IN stays
+         tight (Shein banned, 3-store list) while UK/US/ZA/AE get the
+         China globals + Amazon-Global + ASOS + eBay variants their
+         shoppers can actually reach. Counts are now distinct per
+         country (e.g. fashion: NG 3.0k / UK 2.7k / US 2.4k / IN 0.16k
+         / ZA 2.1k / AE 2.1k) and track what the visitor sees after
+         clicking through to /deals.
+
+   Trade-off: still a *simplification* of filterDealsForCountry — it
+   omits the long-tail branches (native-roster substring match,
+   country: tags, untagged-currency fallback) that contribute a few
+   percent. That direction is safe: the tile slightly UNDER-promises
+   vs the full /deals filter rather than the old over-promise (the
+   "ZA shows 600 / /deals shows 21" class of bug). The tile click
+   lands on /deals which applies the full filter.
+
+   Egress: one ~60 KB stores fetch (id, name, country for ~1000 rows)
+   per render to resolve the cross-border set, then N zero-row HEAD
+   COUNTs. Cached 5 min per country, so amortised to near-free.
 
    Cache key includes the country code so /uk and /ng don't
    collide. Cache tag `category-counts` lets a future cron call
@@ -86,39 +103,55 @@ const fetchCategoryCounts = (country: Country) =>
         return Object.fromEntries(slugs.map((s) => [s, 0]));
       }
 
+      const upperCountry = country.code.toUpperCase();
+
+      /* Resolve this market's cross-border store UUIDs once. The stores
+         table is small (~1000 rows); we pull id+name+country and match
+         each store against the country's cross-border allowlist using
+         the exact isCrossBorderStore predicate /deals relies on. This
+         is what makes the per-country counts diverge instead of all
+         collapsing to the shared intl pool. */
+      const { data: storeRows } = await supa
+        .from("stores")
+        .select("id, name, country");
+      const crossBorderIds: string[] = [];
+      for (const s of storeRows ?? []) {
+        const name = (s as { name: string | null }).name ?? "";
+        if (isCrossBorderStore({ storeId: name, storeName: name, currency: "", tags: [] }, country.code)) {
+          crossBorderIds.push((s as { id: string }).id);
+        }
+      }
+
+      /* country-anchored OR on this market's cross-border set. When the
+         cross-border set is empty (shouldn't happen for our 6 markets,
+         but guard anyway) fall back to the anchor clause alone so the
+         filter stays valid. */
+      const orFilter = crossBorderIds.length > 0
+        ? `country.ilike.${upperCountry},id.in.(${crossBorderIds.join(",")})`
+        : `country.ilike.${upperCountry}`;
+
       /* Per-category HEAD COUNT. `count: 'exact'` returns the
          true count from Postgres; `head: true` transfers zero
-         rows back. Each request is ~50 bytes of response (just
-         the count header). 10 categories in parallel = ~500 bytes
-         total per render. Compare to v1's 7.88 MB / v2's 1.31 MB
-         — the count path is now effectively free. */
+         rows back. The OR is scoped to the joined stores row via
+         PostgREST's foreignTable option. */
       const counts: Record<string, number> = {};
-      const upperCountry = country.code.toUpperCase();
       await Promise.all(
         slugs.map(async (slug) => {
           const { count, error } = await supa
             .from("offers")
-            .select("id, products!inner(category_slug), stores!inner(country, is_international)", {
+            .select("id, products!inner(category_slug), stores!inner(id, country)", {
               count: "exact",
               head:  true,
             })
             .eq("in_stock", true)
             .eq("products.category_slug", slug)
-            /* Country-relevance OR-filter at SQL level.
-               PostgREST .or() with foreignTable scopes the OR to
-               the joined stores row. Either the store is
-               cross-border (relevant to every market) OR its
-               anchored country matches the visitor's. */
-            .or(
-              `is_international.eq.true,country.ilike.${upperCountry}`,
-              { foreignTable: "stores" },
-            );
+            .or(orFilter, { foreignTable: "stores" });
           counts[slug] = error ? 0 : (count ?? 0);
         }),
       );
       return counts;
     },
-    ["category-counts-v3", country.code, browsable.map((c) => c.slug).join(",")],
+    ["category-counts-v4", country.code, browsable.map((c) => c.slug).join(",")],
     {
       revalidate: 300, // 5 min — tighter than the page's 30-min ISR
       tags:       ["category-counts"],
@@ -221,7 +254,7 @@ export default async function CategoryGrid({ country }: { country: Country }) {
                       {cat.name}
                     </p>
                     <p className="text-[11px] sm:text-xs text-ink-3 mt-0.5 tabular-nums">
-                      {count.toLocaleString()} deals
+                      {formatCount(count)} deals
                     </p>
                   </div>
                 </div>

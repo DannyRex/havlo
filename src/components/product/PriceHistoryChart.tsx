@@ -146,6 +146,23 @@ export default function PriceHistoryChart({
     [sliced, width, currentNgn, range.days],
   );
 
+  /* Store-count provenance for the footer strip. Swept over the
+     FULL points array — deliberately NOT the range-sliced window
+     that feeds `geom`. The footer previously read
+     geom.peakStoreCount, which only saw the active window, so the
+     number flickered (1 on a 30D default load, 2 on a 90D/All load)
+     and read as a third, contradictory store count against the
+     live "Compare prices across 20 stores" headline. Sweeping the
+     full history makes it stable across range toggles and frames it
+     honestly as "how many stores this timeline was built from",
+     which is a provenance fact independent of today's live pool.
+     May 2026 QA non-negotiable: "fluctuating store counts." */
+  const historyStoreCount = useMemo(() => {
+    let peak = 0;
+    for (const p of points) if (p.storeCount > peak) peak = p.storeCount;
+    return peak;
+  }, [points]);
+
   /* Hover + pin state. `pinned` keeps the tooltip visible after a
      tap (mobile) or Enter/Space (keyboard) until the user moves
      pointer away or hits Esc / taps outside. */
@@ -588,8 +605,13 @@ export default function PriceHistoryChart({
            29 2026 trust-signal consolidation. */
         return (
           <p className="mt-3 text-[11px] text-ink-3 leading-tight">
-            Tracked across {geom.peakStoreCount} {geom.peakStoreCount === 1 ? "store" : "stores"} ·
-            {" "}last refreshed{" "}
+            {historyStoreCount > 0 && (
+              <>
+                Price history from {historyStoreCount}{" "}
+                {historyStoreCount === 1 ? "store" : "stores"} ·{" "}
+              </>
+            )}
+            last refreshed{" "}
             <time suppressHydrationWarning>{timeAgo(lastDay)}</time>
           </p>
         );
@@ -776,7 +798,6 @@ interface Geometry {
   meanNgn:    number;
   currentRefY: number;
   axisTicks:  { x: number; label: string }[];
-  peakStoreCount: number;
 }
 
 /* Monotone cubic Hermite spline → cubic Bezier path.
@@ -848,27 +869,48 @@ function buildMonotonePath(xs: number[], ys: number[]): string {
   return parts.join(" ");
 }
 
+/* Hydration-safe "now": snapped to UTC midnight of the current day.
+   The chart's X axis is day-granular (every point is keyed by `day`,
+   parsed as a UTC midnight), so sub-day precision was never visible.
+   But a raw Date.now() made the SVG path coordinates depend on the
+   exact render instant, which differs between the server render and
+   the first client hydration (a few hundred ms to a few seconds
+   apart). At 30D range the X projection is ~2.3e-7 px/ms, enough to
+   shift a toFixed(2) path coord by ~1 ULP on a fraction of points and
+   trip React's hydration attribute-mismatch warning (#418) on the
+   <path d>. Snapping to UTC midnight makes `today` identical across
+   SSR and the first client render within the same calendar day, so
+   the geometry serialises byte-for-byte. The only divergence window
+   is the single render that straddles UTC midnight, which self-heals
+   on the next render — the same accepted edge as every other
+   day-granular surface (e.g. the footer year). */
+function todayMidnightUtcMs(): number {
+  const d = new Date();
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
 function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: number): Geometry {
   if (points.length === 0) {
     return {
       pathD: "", areaD: "", xs: [], ys: [],
       lowestIdx: 0, lowestNgn: 0, lowestX: 0, lowestY: 0,
       highestNgn: 0, meanNgn: 0,
-      currentRefY: PAD_TOP, axisTicks: [], peakStoreCount: 0,
+      currentRefY: PAD_TOP, axisTicks: [],
     };
   }
 
-  /* Sweep for stats in one pass. */
+  /* Sweep for stats in one pass. Store-count provenance is computed
+     separately in the component over the FULL history (see
+     historyStoreCount) so it doesn't inherit this function's
+     range-sliced view. */
   let lowestNgn  = points[0].minPriceNgn;
   let lowestIdx  = 0;
   let highestNgn = points[0].minPriceNgn;
   let sum        = points[0].minPriceNgn;
-  let peakStores = points[0].storeCount;
   for (let i = 1; i < points.length; i++) {
     const p = points[i].minPriceNgn;
     if (p < lowestNgn)  { lowestNgn  = p; lowestIdx = i; }
     if (p > highestNgn) { highestNgn = p; }
-    if (points[i].storeCount > peakStores) peakStores = points[i].storeCount;
     sum += p;
   }
   const meanNgn = sum / points.length;
@@ -896,7 +938,7 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
      The path is drawn through points at their true date positions,
      then extends horizontally from the last point to today so the
      chart visually reads "no change since the last reading". */
-  const today        = Date.now();
+  const today        = todayMidnightUtcMs();
   const firstDayMs   = new Date(points[0].day).getTime();
   /* "All" range — tightly fit the X domain to the actual data span
      rather than forcing a full 365-day window. The earlier fixed-
@@ -1015,7 +1057,6 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
        prices still appear at the top/bottom edge. */
     currentRefY: PAD_TOP, // placeholder; caller sets via buildHoverState's external use
     axisTicks,
-    peakStoreCount: peakStores,
   };
 }
 
@@ -1241,7 +1282,7 @@ function sliceToLastNDays(points: PriceHistoryPoint[], days: number): PriceHisto
      data point would have made the right-edge label "May 1" instead.
      The chart geometry extends the line horizontally from the last
      point to today's X position so the right edge stays meaningful. */
-  const today = Date.now();
+  const today = todayMidnightUtcMs();
   const threshold = today - days * 86_400_000;
   let firstIdx = 0;
   for (let i = points.length - 1; i >= 0; i--) {
@@ -1281,7 +1322,8 @@ function buildAriaSummary({
   const lowestClause = currentIsLowest
     ? `Lowest ${low}, which is the current price.`
     : `Lowest ${low} on ${lowestDate}.`;
-  return `Price history over ${range.label}. ${sliced.length} data points. ` +
+  const pointWord = sliced.length === 1 ? "data point" : "data points";
+  return `Price history over ${range.label}. ${sliced.length} ${pointWord}. ` +
          `Current price ${cur}. ${lowestClause} Highest ${high}.`;
 }
 

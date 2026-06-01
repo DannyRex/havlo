@@ -740,13 +740,20 @@ export default function PriceComparisonBar({
         </div>
       ) : (
         <div className="flex items-center justify-between text-[11px] text-ink-3 tabular-nums mb-3">
+          {/* "now" qualifier marks this as the LIVE spread across
+              today's listings — distinct from the "Lowest tracked"
+              historical low below. Without it, "£77 cheapest" beside
+              "Lowest tracked £74" reads as two contradictory lows for
+              the same product (QA #3) when they're really two
+              different facts: cheapest available right now vs lowest
+              we've ever recorded. */}
           <span>
             {formatPriceForUser(lowestPriceNgn, country)}
-            <span className="ml-1 opacity-70">cheapest</span>
+            <span className="ml-1 opacity-70">cheapest now</span>
           </span>
           <span>
             {formatPriceForUser(highestPriceNgn, country)}
-            <span className="ml-1 opacity-70">highest</span>
+            <span className="ml-1 opacity-70">highest now</span>
           </span>
         </div>
       )}

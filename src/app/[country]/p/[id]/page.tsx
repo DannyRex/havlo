@@ -1005,7 +1005,7 @@ export default async function ProductPage({ params }: PageProps) {
      before the signature-leak fix + ingest-side price guard — don't
      poison the "Lowest tracked" line. A real flash sale survives
      priceLooksPlausible; a $10-on-a-$300-iPhone history row does not. */
-  const priceHistorySummary = priceHistoryRows
+  let priceHistorySummary = priceHistoryRows
     ? rollupPriceHistory(
         priceHistoryRows,
         offer.store_id,
@@ -1021,6 +1021,44 @@ export default async function ProductPage({ params }: PageProps) {
   const priceTimeseriesSane = priceTimeseries
     ? sanitisePriceTimeseries(priceTimeseries, offer.title, offer.category_slug ?? null)
     : null;
+
+  /* ── #3 reconciliation: one source of truth for the historical low ──
+     The comparison bar's "Lowest tracked" line and the price chart
+     used to read different RPCs — the 90d product_price_history
+     rollup (priceHistorySummary) vs the 365d product_price_timeseries
+     the chart actually plots (priceTimeseriesSane). They could
+     therefore disagree: QA caught "Lowest tracked £72" sitting beside
+     a chart whose lowest plotted point was £74, with the live spectrum
+     showing £77 cheapest — three numbers, no reconciliation.
+
+     The chart IS the visible evidence, so the bar's headline low must
+     be a value the user can see on it. When the rollup low diverges
+     from the timeseries floor (lowest plotted point), override the bar
+     to that floor and drop the rollup's per-store attribution — the
+     per-day min buckets aren't store-attributed, so keeping a store id
+     or "at this store" low that no longer matches the new headline
+     would just reintroduce a smaller contradiction. When the two
+     already agree (the common case), keep the richer rollup intact so
+     the "Lowest in 90 days" verdict and the "at this store" line still
+     work. App-side only; the underlying corrupt rows are swept by the
+     DB migration on its own schedule. */
+  if (priceHistorySummary && priceTimeseriesSane && priceTimeseriesSane.length > 0) {
+    let floorNgn = priceTimeseriesSane[0].minPriceNgn;
+    let floorDay = priceTimeseriesSane[0].day;
+    for (const p of priceTimeseriesSane) {
+      if (p.minPriceNgn < floorNgn) { floorNgn = p.minPriceNgn; floorDay = p.day; }
+    }
+    /* Diverged beyond a ₦1 rounding epsilon → reconcile to the chart. */
+    if (Math.abs(floorNgn - priceHistorySummary.allTimeLowNgn) > 1) {
+      priceHistorySummary = {
+        ...priceHistorySummary,
+        allTimeLowNgn:     floorNgn,
+        allTimeLowAt:      `${floorDay}T00:00:00.000Z`,
+        allTimeLowStoreId: "",        // per-day min isn't store-attributed
+        thisStoreLowNgn:   undefined, // never show a store low under the floor
+      };
+    }
+  }
   const breadcrumb = buildBreadcrumbList([
     { name: "Havlo",          url: `${SITE_URL}/${country.code}` },
     { name: country.name,     url: `${SITE_URL}/${country.code}` },

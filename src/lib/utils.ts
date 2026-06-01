@@ -446,6 +446,25 @@ export function formatCompact(amount: number): string {
   return `₦${amount}`;
 }
 
+/* Deterministic integer grouping ("3257" → "3,257").
+
+   Hydration safety: a bare `n.toLocaleString()` (no locale arg) formats
+   with the RUNTIME's default locale, which differs between the Vercel
+   Node server (en-US full ICU) and a visitor's browser (e.g. fr-FR
+   renders "3 257", de-DE "3.257"). When the same count is server-
+   rendered and then hydrated, those differ and React logs a text
+   mismatch (#418) — the console-noise half of the QA "hydration errors"
+   finding. Pinning the locale to en-US makes server and client emit the
+   identical string for every visitor, matching the comma grouping the
+   price formatters (formatLocalExact, formatUSDPrice) already use.
+
+   Use this for any plain integer that appears in rendered markup
+   (store counts, product counts, "N deals"). Prices go through
+   formatLocal / formatPriceForUser, which are already locale-pinned. */
+export function formatCount(n: number): string {
+  return Math.round(n).toLocaleString("en-US");
+}
+
 /* Country-aware compact formatter. Used wherever the codebase already
    has an amount in NGN (typically because /compare's matcher
    normalises everything to NGN internally) but the UI is being

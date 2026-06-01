@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { formatNaira, proxiedImageUrl, cleanTitle } from "@/lib/utils";
+import { formatNaira, proxiedImageUrl, cleanTitle, formatCount } from "@/lib/utils";
 import type { ProductGroup } from "@/lib/search";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 
@@ -25,7 +25,7 @@ export default function GroupCard({ g }: { g: ProductGroup }) {
         )}
         {g.storeCount > 1 && (
           <span className="absolute right-1.5 top-1.5 rounded-md bg-bg/80 px-1.5 py-0.5 text-[10px] font-semibold text-ink">
-            {g.storeCount.toLocaleString()} stores
+            {formatCount(g.storeCount)} stores
           </span>
         )}
       </div>

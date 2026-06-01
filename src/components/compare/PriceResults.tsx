@@ -1,7 +1,7 @@
 "use client";
 
 import { ExternalLink, Trophy, Truck, Globe, Star } from "lucide-react";
-import { formatPriceForUser, proxiedImageUrl, cleanTitle } from "@/lib/utils";
+import { formatPriceForUser, proxiedImageUrl, cleanTitle, formatCount } from "@/lib/utils";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { displayStoreName } from "@/lib/store-display";
@@ -90,7 +90,7 @@ export default function PriceResults({
               </div>
             )}
             <div className="text-xs text-ink-3">
-              {storeCount.toLocaleString()} store{storeCount > 1 ? "s" : ""}
+              {formatCount(storeCount)} store{storeCount > 1 ? "s" : ""}
             </div>
           </div>
         </div>

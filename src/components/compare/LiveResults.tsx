@@ -6,6 +6,7 @@ import {
   formatUSDPrice,
   savings,
   formatCompact,
+  formatCount,
 } from "@/lib/utils";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import { useCountry } from "@/components/providers/CountryProvider";
@@ -257,7 +258,7 @@ export default function LiveResults({ items, loading, providers }: Props) {
         </div>
         <h3 className="text-lg sm:text-xl font-bold text-ink tracking-[-0.02em]">
           {items.length > 0
-            ? `${items.length.toLocaleString()} live deals from global stores`
+            ? `${formatCount(items.length)} live deals from global stores`
             : "Live deals from global stores"}
         </h3>
         <p className="text-xs sm:text-sm text-ink-2 mt-0.5">

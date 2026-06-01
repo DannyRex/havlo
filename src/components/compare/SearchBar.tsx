@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Search, X, TrendingDown, Link2, ArrowUp } from "lucide-react";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { track, extractDomain } from "@/lib/analytics";
+import { formatCount } from "@/lib/utils";
 
 interface Suggestion { title: string; key: string; storeCount: number }
 
@@ -407,7 +408,7 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
               >
                 <span className="text-ink line-clamp-2 leading-snug w-full">{s.title}</span>
                 <span className="text-[10px] text-ink-3 whitespace-nowrap">
-                  {s.storeCount.toLocaleString()} store{s.storeCount > 1 ? "s" : ""}
+                  {formatCount(s.storeCount)} store{s.storeCount > 1 ? "s" : ""}
                 </span>
               </button>
             ))}

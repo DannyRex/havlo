@@ -1,7 +1,7 @@
 "use client";
 
 import { Globe, LayoutGrid, MapPin } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatCount } from "@/lib/utils";
 import type { OriginFilter } from "@/types";
 
 interface Props {
@@ -75,11 +75,11 @@ export default function OriginToggle({ active, onChange, counts }: Props) {
                    defence-in-depth against future schema drift. */
                 title={
                   typeof dealCount === "number" && dealCount > 0 && dealCount < count
-                    ? `${count.toLocaleString()} products · ${dealCount.toLocaleString()} on sale`
-                    : `${count.toLocaleString()} products`
+                    ? `${formatCount(count)} products · ${formatCount(dealCount)} on sale`
+                    : `${formatCount(count)} products`
                 }
               >
-                {count.toLocaleString()}
+                {formatCount(count)}
               </span>
             )}
           </button>

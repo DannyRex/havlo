@@ -14,7 +14,7 @@ import CategorySubscribe from "./CategorySubscribe";
 import LiveResults from "@/components/compare/LiveResults";
 import CompareAnchorCard from "@/components/compare/CompareAnchorCard";
 import { useCountry } from "@/components/providers/CountryProvider";
-import { cn } from "@/lib/utils";
+import { cn, formatCount } from "@/lib/utils";
 import { categories } from "@/lib/data/categories";
 import { logSearchEvent } from "@/lib/search/log-search";
 import type { Deal, DiscountTier, OriginFilter, SortOption } from "@/types";
@@ -733,8 +733,8 @@ export default function DealFeed({
                  interpretation. Honest framing over filler claims. */
           <p className="text-xs sm:text-sm text-ink-3 mt-2 tabular-nums">
             {activeCounts.deals === undefined || activeCounts.deals === 0 || activeCounts.deals >= activeCounts.total
-              ? `Browsing ${activeCounts.total.toLocaleString()} products today.`
-              : <>Browsing {activeCounts.total.toLocaleString()} products · {activeCounts.deals.toLocaleString()} on sale right now.</>}
+              ? `Browsing ${formatCount(activeCounts.total)} products today.`
+              : <>Browsing {formatCount(activeCounts.total)} products · {formatCount(activeCounts.deals)} on sale right now.</>}
           </p>
         )}
       </div>
@@ -983,7 +983,7 @@ export default function DealFeed({
                     already-stable slice rather than chasing a
                     per-request number. Falls back to `total` before
                     originCounts populates. */}
-                {(activeCounts?.total ?? total).toLocaleString()} deals
+                {formatCount(activeCounts?.total ?? total)} deals
               </span>
             )}
 
@@ -1215,7 +1215,7 @@ export default function DealFeed({
       {/* End of feed */}
       {!loading && !hasMore && items.length > 0 && liveItems.length === 0 && !liveLoading && (
         <p className="text-center text-xs text-ink-3 mt-12">
-          That&apos;s all {total.toLocaleString()} deals for now.
+          That&apos;s all {formatCount(total)} deals for now.
         </p>
       )}
     </div>

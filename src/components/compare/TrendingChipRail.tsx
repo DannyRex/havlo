@@ -27,6 +27,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TrendingUp, Loader2 } from "lucide-react";
+import { formatCount } from "@/lib/utils";
 import type { MultiStoreChip } from "@/lib/trending-multi-store";
 
 interface Props {
@@ -272,7 +273,7 @@ export default function TrendingChipRail({
                     ? "bg-surface border-border opacity-50 pointer-events-none"
                     : "bg-surface border-border hover:border-border-strong hover:shadow-card active:scale-95"
               }`}
-              aria-label={`${chip.title}, available across ${chip.storeCount.toLocaleString()} stores`}
+              aria-label={`${chip.title}, available across ${formatCount(chip.storeCount)} stores`}
             >
               <span className="text-[13px] font-medium text-ink">{chip.title}</span>
               {isThisPending ? (
