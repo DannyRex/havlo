@@ -1,0 +1,203 @@
+name: Refresh free data (daily, non-SerpAPI sources)
+
+on:
+  schedule:
+    # The paid workflow (scrape-deals.yml) refreshes EVERYTHING on Mon +
+    # Thu at 05:00 UTC and also sends the newsletter. This companion
+    # workflow fills the OTHER five days with the FREE sources only, so
+    # free inventory refreshes every day while SerpAPI spend and the
+    # digest cadence stay exactly twice-weekly.
+    #
+    #   Mon, Thu            → scrape-deals.yml   (free + SerpAPI + newsletter)
+    #   Sun,Tue,Wed,Fri,Sat → this file          (free only, no email, no credits)
+    #
+    # 0,2,3,5,6 = Sun, Tue, Wed, Fri, Sat (cron's day-of-week: 0=Sun..6=Sat).
+    # Together with scrape-deals.yml's "1,4" the free sources are touched
+    # all seven days, with no day running both files.
+    #
+    # Free sources here: the Playwright store scrape (+ deals.ts commit +
+    # ingest:scraped), the AliExpress affiliate API, and NG Shopify JSON
+    # (3C Hub). There are deliberately NO SerpAPI jobs (Jumia, standard
+    # Google Shopping, NG long-tail, UK retailers) and NO send-newsletter
+    # here. Those stay in the Mon/Thu workflow. If you add or remove a
+    # free source, keep this file and scrape-deals.yml's free jobs in sync
+    # until they are factored into one reusable workflow.
+    - cron: "0 5 * * 0,2,3,5,6"
+  workflow_dispatch: {}
+
+# The scrape job commits the refreshed deals.ts back to the repo, so the
+# auto-injected GITHUB_TOKEN needs write access to contents (same as the
+# Mon/Thu workflow).
+permissions:
+  contents: write
+
+# Don't let a manual run race a scheduled one of THIS workflow on the git
+# push. Scheduled runs never overlap (disjoint days, 60m timeout), so this
+# only guards manual dispatch. cancel-in-progress: false lets an in-flight
+# commit finish cleanly rather than being killed mid-push. A manual overlap
+# with the Mon/Thu workflow is still covered by the scrape job's rebase +
+# retry push loop below.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+
+  # ── Job 1: Playwright scrape + commit refreshed deals.ts +
+  #          ingest scraped → DB. Mirrors the `scrape` job in
+  #          scrape-deals.yml. The three steps stay in one job because
+  #          (a) the commit needs the same checkout that ran the scrape,
+  #          and (b) ingest:scraped reads the freshly-generated deals.ts
+  #          before it's pushed. ──
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run scrapers
+        run: npm run scrape
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          git diff --quiet src/lib/data/deals.ts || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit & push if deals changed
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          # Canonical github-actions[bot] identity so Vercel accepts the
+          # auto-commit and deploys it (a made-up author email fails
+          # Vercel's "commit author must map to a GitHub account" check).
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/data/deals.ts
+          git commit -m "chore: refresh deals [$(date '+%Y-%m-%d')]"
+          # Scrape can take 15-25 min; main may have moved during the run
+          # (manual commits, the Mon/Thu workflow on an overlapping manual
+          # dispatch). Rebase + retry on push rejection so we don't lose
+          # the data refresh.
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "✓ Push succeeded on attempt $attempt"
+              break
+            fi
+            echo "✗ Push rejected (attempt $attempt). Rebasing onto remote main…"
+            git fetch origin main
+            git rebase origin/main
+          done
+
+      # Ingestion: pushes the refreshed deals.ts into Supabase so the
+      # app's DB-backed providers serve fresh rows immediately. Stays in
+      # this job because it reads the just-generated deals.ts.
+      - name: Ingest scraped deals → Supabase
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: npm run ingest:scraped
+
+  # ── Job 2: AliExpress affiliate ingest. Independent API call to the
+  #          AliExpress Open Platform, free (no SerpAPI credits). Mirrors
+  #          the ingest-aliexpress job in scrape-deals.yml. ──
+  ingest-aliexpress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ALIEXPRESS_APP_KEY:         ${{ secrets.ALIEXPRESS_APP_KEY }}
+      ALIEXPRESS_APP_SECRET:      ${{ secrets.ALIEXPRESS_APP_SECRET }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Ingest AliExpress affiliate deals → Supabase
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.ALIEXPRESS_APP_KEY != '' && env.ALIEXPRESS_APP_SECRET != ''
+        run: npm run ingest:aliexpress
+
+  # ── Job 3: NG Shopify-based retailers via /collections/all/products.json
+  #          (3C Hub + future NG Shopify stores). Pure node-fetch, no
+  #          Playwright, no SerpAPI credits. In scrape-deals.yml this runs
+  #          as the third step of the paid Jumia job; here it's a stand-
+  #          alone free job so the daily run carries zero credit cost. ──
+  ingest-ng-shopify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Ingest NG Shopify-based retailers → Supabase
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: npm run ingest:ng-shopify
+
+  # ── Job 4: Dedup pass. Re-keys product signatures with the compact
+  #          'brand|model[|inches]' form and merges any near-duplicates
+  #          the free ingests just created. Pure DB work, no API credits.
+  #          Mirrors the dedup job in scrape-deals.yml, minus the SerpAPI
+  #          jobs from its needs-chain. if: success() || failure() so the
+  #          merge still runs on a partial ingest (better to dedup the
+  #          partial catalog than skip it), but not on a manual cancel. ──
+  dedup:
+    needs: [scrape, ingest-aliexpress, ingest-ng-shopify]
+    if: success() || failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Dedup products
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: npm run dedup
