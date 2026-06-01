@@ -5,7 +5,6 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import ThemeProvider from "@/components/ui/ThemeProvider";
 import { CountryProvider } from "@/components/providers/CountryProvider";
-import { getRequestCountry } from "@/lib/country-server";
 import JsonLd from "@/components/seo/JsonLd";
 import DeferredConsentStack from "@/components/seo/DeferredConsentStack";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/seo";
@@ -177,15 +176,34 @@ export default function RootLayout({
       </head>
       <body className="min-h-[100dvh] flex flex-col antialiased font-sans bg-bg text-ink">
         <ThemeProvider>
-          {/* Seed CountryProvider with the country middleware resolved
-              for this request (the x-havlo-country header): the URL's
-              /[country]/ segment when present, else cookie/geo. The
-              Navbar lives here in the root layout, above the inner
-              [country] CountryProvider, so without a URL-accurate seed
-              its SSR render used the cookie's country while the client
-              resolved the URL's. That hydration mismatch threw React
-              #418/#423/#425 and flashed the wrong flag on first paint. */}
-          <CountryProvider initialCode={getRequestCountry().code}>
+          {/* DO NOT pass an initialCode here, and DO NOT read headers()/
+              cookies() (directly or via getRequestCountry/getServerCountry)
+              anywhere in this layout's render path.
+
+              WHY: any dynamic-function read in the ROOT layout opts EVERY
+              route in the app into dynamic rendering — defeating the ISR
+              declared on the homepage (revalidate=900), the category/brand/
+              PDP hubs (revalidate=21600), and turning every static legal
+              page into an on-demand SSR. A May 2026 regression seeded this
+              provider with getRequestCountry() (which reads the
+              x-havlo-country header) to kill a navbar flag flash; the audit
+              that followed found it had silently pushed the WHOLE site to
+              `x-vercel-cache: MISS, private, no-store` — ~60 Supabase
+              queries and 3-5s TTFB on EVERY visit — and made page-level
+              notFound() return soft-404 (HTTP 200) instead of a real 404.
+
+              The navbar/footer country flag is handled WITHOUT a server
+              seed: CountryProvider's useState initialiser resolves the
+              country from window.location.pathname on the first client
+              render, and CountrySelect carries suppressHydrationWarning on
+              the flag + code so the SSR-emits-NG / client-resolves-URL diff
+              is absorbed cleanly. Country-scoped page CONTENT renders with
+              the correct country regardless: the nested [country]/layout
+              CountryProvider is seeded statically from params.country, and
+              landing components take `country` as a prop. The only cost is
+              a one-frame flag flash on non-NG country pages — a documented,
+              accepted trade-off for an ISR-able site. */}
+          <CountryProvider>
             <Navbar />
             <main className="flex-1">{children}</main>
             <Footer />
