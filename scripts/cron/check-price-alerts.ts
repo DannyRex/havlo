@@ -1,11 +1,12 @@
 #!/usr/bin/env tsx
 /* Daily price-alert scan + email.
 
-   Fires from CI on a daily schedule (.github/workflows/scrape-deals.yml
-   plus a dedicated daily trigger). For each row in price_alerts where
-   notified_at is null AND the current cheapest in-country offer is
-   at or below target_ngn, send the trigger email via Resend and
-   stamp notified_at so it doesn't re-fire.
+   Fires from CI daily via .github/workflows/price-alerts.yml (cron
+   07:00 UTC, plus a manual workflow_dispatch with a dry_run input).
+   For each row in price_alerts where notified_at is null AND the
+   current cheapest in-country offer is at or below target_ngn, send
+   the trigger email via Resend and stamp notified_at so it doesn't
+   re-fire.
 
    Only handles product_id-keyed alerts in v1. Query-only alerts
    (fallback when PDP has no product UUID) will be handled in a

@@ -1,0 +1,79 @@
+name: Price alerts (daily scan + email)
+
+on:
+  schedule:
+    # Daily at 07:00 UTC (08:00 WAT). The data refresh (scrape-deals.yml)
+    # runs Mon + Thu at 05:00 UTC and settles — scrape + the four ingests
+    # + dedup — by ~06:00 UTC, so an 07:00 scan picks up that morning's
+    # fresh price drops on ingest days. On the other five days the scan is
+    # a cheap no-op: pending_price_alerts returns nothing new, the script
+    # logs "No alerts to send" and exits. Running daily (rather than only
+    # Mon/Thu) means a manual mid-week ingest or a corrected price still
+    # fires its alerts within 24h instead of waiting for the next cron.
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+    # Manual run from the GitHub UI. dry_run lets us validate the scan
+    # (counts + sample subjects) without sending any email or stamping
+    # notified_at — safe to trigger any time.
+    inputs:
+      dry_run:
+        description: "Preview only (no emails sent, no notified_at writes)"
+        type:        boolean
+        required:    false
+        default:     false
+
+# Read-only token is sufficient — the job talks to Supabase + Resend over
+# the network and never pushes to the repo.
+permissions:
+  contents: read
+
+jobs:
+  check-price-alerts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RESEND_API_KEY:            ${{ secrets.RESEND_API_KEY }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Loud-fail guard, same pattern as send-newsletter. Without it a
+      # missing secret makes the run step's `if:` evaluate false, the step
+      # shows "skipped" with a green check, and the job passes — masking a
+      # silent outage where no alert email ever sends. A dry-run dispatch
+      # only needs the DB secrets (it never calls Resend), so RESEND_API_KEY
+      # is not required when inputs.dry_run is true.
+      - name: Verify alert secrets present
+        run: |
+          missing=""
+          [ -z "$SUPABASE_URL" ]              && missing="$missing SUPABASE_URL"
+          [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] && missing="$missing SUPABASE_SERVICE_ROLE_KEY"
+          if [ "${{ inputs.dry_run }}" != "true" ] && [ -z "$RESEND_API_KEY" ]; then
+            missing="$missing RESEND_API_KEY"
+          fi
+          if [ -n "$missing" ]; then
+            echo "::error::Price-alert scan aborted — missing secrets:$missing"
+            echo "::error::Add the missing secret(s) at https://github.com/DannyRex/havlo/settings/secrets/actions"
+            exit 1
+          fi
+          echo "✓ All required price-alert secrets present"
+
+      - name: Scan price alerts and notify (dry run)
+        if: inputs.dry_run == true
+        run: npm run alerts:dry-run
+
+      - name: Scan price alerts and notify
+        if: inputs.dry_run != true
+        run: npm run alerts:check
