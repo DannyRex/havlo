@@ -28,6 +28,17 @@ import type { SeoDeal } from "@/lib/seo";
    read, deduped with generateMetadata via React cache(). */
 export const revalidate = 21600;
 
+/* Category slugs are a FINITE, build-time-known set (categories.ts ×
+   ACTIVE_COUNTRIES — see generateStaticParams below). dynamicParams=false
+   makes any slug outside that set 404 at the ROUTING layer with a real
+   HTTP 404 — the same mechanism that correctly 404s an unknown /[country].
+   Without it, an unknown slug fell through to the page body's
+   notFound(), which under this route's dynamic render returned a
+   soft-404 (HTTP 200 with the not-found UI) — bad for crawl signals.
+   Valid slugs still render normally (dynamically, for the country
+   header); only unlisted slugs are rejected up front. */
+export const dynamicParams = false;
+
 /* Pre-build every active market × real category (10 cats × 6 markets =
    60 pages). Bounded + cheap; keeps the hubs crawl-ready on first
    deploy rather than waiting for on-demand ISR. */
