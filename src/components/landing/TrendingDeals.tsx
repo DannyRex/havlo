@@ -124,6 +124,25 @@ function capPerStore(bucket: Deal[], cap: number): Deal[] {
   return out;
 }
 
+/* Order a bucket so genuinely-clicked products lead (#18: "trending
+   should actually reflect what people click"). The sort is STABLE, so
+   among equal click counts the existing discount/freshness order is
+   preserved — clicks are the PRIMARY signal, discount the secondary.
+
+   This is a boost, not a swap: because the deterministic HEAD takes the
+   FIRST items of each bucket (composePicks with randomize=false), the
+   most-clicked products own the above-the-fold hero band, while the deep
+   tail — almost all 0-click, the bulk of the ~200-item pool from #17 —
+   still fills the bucket and randomizes per visit. So popularity drives
+   what's featured without collapsing the larger-pool freshness. As click
+   volume is still thin (a few hundred outbound clicks), most buckets have
+   only a handful of clicked rows, and everything else simply keeps its
+   discount order. Deal.clicks is populated upstream by rowToDeal from
+   outbound_clicks over the last 30 days. */
+function byClicksDesc(bucket: Deal[]): Deal[] {
+  return [...bucket].sort((a, b) => (b.clicks ?? 0) - (a.clicks ?? 0));
+}
+
 function composeBuckets(pool: Deal[], isNG: boolean): TrendingBuckets {
   /* Bucket the pool by classification.
 
@@ -146,11 +165,14 @@ function composeBuckets(pool: Deal[], isNG: boolean): TrendingBuckets {
       bucketed[base].push(d);
     }
   }
+  /* byClicksDesc before the per-store cap (#18) so a popular store's
+     most-clicked rows survive the cap, and clicked rows lead each bucket
+     → the stable HEAD features them. */
   return {
-    local:      capPerStore(bucketed.local,         PER_STORE_CAP).slice(0, POOL_CAP_LOCAL),
-    amazon:     capPerStore(bucketed.amazon,        PER_STORE_CAP).slice(0, POOL_CAP_AMAZON),
-    aliexpress: capPerStore(bucketed.aliexpress,    PER_STORE_CAP).slice(0, POOL_CAP_ALIEXPRESS),
-    intlOther:  capPerStore(bucketed["intl-other"], PER_STORE_CAP).slice(0, POOL_CAP_INTL_OTHER),
+    local:      capPerStore(byClicksDesc(bucketed.local),         PER_STORE_CAP).slice(0, POOL_CAP_LOCAL),
+    amazon:     capPerStore(byClicksDesc(bucketed.amazon),        PER_STORE_CAP).slice(0, POOL_CAP_AMAZON),
+    aliexpress: capPerStore(byClicksDesc(bucketed.aliexpress),    PER_STORE_CAP).slice(0, POOL_CAP_ALIEXPRESS),
+    intlOther:  capPerStore(byClicksDesc(bucketed["intl-other"]), PER_STORE_CAP).slice(0, POOL_CAP_INTL_OTHER),
   };
 }
 
