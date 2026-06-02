@@ -22,7 +22,7 @@ import { resolveStoreLogoUrl } from "@/lib/store-logo";
 import { merchantTrust } from "@/lib/merchant-trust";
 import { partitionDupesByVariantMatch, variantOffers } from "./variant-pooling";
 import { partitionDupesByVariantMatchDeep } from "./variant-pooling-deep";
-import { priceLooksPlausible, isUsedListing } from "./price-floor";
+import { priceLooksPlausible, isUsedListing, looksCounterfeit } from "./price-floor";
 import { isLooseCategoryModel } from "./normalize";
 import type {
   SearchOutput, ProductGroup, StoreOffer, DupeResult, SearchSuggestion,
@@ -538,6 +538,8 @@ export async function pgFtsFindDupes(
     .filter((r) => queryIsAccessory ? looksLikeAccessory(r.title) : !looksLikeAccessory(r.title))
     // Drop counterfeit-looking titles ("Apple MacBook Neo A18 Pro")
     .filter((r) => !looksSuspicious(r.title))
+    // Drop luxury-trademark counterfeits ("...Interlocking G", "Super Clone")
+    .filter((r) => !looksCounterfeit(r.title))
     // Product-family gate: an iPhone anchor must not get iPad / MacBook dupes.
     .filter((r) => !familiesIncompatible(query, r.title))
     /* Family match.
@@ -758,6 +760,8 @@ export async function pgFtsFindSimilar(
     const candidates = (data as FtsRow[])
       .filter((r) => !looksLikeAccessory(r.title))
       .filter((r) => !looksSuspicious(r.title))
+      // Drop luxury-trademark counterfeits ("...Interlocking G", "Super Clone")
+      .filter((r) => !looksCounterfeit(r.title))
       /* Family gate covers BOTH category-class queries ('phones')
          AND specific-product queries ('iPhone 16 Plus', 'MacBook
          Pro M4'). Together they prevent cross-category bleed. */
@@ -905,6 +909,8 @@ export async function pgFtsFindSimilar(
     .filter((r) => !looksLikeAccessory(r.title))
     // Drop counterfeit-looking titles ("Apple MacBook Neo A18 Pro")
     .filter((r) => !looksSuspicious(r.title))
+    // Drop luxury-trademark counterfeits ("...Interlocking G", "Super Clone")
+    .filter((r) => !looksCounterfeit(r.title))
     /* Strict family match — when the anchor has a recognised family
        (footwear, watch, earbuds, etc.), candidates must be in the
        same family. Stops cross-family same-brand dupes like
@@ -1021,6 +1027,8 @@ export async function pgFtsFindByProductId(
        accessories so a phone anchor doesn't pull in cases. */
     .filter((r) => anchorIsAccessory ? looksLikeAccessory(r.title) : !looksLikeAccessory(r.title))
     .filter((r) => !looksSuspicious(r.title))
+    // Drop luxury-trademark counterfeits ("...Interlocking G", "Super Clone")
+    .filter((r) => !looksCounterfeit(r.title))
     /* Family gate. Anchor family inferred from title; candidates
        must match. Skipped when family is null (allows broad
        'gift for mum'-style anchors to surface anything). */

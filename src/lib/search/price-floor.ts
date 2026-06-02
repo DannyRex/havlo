@@ -243,3 +243,72 @@ export function isUsedListing(storeName?: string | null, title?: string | null):
   }
   return false;
 }
+
+/* ── Counterfeit / trademark-mimicry suppression ───────────────────
+   Finding #10 (May 2026 QA): the catalog surfaced listings that
+   imitate luxury houses to move counterfeits — "GG Exclusive men's
+   Ace sneaker with Interlocking G" (Gucci monogram), "Medusa Logo
+   Clip Sandals" (Versace), "Luxury Patekes Philipely ... Super Clone
+   Watch" (Patek), unbranded "AAA ... Date Just MIYOTA" (Rolex),
+   "Mirror Quality Hobo Bag", plus 7A/10A/12A-graded replica handbags.
+
+   Unlike isUsedListing — a genuine product we DISCLOSE with a chip —
+   a counterfeit is a legal-liability item callers SUPPRESS outright
+   (drop the row rather than label it). A brand's legal team
+   screenshotting a Havlo page full of fakes is the failure mode.
+
+   CRITICAL precision constraints. Havlo's value prop legitimately
+   INCLUDES dupes / "inspired by" alternatives (legal fragrance dupes,
+   generic look-for-less items in DupeCard), so this targets TRADEMARK
+   MIMICRY and replica-grade slang ONLY — never the words "dupe",
+   "inspired by", "alternative", or "similar to". Two real false-
+   positive traps the rules are tuned around:
+     • "replica" is LEGITIMATE for licensed sports merch ("NBA
+       All-Star Replica Basketball", replica jerseys / kits) — so bare
+       "replica" is NOT a signal; only explicit "<luxury> replica"
+       phrasings or the grade-slang below.
+     • "10A / 12A grade" is a LEGITIMATE human-hair quality grade
+       ("12A Burmese Curly Human Hair Wig") — so the grade-code rule
+       fires only on bag/shoe listings and is vetoed by any hair term.
+
+   Verified against the live catalog (15,197 titles): suppresses 21
+   confirmed counterfeits, 0 false positives. Deliberately favours
+   false negatives — a grade-only watch with no "super clone" / "date
+   just" tell slips through rather than risk a legitimate listing. */
+const COUNTERFEIT_TERMS: RegExp[] = [
+  /\bsuper\s*clone\b/i,                 // "Super Clone" / "Superclone" replica-watch slang
+  /\bclone\s+watch(?:es)?\b/i,
+  /\bmirror\s+(?:quality|image)\b/i,    // 1:1 "mirror" bags/watches
+  /\b(?:first|1st|master)\s+cop(?:y|ies)\b/i,
+  /\b1\s*:\s*1\s+(?:replica|copy|clone)\b/i,
+  /\baaa\b[^.]{0,25}\bdate\s*just\b/i,  // unbranded "AAA ... Date Just" = fake Rolex Datejust
+];
+
+/* Monogram / logo references that evoke a luxury house, usually while
+   hiding the real brand behind initials to slip past name filters. */
+const MONOGRAM_MIMICRY: RegExp[] = [
+  /\binterlock(?:ing)?\s*g\b/i,                                   // Gucci interlocking-G
+  /\b(?:double\s*g|gg)\s+(?:monogram|logo|pattern|exclusive)\b/i, // Gucci GG
+  /\blv\s+(?:monogram|logo|pattern|print)\b/i,                    // Louis Vuitton
+  /\bcc\s+(?:logo|monogram|quilted)\b/i,                          // Chanel
+  /\bmedusa\s+(?:head|logo|print)\b/i,                            // Versace
+  /\bv[-\s]?logo\s+(?:bag|handbag|leather|crossbody|tote)\b/i,    // Valentino V-logo
+  /\bred\s+bottoms?\b/i,                                          // Louboutin (resale slang)
+];
+
+/* Replica grade-codes (7A/10A/12A) only signal counterfeit on a
+   bag/shoe listing in a designer/luxury context, and NEVER when a
+   human-hair term is present (those grades are a legit hair scale). */
+const CF_GRADE_CODE   = /\b(?:7a|10a|12a)\b/i;
+const CF_LUXE_CONTEXT = /\b(?:designer|luxury|quality)\b/i;
+const CF_BAGSHOE_NOUN = /\b(?:bag|tote|handbag|crossbody|purse|wallet|clutch|sneakers?|trainers?|shoes?|loafers?)\b/i;
+const CF_HAIR_VETO    = /\b(?:wig|wigs|hair|lace|drawn|density|closure|frontal|bundles?|remy|weave|bob)\b/i;
+
+export function looksCounterfeit(title?: string | null): boolean {
+  if (!title) return false;
+  if (COUNTERFEIT_TERMS.some((re) => re.test(title))) return true;
+  if (MONOGRAM_MIMICRY.some((re) => re.test(title))) return true;
+  if (CF_GRADE_CODE.test(title) && CF_BAGSHOE_NOUN.test(title)
+      && CF_LUXE_CONTEXT.test(title) && !CF_HAIR_VETO.test(title)) return true;
+  return false;
+}

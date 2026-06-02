@@ -13,7 +13,7 @@ import { searchCandidates } from "@/lib/search/query-expand";
 import { fetchOffersAt30dLow } from "@/lib/search/price-history";
 import { withTimeout } from "@/lib/promise-timeout";
 import { isCrossBorderStore } from "@/lib/country";
-import { isUsedListing } from "@/lib/search/price-floor";
+import { isUsedListing, looksCounterfeit } from "@/lib/search/price-floor";
 
 interface BestOfferRow {
   product_id: string;
@@ -204,9 +204,12 @@ async function searchDealsViaFts(
   const popularity = await getPopularityRecord().catch(() => ({} as PopularityRecord));
 
   /* Drop Google-relay URLs (legacy SerpAPI residue) — same gate
-     the browse path applies. */
+     the browse path applies. Also suppress counterfeit / trademark-
+     mimicry listings (Finding #10) so a search for "gucci sneaker"
+     can't surface a "GG Exclusive ... Interlocking G" fake. */
   const fromDb = merged
     .filter((r) => isUsableMerchantUrl(r.url))
+    .filter((r) => !looksCounterfeit(r.title))
     .map((r) => rowToDeal(r, popularity));
 
   /* Popularity-aware re-rank. RPC already returned rows in relevance
@@ -551,6 +554,7 @@ export const dbBrowseProvider: BrowseProvider = {
        the user on a Google search page — broken UX. */
     const fromDb = allRows
       .filter((r) => isUsableMerchantUrl(r.url))
+      .filter((r) => !looksCounterfeit(r.title))
       .map((r) => rowToDeal(r, popularity));
     /* Merge curated Amazon catalog with the ingested data, then
        re-apply the requested sort to the combined array. Lets
