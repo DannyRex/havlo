@@ -19,7 +19,7 @@
 
 import type { StoreOffer } from "@/lib/search";
 import { type Country, isOfferAllowedForCountry } from "@/lib/country";
-import { effectiveLandedPrice, isCrossBorderForUser } from "@/lib/landed-price";
+import { isCrossBorderForUser } from "@/lib/landed-price";
 import { isAccessoryListing, isUsedListing } from "@/lib/search/price-floor";
 
 /* Per-store summary the new PriceComparisonBar needs to plot dots
@@ -29,7 +29,7 @@ export interface PerStoreOffer {
   storeId:       string;
   storeName:     string;
   storeLogoUrl:  string;
-  effectiveNgn:  number;       // country-aware (local: base; intl: landed)
+  effectiveNgn:  number;       // raw merchant price (NGN); landed is shown only as a labelled "(est.)" total (#16)
   isCrossBorder: boolean;      // for the visitor specifically
   offerId:       string;       // for "cheaper at [Store]" deep-link
   /** Used / refurbished / open-box listing (high-precision detection
@@ -64,18 +64,19 @@ export interface AnchorStats {
   perStoreOffers: PerStoreOffer[];
 }
 
-/* Same-store + same-effective-price dedup — country-aware via
-   effectiveLandedPrice. Round to nearest ₦100 so trivial
-   FX-rounding differences don't leak through as separate rows.
-   Mirrors lines 558-566 of /[country]/compare/page.tsx so the
-   PDP CTA's N matches the compare anchor section's N exactly. */
-function dedupAnchorOffers(offers: StoreOffer[], country: Country): StoreOffer[] {
+/* Same-store + same-price dedup on the RAW merchant price (#16: the PDP
+   now leads with the raw price on every surface — hero, chart, spectrum
+   — and shows the cross-border landed total only as a labelled "(est.)".
+   So the spectrum's pool, sort and "cheapest" all key off o.price, never
+   the landed estimate, which is what kept the spectrum's headline out of
+   step with the hero + chart). Round to nearest ₦100 so trivial
+   FX-rounding differences don't leak through as separate rows. */
+function dedupAnchorOffers(offers: StoreOffer[]): StoreOffer[] {
   const seen = new Set<string>();
   return offers
-    .filter((o) => o.landedPrice > 0)
+    .filter((o) => o.price > 0)
     .filter((o) => {
-      const eff = effectiveLandedPrice(o, country);
-      const key = `${o.storeId}|${Math.round(eff / 100) * 100}`;
+      const key = `${o.storeId}|${Math.round(o.price / 100) * 100}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -120,7 +121,7 @@ export function computeAnchorStats(
     ? countryFiltered
     : countryFiltered.filter((o) => !isAccessoryListing(o.productTitle));
 
-  const deduped = dedupAnchorOffers(accessoryFiltered, country);
+  const deduped = dedupAnchorOffers(accessoryFiltered);
 
   /* Outlier filter — defense against over-merged products in the DB
      AND against legitimate-but-misleading storage-tier spreads (the
@@ -136,7 +137,7 @@ export function computeAnchorStats(
     family === "fashion"  || family === "beauty"  || family === "sports" ? 4 :
     family === "home"     || family === "health" ? 3 :
     /* phones, electronics, computing, audio, gaming, default */         2.5;
-  const offerPrices = deduped.map((o) => effectiveLandedPrice(o, country)).filter((p) => p > 0);
+  const offerPrices = deduped.map((o) => o.price).filter((p) => p > 0);
   let medianPrice = 0;
   if (offerPrices.length > 0) {
     const sorted = [...offerPrices].sort((a, b) => a - b);
@@ -155,25 +156,26 @@ export function computeAnchorStats(
   const referencePrice = anchorPriceNgn > 0 ? anchorPriceNgn : medianPrice;
   const dedupedFiltered = referencePrice > 0
     ? deduped.filter((o) => {
-        const p = effectiveLandedPrice(o, country);
+        const p = o.price;
         if (p <= 0) return false;
         const ratio = p / referencePrice;
         return ratio >= 1 / ANCHOR_OUTLIER_RATIO && ratio <= ANCHOR_OUTLIER_RATIO;
       })
     : deduped;
 
-  /* Per-store rows for the new PriceComparisonBar. Sorted cheapest
-     first so the bar can plot dots in display order and the
-     'cheapest at [Store]' lookup is perStoreOffers[0].
-     effectiveNgn is country-aware via effectiveLandedPrice — local
-     stores show base price, cross-border show landed (+ ~30%
-     shipping/customs estimate). */
+  /* Per-store rows for the PriceComparisonBar. Sorted cheapest first so
+     the bar can plot dots in display order and the 'cheapest at [Store]'
+     lookup is perStoreOffers[0]. effectiveNgn is the RAW merchant price
+     (#16) so the spectrum's headline / "cheapest" agrees with the hero
+     big-price and the price-history chart, which both lead with the raw
+     price. isCrossBorder still drives the "+ ~30% shipping/customs" est.
+     disclaimer so the cross-border caveat is never lost. */
   const perStoreOffers: PerStoreOffer[] = dedupedFiltered
     .map((o) => ({
       storeId:       o.storeId,
       storeName:     o.storeName,
       storeLogoUrl:  o.storeLogoUrl,
-      effectiveNgn:  effectiveLandedPrice(o, country),
+      effectiveNgn:  o.price,
       isCrossBorder: isCrossBorderForUser(o, country),
       offerId:       o.offerId,
       isUsed:        isUsedListing(o.storeName, o.productTitle),

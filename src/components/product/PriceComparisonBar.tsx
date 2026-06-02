@@ -33,8 +33,11 @@
    formatPriceForUser converts to the visitor's display currency at
    render time. Passing user-currency values would double-convert
    and round small-amount products to £0 (May 2026 bug). The
-   PerStoreOffer.effectiveNgn from pdp-stats is also NGN, validated
-   country-aware via effectiveLandedPrice. */
+   PerStoreOffer.effectiveNgn from pdp-stats is the RAW merchant price
+   in NGN (#16) so the bar's headline / "cheapest" agrees with the hero
+   big-price and the price-history chart; the cross-border landed total
+   is surfaced separately as the "+ ~30% shipping/customs" est.
+   disclosure below. */
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
