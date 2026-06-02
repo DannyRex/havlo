@@ -42,7 +42,7 @@ import { pgFtsFindDupes } from "@/lib/search/pg-fts";
 import { isOfferAllowedForCountry } from "@/lib/country";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
 import SimilarProducts from "@/components/product/SimilarProducts";
-import { getClickThroughUrl } from "@/lib/utils";
+import { getClickThroughUrl, cleanTitle, sanitizeLabel } from "@/lib/utils";
 import { appendSignature } from "@/lib/go-signing";
 import { toAbsoluteMerchantUrl } from "@/lib/pdp-url";
 import { displayStoreName } from "@/lib/store-display";
@@ -77,9 +77,17 @@ function parseNumber(v: string | string[] | undefined, fallback = 0): number {
 const PRICE_MAX = 1_000_000_000;
 
 function searchParamsToOffer(sp: PageProps["searchParams"]): OfferData | null {
-  /* Cap the title. A 2000-char `t=` would otherwise flow straight
-     into a 2000-char <title> tag and browser-tab label. */
-  const title  = single(sp.t).trim().slice(0, 200);
+  /* Sanitize, then cap, the title. The `t=` param is fully
+     attacker-controllable and flows into BOTH the visible hero and the
+     document <title> ("<title> at <store>"). cleanTitle strips
+     tag-shaped markup, control chars and invisible bidi/zero-width
+     spoofing characters — the SAME normalisation the regular PDP
+     (/p/[id]) already applies to its <title> via cleanTitle, so the two
+     routes treat titles identically. The slice then caps a hostile
+     2000-char value before it can become a 2000-char browser-tab label.
+     Clean-then-cap (not cap-then-clean) so a tag straddling the 200th
+     char can't leave a dangling fragment. Finding #12. */
+  const title  = cleanTitle(single(sp.t)).slice(0, 200);
   /* Unwrap `/api/go?url=<abs>` relay wrappers (SerpAPI Google-relay
      rows carry Deal.url in that form) to the absolute merchant URL.
      Without this, the `new URL()` parse below throws on the relative
@@ -136,7 +144,12 @@ function searchParamsToOffer(sp: PageProps["searchParams"]): OfferData | null {
     offerId:         "",
     productId:       "",
     storeId:         single(sp.s) || "external",
-    storeName:       (single(sp.sn) || "Merchant").slice(0, 80),
+    /* sn= is user-controllable and is concatenated into the <title>
+       after "at"; sanitize it the same way as the product title. Uses
+       sanitizeLabel (not cleanTitle) so a legitimate hyphenated store
+       name — "Best-Buy" — isn't mangled into "Best – Buy" by the
+       separator-collapse cleanTitle applies. Finding #12. */
+    storeName:       (sanitizeLabel(single(sp.sn)) || "Merchant").slice(0, 80),
     storeLogoUrl:    single(sp.sl) || null,
     title,
     category:        "general",

@@ -649,6 +649,21 @@ function deLeetToken(token: string): string {
   return ZERO_FOR_O_TOKEN.test(token) ? token.replace(/0/g, "o") : token;
 }
 
+/* Invisible directional / zero-width characters that must never reach a
+   rendered title or a document <title>. They survive React + Next
+   HTML-escaping intact (escaping only neutralises < > & " '), yet they
+   let a crafted string reorder or hide how a title paints: a right-to-
+   left override (U+202E) visually reverses the product name, a zero-
+   width space (U+200B) splits a word with no visible gap, a stray BOM
+   (U+FEFF) wedges itself mid-string. None carry legible content, so
+   they're removed outright.
+
+   Deliberately EXCLUDES U+200C / U+200D (ZWNJ / ZWJ): those are
+   load-bearing in Devanagari (India), Arabic (UAE) and emoji ZWJ
+   sequences, so stripping them would corrupt legitimate multi-script
+   titles in the very markets Havlo serves. Finding #12. */
+const TITLE_UNSAFE_CHARS = /[\u200B\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+
 /* Clean up dirty product titles from upstream scrapers (especially ASOS
    which spits out "Brand – Product – – Material" with repeated en-dashes).
    Collapses any run of separator characters (en-dash, em-dash, hyphen, |)
@@ -674,6 +689,13 @@ export function cleanTitle(raw: string): string {
        trailing space-collapse + trim tidy up either way. Finding #8. */
     .replace(/\uFFFD/g, "")
     .replace(/[\u0000-\u001F\u007F]/g, " ")
+    /* Strip invisible directional / zero-width / BOM characters. Unlike
+       the tag strip above, these survive HTML escaping untouched, so a
+       crafted title (e.g. a right-to-left override) can still reorder or
+       hide how the name paints in a browser tab, a SERP, or our own
+       document <title>. Removed outright (zero-width), keeping ZWNJ/ZWJ
+       for Indic + Arabic + emoji. See TITLE_UNSAFE_CHARS. Finding #12. */
+    .replace(TITLE_UNSAFE_CHARS, "")
     /* Repair zero-for-o brand corruption per token ("Veat00l" → "Veatool").
        deLeetToken self-gates on a shape that excludes every real model
        code, so this is inert on the 99.98% of titles with no corruption. */
@@ -682,6 +704,26 @@ export function cleanTitle(raw: string): string {
     .replace(/^\s*[–—|\-]+\s*/, "")                       // trim leading
     .replace(/\s*[–—|\-]+\s*$/, "")                       // trim trailing
     .replace(/\s{2,}/g, " ")                                         // collapse spaces
+    .trim();
+}
+
+/* Sanitize a short label (a store / brand name) for safe use in a
+   document <title> or a visible chip, WITHOUT the product-title
+   normalisation cleanTitle applies — its separator-run collapse would
+   turn a legitimate "Best-Buy" into "Best – Buy". Strips tag-shaped
+   markup, the U+FFFD replacement char, ASCII control chars and the
+   invisible directional / zero-width set, then collapses whitespace.
+
+   Exists for /p/live, whose store name arrives from a user-controllable
+   `sn=` query param and is concatenated straight into the page <title>
+   ("<product> at <store>"). Finding #12. */
+export function sanitizeLabel(raw: string): string {
+  return raw
+    .replace(/<[^>]*>/g, "")
+    .replace(/\uFFFD/g, "")
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(TITLE_UNSAFE_CHARS, "")
+    .replace(/\s{2,}/g, " ")
     .trim();
 }
 
