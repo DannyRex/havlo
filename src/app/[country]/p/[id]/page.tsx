@@ -1152,7 +1152,7 @@ export default async function ProductPage({ params }: PageProps) {
         availability:    offer.in_stock
           ? "https://schema.org/InStock"
           : "https://schema.org/OutOfStock",
-        seller:          { "@type": "Organization", name: offer.store_name },
+        seller:          { "@type": "Organization", name: displayStoreName(offer.store_name) },
         priceValidUntil,
       };
 
@@ -1281,7 +1281,7 @@ export default async function ProductPage({ params }: PageProps) {
             points={priceTimeseriesSane ?? []}
             currentNgn={anchorPriceNgn}
             country={country}
-            visitingStoreName={offer.store_name}
+            visitingStoreName={displayStoreName(offer.store_name)}
             dataSource={
               /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(offer.product_id ?? "")
                 ? "tracked"

@@ -45,6 +45,7 @@ import SimilarProducts from "@/components/product/SimilarProducts";
 import { getClickThroughUrl } from "@/lib/utils";
 import { appendSignature } from "@/lib/go-signing";
 import { toAbsoluteMerchantUrl } from "@/lib/pdp-url";
+import { displayStoreName } from "@/lib/store-display";
 
 /* Synthetic PDPs are never indexed — they're transient anchors for
    external offers that may or may not exist tomorrow. Keeps Google
@@ -161,10 +162,11 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   if (!offer) {
     return { title: "Product not found", robots: { index: false, follow: false } };
   }
-  const title = `${offer.title} at ${offer.storeName}`;
+  const storeLabel = displayStoreName(offer.storeName);
+  const title = `${offer.title} at ${storeLabel}`;
   return {
     title,
-    description: `Find ${offer.title} at ${offer.storeName} on Havlo. See cheaper alternatives across other stores in ${country.name}.`,
+    description: `Find ${offer.title} at ${storeLabel} on Havlo. See cheaper alternatives across other stores in ${country.name}.`,
     /* Synthetic PDPs never get indexed — they're transient query-
        param URLs for offers that may or may not exist tomorrow,
        and indexing them would pollute SERPs with disposable URLs. */

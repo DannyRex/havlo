@@ -5,6 +5,7 @@
    ────────────────────────────────────────────────────────────────── */
 
 import { ACTIVE_COUNTRIES } from "./country";
+import { displayStoreName } from "./store-display";
 
 export const SITE_URL  = "https://havlo.io";
 export const SITE_NAME = "Havlo";
@@ -220,7 +221,7 @@ export function buildItemListJsonLd(deals: SeoDeal[], listName: string = "Trendi
           price:            d.salePrice,
           priceCurrency:    d.currency,
           availability:     "https://schema.org/InStock",
-          seller:           { "@type": "Organization", name: d.storeName },
+          seller:           { "@type": "Organization", name: displayStoreName(d.storeName) },
         },
       },
     })),

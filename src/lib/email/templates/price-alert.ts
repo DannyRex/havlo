@@ -25,6 +25,7 @@ import {
   plainTextShell,
   button,
 } from "./_layout";
+import { displayStoreName } from "@/lib/store-display";
 
 interface Email {
   subject: string;
@@ -93,15 +94,22 @@ export function priceAlertTriggered({
   const cc = country.toLowerCase();
   void cc;
   const unsubUrl = `${SITE_URL}/unsubscribe-alert?token=${unsubscribeToken}`;
+  /* Clean the merchant string before it reaches the inbox. The cron
+     passes the offer's raw storeName, which can be an
+     "eBay - <seller-handle>" marketplace string; the same display
+     normaliser every on-site label uses keeps the email saying
+     "eBay" rather than leaking a seller handle into the subject
+     preheader, body, and button. */
+  const storeLabel = displayStoreName(storeName);
 
   const subject   = `${productTitle.slice(0, 55)} is now ${cheapestPriceFmt}`;
-  const preheader = `Below your target of ${targetPriceFmt}. View the offer at ${storeName}.`;
+  const preheader = `Below your target of ${targetPriceFmt}. View the offer at ${storeLabel}.`;
 
   const body = `
 ${paragraph("Quick heads-up.")}
-${paragraph(`<strong style="font-weight:600;">${escapeHtml(productTitle)}</strong> just dropped to <strong style="font-weight:600;">${escapeHtml(cheapestPriceFmt)}</strong> at ${escapeHtml(storeName)}.`)}
+${paragraph(`<strong style="font-weight:600;">${escapeHtml(productTitle)}</strong> just dropped to <strong style="font-weight:600;">${escapeHtml(cheapestPriceFmt)}</strong> at ${escapeHtml(storeLabel)}.`)}
 ${paragraph(`That's below the target you set (${escapeHtml(targetPriceFmt)}).`)}
-${button({ url: productUrl, label: `View at ${storeName}`, align: "left" })}
+${button({ url: productUrl, label: `View at ${storeLabel}`, align: "left" })}
 ${spacer(16)}
 ${paragraph(`Prices at this level usually don't hold for long, so it's worth checking soon if you've been waiting.`)}
 ${signature("Danny")}
@@ -115,10 +123,10 @@ ${paragraph(`<span style="font-size:12px;color:#9ca3af;">${textLink({ url: unsub
     body: [
       `Quick heads-up.`,
       ``,
-      `"${productTitle}" just dropped to ${cheapestPriceFmt} at ${storeName}.`,
+      `"${productTitle}" just dropped to ${cheapestPriceFmt} at ${storeLabel}.`,
       `That's below the target you set (${targetPriceFmt}).`,
       ``,
-      `View at ${storeName}: ${productUrl}`,
+      `View at ${storeLabel}: ${productUrl}`,
       ``,
       `Prices at this level usually don't hold for long, so it's worth checking soon if you've been waiting.`,
       ``,

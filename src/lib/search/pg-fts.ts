@@ -22,7 +22,7 @@ import { resolveStoreLogoUrl } from "@/lib/store-logo";
 import { merchantTrust } from "@/lib/merchant-trust";
 import { partitionDupesByVariantMatch, variantOffers } from "./variant-pooling";
 import { partitionDupesByVariantMatchDeep } from "./variant-pooling-deep";
-import { priceLooksPlausible } from "./price-floor";
+import { priceLooksPlausible, isUsedListing } from "./price-floor";
 import { isLooseCategoryModel } from "./normalize";
 import type {
   SearchOutput, ProductGroup, StoreOffer, DupeResult, SearchSuggestion,
@@ -176,6 +176,11 @@ function offerToStoreOffer(o: NestedOffer, productTitle?: string): StoreOffer {
        cue on /compare rows. Resolved here (server-side) so the
        MERCHANTS table never reaches the client. */
     trust:          merchantTrust(o.store_id, store?.name ?? o.store_id),
+    /* Used / refurbished flag — the per-store productTitle is the
+       strongest signal we have ("PRE-OWNED…", "Refurbished…",
+       "… Renewed"). Lets compare cards label the offer instead of
+       pooling it silently beside new listings. */
+    isUsed:         isUsedListing(store?.name ?? o.store_id, productTitle),
   };
 }
 
@@ -205,6 +210,9 @@ function ftsRowToSingleOffer(r: FtsRow): StoreOffer {
     storeCountry:   r.store_country ?? null,
     /* See offerToStoreOffer — same server-side trust resolution. */
     trust:          merchantTrust(r.store_id, r.store_name),
+    /* See offerToStoreOffer — used / refurbished detection from the
+       FTS row's own title + store name. */
+    isUsed:         isUsedListing(r.store_name, r.title),
   };
 }
 

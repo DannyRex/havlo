@@ -40,6 +40,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Check, Globe, AlertCircle, TrendingDown, Award, History, ArrowRight, Plane, RotateCcw } from "lucide-react";
 import { formatPriceForUser, timeAgo } from "@/lib/utils";
+import { displayStoreName } from "@/lib/store-display";
 import { type Country } from "@/lib/country";
 import type { PerStoreOffer } from "@/lib/pdp-stats";
 import type { PriceHistorySummary } from "@/lib/search/price-history";
@@ -555,7 +556,7 @@ export default function PriceComparisonBar({
                 }}
                 className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center pointer-events-auto z-10 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 style={{ left: `${left}%` }}
-                aria-label={`${row.storeName} at ${formatPriceForUser(row.effectiveNgn, country)}`}
+                aria-label={`${displayStoreName(row.storeName)} at ${formatPriceForUser(row.effectiveNgn, country)}`}
                 aria-pressed={isInActiveCluster}
               >
                 <span
@@ -612,13 +613,13 @@ export default function PriceComparisonBar({
               return (
                 <div
                   role="dialog"
-                  aria-label={`${row.storeName} details`}
+                  aria-label={`${displayStoreName(row.storeName)} details`}
                   className={`absolute -top-16 ${translateClass} z-30 rounded-lg bg-ink text-bg px-2.5 py-1.5 shadow-[0_6px_18px_rgba(0,0,0,0.25)] whitespace-nowrap pointer-events-none max-w-[calc(100vw-2rem)]`}
                   style={{ left: `${left}%` }}
                   data-anchor={anchor}
                 >
                   <p className="text-[11px] font-semibold leading-tight">
-                    {row.storeName}
+                    {displayStoreName(row.storeName)}
                   </p>
                   <p className="text-[12px] tabular-nums font-bold leading-tight">
                     {formatPriceForUser(row.effectiveNgn, country)}
@@ -665,7 +666,7 @@ export default function PriceComparisonBar({
                   {sortedOffers.map((o) => (
                     <li key={o.offerId} className="flex items-baseline justify-between gap-3 text-[12px]">
                       <span className="font-medium truncate inline-flex items-center gap-1">
-                        {o.storeName}
+                        {displayStoreName(o.storeName)}
                         {o.isCrossBorder && (
                           <Plane size={9} className="text-amber-300 dark:text-amber-700 shrink-0" aria-hidden="true" />
                         )}
@@ -779,7 +780,7 @@ export default function PriceComparisonBar({
           <span className="inline-flex items-center gap-2 min-w-0">
             <TrendingDown size={15} className="text-emerald-600 dark:text-emerald-400 shrink-0" aria-hidden="true" />
             <span className="text-[13px] text-emerald-800 dark:text-emerald-200 truncate">
-              Save <span className="font-semibold">{formatPriceForUser(cheaperSavings, country)}</span> at <span className="font-semibold">{cheapest!.storeName}</span>
+              Save <span className="font-semibold">{formatPriceForUser(cheaperSavings, country)}</span> at <span className="font-semibold">{displayStoreName(cheapest!.storeName)}</span>
             </span>
           </span>
           <ArrowRight size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0 group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
@@ -809,7 +810,7 @@ export default function PriceComparisonBar({
                   <span className="font-semibold text-ink tabular-nums">
                     {formatPriceForUser(cheapestUsed.effectiveNgn, country)}
                   </span>{" "}
-                  at <span className="font-medium text-ink">{cheapestUsed.storeName}</span>
+                  at <span className="font-medium text-ink">{displayStoreName(cheapestUsed.storeName)}</span>
                   {cheapestUsed.isCrossBorder && (
                     <span className="text-ink-3 whitespace-nowrap">
                       {" "}<Plane size={9} className="inline -mt-px" aria-hidden="true" /> cross-border
@@ -892,7 +893,7 @@ export default function PriceComparisonBar({
         {!isSingleStore && cheapest && cheapest.storeId !== thisStoreId && (
           <span className="inline-flex items-center gap-1 text-ink-3">
             <span aria-hidden="true">·</span>
-            Cheapest at <span className="font-medium text-ink-2">{cheapest.storeName}</span>
+            Cheapest at <span className="font-medium text-ink-2">{displayStoreName(cheapest.storeName)}</span>
           </span>
         )}
         {storeCountry && (

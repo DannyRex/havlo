@@ -197,6 +197,16 @@ export default function DupeCard({
           )}
         </div>
 
+        {/* Used / refurbished — the headline price is the cheapest
+            offer (dupe.offers[0]); if that's a pre-owned / refurbished
+            listing, say so rather than presenting it as a like-for-like
+            cheaper alternative. Amber = context, not a positive. */}
+        {bestOffer?.isUsed && (
+          <span className="mt-1.5 inline-flex w-fit items-center rounded px-1.5 py-0.5 text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300">
+            Used / Refurbished
+          </span>
+        )}
+
         {/* Primary CTA — visual only. The whole upper-card Link
             wrapper handles the click. This span carries the same
             button styling so the user has the familiar visual
@@ -279,7 +289,10 @@ export default function DupeCard({
                       storeName={offer.storeName}
                       storeLogoUrl={offer.storeLogoUrl}
                     />
-                    <span className="text-ink-2 truncate flex-1">{displayStoreName(offer.storeName)}</span>
+                    <span className="text-ink-2 truncate flex-1">
+                      {displayStoreName(offer.storeName)}
+                      {offer.isUsed && <span className="text-amber-600 dark:text-amber-400 font-medium"> · Used</span>}
+                    </span>
                     {/* Country-aware price — match the headline above
                         (line ~135). Was bare `offer.price`, which read
                         as cross-border merchant-price WITHOUT the

@@ -24,6 +24,7 @@
 import Link from "next/link";
 import { Star, Plane, ChevronRight, ArrowDown, ShieldCheck } from "lucide-react";
 import { formatPriceForUser, formatCount, cleanTitle } from "@/lib/utils";
+import { displayStoreName } from "@/lib/store-display";
 import { pdpUrlForOffer } from "@/lib/pdp-url";
 import {
   effectiveLandedPrice,
@@ -255,13 +256,21 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                             />
                           )}
                           <span className="text-sm font-semibold text-ink truncate">
-                            {offer.storeName}
+                            {displayStoreName(offer.storeName)}
                           </span>
                           {/* Per-merchant trust cue — icon-only here to
                               keep dense rows uncluttered. Shows only for
                               curated, link-verified retailers; lesser-
                               known stores get nothing (not penalised). */}
                           <MerchantVerifiedChip trust={offer.trust} />
+                          {/* Used / refurbished — flag a pre-owned offer
+                              so it isn't read as a like-for-like new-item
+                              price in the anchor comparison. */}
+                          {offer.isUsed && (
+                            <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-300 font-medium shrink-0">
+                              Used
+                            </span>
+                          )}
                           {/* Cross-border tag — uses isCrossBorderForUser
                               (visitor-aware) rather than the raw
                               isInternational DB flag, so a UK retailer

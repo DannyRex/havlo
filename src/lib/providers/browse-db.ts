@@ -13,6 +13,7 @@ import { searchCandidates } from "@/lib/search/query-expand";
 import { fetchOffersAt30dLow } from "@/lib/search/price-history";
 import { withTimeout } from "@/lib/promise-timeout";
 import { isCrossBorderStore } from "@/lib/country";
+import { isUsedListing } from "@/lib/search/price-floor";
 
 interface BestOfferRow {
   product_id: string;
@@ -75,6 +76,11 @@ function rowToDeal(r: BestOfferRow, popularity?: PopularityRecord): Deal {
        full ISO form transparently. */
     postedAt: r.scraped_at,
     storeCountry: r.store_country ?? null,
+    /* Flag used / refurbished / pre-owned listings so the card can
+       label them instead of presenting them as a fresh "deal". Cheap
+       pure string check (no extra DB read) over the title + store
+       name the row already carries. */
+    isUsed: isUsedListing(r.store_name, r.title),
   };
 }
 

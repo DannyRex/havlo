@@ -26,6 +26,7 @@ import {
   plainTextShell,
   type MatchRowData,
 } from "./_layout";
+import { displayStoreName } from "@/lib/store-display";
 
 interface Args {
   query:   string;
@@ -55,7 +56,15 @@ export function notifyProductMatchFound({ query, country, offers }: Args): Email
 
   /* ── HTML body ──────────────────────────────────────────────── */
 
-  const top = offers.slice(0, 5);
+  /* Clean the merchant string once so both the HTML match rows
+     (_layout's matchRow) and the plain-text fallback show "eBay"
+     instead of an "eBay - <seller-handle>" marketplace string.
+     _layout escapes but doesn't normalise, and it's a shared shell
+     we don't edit, so the cleaning happens here at the data edge. */
+  const top = offers.slice(0, 5).map((o) => ({
+    ...o,
+    storeName: displayStoreName(o.storeName),
+  }));
   const rowsHtml = top.map((o, i) => matchRow(o, i === top.length - 1)).join("\n");
 
   const body = `

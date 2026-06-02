@@ -91,6 +91,21 @@ export interface Deal {
       providers without the price-history backbone (curated catalogs,
       live-search results) leave it undefined → no badge. */
   at30DayLow?: boolean;
+
+  /** True when this listing is used / refurbished / open-box / pre-
+      owned / second-hand, detected from the title or a refurb-only
+      store (isUsedListing in price-floor.ts). Drives the small
+      "Used / Refurbished" badge on deal + compare cards so a
+      pre-owned iPhone or a renewed TV is never presented as if it
+      were new — the whole-catalog incidence is tiny (~0.15%) but
+      mislabelling a used item as a fresh "deal" is exactly the kind
+      of trust break a sharp shopper screenshots. Optional: providers
+      that don't run the check (curated catalog) leave it undefined →
+      no badge. NOTE this is a TITLE/STORE heuristic only — open
+      marketplaces (eBay) that sell used WITHOUT a condition word in
+      the title can't be caught here; that needs ingest-time
+      condition capture the read-only catalog doesn't expose yet. */
+  isUsed?: boolean;
 }
 
 export interface PriceResult {

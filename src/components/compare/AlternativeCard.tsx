@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, TrendingDown, Store } from "lucide-react";
 import { formatNaira, proxiedImageUrl, cleanTitle, formatCount } from "@/lib/utils";
+import { displayStoreName } from "@/lib/store-display";
 import type { Alternative } from "@/types";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 
@@ -50,7 +51,7 @@ export default function AlternativeCard({ alt }: Props) {
 
       {/* Content */}
       <div className="p-4">
-        <p className="text-[11px] text-ink-3 mb-0.5">{alt.brand}</p>
+        <p className="text-[11px] text-ink-3 mb-0.5">{displayStoreName(alt.brand)}</p>
         <h3 className="text-sm font-bold text-ink mb-2 line-clamp-2 group-hover:text-brand transition-colors leading-snug">
           {cleanTitle(alt.title)}
         </h3>
@@ -80,7 +81,7 @@ export default function AlternativeCard({ alt }: Props) {
         {/* Store info */}
         <div className="flex items-center gap-1.5 text-[11px] text-ink-3 mb-3">
           <Store size={11} />
-          From {alt.topStore} · {formatCount(alt.storeCount)} stores
+          From {displayStoreName(alt.topStore)} · {formatCount(alt.storeCount)} stores
         </div>
 
         {/* CTA */}

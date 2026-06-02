@@ -3,6 +3,7 @@ import { ArrowRight, TrendingDown } from "lucide-react";
 import { deals as staticDeals } from "@/lib/data/deals";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { filterDealsForCountry } from "@/lib/country";
+import { displayStoreName } from "@/lib/store-display";
 import type { Deal } from "@/types";
 
 /* 5-min seeded PRNG so the collage rotates with the rest of the page.
@@ -142,6 +143,12 @@ function CollageCard({
     sz === "lg" ? "w-14 h-14" : sz === "sm" ? "w-11 h-11" : "w-12 h-12";
   const numClass =
     sz === "lg" ? "text-base" : sz === "sm" ? "text-[13px]" : "text-sm";
+  /* Normalise once for both the alt text and the visible caption.
+     Collage cards pull storeName straight off the Deal, which can
+     carry an "eBay - <seller-handle>" marketplace string — run it
+     through the same display cleaner every other card uses so the
+     homepage proof never leaks a raw seller handle. */
+  const displayStore = displayStoreName(store);
   return (
     <div
       /* bg-white + fixed dark text so cards stay readable in BOTH themes —
@@ -169,10 +176,10 @@ function CollageCard({
              the title + store so an assistive-tech user knows what
              real catalog samples Havlo is showing them. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={img} alt={`${title} at ${store}, ${percent}% off`} className="w-full h-full object-cover" />
+          <img src={img} alt={`${title} at ${displayStore}, ${percent}% off`} className="w-full h-full object-cover" />
         </div>
         <div className="pt-2.5 px-0.5">
-          <p className="text-[11px] text-zinc-500 truncate">{store}</p>
+          <p className="text-[11px] text-zinc-500 truncate">{displayStore}</p>
           <p className="text-[13px] font-semibold text-zinc-900 truncate mt-0.5">{title}</p>
         </div>
       </div>

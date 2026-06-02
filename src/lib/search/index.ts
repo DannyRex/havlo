@@ -68,6 +68,13 @@ export interface StoreOffer {
       and drives the subtle "Verified" cue on /compare rows. Absent
       for live SerpAPI rows and lesser-known stores (no badge shown). */
   trust?: MerchantTrust;
+  /** True when this offer is used / refurbished / open-box / pre-owned
+      (isUsedListing on the per-store title + store name). Drives the
+      "Used / Refurbished" label on compare cards so a pre-owned offer
+      is never pooled silently next to new ones. Title/store heuristic
+      only — eBay-style unlabelled used can't be caught without ingest
+      condition data. */
+  isUsed?: boolean;
 }
 
 export interface ProductGroup {

@@ -123,7 +123,7 @@ export default function PriceResults({
               <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-surface-2 p-1.5 shrink-0">
                 {/* Plain <img> — skip Vercel transform for 28×28 logo. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.storeLogoUrl} alt={p.storeName} width={28} height={28}
+                <img src={p.storeLogoUrl} alt={displayStoreName(p.storeName)} width={28} height={28}
                      loading="lazy" decoding="async"
                      className={`object-contain ${storeLogoInvertClass(p.storeId)}`}
                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
@@ -159,6 +159,14 @@ export default function PriceResults({
                   {isIntlForUser(p) && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-medium flex items-center gap-1">
                       <Globe size={9} /> INTL
+                    </span>
+                  )}
+                  {/* Used / refurbished — keep a pre-owned offer from
+                      sitting silently next to new ones in the same
+                      comparison. Detected at the data layer (isUsed). */}
+                  {p.isUsed && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-medium">
+                      Used / Refurbished
                     </span>
                   )}
                 </div>

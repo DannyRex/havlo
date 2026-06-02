@@ -24,6 +24,7 @@
 import { useState } from "react";
 import { storeLogoInvertClass } from "@/lib/store-logo-invert";
 import { resolveStoreDomain } from "@/lib/store-domains";
+import { displayStoreName } from "@/lib/store-display";
 
 interface Props {
   storeId:      string;
@@ -82,6 +83,12 @@ export default function StoreLogo({
 
   const inner = size - pad * 2;
   const initial = storeName.trim().charAt(0).toUpperCase() || "•";
+  /* Cleaned name for the logo alt text. resolveStoreDomain and the
+     letter badge above keep the raw storeName (domain resolution and
+     the initial are unaffected by the marketplace suffix), but the
+     alt is screen-reader-facing, so strip "eBay - <seller-handle>"
+     down to "eBay" the same way every visible store label does. */
+  const altName = displayStoreName(storeName);
 
   /* Theme-aware inversion applies only to the curated /logos assets
      (some are white/dark-on-transparent). A favicon is full-colour
@@ -108,7 +115,7 @@ export default function StoreLogo({
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src}
-          alt={storeName}
+          alt={altName}
           width={inner}
           height={inner}
           loading="lazy"

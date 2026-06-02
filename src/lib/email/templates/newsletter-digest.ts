@@ -25,6 +25,7 @@ import {
   plainTextShell,
   type DealCardData,
 } from "./_layout";
+import { displayStoreName } from "@/lib/store-display";
 
 interface Args {
   country: string | null;
@@ -68,6 +69,17 @@ export function newsletterDigest({ country, category, categoryLabel, deals, unsu
   const cc = (country ?? "ng").toLowerCase();
   const dealsUrl = `${SITE_URL}/${cc}/deals`;
 
+  /* Normalise every merchant string once, up front, so both the HTML
+     deal cards (rendered by _layout's dealCard) and the plain-text
+     fallback below show "eBay" rather than an "eBay - <seller-handle>"
+     marketplace string. _layout escapes but does not clean the name,
+     and it's a fixed shared shell we don't touch, so the cleaning has
+     to happen here at the data boundary. */
+  const cleanedDeals: DealCardData[] = deals.map((d) => ({
+    ...d,
+    storeName: displayStoreName(d.storeName),
+  }));
+
   /* Subjects are STRUCTURALLY DISTINCT so Gmail's subject-similarity
      threading heuristic can't bundle a subscriber's overall digest
      and a category digest into a single conversation. See May 2026
@@ -89,7 +101,7 @@ export function newsletterDigest({ country, category, categoryLabel, deals, unsu
 
   /* ── HTML body ──────────────────────────────────────────────── */
 
-  const dealsHtml = deals.map(dealCard).join("\n");
+  const dealsHtml = cleanedDeals.map(dealCard).join("\n");
 
   /* Footer unsubscribe line. Only rendered when the cron supplies a
      per-recipient signed URL. The visible link lands on the branded
@@ -120,7 +132,7 @@ ${unsubFootnote}
   /* ── Plain text body ────────────────────────────────────────── */
 
   const dealLines: string[] = [];
-  for (const d of deals) {
+  for (const d of cleanedDeals) {
     dealLines.push(
       d.title,
       `  ${d.priceDisplay}${d.originalDisplay ? ` (was ${d.originalDisplay})` : ""}${d.discountPercent > 0 ? ` - ${d.discountPercent}% off` : ""} at ${d.storeName}`,

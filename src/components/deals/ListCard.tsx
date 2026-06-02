@@ -196,6 +196,15 @@ export default function ListCard({ deal, linkHref }: Props) {
           {cleanedTitle}
         </p>
 
+        {/* Used / refurbished label — mirror of MasonryCard. Keeps a
+            pre-owned or refurbished listing from reading as a fresh
+            "deal". Amber = context, not a positive. */}
+        {deal.isUsed && (
+          <span className="inline-flex items-center mt-1 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300">
+            Used / Refurbished
+          </span>
+        )}
+
         <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
           {isPriceFromOnly && (
             <span className="text-[11px] font-medium text-ink-3 leading-none">from</span>

@@ -428,6 +428,16 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
           {cleanedTitle}
         </p>
 
+        {/* Used / refurbished label — a pre-owned or refurbished item
+            must never read as a fresh "deal". Amber (not green) so it
+            reads as context, not a positive. Detected from the title /
+            refurb store at the data layer (deal.isUsed). */}
+        {deal.isUsed && (
+          <span className="inline-flex items-center gap-1 mb-1 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300">
+            Used / Refurbished
+          </span>
+        )}
+
         <div className="flex items-baseline gap-1 sm:gap-1.5 flex-wrap">
           {isPriceFromOnly && (
             <span className="text-[10px] sm:text-[11px] font-medium text-ink-3 leading-none">from</span>
