@@ -1,7 +1,7 @@
 "use client";
 
 import { ExternalLink, Trophy, Truck, Globe, Star } from "lucide-react";
-import { formatPriceForUser, proxiedImageUrl, cleanTitle, formatCount } from "@/lib/utils";
+import { formatPriceForUser, formatPriceDeltaForUser, proxiedImageUrl, cleanTitle, formatCount } from "@/lib/utils";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { displayStoreName } from "@/lib/store-display";
@@ -86,7 +86,7 @@ export default function PriceResults({
             </div>
             {maxSavings > 0 && (
               <div className="text-xs text-ink-2">
-                Save up to <span className="font-semibold text-ink">{formatPriceForUser(maxSavings, country)}</span> vs. highest
+                Save up to <span className="font-semibold text-ink">{formatPriceDeltaForUser(bestPrice + maxSavings, bestPrice, country)}</span> vs. highest
               </div>
             )}
             <div className="text-xs text-ink-3">

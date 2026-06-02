@@ -23,7 +23,7 @@
 
 import Link from "next/link";
 import { Star, Plane, ChevronRight, ArrowDown, ShieldCheck } from "lucide-react";
-import { formatPriceForUser, formatCount, cleanTitle } from "@/lib/utils";
+import { formatPriceForUser, formatPriceDeltaForUser, formatCount, cleanTitle } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import { pdpUrlForOffer } from "@/lib/pdp-url";
 import {
@@ -141,7 +141,7 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                 </span>
                 {spread > 0 && (
                   <span className="text-xs text-ink-3">
-                    Save up to <span className="text-success font-semibold">{formatPriceForUser(spread, country)}</span> across stores
+                    Save up to <span className="text-success font-semibold">{formatPriceDeltaForUser(dearest!.eff, cheapest!.eff, country)}</span> across stores
                   </span>
                 )}
               </div>
@@ -311,7 +311,7 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                         </p>
                         {savings > 0 && (
                           <p className="text-[11px] text-ink-3 tabular-nums">
-                            +{formatPriceForUser(savings, country)}
+                            +{formatPriceDeltaForUser(eff, rowsCheapest, country)}
                           </p>
                         )}
                       </div>

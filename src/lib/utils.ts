@@ -537,6 +537,50 @@ export function formatPriceForUserExact(
   return formatLocalExact(target, country);
 }
 
+/* Format a price DELTA so it always equals the difference of its two
+   operand prices AS THE USER SEES THEM RENDERED. Both operands are
+   rounded to the visitor's display precision (USD 2dp, every other
+   currency whole units) BEFORE subtracting, never after.
+
+   Why this exists (QA #11): "£109 highest - £100 cheapest" gets shown
+   beside a savings line that read "£8". The prices are each rounded
+   independently for display, but the savings was rounding the raw
+   delta once: round(108.6) - round(100.4) = 9, yet round(108.6 -
+   100.4) = round(8.2) = 8. Independently-rounded deltas drift by one
+   minor unit at any rounding boundary. Deriving the delta from the same
+   rounded integers the user can read off the two price labels makes the
+   on-screen arithmetic self-consistent, every time.
+
+   Operands are NGN by default (matches every comparison call site).
+   Pass them in either order; the magnitude of the gap is formatted. */
+export function formatPriceDeltaForUser(
+  aNgn:           number,
+  bNgn:           number,
+  country:        Country,
+  sourceCurrency: "NGN" | "USD" = "NGN",
+): string {
+  /* Round each operand to the EXACT value its own price label shows by
+     running it through the identical formatter the labels use
+     (formatLocalExact → Intl.NumberFormat), then reading the number
+     back. Numeric rounding (Math.round(x*100)/100 OR x.toFixed(2))
+     drifts a penny off Intl on a few percent of USD values because
+     each rounds the double differently than Intl does; deriving the
+     operand from the formatter itself makes the delta equal to the
+     visible difference by construction, in every currency.
+
+     Slice the symbol off by its known length (don't regex-strip
+     non-digits) so a symbol that contains a dot — AED's "د.إ" — can't
+     corrupt the parse; then drop the en-locale thousands commas. */
+  const toDisplay = (amt: number): number => {
+    const converted = convertForUser(amt, country, sourceCurrency);
+    const body = formatLocalExact(converted, country)
+      .slice(country.symbol.length)
+      .replace(/,/g, "");
+    return parseFloat(body);
+  };
+  return formatLocal(Math.abs(toDisplay(aNgn) - toDisplay(bNgn)), country);
+}
+
 /* Shared conversion path. Avoids duplicating the
    source-currency-aware math between the adaptive + exact
    formatters. */

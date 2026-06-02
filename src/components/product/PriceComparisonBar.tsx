@@ -39,7 +39,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Check, Globe, AlertCircle, TrendingDown, Award, History, ArrowRight, Plane, RotateCcw } from "lucide-react";
-import { formatPriceForUser, timeAgo } from "@/lib/utils";
+import { formatPriceForUser, formatPriceDeltaForUser, timeAgo } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import { type Country } from "@/lib/country";
 import type { PerStoreOffer } from "@/lib/pdp-stats";
@@ -434,7 +434,10 @@ export default function PriceComparisonBar({
     if (isSingleStore) return null;
     if (offset === 0) return "This is the cheapest price across the stores we track.";
     if (savingsPctVsHighest >= 5) {
-      return `You'd save ${formatPriceForUser(savingsVsHighest, country)} vs the highest known price.`;
+      /* Delta derived from the SAME rounded prices shown as "cheapest
+         now / highest now" above, so the saving can't read £8 while
+         the labels differ by £9 (QA #11). */
+      return `You'd save ${formatPriceDeltaForUser(highestPriceNgn, thisPriceNgn, country)} vs the highest known price.`;
     }
     return null;
   })();
@@ -780,7 +783,7 @@ export default function PriceComparisonBar({
           <span className="inline-flex items-center gap-2 min-w-0">
             <TrendingDown size={15} className="text-emerald-600 dark:text-emerald-400 shrink-0" aria-hidden="true" />
             <span className="text-[13px] text-emerald-800 dark:text-emerald-200 truncate">
-              Save <span className="font-semibold">{formatPriceForUser(cheaperSavings, country)}</span> at <span className="font-semibold">{displayStoreName(cheapest!.storeName)}</span>
+              Save <span className="font-semibold">{formatPriceDeltaForUser(thisPriceNgn, cheapest!.effectiveNgn, country)}</span> at <span className="font-semibold">{displayStoreName(cheapest!.storeName)}</span>
             </span>
           </span>
           <ArrowRight size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0 group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
