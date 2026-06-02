@@ -10,8 +10,8 @@
      • Range toggle: 30D / 90D / All. Client-side slice so switching
        is instant (server fetch is now 365d, see page.tsx).
      • Verdict header: dynamic copy + colour that answers "is this
-       a good price right now?" — "Cheapest in 30 days" (success),
-       "X% above the cheapest" (warn), "Higher than usual" (danger).
+       a good price right now?" — "Lowest in 30 days" (success),
+       "X% above the lowest" (warn), "Higher than usual" (danger).
      • Tooltip rendered at the hovered point as an HTML overlay
        (not below the chart). Smart-flips to avoid overflow.
      • X-axis date ticks — 3-4 evenly spaced labels.
@@ -290,9 +290,16 @@ export default function PriceHistoryChart({
      "right now" so we never stamp today's price with a stale history
      date (geom.lowestIdx still points at the lowest tracked day). */
   const currentIsLowest = currentNgn <= geom.lowestNgn;
+  /* "today" (not "right now") so the Lowest tile's caption doesn't read
+     as a near-duplicate of the separate "Right now" tile beside it. */
   const lowestDate = currentIsLowest
-    ? "right now"
+    ? "today"
     : dateFmt.format(new Date(sliced[geom.lowestIdx].day));
+
+  /* Shared time-window caption for the Lowest / Highest tiles so both
+     read with the same framing ("in 30 days" / "all time") instead of a
+     date on one and a range on the other (#23). */
+  const rangeCaption = range.label === "All" ? "all time" : `in ${range.label.toLowerCase()}`;
 
   /* Reference-line label that floats on the right edge. Slight
      dim so it doesn't compete with the line. */
@@ -553,8 +560,8 @@ export default function PriceHistoryChart({
                      comment. The user is comparing close values and a
                      ≥ 1M adaptive form would collapse small deltas to
                      "+₦0.0M". */
-                  ? `+${formatPriceForUserExact(hover.deltaFromLow, country)} above the cheapest`
-                  : "Cheapest day shown"}
+                  ? `+${formatPriceForUserExact(hover.deltaFromLow, country)} above the lowest`
+                  : "Lowest day shown"}
               </div>
             )}
           </div>
@@ -563,19 +570,21 @@ export default function PriceHistoryChart({
 
       {/* ── Tiles strip ─────────────────────────────────────── */}
       <div className="mt-3 sm:mt-4 grid grid-cols-3 gap-2">
+        {/* Lowest / Highest describe the price RANGE over the selected
+            period; "Right now" is the current price. Labels kept to that
+            plain trio (#23) so the context reads at a glance. Captions
+            carry the time window consistently ("in 30 days" / "all time")
+            instead of a bare date or the old "this view" jargon. */}
         <Tile
-          label="Cheapest"
+          label="Lowest"
           value={formatPriceForUser(geom.lowestNgn, country)}
-          caption={lowestDate}
+          caption={rangeCaption}
           tone="success"
         />
         <Tile
           label="Highest"
           value={formatPriceForUser(geom.highestNgn, country)}
-          /* "this view" reads as the user's current selection — the
-             range toggle is right above this tile so there's no
-             ambiguity about what "this view" refers to. */
-          caption={`in ${range.label === "All" ? "this view" : range.label.toLowerCase()}`}
+          caption={rangeCaption}
         />
         <Tile
           label="Right now"
@@ -1229,17 +1238,16 @@ function computeVerdict(
     };
   }
 
-  /* At-floor: 1% tolerance for FX + rounding drift.
-     "Cheapest in 30 days" beats "Lowest in 30 days" — it's the verb
-     a shopper actually uses ("is this the cheapest?"), and it primes
-     the buy action. "Lowest" is database-noun; "Cheapest" is
-     shopper-adjective. */
+  /* At-floor: 1% tolerance for FX + rounding drift. Uses "Lowest" to
+     match the "Lowest" stat tile + the "X% above the lowest" copy below,
+     so the chart uses ONE word for the historical floor everywhere (#23
+     — a consistent term is clearer than alternating cheapest/lowest). */
   if (currentNgn <= lowestNgn * 1.01) {
     return {
-      copy:        `Cheapest ${verdictPhrase}`,
+      copy:        `Lowest ${verdictPhrase}`,
       tone:        "success",
       icon:        "down",
-      tileCaption: "At the cheapest",
+      tileCaption: "At its lowest",
     };
   }
   /* Below mean: still a good time to buy, just not the floor. */
@@ -1247,10 +1255,10 @@ function computeVerdict(
     const pctAboveLow = Math.round(((currentNgn - lowestNgn) / lowestNgn) * 100);
     const pctFmt = pctAboveLow.toLocaleString("en-US");
     return {
-      copy:        `${pctFmt}% above the cheapest`,
+      copy:        `${pctFmt}% above the lowest`,
       tone:        "neutral",
       icon:        "flat",
-      tileCaption: `${pctFmt}% above the cheapest`,
+      tileCaption: `${pctFmt}% above the lowest`,
     };
   }
   /* Above mean: warn signal. */
@@ -1261,14 +1269,14 @@ function computeVerdict(
       copy:        `Higher than usual`,
       tone:        "warn",
       icon:        "up",
-      tileCaption: `${pctFmt}% above the cheapest`,
+      tileCaption: `${pctFmt}% above the lowest`,
     };
   }
   return {
-    copy:        `${pctFmt}% above the cheapest`,
+    copy:        `${pctFmt}% above the lowest`,
     tone:        "warn",
     icon:        "up",
-    tileCaption: `${pctFmt}% above the cheapest`,
+    tileCaption: `${pctFmt}% above the lowest`,
   };
 }
 

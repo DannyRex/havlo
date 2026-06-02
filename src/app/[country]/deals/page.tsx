@@ -5,6 +5,7 @@ import Link from "next/link";
 import DealFeed from "@/components/deals/DealFeed";
 import JsonLd from "@/components/seo/JsonLd";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
+import ScrollToTopButton from "@/components/ui/ScrollToTopButton";
 import { getCountry } from "@/lib/country";
 import { categories } from "@/lib/data/categories";
 import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList, buildItemListJsonLd } from "@/lib/seo";
@@ -357,6 +358,10 @@ export default async function DealsPage({
           visitor who scrolls the whole /deals feed without finding
           what they want still gets the signup prompt. */}
       <NewsletterStrip />
+
+      {/* Back-to-top FAB (#21) — the deals feed is a long, lazy-loading
+          scroll surface, so give the visitor a one-tap way back up. */}
+      <ScrollToTopButton />
     </>
   );
 }

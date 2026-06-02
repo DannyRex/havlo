@@ -4,16 +4,22 @@
    pgFtsFindDupes and renders one MasonryCard per group, where each
    card points at the cheapest offer in that group.
 
-   Same visual treatment as /deals so the user feels the cards are
-   the same primitive they're already familiar with. The masonry
-   columns layout is also lifted from TrendingDeals — single-render
-   via CSS columns (no triple-DOM mobile/tablet/desktop trick that
-   3x'd image fetches pre-Bucket-1-fix). */
+   Layout: a left-to-right responsive GRID (#19). It used to be a CSS
+   multi-column masonry, but `columns-*` fills VERTICALLY — card 1 sits
+   above card 2 in the first column, so the eye reads top-to-bottom
+   instead of across. Users expect "You may also like" to read left to
+   right (card 1, 2, 3 across the first row). A grid does exactly that in
+   a single DOM pass (no triple-DOM mobile/tablet/desktop trick that 3x'd
+   image fetches), at the cost of the staggered-height masonry look — so
+   every card gets the SAME aspect for clean, aligned rows. */
 
 import MasonryCard from "@/components/deals/MasonryCard";
-import { MASONRY_ASPECTS } from "@/components/deals/masonry-layout";
 import type { DupeResult } from "@/lib/search";
 import type { Deal } from "@/types";
+
+/* Uniform card aspect so grid rows align cleanly (no masonry stagger).
+   4:5 portrait suits product imagery without over-cropping. */
+const SIMILAR_ASPECT = "aspect-[4/5]";
 
 interface Props {
   dupes:       DupeResult[];
@@ -79,21 +85,20 @@ export default function SimilarProducts({ dupes, countryCode }: Props) {
   const deals = dupes.map(dupeToDeal);
 
   return (
-    <div className="columns-2 sm:columns-3 lg:columns-4 gap-2 sm:gap-3 lg:gap-4 [column-fill:_balance]">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
       {deals.map((deal, i) => (
-        <div key={deal.id + ":" + i} className="break-inside-avoid mb-2 sm:mb-3 lg:mb-4">
-          {/* Card links to the real PDP for the cheapest offer of
-              this dupe (deal.id is now the offer_id thanks to the
-              offerId propagation through StoreOffer). Falls back to
-              /compare?q={title} when the offer_id couldn't be
-              attached — rare edge case for live results that aren't
-              in the DB. */}
-          <MasonryCard
-            deal={deal}
-            aspect={MASONRY_ASPECTS[i % MASONRY_ASPECTS.length]}
-            priority={i < 2}
-          />
-        </div>
+        /* Each card links to the real PDP for the cheapest offer of
+           this dupe (deal.id is the offer_id via the offerId
+           propagation through StoreOffer). Falls back to
+           /compare?q={title} when the offer_id couldn't be attached —
+           rare edge case for live results that aren't in the DB.
+           Uniform aspect → the grid reads cleanly left-to-right (#19). */
+        <MasonryCard
+          key={deal.id + ":" + i}
+          deal={deal}
+          aspect={SIMILAR_ASPECT}
+          priority={i < 2}
+        />
       ))}
     </div>
   );

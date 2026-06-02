@@ -1323,13 +1323,23 @@ export default async function ProductPage({ params }: PageProps) {
             gtin/mpn for the Product schema in the same round trip;
             ProductAbout.tsx is deleted. */}
 
+        {/* "Other variants" disclosure (#15 / renamed + reordered #22).
+            Same-line variants of THIS product (other storage / colour /
+            size / generation). Shown ABOVE "You may also like" (#22)
+            because variants of the exact product the user is viewing are
+            more relevant than cross-product alternatives. Gated behind an
+            explicit click (native <details>, collapsed by default) so a
+            base-tier shopper is never auto-steered to a sub-tier. Each
+            row links to that variant's OWN PDP with its OWN price + store
+            count — no number feeds the comparison, so nothing can
+            contradict it. */}
+        <OtherConfigurations configs={otherConfigs} country={country} />
+
         {dupesForRail.length > 0 ? (
-          /* Cheaper alternatives section — moved ABOVE the sibling
-             rail per user preference (May 2026 v3). Cross-brand /
-             cross-tier cheaper picks are the higher-intent surface
-             ("can I get this product cheaper / different brand?"),
-             siblings ("other configurations in this line") are the
-             secondary browse. */
+          /* Cheaper alternatives section. Cross-brand / cross-tier
+             cheaper picks ("can I get this cheaper / a different
+             brand?"); the same-line variants live in the disclosure
+             directly above this. */
           <section className="mt-12 sm:mt-16">
             <header className="mb-6 sm:mb-8">
               <h2 className="text-[22px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
@@ -1374,20 +1384,6 @@ export default async function ProductPage({ params }: PageProps) {
             <FallbackCategoryRail deals={fallbackDeals} />
           </section>
         ) : null}
-
-        {/* "Other configurations" disclosure (#15). Revives the sibling
-            surface the May 2026 re-audit removed, but on the terms that
-            note prescribed: gated behind an explicit click (native
-            <details>, collapsed by default) instead of an auto-rendered
-            rail, so a base-tier shopper is never steered to a sub-tier
-            they didn't ask for. Driven by otherConfigs (selectLineConfigs
-            over the partition's sibling + other-product buckets). Each row
-            links to that config's OWN PDP with its OWN price + store count
-            — no number feeds the comparison above, so nothing can
-            contradict it. Addresses the QA finding where a single-store
-            config (e.g. "MacBook Air 15 M3 256GB") read as "1 store" with
-            no path to the rest of the line. */}
-        <OtherConfigurations configs={otherConfigs} country={country} />
 
         {/* Live deals rail removed (May 2026).
             Earlier this surface fetched /api/live-search on mount,

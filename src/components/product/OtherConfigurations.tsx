@@ -77,7 +77,7 @@ export default function OtherConfigurations({ configs, country }: Props) {
         <summary className="flex items-center gap-2.5 px-4 sm:px-5 py-3.5 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
           <Layers size={16} className="shrink-0 text-ink-3" aria-hidden="true" />
           <span className="text-sm font-semibold text-ink">
-            Other configurations
+            Other variants
             <span className="ml-1.5 font-normal text-ink-3">({rows.length})</span>
           </span>
           <ChevronRight
@@ -89,7 +89,7 @@ export default function OtherConfigurations({ configs, country }: Props) {
 
         <div className="px-4 sm:px-5 pb-4">
           <p className="mb-3 text-xs leading-relaxed text-ink-3">
-            Other versions in this line (different size, storage, colour, or generation).
+            Other variants in this line (different size, storage, colour, or generation).
             Each is a separate product with its own page and price, so these are not part of the comparison above.
           </p>
           <ul className="space-y-1.5">

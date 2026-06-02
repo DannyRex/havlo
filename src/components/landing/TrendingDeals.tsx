@@ -294,10 +294,10 @@ export default function TrendingDeals({
               </span>
             </div>
             <h2 className="text-[26px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
-              Trending right now
+              Never overpay shopping online
             </h2>
             <p className="text-sm sm:text-base text-ink-2 mt-1.5 hidden sm:block">
-              The biggest price drops we&apos;ve found across stores today.
+              Trending now: the biggest price drops we&apos;ve found across stores today.
             </p>
           </div>
           {/* Country-prefixed href — a bare /deals would get bounced
