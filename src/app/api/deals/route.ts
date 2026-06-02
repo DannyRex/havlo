@@ -628,18 +628,22 @@ export async function GET(req: NextRequest) {
          by a seeded random amount, up to JITTER/2 positions in either
          direction, then the pool is re-sorted by the jittered rank.
 
-         Bumped 320 -> 1500 after follow-up feedback ("doesn't seem
-         like the pool has increased"). With JITTER=320 the visible
-         first ~60 was effectively sampled from only the top ~220
-         deals — so the same familiar items kept dominating. JITTER
-         =1500 widens that draw to roughly the top ~1,560: deals well
-         past idx 500 now get a real chance to appear. Top-relevance
-         items still surface frequently (a deal at idx 0 has rank
-         in [-750, 750] so it's still very likely to land in the
-         visible window), so the strongest deals don't get buried.
-         Larger is the one knob: it trades "best matches always
-         first" for "more reveal of less-seen items". */
-      const JITTER = 1500;
+         Bumped 320 -> 1500 -> 2600 after repeat "I keep seeing the
+         same things" feedback (#17). With JITTER=320 the visible first
+         ~60 was effectively sampled from only the top ~220 deals; 1500
+         widened it to ~1,560; 2600 reaches ~top-2,660, which now covers
+         the FULL fetched pool even in deep markets like NG (PASS_C_MAX
+         pulls ~1.5k local rows there) so a repeat visitor pages across
+         far more of the catalog. Top-relevance items still surface
+         often (a deal at idx 0 has rank in [-1300, 1300] so it's still
+         likely to land in the visible window), so the strongest deals
+         aren't buried. NOTE: this only reshuffles within the rows the
+         RPC already returned (PASS_MAX/PASS_C_MAX). Reaching deals
+         BEYOND that fetch window needs either a larger p_max_rows (more
+         egress) or a rotating offset/seed in browse_deals (a DB change).
+         Larger jitter trades "best matches always first" for "more
+         reveal of less-seen items". */
+      const JITTER = 2600;
       const jittered = qualifyingByOrigin
         .map((deal, idx) => ({ deal, rank: idx + (rng() - 0.5) * JITTER }))
         .sort((a, b) => a.rank - b.rank)

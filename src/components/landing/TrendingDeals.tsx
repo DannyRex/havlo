@@ -97,15 +97,20 @@ const fetchPoolCached = unstable_cache(
    from any non-empty bucket when one (e.g. intlOther on non-NG) is
    thin or empty.
 
-   Per-bucket POOL CAPS are sized at roughly 5× the per-visit quota so
-   the client's random 16-pick has real depth to draw from on every
-   reload. PER_STORE_CAP keeps one dominant retailer (Currys for UK,
-   Konga for NG, …) from monopolising its bucket. */
+   Per-bucket POOL CAPS are sized at roughly 12× the per-visit quota
+   (#17, up from 5×) so the client's random 16-pick draws from a much
+   deeper pool every reload and a repeat visitor stops seeing the same
+   faces. The catalog easily backs this: ~6.4k qualifying deals for UK
+   (3.4k at ≥15% off), ~9.5k for NG — the old ~80-item pool was
+   throttling a catalog with thousands of eligible products. PER_STORE_CAP
+   keeps one dominant retailer (Currys for UK, Konga for NG, …) from
+   monopolising its bucket, so the deeper pool stays spread across many
+   stores rather than 100 rows of one. */
 const PER_STORE_CAP       = 5;
-const POOL_CAP_LOCAL      = 45;
-const POOL_CAP_AMAZON     = 20;
-const POOL_CAP_ALIEXPRESS = 5;
-const POOL_CAP_INTL_OTHER = 10;
+const POOL_CAP_LOCAL      = 110;
+const POOL_CAP_AMAZON     = 48;
+const POOL_CAP_ALIEXPRESS = 14;
+const POOL_CAP_INTL_OTHER = 28;
 
 function capPerStore(bucket: Deal[], cap: number): Deal[] {
   const seen = new Map<string, number>();
