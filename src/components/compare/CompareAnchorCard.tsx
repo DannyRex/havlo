@@ -27,7 +27,6 @@ import { formatPriceForUser, formatPriceDeltaForUser, formatCount, cleanTitle } 
 import { displayStoreName } from "@/lib/store-display";
 import { pdpUrlForOffer } from "@/lib/pdp-url";
 import {
-  effectiveLandedPrice,
   effectiveDeliveryDays,
   anyCrossBorderForUser,
   isCrossBorderForUser,
@@ -48,14 +47,14 @@ interface Props {
 }
 
 export default function CompareAnchorCard({ anchor, dupes, country, query }: Props) {
-  /* Price summary line — cheapest store's price as headline,
-     spread vs the most-expensive store ("save up to X across
-     stores"). Sort by EFFECTIVE landed price (country-aware) so
-     UK shoppers looking at a UK retailer don't see a 30% landed
-     adder baked into the headline. */
+  /* Price summary line — cheapest store's price as headline, spread vs
+     the most-expensive store ("save up to X across stores"). Sort + show
+     the RAW merchant price (#16) so this matches the PDP hero / chart /
+     spectrum; the cross-border "+ ~30%" caveat lives in the footnote
+     disclosure below, not baked into the headline number. */
   const withEff = anchor.offers
-    .filter((o) => o.landedPrice > 0)
-    .map((o) => ({ o, eff: effectiveLandedPrice(o, country) }))
+    .filter((o) => o.price > 0)
+    .map((o) => ({ o, eff: o.price }))
     .sort((a, b) => a.eff - b.eff);
   const cheapest = withEff[0];
   const dearest  = withEff[withEff.length - 1];
@@ -71,20 +70,26 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
      compare/page.tsx exactly. */
   const seenRowKeys = new Set<string>();
   const sortedRows = anchor.offers
-    .filter((o) => o.landedPrice > 0)
+    .filter((o) => o.price > 0)
     .filter((o) => {
-      const eff = effectiveLandedPrice(o, country);
-      const key = `${o.storeId}|${Math.round(eff / 100) * 100}`;
+      const key = `${o.storeId}|${Math.round(o.price / 100) * 100}`;
       if (seenRowKeys.has(key)) return false;
       seenRowKeys.add(key);
       return true;
     })
-    .sort((a, b) => effectiveLandedPrice(a, country) - effectiveLandedPrice(b, country));
+    .sort((a, b) => a.price - b.price);
 
-  const rowsCheapest    = sortedRows.length > 0 ? effectiveLandedPrice(sortedRows[0], country) : 0;
+  const rowsCheapest    = sortedRows.length > 0 ? sortedRows[0].price : 0;
   const isSingleStore   = sortedRows.length === 1;
   const hasDupes        = dupes.length > 0;
-  const cheapestDupeBest = hasDupes ? dupes.reduce((min, d) => Math.min(min, d.bestPrice), Infinity) : 0;
+  /* Cheapest alternative for the "Alternatives from £X" line — derive
+     from the dupes' RAW offer prices (#16), not the engine's landed
+     dupe.bestPrice, so this figure matches the raw headlines the
+     DupeCards now render below. */
+  const dupeRawPrices    = hasDupes
+    ? dupes.flatMap((d) => d.offers.map((o) => o.price)).filter((p) => p > 0)
+    : [];
+  const cheapestDupeBest = dupeRawPrices.length > 0 ? Math.min(...dupeRawPrices) : 0;
 
   return (
     <div className="relative max-w-3xl mx-auto mb-8 sm:mb-10">
@@ -200,7 +205,7 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
             <ul className="space-y-1.5">
               {sortedRows.map((offer, i) => {
                 const isBest   = !isSingleStore && i === 0;
-                const eff      = effectiveLandedPrice(offer, country);
+                const eff      = offer.price;
                 const savings  = eff - rowsCheapest;
                 const subtitle = (offer.productTitle && offer.productTitle !== anchor.title)
                   ? offer.productTitle
@@ -307,14 +312,11 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
 
                       <div className="text-right shrink-0">
                         <p className={`text-base font-bold tabular-nums ${isBest ? "text-success" : "text-ink"}`}>
+                          {/* Raw merchant price (#16) — matches the PDP hero /
+                              chart / spectrum. The cross-border "+ ~30%
+                              shipping/customs" caveat is in the footnote
+                              disclosure below, so no per-row "est." cue. */}
                           {formatPriceForUser(eff, country)}
-                          {/* Persistent "est." cue on cross-border rows: the
-                              shown total bakes in the ~30% landed allowance,
-                              so flag it as an estimate right at the number,
-                              not only in the footnote below. (#14) */}
-                          {isXBorder && (
-                            <span className="ml-1 text-[10px] font-normal text-ink-3 align-baseline">est.</span>
-                          )}
                         </p>
                         {savings > 0 && (
                           <p className="text-[11px] text-ink-3 tabular-nums">

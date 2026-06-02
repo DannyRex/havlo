@@ -8,7 +8,6 @@ import { pdpUrlForOffer } from "@/lib/pdp-url";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
-import { effectiveLandedPrice } from "@/lib/landed-price";
 import { displayStoreName } from "@/lib/store-display";
 import { storeLogoInvertOnLight } from "@/lib/store-logo-invert";
 import { trackClick } from "@/lib/trackClick";
@@ -176,26 +175,23 @@ export default function DupeCard({
           {cleanTitle(dupe.title)}
         </h3>
 
-        {/* Price + savings line — country-aware. dupe.bestPrice is the
-            ingest-time landedPrice (price + 30% for stores flagged
-            international). For a visitor in the store's anchored
-            country (UK shopper, UK retailer) the landed adder is
-            wrong — they pay the merchant price directly. Recompute
-            from the cheapest offer using effectiveLandedPrice so the
-            headline matches the merchant's own checkout total. */}
+        {/* Price + savings line. Headline is the cheapest offer's RAW
+            merchant price (#16) so it matches the PDP hero / chart /
+            spectrum and the CompareAnchorCard rows — Havlo leads with the
+            merchant price everywhere and surfaces the cross-border "+ ~30%
+            shipping/customs" caveat separately. dupe.bestPrice is only a
+            fallback for the rare bestOffer-less group. */}
         <div className="mt-2.5 flex items-baseline gap-2">
           <span className="text-base font-bold text-ink">
+            {/* Raw merchant price (#16) — matches the PDP hero / chart /
+                spectrum and CompareAnchorCard. The cross-border "+ ~30%"
+                caveat rides on the Plane chip + disclosure, not the
+                number, so there's no per-price "est." cue. */}
             {formatPriceForUser(
-              bestOffer ? effectiveLandedPrice(bestOffer, country) : dupe.bestPrice,
+              bestOffer ? bestOffer.price : dupe.bestPrice,
               country,
             )}
           </span>
-          {/* "est." cue when the headline bakes in the ~30% landed
-              allowance — same guard as the Plane chip below so the
-              number and the badge always agree. (#14) */}
-          {bestOffer && isIntlForUser(bestOffer) && bestOffer.landedCostExtra > 0 && (
-            <span className="text-[10px] font-normal text-ink-3">est.</span>
-          )}
           {hasSavings && (
             <span className="text-[11px] text-success font-semibold">
               save {formatPriceForUser(dupe.savingsVsAnchor, country)}
@@ -299,13 +295,13 @@ export default function DupeCard({
                       {displayStoreName(offer.storeName)}
                       {offer.isUsed && <span className="text-amber-600 dark:text-amber-400 font-medium"> · Used</span>}
                     </span>
-                    {/* Country-aware price — match the headline above
-                        (line ~135). Was bare `offer.price`, which read
-                        as cross-border merchant-price WITHOUT the
-                        landed-cost estimate the headline already
-                        includes. Same product, two visibly different
-                        prices on the same card. Audit May 2026. */}
-                    <span className="font-semibold text-ink tabular-nums">{formatPriceForUser(effectiveLandedPrice(offer, country), country)}</span>
+                    {/* Raw merchant price (#16) — matches the headline
+                        above (which now also leads with the raw price) so
+                        the per-store rows and the headline never show two
+                        different numbers for the same offer. Cross-border
+                        shipping/customs is surfaced separately, not baked
+                        into the number. */}
+                    <span className="font-semibold text-ink tabular-nums">{formatPriceForUser(offer.price, country)}</span>
                   </a>
                 ))}
               </div>
