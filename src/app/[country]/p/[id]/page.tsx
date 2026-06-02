@@ -46,6 +46,7 @@ import {
 import { effectiveLandedPrice, landedTotal, LANDED_RATE } from "@/lib/landed-price";
 import { partitionDupesByVariantMatch, variantOffers, type PartitionResult } from "@/lib/search/variant-pooling";
 import { partitionDupesByVariantMatchDeep } from "@/lib/search/variant-pooling-deep";
+import { selectLineConfigs } from "@/lib/search/line-configs";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
 import { fetchProductMeta } from "@/lib/offers/fetch-product-description";
 import { usdToNgn, cleanTitle, formatPriceForUser } from "@/lib/utils";
@@ -55,6 +56,7 @@ import { slugifyBrand } from "@/lib/hubs";
 import JsonLd from "@/components/seo/JsonLd";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ProductHero, { type OfferData } from "@/components/product/ProductHero";
+import OtherConfigurations from "@/components/product/OtherConfigurations";
 import { merchantTrust } from "@/lib/merchant-trust";
 import { displayStoreName } from "@/lib/store-display";
 import PdpViewTracker from "@/components/product/PdpViewTracker";
@@ -959,9 +961,26 @@ export default async function ProductPage({ params }: PageProps) {
     ...partition.likelyVariants.flatMap((v) => v.offers.map((o) => o.offerId)),
     ...partition.siblingVariants.flatMap((v) => v.offers.map((o) => o.offerId)),
   ]);
+  /* "Other configurations" set (#15) — same brand + same model line as
+     the anchor, different config (size / storage / colour / generation).
+     Drawn from the partition's sibling + other-product buckets (already
+     accessory/counterfeit/country-filtered by the dupes engine) and
+     narrowed by selectLineConfigs. Display-only: each links to its own
+     PDP and is never merged into the spectrum, so no number here can
+     contradict the comparison above. Rendered via the click-gated
+     OtherConfigurations disclosure further down. */
+  const otherConfigs = selectLineConfigs(
+    { title: offer.title, brand: offer.brand },
+    [...partition.siblingVariants, ...partition.otherProducts],
+  );
+  const otherConfigKeys = new Set(otherConfigs.map((d) => d.key));
+
   const dupesForRail = filteredDupes
     .filter((d) => {
       if (variantProductIds.has(d.key)) return false;
+      /* Keep the labelled "Other configurations" set out of the generic
+         "You may also like" rail so each related product appears once. */
+      if (otherConfigKeys.has(d.key)) return false;
       /* Defensive: if any of the dupe's offers got merged into the
          spectrum (FTS sometimes splits same-product into two
          group rows), drop the rail entry too. */
@@ -987,16 +1006,11 @@ export default async function ProductPage({ params }: PageProps) {
       return minEffective(a) - minEffective(b);
     });
 
-  /* Sibling rail — same brand + same model line + different sub-tier.
-     Surfaces iPhone 15 Plus / Pro / Pro Max when viewing iPhone 15,
-     Galaxy S24 Ultra / FE when viewing Galaxy S24, etc. Excluded
-     from the cross-brand 'Cheaper alternatives' rail above so the
-     two surfaces are semantically distinct:
-       Other models in this line  → siblingsForRail (same product family)
-       Cheaper alternatives       → dupesForRail (different products) */
-  const siblingsForRail = filteredDupes.filter((d) =>
-    partition.siblingVariants.some((s) => s.key === d.key),
-  );
+  /* (Other-configuration selection now lives above as `otherConfigs`,
+     which supersedes the old siblingsForRail: it covers laptop /
+     console-style configs — MacBook Air 13 vs 15, M3 vs M4 — not just
+     phone sub-tiers, and is verified to exclude different lines like
+     MacBook Pro. #15) */
 
   /* priceHistoryRows + priceTimeseries are now fetched UP TOP in
      the same Promise.all as dupes + anchorOffers — see the May 2026
@@ -1361,17 +1375,19 @@ export default async function ProductPage({ params }: PageProps) {
           </section>
         ) : null}
 
-        {/* "Other models in this line" sibling rail REMOVED May 2026
-            launch-readiness re-audit. Surfacing iPhone 15 Plus when the
-            anchor is iPhone 15 (or S24 Ultra when anchor is S24) was
-            flagged as a sibling-gate regression — users on a base-tier
-            PDP shouldn't be steered to a sub-tier they didn't ask for,
-            even labelled as "Other models". If we want to bring this
-            back later, gate it behind an explicit "Compare configurations"
-            click rather than auto-rendering. The partition logic in
-            partitionDupesByVariantMatch still computes siblingVariants
-            so the spectrum pool can pull them in (likelyVariants), it
-            just no longer renders as its own rail. */}
+        {/* "Other configurations" disclosure (#15). Revives the sibling
+            surface the May 2026 re-audit removed, but on the terms that
+            note prescribed: gated behind an explicit click (native
+            <details>, collapsed by default) instead of an auto-rendered
+            rail, so a base-tier shopper is never steered to a sub-tier
+            they didn't ask for. Driven by otherConfigs (selectLineConfigs
+            over the partition's sibling + other-product buckets). Each row
+            links to that config's OWN PDP with its OWN price + store count
+            — no number feeds the comparison above, so nothing can
+            contradict it. Addresses the QA finding where a single-store
+            config (e.g. "MacBook Air 15 M3 256GB") read as "1 store" with
+            no path to the rest of the line. */}
+        <OtherConfigurations configs={otherConfigs} country={country} />
 
         {/* Live deals rail removed (May 2026).
             Earlier this surface fetched /api/live-search on mount,
