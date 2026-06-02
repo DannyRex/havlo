@@ -20,6 +20,7 @@ import { usdToNgn } from "@/lib/utils";
 import { isUsableMerchantUrl } from "@/lib/url-helpers";
 import { resolveStoreLogoUrl } from "@/lib/store-logo";
 import { merchantTrust } from "@/lib/merchant-trust";
+import { LANDED_RATE } from "@/lib/landed-price";
 import { partitionDupesByVariantMatch, variantOffers } from "./variant-pooling";
 import { partitionDupesByVariantMatchDeep } from "./variant-pooling-deep";
 import { priceLooksPlausible, isUsedListing, looksCounterfeit } from "./price-floor";
@@ -146,7 +147,7 @@ function offerToStoreOffer(o: NestedOffer, productTitle?: string): StoreOffer {
   const priceN = priceInNgn(o.current_price, o.currency);
   const origN = o.original_price ? priceInNgn(o.original_price, o.currency) : priceN;
   const isIntl = store?.is_international ?? false;
-  const landedExtra = isIntl ? Math.round(priceN * 0.30) : 0;
+  const landedExtra = isIntl ? Math.round(priceN * LANDED_RATE) : 0;
   return {
     /* Threaded through so cards rendered from StoreOffer (compare
        dupes, PDP similar-products) can route to the real /p/[offer_id]
@@ -187,7 +188,7 @@ function offerToStoreOffer(o: NestedOffer, productTitle?: string): StoreOffer {
 function ftsRowToSingleOffer(r: FtsRow): StoreOffer {
   const priceN = priceInNgn(r.current_price, r.currency);
   const origN = r.original_price ? priceInNgn(r.original_price, r.currency) : priceN;
-  const landedExtra = r.is_international ? Math.round(priceN * 0.30) : 0;
+  const landedExtra = r.is_international ? Math.round(priceN * LANDED_RATE) : 0;
   return {
     offerId:        r.offer_id,
     storeId:        r.store_id,

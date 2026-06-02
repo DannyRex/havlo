@@ -28,6 +28,7 @@ import {
 } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import { brandDisplay } from "@/lib/brand-display";
+import { landedTotal } from "@/lib/landed-price";
 import PriceComparisonBar from "@/components/product/PriceComparisonBar";
 import PriceAlertButton from "@/components/product/PriceAlertButton";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
@@ -249,14 +250,16 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
      currency note BELOW the landed total. */
   let secondaryStr: string | null = null;
   if (isCrossBorder) {
-    /* Primary line: landed total in user's currency. */
-    const landedAmount = Math.round(primaryAmount * 1.30);
+    /* Primary line: landed total in user's currency. landedTotal()
+       centralises the +30% allowance; "(est.)" keeps it honestly
+       framed as a rough estimate, never precise per-item cost. (#14) */
+    const landedAmount = Math.round(landedTotal(primaryAmount));
     const landedFmt = country.currency === "NGN"
       ? formatCompact(landedAmount)
       : country.currency === "USD"
         ? formatUSDPrice(landedAmount)
         : formatLocal(landedAmount, country);
-    secondaryStr = `≈ ${landedFmt} total`;
+    secondaryStr = `≈ ${landedFmt} total (est.)`;
   }
 
   /* Resolved /api/go URL for the View-at-merchant CTA. The wrapper

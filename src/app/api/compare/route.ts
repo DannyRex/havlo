@@ -7,6 +7,7 @@ import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { getServerCountry } from "@/lib/country-server";
 import { getCountry, isOfferAllowedForCountry, COUNTRIES } from "@/lib/country";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
+import { LANDED_RATE } from "@/lib/landed-price";
 import { usdToNgn } from "@/lib/utils";
 import type { SearchOutput, ProductGroup, DupeResult, StoreOffer } from "@/lib/search";
 
@@ -83,7 +84,7 @@ function offerRowToStoreOffer(row: OfferRow): StoreOffer {
   /* Match the ingest's landed-cost heuristic: ~30% adder for
      international stores (USD-priced) so the spectrum's
      effective-price math agrees with the DB-anchored path. */
-  const landedExtra = row.is_international ? Math.round(priceNgn * 0.30) : 0;
+  const landedExtra = row.is_international ? Math.round(priceNgn * LANDED_RATE) : 0;
   const discountPct = row.discount_percent ?? 0;
   return {
     offerId:         row.offer_id,

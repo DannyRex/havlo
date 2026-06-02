@@ -190,6 +190,12 @@ export default function DupeCard({
               country,
             )}
           </span>
+          {/* "est." cue when the headline bakes in the ~30% landed
+              allowance — same guard as the Plane chip below so the
+              number and the badge always agree. (#14) */}
+          {bestOffer && isIntlForUser(bestOffer) && bestOffer.landedCostExtra > 0 && (
+            <span className="text-[10px] font-normal text-ink-3">est.</span>
+          )}
           {hasSavings && (
             <span className="text-[11px] text-success font-semibold">
               save {formatPriceForUser(dupe.savingsVsAnchor, country)}

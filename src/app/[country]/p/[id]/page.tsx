@@ -43,7 +43,7 @@ import {
   fetchProductPriceTimeseries,
   sanitisePriceTimeseries,
 } from "@/lib/search/price-history";
-import { effectiveLandedPrice } from "@/lib/landed-price";
+import { effectiveLandedPrice, landedTotal, LANDED_RATE } from "@/lib/landed-price";
 import { partitionDupesByVariantMatch, variantOffers, type PartitionResult } from "@/lib/search/variant-pooling";
 import { partitionDupesByVariantMatchDeep } from "@/lib/search/variant-pooling-deep";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
@@ -559,12 +559,14 @@ export default async function ProductPage({ params }: PageProps) {
     isInternational: offer.is_international,
     storeCountry:    offer.store_country ?? null,
     /* currency stays NGN here because anchorPriceNgn is already
-       NGN-normalised above. landedCostExtra = price × 0.3 mirrors
-       the bake-time computation used by the dupes engine. */
+       NGN-normalised above. landedCostExtra = price × LANDED_RATE
+       mirrors the bake-time computation used by the dupes engine;
+       landedPrice goes through landedTotal so every surface shares
+       one multiplier. (#14) */
     currency:        "NGN" as const,
     price:           anchorPriceNgn,
-    landedCostExtra: Math.round(anchorPriceNgn * 0.3),
-    landedPrice:     Math.round(anchorPriceNgn * 1.3),
+    landedCostExtra: Math.round(anchorPriceNgn * LANDED_RATE),
+    landedPrice:     Math.round(landedTotal(anchorPriceNgn)),
   };
   const anchorEffectiveNgn = effectiveLandedPrice(anchorOfferLike, country);
 

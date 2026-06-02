@@ -19,6 +19,7 @@ import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { USD_FX, formatLocal, inferStoreCountry, isGlobalIntlStore, type Country } from "@/lib/country";
 import { pdpUrlForDeal } from "@/lib/pdp-url";
+import { landedTotal } from "@/lib/landed-price";
 import type { Deal } from "@/types";
 
 /* Convert any Deal price (NGN or USD) into the user's preferred
@@ -130,7 +131,7 @@ export default function ListCard({ deal, linkHref }: Props) {
   /* Cross-border total estimate (price + ~30% shipping/customs).
      Already gated on isCrossBorder — same store-roster check, no
      change. */
-  const landedNgnStr = isCrossBorder ? `≈ ${formatLocal(Math.round(primarySale * 1.30), country)}` : null;
+  const landedNgnStr = isCrossBorder ? `≈ ${formatLocal(Math.round(landedTotal(primarySale)), country)}` : null;
 
   return (
     <Link
@@ -240,7 +241,7 @@ export default function ListCard({ deal, linkHref }: Props) {
             <span>total</span>
             <InfoTip
               label="What's included in the total"
-              text="Estimated total: product price + ~30% for cross-border shipping and customs. Actual cost varies."
+              text="A rough estimate: the item price plus about 30% for cross-border shipping and customs. The real total varies by carrier, weight and customs."
               size={11}
             />
           </p>

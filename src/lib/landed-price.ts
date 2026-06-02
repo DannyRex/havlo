@@ -25,6 +25,31 @@
 import type { Country } from "./country";
 import { isGlobalIntlStore, resolveStoreCountry } from "./country";
 
+/* ── Cross-border landed-cost rate ─────────────────────────────────
+   The "landed" total Havlo shows for an international offer is the
+   merchant price plus this flat allowance for shipping + import duty.
+
+   It is deliberately ONE blunt number, not per-item math: at display
+   time we have no carrier quote, parcel weight, or per-country duty
+   schedule, so a single ~30% allowance is the honest resolution of
+   what we actually know. Because it is an approximation, EVERY surface
+   that renders a landed total must frame it as a rough estimate (the
+   "est." cue + the "rough estimate" disclaimers) and never as precise
+   per-item cost. Centralised here so the rate has exactly one home and
+   the compare row, PDP hero, deal cards and price spectrum can never
+   drift onto different multipliers. (#14) */
+export const LANDED_RATE = 0.30;
+
+/* Merchant price plus the flat landed allowance. Bit-identical to the
+   historical `base * 1.30` literal this replaces: 1 + 0.30 === 1.3
+   exactly in IEEE-754 (both 0x3FF4CCCCCCCCCCCD), so centralising the
+   rate changes no displayed or ranked number — it is a pure refactor.
+   Returns a raw number; callers Math.round + format at the display
+   layer. */
+export function landedTotal(base: number): number {
+  return base * (1 + LANDED_RATE);
+}
+
 /* Minimal offer shape we need to make the call. Subset of StoreOffer
    so the helper accepts both the dupes-engine StoreOffer AND any
    future shape that carries the same identity + price fields. */

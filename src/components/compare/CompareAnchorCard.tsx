@@ -308,6 +308,13 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                       <div className="text-right shrink-0">
                         <p className={`text-base font-bold tabular-nums ${isBest ? "text-success" : "text-ink"}`}>
                           {formatPriceForUser(eff, country)}
+                          {/* Persistent "est." cue on cross-border rows: the
+                              shown total bakes in the ~30% landed allowance,
+                              so flag it as an estimate right at the number,
+                              not only in the footnote below. (#14) */}
+                          {isXBorder && (
+                            <span className="ml-1 text-[10px] font-normal text-ink-3 align-baseline">est.</span>
+                          )}
                         </p>
                         {savings > 0 && (
                           <p className="text-[11px] text-ink-3 tabular-nums">
@@ -334,8 +341,8 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
             {anyCrossBorderForUser(sortedRows, country) && (
               <p className="mt-3 text-[11px] text-ink-3 leading-relaxed">
                 <span className="text-amber-500">⚑</span>{" "}
-                Cross-border prices include a ~30% landed estimate (shipping + customs).
-                Final total varies by carrier and customs assessment.
+                Cross-border totals are a rough estimate: the price plus about 30% for shipping and customs.
+                The real amount varies by carrier, item weight, and customs.
               </p>
             )}
             {/* Price-as-last-seen honesty (Spoken learning #4). Prices

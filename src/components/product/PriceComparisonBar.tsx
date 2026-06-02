@@ -914,8 +914,8 @@ export default function PriceComparisonBar({
       {anyXBorder && (
         <p className="mt-2.5 text-[11px] text-ink-3 leading-relaxed">
           <span className="text-amber-500">⚑</span>{" "}
-          Cross-border prices include a ~30% landed estimate (shipping + customs).
-          Final total varies by carrier and customs assessment.
+          Cross-border totals are a rough estimate: the price plus about 30% for shipping and customs.
+          What you pay varies by carrier, item weight, and customs.
         </p>
       )}
       {/* When the visiting offer itself is cross-border but no
@@ -925,8 +925,8 @@ export default function PriceComparisonBar({
       {!anyXBorder && thisIsCrossBorder && (
         <p className="mt-2.5 text-[11px] text-ink-3 leading-relaxed">
           <span className="text-amber-500">⚑</span>{" "}
-          This offer ships across borders. The price includes a ~30% landed
-          estimate for shipping and customs.
+          This offer ships across borders, so the total is a rough estimate: the price
+          plus about 30% for shipping and customs, which varies by carrier and customs.
         </p>
       )}
     </div>

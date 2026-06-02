@@ -32,6 +32,7 @@ import InfoTip from "@/components/ui/InfoTip";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import { track } from "@/lib/analytics";
 import { pdpUrlForDeal } from "@/lib/pdp-url";
+import { landedTotal } from "@/lib/landed-price";
 import type { Deal } from "@/types";
 
 interface Props {
@@ -246,7 +247,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
      (USD-stored, GBP user) shouldn't show "≈ £1,173 (landed)" since
      no cross-border shipping applies. */
   const landedFmt = isCrossBorderForUser
-    ? formatLocal(Math.round(primarySale * 1.30), country)
+    ? formatLocal(Math.round(landedTotal(primarySale)), country)
     : null;
 
   /* Secondary price (the original-currency hint) — small, italic,
@@ -486,7 +487,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
             <span>total</span>
             <InfoTip
               label="What's included in the total"
-              text="Estimated total: product price + ~30% for cross-border shipping and customs. Actual cost varies by carrier, weight, and customs assessment."
+              text="A rough estimate: the item price plus about 30% for cross-border shipping and customs. The real total varies by carrier, weight and customs."
               size={11}
             />
           </p>
