@@ -25,7 +25,6 @@
 import Link from "next/link";
 import { ChevronRight, Layers } from "lucide-react";
 import { cleanTitle, formatPriceForUser, proxiedImageUrl } from "@/lib/utils";
-import { effectiveLandedPrice } from "@/lib/landed-price";
 import { pdpUrlForOffer } from "@/lib/pdp-url";
 import type { Country } from "@/lib/country";
 import type { DupeResult } from "@/lib/search";
@@ -49,24 +48,25 @@ export default function OtherConfigurations({ configs, country }: Props) {
 
   const rows = configs
     .map((d) => {
-      /* Cheapest offer by the SAME country-aware landed definition every
-         other surface uses, so this config's "from" price matches what
-         the user sees once they open its page. */
-      const best = [...d.offers].sort(
-        (a, b) => effectiveLandedPrice(a, country) - effectiveLandedPrice(b, country),
-      )[0];
+      /* Cheapest offer by RAW merchant price — matches what the variant's
+         own page now shows (#16 leads with the raw price everywhere), and
+         is the value we sort the list by. */
+      const best = [...d.offers].sort((a, b) => a.price - b.price)[0];
       if (!best) return null;
       const storeCount = new Set(d.offers.map((o) => o.storeId)).size;
       return {
         key:       d.key,
         title:     cleanTitle(d.title),
         image:     d.imageUrl ?? best.imageUrl ?? null,
-        fromPrice: formatPriceForUser(effectiveLandedPrice(best, country), country),
+        fromNgn:   best.price,
+        fromPrice: formatPriceForUser(best.price, country),
         storeCount,
         href:      pdpUrlForOffer(country.code, { ...best, title: d.title }),
       };
     })
     .filter((r): r is NonNullable<typeof r> => r !== null)
+    /* Cheapest variant first (ascending price). */
+    .sort((a, b) => a.fromNgn - b.fromNgn)
     .slice(0, MAX_ROWS);
 
   if (rows.length === 0) return null;
@@ -99,7 +99,10 @@ export default function OtherConfigurations({ configs, country }: Props) {
                   href={r.href}
                   className="flex items-center gap-3 rounded-xl border border-border bg-bg px-3 py-2.5 transition-colors hover:border-border-strong"
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white">
+                  {/* Slightly larger thumbnail (56px, was 40px) so the
+                      product is recognisable enough to judge the variant
+                      similarity at a glance. */}
+                  <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white">
                     {r.image ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
