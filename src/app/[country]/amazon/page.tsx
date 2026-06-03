@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import JsonLd from "@/components/seo/JsonLd";
 import AmazonDealsBrowser from "@/components/hub/AmazonDealsBrowser";
+import AmazonCashbackBanner from "@/components/hub/AmazonCashbackBanner";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ScrollToTopButton from "@/components/ui/ScrollToTopButton";
 import { getCountry, ACTIVE_COUNTRIES } from "@/lib/country";
@@ -111,6 +112,10 @@ export default async function AmazonDealsPage({
             history. Tap any item to see the full history before you buy.
           </p>
         </header>
+
+        {/* 2% cashback applies to every Amazon order, so it's advertised
+            once here (not per card). */}
+        <AmazonCashbackBanner country={country} />
 
         {/* Browser — client-side filter (country + category) + sort. */}
         {offers.length > 0 ? (
