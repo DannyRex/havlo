@@ -51,6 +51,31 @@ where o.current_price is not null
     select 1 from offer_price_history h where h.offer_id = o.id
   );
 
+-- ── Durable seed RPC (#24) ───────────────────────────────────────────
+-- Same idempotent seed wrapped in a callable function so the ingest cron
+-- can run it after every scrape cycle (scrape-free-daily.yml dedup job →
+-- `npm run seed:price-history`). Returns the number of starting points
+-- seeded so the cron can log it. Keeps NG (and every market) at ~full
+-- history coverage without waiting for a manual re-backfill.
+create or replace function seed_missing_price_history()
+returns integer
+language plpgsql
+as $$
+declare seeded integer;
+begin
+  with ins as (
+    insert into offer_price_history (offer_id, product_id, price, currency, discount_percent, recorded_at)
+    select o.id, o.product_id, o.current_price, o.currency, o.discount_percent, coalesce(o.scraped_at, now())
+    from offers o
+    where o.current_price is not null and o.current_price > 0
+      and not exists (select 1 from offer_price_history h where h.offer_id = o.id)
+    returning 1
+  )
+  select count(*) into seeded from ins;
+  return seeded;
+end;
+$$;
+
 -- ── Sanity checks (run in the Supabase SQL editor after applying) ────
 --   -- 1. Remaining chartable offers with no history should be ~0:
 --   select count(*) from offers o

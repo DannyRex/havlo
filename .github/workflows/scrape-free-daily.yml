@@ -201,3 +201,11 @@ jobs:
       - name: Dedup products
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
         run: npm run dedup
+
+      # Seed a "tracking starts now" price-history point for any offer
+      # ingested this cycle that doesn't have one yet (#24), so NG (the
+      # most-refreshed market) stops rendering flat/empty charts. Idempotent
+      # + no API credits; no-ops until migration 0067 is applied.
+      - name: Seed missing price-history points
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: npm run seed:price-history

@@ -35,6 +35,7 @@
     "resignature": "tsx --tsconfig tsconfig.scripts.json scripts/resignature-products.ts",
     "backfill:brand": "tsx --tsconfig tsconfig.scripts.json scripts/backfill-brand.ts",
     "prune:price-history": "tsx --tsconfig tsconfig.scripts.json scripts/prune-price-history.ts",
+    "seed:price-history": "tsx --tsconfig tsconfig.scripts.json scripts/seed-missing-history.ts",
     "sweep:stale-offers": "tsx --tsconfig tsconfig.scripts.json scripts/sweep-stale-offers.ts",
     "scrape:brand-dtc": "tsx --tsconfig tsconfig.scripts.json scripts/scrape-brand-dtc.ts",
     "backfill:images": "tsx --tsconfig tsconfig.scripts.json scripts/backfill-product-images.ts"
