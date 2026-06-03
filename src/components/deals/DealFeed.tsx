@@ -688,6 +688,15 @@ export default function DealFeed({
     !!initialComparison &&
     searchDebounced.trim().toLowerCase() === initialComparison.query.trim().toLowerCase();
 
+  /* Distinct stores behind the comparison anchor. Drives the header
+     copy: a single-store anchor reads "Best price we found" rather than
+     falsely implying a cross-store comparison. (The card's own rows
+     already say "Available at" vs "Across N stores", and hide the
+     "Save up to X" spread when there's only one store.) */
+  const comparisonStoreCount = initialComparison
+    ? new Set((initialComparison.anchor.offers ?? []).map((o) => o.storeId)).size
+    : 0;
+
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-8 sm:py-12">
 
@@ -823,7 +832,7 @@ export default function DealFeed({
       {showComparisonHeader && initialComparison && (
         <div className="mb-2">
           <p className="max-w-3xl mx-auto text-[11px] font-bold uppercase tracking-[0.12em] text-ink-3 mb-3 px-1">
-            Best price across stores
+            {comparisonStoreCount >= 2 ? "Best price across stores" : "Best price we found"}
           </p>
           <CompareAnchorCard
             anchor={initialComparison.anchor}

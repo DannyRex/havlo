@@ -165,7 +165,7 @@ async function fetchInitialDeals(
         tokens, i.e. the FTS top hit actually IS what they searched —
         guards against FTS latching onto a tangential product via one
         shared word. */
-function isConfidentProductQuery(search: string, anchorTitle: string): boolean {
+function isConfidentProductQuery(search: string, anchorTitle: string, distinctStores: number): boolean {
   const STOP = new Set([
     "the", "a", "an", "for", "with", "and", "of", "in", "on", "new",
     "best", "cheap", "cheapest", "price", "prices", "deal", "deals", "buy", "sale",
@@ -176,7 +176,16 @@ function isConfidentProductQuery(search: string, anchorTitle: string): boolean {
   if (qTokens.length < 2) return false;
   const titleTokens = new Set(tokenize(anchorTitle));
   const hits = qTokens.filter((t) => titleTokens.has(t)).length;
-  return hits >= Math.ceil(qTokens.length * 0.6);
+  /* Tier the overlap requirement by corroboration. 2+ distinct stores
+     carrying the SAME matched product is itself evidence the anchor is
+     correct, so 60% token overlap is enough. A SINGLE-store anchor has
+     no such corroboration, so require EVERY meaningful query token in
+     the title — otherwise a generic-category match ("scanfrost chest
+     freezer" -> "snowsea chest deep freezer", sharing only chest +
+     freezer) would headline a DIFFERENT brand as "best price we found".
+     This is what makes the single-store loosening (June 2026) safe. */
+  const need = distinctStores >= 2 ? Math.ceil(qTokens.length * 0.6) : qTokens.length;
+  return hits >= need;
 }
 
 /* Resolve the landing search to a confident cross-store comparison
@@ -184,9 +193,14 @@ function isConfidentProductQuery(search: string, anchorTitle: string): boolean {
    which does NOT fan out to live-search (that's a separate client-side
    /api/live-search call) and does NOT invoke the LLM judge (that lives
    only on the pid path, pgFtsFindByProductId). So this stays cheap and
-   reuses /api/compare's 1h edge cache. The anchor is returned only
-   when it's a genuine multi-store comparison (>= 2 DISTINCT stores)
-   for a confident product query. */
+   reuses /api/compare's 1h edge cache. The anchor is returned for any
+   confident product query with >= 1 in-stock offer. The header copy
+   adapts to the store count ("Best price across stores" for 2+ stores,
+   "Best price we found" for a single store) and CompareAnchorCard hides
+   its spread + says "Available at" when there's one store, so a
+   one-store anchor never implies a cross-store comparison that isn't
+   there. (Founder direction June 2026: the strict 2-store gate stayed
+   silent on most real queries given thin cross-store catalog overlap.) */
 async function fetchComparisonForSearch(
   search: string,
   countryCode: string,
@@ -204,8 +218,8 @@ async function fetchComparisonForSearch(
     if (data?.mode !== "similar" || !data.anchor) return null;
     const anchor = data.anchor as ProductGroup;
     const distinctStores = new Set((anchor.offers ?? []).map((o) => o.storeId)).size;
-    if (distinctStores < 2) return null;
-    if (!isConfidentProductQuery(q, anchor.title)) return null;
+    if (distinctStores < 1) return null;   // single-store OK; header reads "Best price we found"
+    if (!isConfidentProductQuery(q, anchor.title, distinctStores)) return null;
     return { anchor, query: q };
   } catch (err) {
     console.error("[fetchComparisonForSearch] threw", (err as Error).message);
@@ -246,7 +260,7 @@ export default async function DealsPage({
      cross-store best-price header in parallel, so the comparison probe
      adds no serial latency to the page. fetchComparisonForSearch is
      self-gating: it returns null for ambiguous/category queries and
-     anything without >= 2 distinct stores, so we always attempt it when
+     anything with no in-stock offer, so we always attempt it when
      a search is present and let it decide. */
   const [initial, comparison] = await Promise.all([
     fetchInitialDeals({
