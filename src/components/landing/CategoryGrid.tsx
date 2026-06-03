@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { categories } from "@/lib/data/categories";
 import CategoryTileLink from "./CategoryTileLink";
-import { type Country } from "@/lib/country";
+import { type Country, filterDealsForCountry } from "@/lib/country";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { formatCount } from "@/lib/utils";
 import {
@@ -76,13 +76,18 @@ const browsable = categories.filter((c) => c.slug !== "all" && !c.hidden);
          after clicking through (user report June 2026: "count on the
          deals-by-category card is different from the all tab count").
 
-   v5 (now): call the SAME getOriginCounts the /deals all-tab pill uses,
-         per category, and read `.all`. The tile number is now equal BY
-         CONSTRUCTION to the post-click /deals?...&origin=all count — same
-         function, same table, same country-aware intl rule. getOriginCounts
-         is memoised on a shared filter key, so the homepage render warms
-         the cache /deals reuses; cheaper than the old bespoke ~60 KB
-         stores fetch + per-category offers HEAD COUNT.
+     v5: call getOriginCounts (the product_best_offers head count). Closer,
+         but STILL a different source than the grid: /deals derives its
+         All-tab pill AND its displayed cards from provider.fetchDeals +
+         filterDealsForCountry, whose broader cross-border set the tight
+         head count under-counted (NG appliances tile 79 vs 192 shown).
+
+   v6 (now): compute the count the EXACT way /deals does — pull each
+         category's browse pool via provider.fetchDeals and run it through
+         filterDealsForCountry, then take `.length`. Tile == /api/deals
+         originCounts.all == deals displayed, by construction (the same two
+         functions, no separate count path that can drift). Cached 30 min
+         since counts only move on ingest (daily / twice-weekly).
 
    Cache key includes the country code so /uk and /ng don't
    collide. Cache tag `category-counts` lets a future cron call
@@ -92,18 +97,18 @@ const fetchCategoryCounts = (country: Country) =>
   unstable_cache(
     async (): Promise<Record<string, number>> => {
       const slugs = browsable.map((c) => c.slug);
-      /* Resolve the SAME browse provider /api/deals uses, then ask it for
-         each category's origin counts and read `.all`. Identical function,
-         table (product_best_offers) and country-aware intl rule as the
-         /deals all-tab pill, so the tile count matches by construction.
-         On a failed/empty count we fall the tile back to 0 (honest: it
-         stays clickable and the deals page handles the empty state). */
+      /* Count each category EXACTLY as /deals does: fetch the category's
+         browse pool and run it through filterDealsForCountry — the same
+         provider.fetchDeals + country filter the route uses to build its
+         All-tab pill AND the displayed grid. So tile == All-tab pill ==
+         deals shown. On error we fall back to 0 (the tile stays clickable
+         and /deals handles the empty state). */
       const provider = await getActiveBrowseProvider();
       const entries = await Promise.all(
         slugs.map(async (slug): Promise<readonly [string, number]> => {
           try {
-            const oc = await provider.getOriginCounts({ categorySlug: slug, country: country.code });
-            return [slug, oc.all ?? 0] as const;
+            const pool = await provider.fetchDeals({ categorySlug: slug, sort: "relevance", country: country.code });
+            return [slug, filterDealsForCountry(pool, country, undefined).length] as const;
           } catch {
             return [slug, 0] as const;
           }
@@ -111,9 +116,9 @@ const fetchCategoryCounts = (country: Country) =>
       );
       return Object.fromEntries(entries);
     },
-    ["category-counts-v5-origincounts", country.code, browsable.map((c) => c.slug).join(",")],
+    ["category-counts-v6-pool", country.code, browsable.map((c) => c.slug).join(",")],
     {
-      revalidate: 300, // 5 min — tighter than the page's 30-min ISR
+      revalidate: 1800, // 30 min — counts only move on ingest; keeps per-category pool pulls infrequent
       tags:       ["category-counts"],
     },
   );

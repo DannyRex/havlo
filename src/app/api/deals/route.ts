@@ -404,11 +404,11 @@ export async function GET(req: NextRequest) {
     /* Three independent fetches fire in parallel:
          1. items pool (capped 3-pass fan-out, drives the grid)
          2. dropdown store list (cap-free RPC, drives the filter panel)
-         3. originCounts head-count (drives the local/intl tab pills)
-       Pre-perf-pass #3 was sequential AFTER #1+#2 finished, adding
-       ~200-500ms to every /api/deals call. Now all three resolve
-       together so total latency = max(individual) instead of sum. */
-    const [allRawAcrossOrigins, dropdownStoresRaw, headOriginCounts] = await Promise.all([
+       (Origin tab counts are derived below from the SAME pool the grid
+       paginates, so they are not fetched here — that keeps the pill equal
+       to the displayed deal count.) Resolving the two in one Promise.all
+       keeps total latency = max(individual), not sum. */
+    const [allRawAcrossOrigins, dropdownStoresRaw] = await Promise.all([
       fetchPoolCached({
         categorySlug: category,
         sort,
@@ -435,16 +435,6 @@ export async function GET(req: NextRequest) {
            country's local roster ∪ cross-border allowlist. */
         origin:      origin,
       }),
-      provider.getOriginCounts({
-        categorySlug: category,
-        minDiscount:  userMinDiscount,
-        search:       search,
-        /* Real store_ids for the RPC (resolved from URL canonical
-           above) — matches the items pool's filter so the tab pill
-           counts stay in sync with what the grid renders. */
-        stores:       realStoreIds ?? undefined,
-        country:      country.code,
-      }).catch(() => null),
     ]);
 
     /* Country store filter — pure-function, runs over Deal[].
@@ -519,58 +509,29 @@ export async function GET(req: NextRequest) {
     const qualifyingLocal = qualifyingCountryFiltered.filter(isLocalToUser);
     const qualifyingIntl  = qualifyingCountryFiltered.filter((d) => !isLocalToUser(d));
 
-    /* Origin pill counts come from a parallel head-count call —
-       NOT from .length on the in-memory pool. Reason: the in-memory
-       pool is capped at the PostgREST db-max-rows=1000 per pass
-       (Pass A + B + C = up to ~3000 unique rows). For a market
-       with more than 3000 rows in the catalog, the pill showed
-       "exactly 1000" or "1959", which read as a UI bug — user
-       report May 2026: "/ng/deals sort=newest shows exactly
-       1000 local — is that a limit?".
+    /* originCounts (the All / Local / Intl tab pills) are ALWAYS derived
+       from the in-memory filtered pool — the SAME list that produces the
+       items + `total` below — so each pill equals the number of cards the
+       grid actually paginates through.
 
-       Head counts use count:'exact'+head:true → returns the true
-       count via Postgres COUNT(*), no row payload, no 1000 cap.
-       The DISPLAYED list still caps at the 3-pass pool; the pill
-       reflects catalog truth so the user knows the inventory is
-       bigger than what's paginatable today.
-
-       Country-aware when present — see browse-db.ts getOriginCounts
-       for the local/intl partition.
-
-       NOTE: headOriginCounts is resolved upstream in the same
-       Promise.all that fetches the items pool + dropdown — see the
-       earlier perf comment. The variable is captured there so the
-       three independent network calls complete in parallel rather
-       than serialising. */
-
-    /* When a search query is present, ALWAYS derive originCounts from
-       the in-memory filtered pool rather than the head-count RPC.
-       Reason: head count uses search_deals_fts with candidates[0]
-       only, while the items pool walks all FTS candidates AND applies
-       additional JS-side filters (isUsableMerchantUrl, country
-       roster, dedup). The two paths can disagree by 1-2 rows for
-       narrow result sets, producing the "4 in tab, 3 displayed"
-       UX bug from the re-audit (UK lawn-mower search).
-
-       For browse-mode (no search), keep the head-count behaviour —
-       it intentionally surfaces the true catalog count beyond the
-       3-pass pool cap so the pill reads "5,453" not "1,000". The
-       discrepancy only matters when the in-memory pool IS the full
-       result set (i.e. for narrow searches where rows < cap). */
-    const originCounts = (search && search.trim())
-      ? {
-          all:   qualifyingCountryFiltered.length,
-          local: qualifyingLocal.length,
-          intl:  qualifyingIntl.length,
-          allDeals:   qualifyingCountryFiltered.filter((d) => d.discountPercent > 0).length,
-          localDeals: qualifyingLocal.filter((d) => d.discountPercent > 0).length,
-          intlDeals:  qualifyingIntl.filter((d) => d.discountPercent > 0).length,
-        }
-      : (headOriginCounts ?? {
-          all:   qualifyingCountryFiltered.length,
-          local: qualifyingLocal.length,
-          intl:  qualifyingIntl.length,
-        });
+       Browse-mode previously used a separate product_best_offers head
+       count to "surface catalog truth beyond the 3-pass cap". But that
+       count's intl rule (is_international AND store_country IS NULL) is
+       TIGHTER than filterDealsForCountry's cross-border set, so it
+       UNDER-counted the displayed pool — NG appliances read pill 79 vs
+       192 deals shown. User report June 2026: "the category-card / All-tab
+       count doesn't match the deals displayed." Pool-derived counts cap
+       with the 3-pass pool, but so does the grid, so count == displayed.
+       (The homepage category tiles compute the SAME number via
+       provider.fetchDeals + filterDealsForCountry — see CategoryGrid.) */
+    const originCounts = {
+      all:   qualifyingCountryFiltered.length,
+      local: qualifyingLocal.length,
+      intl:  qualifyingIntl.length,
+      allDeals:   qualifyingCountryFiltered.filter((d) => d.discountPercent > 0).length,
+      localDeals: qualifyingLocal.filter((d) => d.discountPercent > 0).length,
+      intlDeals:  qualifyingIntl.filter((d) => d.discountPercent > 0).length,
+    };
 
     /* Items pool: qualifying pool, narrowed to the user's origin choice. */
     let qualifyingByOrigin =
