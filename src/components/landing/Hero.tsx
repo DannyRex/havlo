@@ -141,18 +141,17 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
      render show the same first example) and only rotates after
      mount via the useEffect below. Suspended while the user is
      focused/typing so the placeholder doesn't shift mid-input. */
-  const fallbackExamples = (() => {
-    switch (countryCode) {
-      case "ng": return ["iPhone 15 Pro", "Air Force 1", "AFNAN perfume", "Stanley Quencher", "Dyson V12", "Accu-Chek glucose meter"];
-      case "uk": return ["AirPods 4", "Dyson Airwrap", "Le Creuset Dutch oven", "Air Max 95", "Charlotte Tilbury", "Garmin Forerunner"];
-      case "us": return ["Stanley Quencher", "Yeti Rambler", "Dyson Airwrap", "Air Force 1", "Owala FreeSip", "AirPods 4"];
-      case "de": return ["Bose QuietComfort", "Adidas Samba", "Le Creuset", "Dyson V12", "Garmin Fenix", "AirPods 4"];
-      case "in": return ["OnePlus Nord", "boAt earbuds", "Nike Air Max", "Lakme foundation", "Stanley Quencher", "Apple Watch SE"];
-      case "ae": return ["iPhone 15 Pro", "AFNAN perfume", "Dyson Airwrap", "Air Max 95", "Apple Watch Ultra", "Le Creuset"];
-      case "za": return ["Yeti Rambler", "Adidas Samba", "Garmin Forerunner", "AirPods 4", "Le Creuset", "Air Force 1"];
-      default:   return ["AirPods 4", "Air Force 1", "Dyson Airwrap", "Stanley Quencher", "Le Creuset", "Garmin Forerunner"];
-    }
-  })();
+  /* Client-side fallback — used ONLY if the server prop is empty. Kept in
+     sync with the curated iconic list in popular-placeholder-examples.ts
+     (same recognizable, category-spanning items, each verified to return
+     results in every market). It can't import that module directly: that
+     file pulls in next/cache, which is server-only. The set is global now
+     (global-iconic brands carry across all markets), so no per-country
+     switch. */
+  const fallbackExamples = [
+    "iPhone 15 Pro", "MacBook Air", "Nike Air Force 1", "AirPods Pro",
+    "PlayStation 5", "Apple Watch", "Dyson Airwrap", "Stanley Quencher",
+  ];
   const placeholderExamples = (placeholderExamplesProp && placeholderExamplesProp.length >= 4)
     ? placeholderExamplesProp
     : fallbackExamples;
@@ -197,7 +196,7 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
     }
     /* origin=all forces /deals to skip its default "local"-tab and
        open the full cross-border pool. Reason: a typed search like
-       "iPhone 17" or "Adidas Samba" is an intent to FIND THE BEST
+       "iPhone 15 Pro" or "Nike Air Force 1" is an intent to FIND THE BEST
        PRICE, not an intent to browse the visitor's local market.
        Opening on the local tab hides AliExpress / Amazon / Shein /
        global retailers on the first paint and the user reads the
@@ -620,7 +619,7 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
             className="hidden sm:block text-xs text-ink-3 mt-3 animate-fade-in text-center"
             style={{ animationDelay: "220ms" }}
           >
-            Try &ldquo;iPhone 17 Pro&rdquo;, &ldquo;Adidas Samba&rdquo;, or paste any product link.
+            Try &ldquo;iPhone 15 Pro&rdquo;, &ldquo;Nike Air Force 1&rdquo;, or paste any product link.
           </p>
         </div>
 

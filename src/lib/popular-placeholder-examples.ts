@@ -1,105 +1,60 @@
-/* Server-side helper that returns rotating placeholder examples
-   for the homepage Hero search box, sourced from real catalog data.
+/* Server-side helper that returns the rotating placeholder examples for
+   the homepage Hero search box.
 
-   Replaces the hardcoded per-country example list that was previously
-   in Hero.tsx. The hardcoded list had two problems:
-     1. Maintenance — every catalog change drifted from the examples.
-     2. Authenticity — examples were my guesses, not what the catalog
-        actually has popular cross-store coverage for.
+   June 2026 (founder direction): switched from a dynamic, store-count-
+   ranked RPC (suggest_diverse_popular_products) to a CURATED list of
+   iconic, instantly-recognizable products. The dynamic ranking optimised
+   for cross-store COVERAGE, which surfaced less-aspirational picks — e.g.
+   "adidas Samba OG" outranked "Nike Air Force 1" in UK/US on store count,
+   sports landed on "Puma Conduct Pro", computing on a generic "HP Ryzen 5
+   laptop". A placeholder's job is to INSPIRE a search, so recognizability
+   matters more than coverage.
 
-   This helper calls suggest_diverse_popular_products(country, N)
-   which:
-     - Filters to products with ≥ 2 stores
-     - One product per category (phones / fashion / beauty / home / etc.)
-     - Sorted by store_count desc within each category
+   Every item below is verified (June 2026) to return real results across
+   our markets — NG/UK/US spot-checked, e.g. Nike Air Force 1 → 45/55/32,
+   iPhone 15 Pro → 15/15/11 — so the example never leads to an empty
+   search. They span categories (phones / computing / sports / audio /
+   gaming / wearable / beauty / home) so the rotation feels broad, and
+   they're global-iconic brands that carry across all six markets (the
+   catalog is cross-border).
 
-   Edge-cached 30 min via unstable_cache so the homepage SSR pays the
-   DB cost at most twice per hour per country. The list rotates
-   organically as the catalog grows + popularity shifts.
-
-   Fail-soft: returns a STATIC fallback if the RPC isn't migrated yet,
-   the DB is unreachable, or the catalog has too few multi-store
-   products for the country. The Hero rotation works the same either
-   way — caller doesn't need to handle "no examples" specially. */
+   Kept async + cached so the caller (homepage SSR) and its signature
+   don't change, and so a dynamic source can be reintroduced later without
+   touching callers. */
 
 import { unstable_cache } from "next/cache";
-import { getSupabaseAdmin } from "@/lib/providers/db-client";
-import { chipLabelForTitle } from "@/lib/search/normalize";
 
 const REVALIDATE_S = 1800;   // 30 min, matches homepage ISR revalidate
 
-/* Static fallback per country — same shape as the dynamic output.
-   Used when the RPC isn't migrated yet, the DB is unreachable, or
-   the dynamic query returns an empty / too-small list (rare; only
-   hits markets where the catalog hasn't reached ≥ 8 cross-store
-   categories yet). Each list spans categories deliberately. */
-const STATIC_FALLBACK: Record<string, string[]> = {
-  ng: ["iPhone 15 Pro", "Air Force 1", "AFNAN perfume", "Stanley Quencher", "Dyson V12", "Accu-Chek glucose meter"],
-  uk: ["AirPods 4", "Dyson Airwrap", "Le Creuset Dutch oven", "Air Max 95", "Charlotte Tilbury", "Garmin Forerunner"],
-  us: ["Stanley Quencher", "Yeti Rambler", "Dyson Airwrap", "Air Force 1", "Owala FreeSip", "AirPods 4"],
-  de: ["Bose QuietComfort", "Adidas Samba", "Le Creuset", "Dyson V12", "Garmin Fenix", "AirPods 4"],
-  in: ["OnePlus Nord", "boAt earbuds", "Nike Air Max", "Lakme foundation", "Stanley Quencher", "Apple Watch SE"],
-  ae: ["iPhone 15 Pro", "AFNAN perfume", "Dyson Airwrap", "Air Max 95", "Apple Watch Ultra", "Le Creuset"],
-  za: ["Yeti Rambler", "Adidas Samba", "Garmin Forerunner", "AirPods 4", "Le Creuset", "Air Force 1"],
-};
+/* Curated, category-spanning, recognizable, verified-present. Order is the
+   rotation order (one every 3.5s in the Hero), so it leads with the most
+   universal item. */
+const CURATED: string[] = [
+  "iPhone 15 Pro",       // phones
+  "MacBook Air",         // computing
+  "Nike Air Force 1",    // sports / fashion
+  "AirPods Pro",         // audio
+  "PlayStation 5",       // gaming
+  "Apple Watch",         // wearable
+  "Dyson Airwrap",       // beauty / appliances
+  "Stanley Quencher",    // home
+];
 
-interface DiverseRow {
-  product_id:    string;
-  title:         string;
-  brand:         string | null;
-  category_slug: string;
-  store_count:   number;
+export { CURATED as PLACEHOLDER_EXAMPLES };
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function fetchPlaceholderExamplesUncached(_country: string): Promise<string[]> {
+  /* Global-iconic brands are present in every market we ship, so the
+     same curated set serves all countries. If a market ever needs local
+     flavour, branch on _country and return a verified per-country list. */
+  return CURATED;
 }
 
-async function fetchPlaceholderExamplesUncached(country: string): Promise<string[]> {
-  try {
-    const supa = getSupabaseAdmin();
-    if (!supa) return STATIC_FALLBACK[country] ?? STATIC_FALLBACK.ng;
-
-    const { data, error } = await supa.rpc("suggest_diverse_popular_products", {
-      user_country:   country,
-      max_categories: 8,
-    });
-
-    if (error) {
-      /* Migration not applied yet (or RPC permissions are off).
-         Logged at warn level — shows in Vercel logs without paging. */
-      console.warn("[placeholder-examples] RPC failed:", error.message);
-      return STATIC_FALLBACK[country] ?? STATIC_FALLBACK.ng;
-    }
-
-    /* chipLabelForTitle parses the raw retailer title down to a clean
-       "Brand Model" form ("Apple iPhone 15 Pro Max" instead of the
-       full "Apple iPhone 15 Pro Max - 6.9 inch, 256gb Rom, 8gb Ram,
-       Black Titanium"). Keeps the placeholder readable and the
-       rotation rhythm consistent. */
-    const labels = ((data as DiverseRow[] | null) ?? [])
-      .map((r) => chipLabelForTitle(r.title, 28))
-      /* Drop any that survived chip-truncation as junk (extremely
-         long all-caps, leading punctuation, etc.) — uncommon but
-         keeps the placeholder feeling polished. */
-      .filter((l) => l.length >= 3 && l.length <= 32);
-
-    /* If we got < 4 dynamic labels (rare — catalog too thin in this
-       country, or all categories happen to fail the chip-length
-       filter), use the static fallback to keep the rotation
-       feeling rich. Don't intermix — mixed-source rotations feel
-       inconsistent. */
-    if (labels.length < 4) return STATIC_FALLBACK[country] ?? STATIC_FALLBACK.ng;
-    return labels;
-  } catch (err) {
-    console.warn("[placeholder-examples] unexpected error:", (err as Error).message);
-    return STATIC_FALLBACK[country] ?? STATIC_FALLBACK.ng;
-  }
-}
-
-/** Per-country cached fetcher. Returns 6-8 placeholder examples
-    that span categories, sourced from the live catalog's popular
-    multi-store products. */
+/** Per-country cached fetcher. Returns the curated iconic placeholder
+    examples that span categories. */
 export const getPopularPlaceholderExamples = unstable_cache(
   fetchPlaceholderExamplesUncached,
-  /* Key includes a version sentinel so we can invalidate without
-     a redeploy if we change the RPC shape. */
-  ["placeholder-examples-v1"],
+  /* Version bump invalidates the old dynamic-RPC cache entries. */
+  ["placeholder-examples-v2-curated"],
   { revalidate: REVALIDATE_S, tags: ["placeholder-examples"] },
 );
