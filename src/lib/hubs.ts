@@ -29,7 +29,6 @@ import { cache } from "react";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { isSyntheticId } from "@/lib/pdp-url";
 import { categories } from "@/lib/data/categories";
-import { filterDealsForCountry, getCountry } from "@/lib/country";
 import type { Deal } from "@/types";
 
 /* Columns pulled from product_best_offers — the subset needed to
@@ -242,22 +241,20 @@ export const fetchBrandHubOffers = cache(async (
   return dealsFromRows((data ?? []) as HubRow[]);
 });
 
-/* ── Amazon hub offers ────────────────────────────────────────────
-   Amazon-store markdowns reachable from the given country — powers the
-   /[country]/amazon affiliate landing.
+/* ── Amazon offers, every marketplace ─────────────────────────────
+   Powers the /[country]/amazon browser. Returns EVERY Amazon markdown
+   we track across all marketplaces (UK / US / AE / IN / DE / ZA), not
+   just the ones reachable from the visitor's market: the page ships
+   its own country + category filters and sort, so it wants the whole
+   catalogue. Prices are normalised to USD across the board, so the
+   page's client-side price sort is apples-to-apples.
 
-   Unlike the category/brand hubs, Amazon is a CROSS-BORDER store for
-   several markets: NG / IN / ZA have no local Amazon but reach
-   amazon.com / .co.uk / .ae. The tight shoppableOr above (local ∪
-   true-globals-with-null-country) would wrongly exclude those
-   foreign-anchored Amazon marketplaces. So here we pull every Amazon
-   markdown and apply filterDealsForCountry — the SAME broad reachability
-   filter /deals uses — so each market sees exactly the Amazon offers it
-   can actually buy. Sorted biggest-markdown first; the cards still link
-   to real PDPs (price-history + the affiliate "Buy on Amazon" button). */
-export const fetchAmazonHubOffers = cache(async (
-  countryCode: string,
-  limit:       number = HUB_GRID_LIMIT,
+   Deduped by product, biggest markdown first. Every card links to a
+   real PDP (price history + the affiliate "Buy on Amazon" button). The
+   400 cap is a generous backstop — the live set is ~350 — so the whole
+   corpus reaches the client for instant filtering. */
+export const fetchAllAmazonOffers = cache(async (
+  limit: number = 400,
 ): Promise<Deal[]> => {
   const supa = getSupabaseAdmin();
   if (!supa) return [];
@@ -268,16 +265,12 @@ export const fetchAmazonHubOffers = cache(async (
     .gt("discount_percent", 0)
     .order("discount_percent", { ascending: false, nullsFirst: false })
     .order("scraped_at", { ascending: false })
-    /* Overfetch: the reachability filter below drops the Amazon
-       marketplaces this market can't shop, so pull a wide slice first. */
-    .limit(Math.min(limit * 6, 600));
+    .limit(limit);
   if (error) {
-    console.warn(`[hubs] amazon (${countryCode}) error:`, error.message);
+    console.warn(`[hubs] all-amazon error:`, error.message);
     return [];
   }
-  const deals   = dealsFromRows((data ?? []) as HubRow[]);
-  const country = getCountry(countryCode);
-  return filterDealsForCountry(deals, country, undefined).slice(0, limit);
+  return dealsFromRows((data ?? []) as HubRow[]);
 });
 
 /* ── Brand catalogue per country ──────────────────────────────────

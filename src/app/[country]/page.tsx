@@ -249,6 +249,11 @@ export default async function HomePage({ params }: { params: { country: string }
       {trendingBuckets && (
         <TrendingDeals buckets={trendingBuckets} countryCode={country.code} />
       )}
+      {/* Amazon affiliate promo — placed right after the trending grid so
+          it rides the deal-discovery momentum (reads as another way to
+          find deals, not an injected ad) while still sitting below the
+          hero + primary feed, not jammed up top. */}
+      <AmazonPromo country={country} />
       {/* Cashback teaser — restores the pre-launch signup hook that
           was previously a hero strip (removed in c9954c9 because it
           duplicated the nav link and pushed the search input down).
@@ -264,7 +269,6 @@ export default async function HomePage({ params }: { params: { country: string }
       <Suspense fallback={<CategoryGridSkeleton />}>
         <CategoryGrid country={country} />
       </Suspense>
-      <AmazonPromo country={country} />
       <StoreLogos country={country} />
       <NewsletterStrip />
       <CTA country={country} />

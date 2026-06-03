@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import JsonLd from "@/components/seo/JsonLd";
-import HubProductGrid from "@/components/hub/HubProductGrid";
+import AmazonDealsBrowser from "@/components/hub/AmazonDealsBrowser";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import { getCountry, ACTIVE_COUNTRIES } from "@/lib/country";
-import { fetchAmazonHubOffers } from "@/lib/hubs";
+import { fetchAllAmazonOffers } from "@/lib/hubs";
 import {
   SITE_URL,
   buildHreflangAlternates,
@@ -16,12 +16,13 @@ import type { SeoDeal } from "@/lib/seo";
 /* Amazon deals hub — /[country]/amazon.
 
    A CamelCamelCamel-style landing that promotes our Amazon affiliate
-   relationship HONESTLY: it surfaces real Amazon markdowns shoppable in
-   the visitor's market, but every card links to a Havlo PDP that carries
-   the product's price history (so a "deal" can be checked, not trusted on
-   faith) and an affiliate "Buy on Amazon" button. Amazon is cross-border
-   for NG/IN/ZA, so fetchAmazonHubOffers applies the full reachability
-   filter — see lib/hubs.ts. */
+   relationship HONESTLY: it surfaces every real Amazon markdown we track
+   across all marketplaces (UK / US / AE / IN / DE / ZA), filterable by
+   country + category and sortable, and every card links to a Havlo PDP
+   that carries the product's price history (so a "deal" can be checked,
+   not trusted on faith) plus an affiliate "Buy on Amazon" button. The
+   filtering/sorting is client-side over the full set — see
+   AmazonDealsBrowser + fetchAllAmazonOffers. */
 export const revalidate = 10800; // 3h — Amazon markdowns move faster than brand hubs
 
 export function generateStaticParams() {
@@ -36,7 +37,7 @@ export async function generateMetadata({
   const country = getCountry(params.country);
   const url = `${SITE_URL}/${country.code}/amazon`;
   const title = `Amazon deals in ${country.name}: checked against price history`;
-  const description = `The biggest Amazon price drops shoppable in ${country.name}, each checked against its price history so a deal is really a deal. See if Amazon is the cheapest before you buy.`;
+  const description = `Every Amazon price drop we track across the UK, US, India and more, each checked against its price history. Filter by country and category, sorted by the biggest real discount.`;
   return {
     title,
     description,
@@ -55,7 +56,7 @@ export default async function AmazonDealsPage({
   params: { country: string };
 }) {
   const country = getCountry(params.country);
-  const offers = await fetchAmazonHubOffers(country.code);
+  const offers = await fetchAllAmazonOffers();
 
   const breadcrumb = buildBreadcrumbList([
     { name: "Havlo",      url: `${SITE_URL}/${country.code}` },
@@ -74,7 +75,7 @@ export default async function AmazonDealsPage({
     currency:        d.currency,
     discountPercent: d.discountPercent,
   }));
-  const itemList = buildItemListJsonLd(seoDeals, `Amazon deals in ${country.name} on Havlo`);
+  const itemList = buildItemListJsonLd(seoDeals, "Amazon deals on Havlo");
 
   return (
     <main className="bg-bg">
@@ -92,8 +93,8 @@ export default async function AmazonDealsPage({
           </ol>
         </nav>
 
-        {/* Hero */}
-        <header className="mb-8 max-w-2xl">
+        {/* Hero — one benefit headline + one informative line. */}
+        <header className="mb-6 max-w-2xl">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-3 mb-3">
             <span className="relative flex h-2 w-2" aria-hidden="true">
               <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 motion-safe:animate-ping" />
@@ -105,36 +106,18 @@ export default async function AmazonDealsPage({
             Save on your next Amazon purchase
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-base leading-relaxed">
-            The biggest Amazon price drops you can shop from {country.name},
-            updated through the day. Tap any item to see its full price
-            history, so you can tell a real markdown from a &ldquo;was&rdquo;
-            price that quietly crept up first, and check whether another
-            store beats Amazon before you buy.
+            Every Amazon price drop we track, checked against its price
+            history. Tap any item to see the full history before you buy.
           </p>
         </header>
 
-        {/* Honesty strip — the CamelCamelCamel value, in our voice. */}
-        <div className="mb-8 grid gap-3 sm:grid-cols-3">
-          {[
-            { t: "Verified by price history", d: "Every deal links to a chart of what it actually cost over time, so an inflated “discount” has nowhere to hide." },
-            { t: "Amazon vs everyone else",   d: "We show the same product at other stores too, so you only buy from Amazon when Amazon is genuinely the best price." },
-            { t: "Shoppable from " + country.name, d: "Only Amazon offers that actually ship to your market, priced in your currency at the spot rate." },
-          ].map((c) => (
-            <div key={c.t} className="rounded-xl border border-border bg-surface p-4">
-              <p className="text-sm font-semibold text-ink mb-1">{c.t}</p>
-              <p className="text-[13px] text-ink-3 leading-relaxed">{c.d}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Grid → real PDPs (price history + affiliate "Buy on Amazon"). */}
+        {/* Browser — client-side filter (country + category) + sort. */}
         {offers.length > 0 ? (
-          <HubProductGrid deals={offers} countryCode={country.code} />
+          <AmazonDealsBrowser deals={offers} countryCode={country.code} />
         ) : (
           <div className="rounded-2xl border border-border bg-surface p-8 text-center">
             <p className="text-ink-2 text-sm">
-              No Amazon price drops shoppable in {country.name} right now. Check
-              back soon, or{" "}
+              No Amazon price drops right now. Check back soon, or{" "}
               <Link href={`/${country.code}/deals`} className="text-ink underline underline-offset-4">
                 browse all deals
               </Link>.
@@ -144,20 +127,10 @@ export default async function AmazonDealsPage({
 
         {/* Affiliate disclosure — FTC + payout-neutral promise (#73). */}
         <p className="mt-8 text-[12px] text-ink-3 leading-relaxed max-w-2xl">
-          As an Amazon Associate, Havlo may earn a commission from qualifying
-          purchases made through links on this page, at no extra cost to you.
-          It never changes which deals we show or how we rank prices. If
-          another store is cheaper, we say so.
+          As an Amazon Associate, Havlo may earn from qualifying purchases,
+          at no extra cost to you. It never changes which deals we show or
+          how we rank prices.
         </p>
-
-        <div className="mt-6">
-          <Link
-            href={`/${country.code}/deals`}
-            className="text-sm text-ink underline underline-offset-4 decoration-ink/40 hover:decoration-ink"
-          >
-            See all deals in {country.name} →
-          </Link>
-        </div>
       </section>
 
       <NewsletterStrip />

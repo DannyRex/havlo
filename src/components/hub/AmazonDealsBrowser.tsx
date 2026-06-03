@@ -1,0 +1,259 @@
+"use client";
+
+/* AmazonDealsBrowser — client-side filter/sort over the full Amazon
+   markdown set (~350 offers, all marketplaces) that the /[country]/amazon
+   page hands down as props.
+
+   Everything runs in-memory: the corpus is small and bounded, so
+   filtering by category + marketplace country and re-sorting is instant
+   with no round-trips. Cards reveal in pages of REVEAL_STEP to keep the
+   DOM light; "Show more" grows the window.
+
+   Prices are all USD upstream, so sorting on the raw salePrice is a
+   consistent order regardless of the per-visitor display currency
+   MasonryCard converts to. */
+
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, Globe, ArrowUpDown } from "lucide-react";
+import MasonryCard from "@/components/deals/MasonryCard";
+import { pdpUrlForDeal } from "@/lib/pdp-url";
+import { categories as ALL_CATEGORIES } from "@/lib/data/categories";
+import { cn, formatCount } from "@/lib/utils";
+import type { Deal } from "@/types";
+
+type SortKey = "discount" | "price-asc" | "price-desc" | "newest";
+
+const SORTS: { value: SortKey; label: string }[] = [
+  { value: "discount",   label: "Biggest discount" },
+  { value: "price-asc",  label: "Price: low to high" },
+  { value: "price-desc", label: "Price: high to low" },
+  { value: "newest",     label: "Newest" },
+];
+
+/* Amazon marketplace code → display name. Keyed on store_country, which
+   the data carries for every Amazon row. Falls back to the raw code for
+   any marketplace not listed here. */
+const MARKET_LABEL: Record<string, string> = {
+  UK: "United Kingdom",
+  US: "United States",
+  AE: "UAE",
+  IN: "India",
+  DE: "Germany",
+  ZA: "South Africa",
+  NG: "Nigeria",
+};
+
+const REVEAL_STEP = 48;
+
+export default function AmazonDealsBrowser({
+  deals,
+  countryCode,
+}: {
+  deals: Deal[];
+  countryCode: string;
+}) {
+  const [cat, setCat] = useState("all");
+  const [market, setMarket] = useState("all");
+  const [sort, setSort] = useState<SortKey>("discount");
+  const [reveal, setReveal] = useState(REVEAL_STEP);
+
+  /* Category chips: the canonical list, narrowed to those actually
+     present in the Amazon set (keeps order + display names). */
+  const catOptions = useMemo(() => {
+    const present = new Set(deals.map((d) => d.categorySlug));
+    return ALL_CATEGORIES.filter((c) => c.slug === "all" || present.has(c.slug));
+  }, [deals]);
+
+  /* Country options: distinct marketplaces present, alphabetised by
+     display name. */
+  const marketOptions = useMemo(() => {
+    const codes = Array.from(
+      new Set(deals.map((d) => d.storeCountry).filter(Boolean) as string[]),
+    );
+    codes.sort((a, b) =>
+      (MARKET_LABEL[a] ?? a).localeCompare(MARKET_LABEL[b] ?? b),
+    );
+    return codes;
+  }, [deals]);
+
+  const filtered = useMemo(() => {
+    let out = deals;
+    if (cat !== "all") out = out.filter((d) => d.categorySlug === cat);
+    if (market !== "all") out = out.filter((d) => d.storeCountry === market);
+    const arr = [...out];
+    switch (sort) {
+      case "price-asc":
+        arr.sort((a, b) => a.salePrice - b.salePrice);
+        break;
+      case "price-desc":
+        arr.sort((a, b) => b.salePrice - a.salePrice);
+        break;
+      case "newest":
+        arr.sort(
+          (a, b) =>
+            new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime(),
+        );
+        break;
+      default:
+        arr.sort((a, b) => b.discountPercent - a.discountPercent);
+    }
+    return arr;
+  }, [deals, cat, market, sort]);
+
+  /* Reset the reveal window whenever the result SET changes (category
+     or country). Re-sorting keeps the window — same items, new order. */
+  useEffect(() => {
+    setReveal(REVEAL_STEP);
+  }, [cat, market]);
+
+  const visible = filtered.slice(0, reveal);
+  const clearFilters = () => {
+    setCat("all");
+    setMarket("all");
+  };
+
+  return (
+    <div>
+      {/* Category chips */}
+      <div className="flex gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
+        {catOptions.map((c) => {
+          const active = cat === c.slug;
+          return (
+            <button
+              key={c.slug}
+              type="button"
+              onClick={() => setCat(c.slug)}
+              aria-pressed={active}
+              className={cn(
+                "shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium border whitespace-nowrap transition-colors",
+                active
+                  ? "bg-ink text-bg border-ink"
+                  : "bg-surface-2 text-ink-2 border-border hover:text-ink",
+              )}
+            >
+              {c.name}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Count + country/sort controls */}
+      <div className="mt-3 mb-4 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[13px] text-ink-3 tabular-nums">
+          {formatCount(filtered.length)} {filtered.length === 1 ? "deal" : "deals"}
+        </p>
+        <div className="flex items-center gap-2">
+          {marketOptions.length > 1 && (
+            <FilterSelect
+              icon={Globe}
+              ariaLabel="Filter by country"
+              value={market}
+              onChange={setMarket}
+              options={[
+                { value: "all", label: "All countries" },
+                ...marketOptions.map((m) => ({
+                  value: m,
+                  label: MARKET_LABEL[m] ?? m,
+                })),
+              ]}
+            />
+          )}
+          <FilterSelect
+            icon={ArrowUpDown}
+            ariaLabel="Sort deals"
+            value={sort}
+            onChange={(v) => setSort(v as SortKey)}
+            options={SORTS}
+          />
+        </div>
+      </div>
+
+      {/* Grid */}
+      {visible.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
+          {visible.map((deal, i) => (
+            <MasonryCard
+              key={deal.id}
+              deal={deal}
+              aspect="aspect-[4/5]"
+              priority={i < 4}
+              linkHref={pdpUrlForDeal(countryCode, deal)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-border bg-surface px-6 py-12 text-center">
+          <p className="text-ink-2 text-sm">
+            No Amazon deals match these filters.
+          </p>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="mt-3 text-[13px] text-ink underline underline-offset-4 decoration-ink/40 hover:decoration-ink"
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
+
+      {/* Show more */}
+      {filtered.length > visible.length && (
+        <div className="mt-6 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setReveal((r) => r + REVEAL_STEP)}
+            className="px-5 py-2.5 rounded-full border border-border bg-surface-2 text-ink-2 text-[13px] font-semibold hover:text-ink hover:border-ink/40 transition-colors"
+          >
+            Show {Math.min(REVEAL_STEP, filtered.length - visible.length)} more
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Compact native-select pill — leading purpose icon, trailing chevron.
+   Native <select> keeps it accessible + mobile-friendly (opens the OS
+   picker, no iOS focus-zoom the way text inputs have) with zero popover
+   code. */
+function FilterSelect<T extends string>({
+  icon: Icon,
+  ariaLabel,
+  value,
+  onChange,
+  options,
+}: {
+  icon: typeof Globe;
+  ariaLabel: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <div className="relative inline-flex items-center">
+      <Icon
+        size={13}
+        strokeWidth={2.25}
+        aria-hidden="true"
+        className="pointer-events-none absolute left-2.5 text-ink-3"
+      />
+      <select
+        aria-label={ariaLabel}
+        value={value}
+        onChange={(e) => onChange(e.target.value as T)}
+        className="appearance-none rounded-full border border-border bg-surface-2 text-ink-2 hover:text-ink text-xs font-medium pl-7 pr-7 py-1.5 outline-none focus:border-brand cursor-pointer transition-colors"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown
+        size={13}
+        aria-hidden="true"
+        className="pointer-events-none absolute right-2 text-ink-3"
+      />
+    </div>
+  );
+}

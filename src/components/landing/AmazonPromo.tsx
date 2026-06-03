@@ -25,9 +25,8 @@ export default function AmazonPromo({ country }: { country: Country }) {
                 Save on your next Amazon purchase
               </h2>
               <p className="text-sm sm:text-base text-ink-2 mt-1.5 max-w-2xl">
-                The biggest Amazon price drops in {country.name}, each checked
-                against its price history, so a discount is real, not a
-                &ldquo;was&rdquo; price that quietly crept up first.
+                Every Amazon price drop we track, checked against its real
+                price history.
               </p>
             </div>
             <span className="shrink-0 inline-flex items-center gap-1.5 text-sm font-semibold text-ink group-hover:gap-2.5 transition-all">
