@@ -724,16 +724,11 @@ export default function PriceComparisonBar({
 
       {/* ── Range labels ───────────────────────────────────────── */}
       {isSingleStore ? (
-        <div className="flex items-center justify-between text-[11px] text-ink-3 tabular-nums mb-3">
+        <div className="flex items-center text-[11px] text-ink-3 tabular-nums mb-3">
           <span>
             {formatPriceForUser(thisPriceNgn, country)}
             <span className="ml-1 opacity-70">listed here</span>
           </span>
-          {/* Right-side label completes the framing — when comparisons
-             arrive (new ingest, new merchant added) the spectrum
-             populates automatically. Said proactively here so the
-             user understands the bar is empty by design, not broken. */}
-          <span className="opacity-60">we&apos;ll add more as sellers list it</span>
         </div>
       ) : allTiedPrices ? (
         /* Tied across all stores — single centred label. The
@@ -868,7 +863,7 @@ export default function PriceComparisonBar({
       {/* ── Single-store hint ──────────────────────────────────── */}
       {isSingleStore && (
         <p className="text-[12px] text-ink-2 mb-3">
-          Havlo couldn&apos;t find this exact product at another store yet. The verdict will update if a cheaper or pricier listing surfaces.
+          We&apos;ll compare prices here as more stores list it.
         </p>
       )}
 
@@ -917,8 +912,7 @@ export default function PriceComparisonBar({
       {anyXBorder && (
         <p className="mt-2.5 text-[11px] text-ink-3 leading-relaxed">
           <span className="text-amber-500">⚑</span>{" "}
-          Cross-border totals are a rough estimate: the price plus about 30% for shipping and customs.
-          What you pay varies by carrier, item weight, and customs.
+          Cross-border total is a rough estimate: roughly +30% for shipping and customs, which varies.
         </p>
       )}
       {/* When the visiting offer itself is cross-border but no
@@ -928,8 +922,7 @@ export default function PriceComparisonBar({
       {!anyXBorder && thisIsCrossBorder && (
         <p className="mt-2.5 text-[11px] text-ink-3 leading-relaxed">
           <span className="text-amber-500">⚑</span>{" "}
-          This offer ships across borders, so the total is a rough estimate: the price
-          plus about 30% for shipping and customs, which varies by carrier and customs.
+          Ships across borders, so the total is a rough estimate: roughly +30% for shipping and customs, which varies.
         </p>
       )}
     </div>

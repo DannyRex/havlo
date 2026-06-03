@@ -2,9 +2,9 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { categories } from "@/lib/data/categories";
 import CategoryTileLink from "./CategoryTileLink";
+import CategoryCount from "./CategoryCount";
 import { type Country } from "@/lib/country";
 import { SITE_URL } from "@/lib/seo";
-import { formatCount } from "@/lib/utils";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
   BeautyIcon, SportsIcon, EarbudsIcon, ElectronicsIcon, HealthIcon,
@@ -211,7 +211,12 @@ export default async function CategoryGrid({ country }: { country: Country }) {
                       {cat.name}
                     </p>
                     <p className="text-[11px] sm:text-xs text-ink-3 mt-0.5 tabular-nums">
-                      {formatCount(count)} deals
+                      {/* SSR `count` paints first (drives the count-sorted
+                          order above + no-flash); CategoryCount then
+                          refreshes it from the live /api/deals the All-tab
+                          reads, so the tile can't drift from the All-tab
+                          count after a data change. */}
+                      <CategoryCount countryCode={country.code} slug={cat.slug} initial={count} />
                     </p>
                   </div>
                 </div>

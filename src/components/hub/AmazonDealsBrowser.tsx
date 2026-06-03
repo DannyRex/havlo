@@ -21,14 +21,33 @@ import { categories as ALL_CATEGORIES } from "@/lib/data/categories";
 import { cn, formatCount } from "@/lib/utils";
 import type { Deal } from "@/types";
 
-type SortKey = "discount" | "price-asc" | "price-desc" | "newest";
+type SortKey = "recommended" | "discount" | "price-asc" | "price-desc" | "newest";
 
 const SORTS: { value: SortKey; label: string }[] = [
-  { value: "discount",   label: "Biggest discount" },
-  { value: "price-asc",  label: "Price: low to high" },
-  { value: "price-desc", label: "Price: high to low" },
-  { value: "newest",     label: "Newest" },
+  { value: "recommended", label: "Recommended" },
+  { value: "discount",    label: "Biggest discount" },
+  { value: "price-asc",   label: "Price: low to high" },
+  { value: "price-desc",  label: "Price: high to low" },
+  { value: "newest",      label: "Newest" },
 ];
+
+/* In-place Fisher-Yates with a seeded RNG (mulberry32) — deterministic
+   for a given seed so re-renders are stable, but a fresh per-visit seed
+   reshuffles the "Recommended" order each visit. */
+function seededShuffle<T>(arr: T[], seed: number): void {
+  let s = seed >>> 0;
+  const rng = () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
 
 /* Amazon marketplace code → display name. Keyed on store_country, which
    the data carries for every Amazon row. Falls back to the raw code for
@@ -54,8 +73,16 @@ export default function AmazonDealsBrowser({
 }) {
   const [cat, setCat] = useState("all");
   const [market, setMarket] = useState("all");
-  const [sort, setSort] = useState<SortKey>("discount");
+  const [sort, setSort] = useState<SortKey>("recommended");
   const [reveal, setReveal] = useState(REVEAL_STEP);
+  /* Per-visit shuffle seed for "Recommended". Null on the server + first
+     client paint (so SSR and hydration both use the deterministic prop
+     order), then set once post-mount so the order reshuffles each visit
+     without a hydration mismatch. */
+  const [shuffleSeed, setShuffleSeed] = useState<number | null>(null);
+  useEffect(() => {
+    setShuffleSeed(Math.floor(Math.random() * 2 ** 31));
+  }, []);
 
   /* Category chips: the canonical list, narrowed to those actually
      present in the Amazon set (keeps order + display names). */
@@ -82,6 +109,9 @@ export default function AmazonDealsBrowser({
     if (market !== "all") out = out.filter((d) => d.storeCountry === market);
     const arr = [...out];
     switch (sort) {
+      case "discount":
+        arr.sort((a, b) => b.discountPercent - a.discountPercent);
+        break;
       case "price-asc":
         arr.sort((a, b) => a.salePrice - b.salePrice);
         break;
@@ -95,10 +125,14 @@ export default function AmazonDealsBrowser({
         );
         break;
       default:
-        arr.sort((a, b) => b.discountPercent - a.discountPercent);
+        /* "recommended" — keep the server's discount-ranked order until
+           the client seed lands, then shuffle per visit so repeat
+           visitors see a fresh mix (the strongest deals still seeded the
+           list, they're just no longer always top-to-bottom). */
+        if (shuffleSeed !== null) seededShuffle(arr, shuffleSeed);
     }
     return arr;
-  }, [deals, cat, market, sort]);
+  }, [deals, cat, market, sort, shuffleSeed]);
 
   /* Reset the reveal window whenever the result SET changes (category
      or country). Re-sorting keeps the window — same items, new order. */

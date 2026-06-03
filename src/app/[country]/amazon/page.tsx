@@ -3,6 +3,7 @@ import Link from "next/link";
 import JsonLd from "@/components/seo/JsonLd";
 import AmazonDealsBrowser from "@/components/hub/AmazonDealsBrowser";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
+import ScrollToTopButton from "@/components/ui/ScrollToTopButton";
 import { getCountry, ACTIVE_COUNTRIES } from "@/lib/country";
 import { fetchAllAmazonOffers } from "@/lib/hubs";
 import {
@@ -134,6 +135,11 @@ export default async function AmazonDealsPage({
       </section>
 
       <NewsletterStrip />
+
+      {/* Back-to-top FAB — the browser can reveal a long, paginated
+          grid, so give the visitor a one-tap way back up (parity with
+          /deals). */}
+      <ScrollToTopButton />
     </main>
   );
 }
