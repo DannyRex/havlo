@@ -29,6 +29,7 @@ import { cache } from "react";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { isSyntheticId } from "@/lib/pdp-url";
 import { categories } from "@/lib/data/categories";
+import { filterDealsForCountry, getCountry } from "@/lib/country";
 import type { Deal } from "@/types";
 
 /* Columns pulled from product_best_offers — the subset needed to
@@ -239,6 +240,44 @@ export const fetchBrandHubOffers = cache(async (
     return [];
   }
   return dealsFromRows((data ?? []) as HubRow[]);
+});
+
+/* ── Amazon hub offers ────────────────────────────────────────────
+   Amazon-store markdowns reachable from the given country — powers the
+   /[country]/amazon affiliate landing.
+
+   Unlike the category/brand hubs, Amazon is a CROSS-BORDER store for
+   several markets: NG / IN / ZA have no local Amazon but reach
+   amazon.com / .co.uk / .ae. The tight shoppableOr above (local ∪
+   true-globals-with-null-country) would wrongly exclude those
+   foreign-anchored Amazon marketplaces. So here we pull every Amazon
+   markdown and apply filterDealsForCountry — the SAME broad reachability
+   filter /deals uses — so each market sees exactly the Amazon offers it
+   can actually buy. Sorted biggest-markdown first; the cards still link
+   to real PDPs (price-history + the affiliate "Buy on Amazon" button). */
+export const fetchAmazonHubOffers = cache(async (
+  countryCode: string,
+  limit:       number = HUB_GRID_LIMIT,
+): Promise<Deal[]> => {
+  const supa = getSupabaseAdmin();
+  if (!supa) return [];
+  const { data, error } = await supa
+    .from("product_best_offers")
+    .select(HUB_COLS)
+    .ilike("store_id", "amazon%")
+    .gt("discount_percent", 0)
+    .order("discount_percent", { ascending: false, nullsFirst: false })
+    .order("scraped_at", { ascending: false })
+    /* Overfetch: the reachability filter below drops the Amazon
+       marketplaces this market can't shop, so pull a wide slice first. */
+    .limit(Math.min(limit * 6, 600));
+  if (error) {
+    console.warn(`[hubs] amazon (${countryCode}) error:`, error.message);
+    return [];
+  }
+  const deals   = dealsFromRows((data ?? []) as HubRow[]);
+  const country = getCountry(countryCode);
+  return filterDealsForCountry(deals, country, undefined).slice(0, limit);
 });
 
 /* ── Brand catalogue per country ──────────────────────────────────

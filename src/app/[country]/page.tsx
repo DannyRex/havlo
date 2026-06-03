@@ -7,6 +7,7 @@ import TrendingDeals, { getTrendingBuckets } from "@/components/landing/Trending
 import { composePicks } from "@/components/landing/trending-compose";
 import CashbackTeaser from "@/components/landing/CashbackTeaser";
 import CategoryGrid from "@/components/landing/CategoryGrid";
+import AmazonPromo from "@/components/landing/AmazonPromo";
 import StoreLogos, { getStoreCountForCountry } from "@/components/landing/StoreLogos";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import CTA from "@/components/landing/CTA";
@@ -263,6 +264,7 @@ export default async function HomePage({ params }: { params: { country: string }
       <Suspense fallback={<CategoryGridSkeleton />}>
         <CategoryGrid country={country} />
       </Suspense>
+      <AmazonPromo country={country} />
       <StoreLogos country={country} />
       <NewsletterStrip />
       <CTA country={country} />

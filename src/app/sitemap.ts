@@ -111,6 +111,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     alternates:     { languages: buildHreflangAlternates("compare") },
   }));
 
+  /* Amazon affiliate hub — /[country]/amazon. One per market.
+     Daily-ish change frequency: Amazon markdowns move faster than the
+     brand hubs but slower than the live /deals feed. */
+  const amazonPages: MetadataRoute.Sitemap = ACTIVE_COUNTRIES.map((c) => ({
+    url:            `${SITE_URL}/${c.code}/amazon`,
+    priority:       0.8,
+    changeFrequency: "daily",
+    lastModified:   now,
+    alternates:     { languages: buildHreflangAlternates("amazon") },
+  }));
+
   /* Global routes — country-independent, no hreflang variants.
      /blog dropped from here: it now redirects to /[country]/blog,
      which is the canonical surface emitted below. */
@@ -275,6 +286,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...homepages,
     ...dealsPages,
     ...comparePages,
+    ...amazonPages,
     ...globalRoutes,
     ...blogIndexRoutes,
     ...blogPostRoutes,
