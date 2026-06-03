@@ -419,10 +419,14 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
         <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-ink-3 mb-0.5 sm:mb-1 leading-none min-w-0">
           <span className="font-medium text-ink-2 truncate">{displayStore}</span>
           <span aria-hidden="true" className="shrink-0 hidden sm:inline">·</span>
-          {/* suppressHydrationWarning — timeAgo reads Date.now() at
-              render. SSR/CSR can disagree at minute/day boundaries.
-              Visual UX identical; this just silences the warning. */}
-          <span className="shrink-0 hidden sm:inline" suppressHydrationWarning>{timeAgo(deal.postedAt)}</span>
+          {/* Last-verified time. Was `hidden sm:inline` — desktop only —
+              which dropped the freshness cue from mobile cards. Now shown
+              on every breakpoint: `ml-auto` pins it to the far right on
+              mobile (where the · separator is hidden), and `sm:ml-0`
+              restores the inline "store · time" layout desktop already
+              had. suppressHydrationWarning — timeAgo reads Date.now(), so
+              SSR/CSR can differ at a minute/day boundary; harmless. */}
+          <span className="shrink-0 ml-auto sm:ml-0" suppressHydrationWarning>{timeAgo(deal.postedAt)}</span>
         </div>
 
         <p className="text-[12px] sm:text-[13px] font-medium text-ink leading-snug line-clamp-2 mb-1 sm:mb-1.5 tracking-[-0.005em]">

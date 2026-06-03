@@ -185,9 +185,11 @@ export default function ListCard({ deal, linkHref }: Props) {
 
       {/* Right column — store · time, title, price row */}
       <div className="flex-1 min-w-0 py-1">
-        <div className="flex items-center gap-1 text-[11px] text-ink-3 leading-none">
+        {/* Store (left) + last-verified time pinned to the far right —
+            matches the masonry card's mobile layout (justify-between, no
+            inline · separator). */}
+        <div className="flex items-center justify-between gap-1.5 text-[11px] text-ink-3 leading-none">
           <span className="font-medium truncate text-ink-2">{displayStore}</span>
-          <span aria-hidden="true">·</span>
           {/* suppressHydrationWarning — same SSR/CSR Date.now()
               divergence as the masonry version. */}
           <span className="shrink-0" suppressHydrationWarning>{timeAgo(deal.postedAt)}</span>
