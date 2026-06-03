@@ -32,13 +32,15 @@ export default function CategoryCount({
 
   useEffect(() => {
     let alive = true;
-    fetch(
-      `/api/deals?country=${countryCode}&category=${encodeURIComponent(slug)}&origin=all&limit=1`,
-    )
+    /* All tiles hit the SAME /api/category-counts URL, so the browser/CDN
+       serves one cached response to all of them (one origin compute) and
+       each reads its own slug. Same pool-derived number the /deals All-tab
+       shows, so the tile stays aligned with the count after click-through. */
+    fetch(`/api/category-counts?country=${countryCode}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        const all = d?.originCounts?.all;
-        if (alive && typeof all === "number") setCount(all);
+        const n = d?.counts?.[slug];
+        if (alive && typeof n === "number") setCount(n);
       })
       .catch(() => {
         /* keep the SSR value */

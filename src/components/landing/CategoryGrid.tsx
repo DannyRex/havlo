@@ -94,25 +94,24 @@ const browsable = categories.filter((c) => c.slug !== "all" && !c.hidden);
        are cheap cache hits — which is what lets the homepage ISR stay short
        (fast refresh) without extra DB load. On a (rare) fetch failure we fall
        back to 0; the tile stays clickable and /deals handles the empty state. */
+/*  v8 (now): a SINGLE call to /api/category-counts instead of N calls to
+    the full /api/deals handler. Same pool-derived numbers (origin='all'),
+    but that endpoint skips the ~1.1s store-dropdown RPC and does the
+    per-category fan-out in one in-process Promise.all rather than N HTTP
+    self-fetches. The June-2026 perf audit flagged the old N-fetch pattern
+    as the single highest-cost thing on the homepage. */
 async function fetchCategoryCounts(country: Country): Promise<Record<string, number>> {
-  const slugs = browsable.map((c) => c.slug);
-  const entries = await Promise.all(
-    slugs.map(async (slug): Promise<[string, number]> => {
-      try {
-        const res = await fetch(
-          `${SITE_URL}/api/deals?country=${country.code}&category=${encodeURIComponent(slug)}&origin=all`,
-          { next: { revalidate: 120 } },
-        );
-        if (!res.ok) return [slug, 0];
-        const data = await res.json();
-        const all = data?.originCounts?.all;
-        return [slug, typeof all === "number" ? all : 0];
-      } catch {
-        return [slug, 0];
-      }
-    }),
-  );
-  return Object.fromEntries(entries);
+  try {
+    const res = await fetch(
+      `${SITE_URL}/api/category-counts?country=${country.code}`,
+      { next: { revalidate: 120 } },
+    );
+    if (!res.ok) return {};
+    const data = await res.json();
+    return (data?.counts ?? {}) as Record<string, number>;
+  } catch {
+    return {};
+  }
 }
 
 /* `country` arrives as a prop from the page so this component stays
