@@ -315,11 +315,12 @@ export default function TrendingDeals({
           </Link>
         </div>
 
-        {/* Card grid is a client component: it picks 16 randomly from
-            the buckets on every fresh page load, so per-visit variety
-            isn't capped by the ISR window the way the old 6-variant
-            composition was. The first HEAD cards are deterministic +
-            eager so one owns the LCP. */}
+        {/* Card grid is a client component: it re-picks ALL 16 cards on
+            every fresh page load (founder direction June 2026 — full
+            rotation, nothing pinned; the left column used to be a static
+            4-card head), so per-visit variety isn't capped by the ISR
+            window. The server still preloads the SSR lead's image so the
+            first paint is fast even though the client then reshuffles. */}
         <TrendingDealsGrid buckets={buckets} />
 
         <div className="mt-8 text-center sm:hidden">

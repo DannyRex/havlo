@@ -55,8 +55,6 @@ import AnimateIn from "@/components/ui/AnimateIn";
 import {
   type TrendingBuckets,
   composePicks,
-  composeTail,
-  HEAD,
 } from "./trending-compose";
 
 /* Re-exported so existing importers (TrendingDeals) can keep pulling
@@ -64,44 +62,48 @@ import {
 export type { TrendingBuckets };
 
 export default function TrendingDealsGrid({ buckets }: { buckets: TrendingBuckets }) {
-  /* Deterministic, identical on server + client → the HEAD slice is
-     hydration-stable and ships in the SSR HTML. */
+  /* SSR-stable deterministic order — identical on server + the FIRST
+     client render so hydration matches and the server-preloaded lead
+     image (composePicks[0]) is the one painted first. */
   const base = useMemo(() => composePicks(buckets, false), [buckets]);
 
-  /* null until the mount effect runs. While null, the tail falls back
-     to base.slice(HEAD) so SSR and the first client render match. */
-  const [tail, setTail] = useState<Deal[] | null>(null);
-
+  /* Re-pick the WHOLE grid on mount so EVERY card — including the
+     top-left lead — is fresh per visit (founder direction June 2026:
+     full rotation, nothing pinned). The OLD code pinned a 4-card HEAD;
+     because CSS columns fill top-to-bottom, that head WAS the left
+     column, so it never rotated while the rest did. null until the mount
+     effect so SSR + the first client render both use `base` (no hydration
+     mismatch + the server-preloaded lead paints first); then it swaps to
+     a fresh random pick. Not on an interval — never reshuffles
+     mid-session. */
+  const [picks, setPicks] = useState<Deal[] | null>(null);
   useEffect(() => {
-    /* Re-pick the tail once on mount for per-visit freshness. The head
-       stays put. Not on an interval — the grid never reshuffles under
-       the user mid-session. */
-    setTail(composeTail(buckets, base.slice(0, HEAD)));
-  }, [buckets, base]);
+    setPicks(composePicks(buckets, true));
+  }, [buckets]);
 
-  const deals = [...base.slice(0, HEAD), ...(tail ?? base.slice(HEAD))];
+  const deals = picks ?? base;
   if (deals.length === 0) return null;
 
-  /* Single render via CSS columns (not three media-query-hidden DOM
-     copies): column-count picks the column count per viewport from
-     one rendering, and break-inside-avoid keeps each card intact.
-     The first HEAD cards render eager (priority) with no AnimateIn
-     wrapper so they paint immediately and one owns the LCP; the rest
-     fade in. */
+  /* CSS columns fill column-major, i.e. top-to-bottom down each column
+     before moving right — that's the reading order we want. The top-left
+     card renders eager (priority, no fade) so the homepage paints a lead
+     image fast; every card rotates per visit, and the rest fade in with a
+     gentle, low stagger so the grid reveals as a soft top-to-bottom wash
+     rather than a left-column-first block. */
   return (
     <div className="columns-2 sm:columns-3 lg:columns-4 gap-2 sm:gap-3 lg:gap-4 [column-fill:_balance]">
       {deals.map((d, i) => {
-        const isHead = i < HEAD;
+        const isLead = i === 0;
         const card = (
           <MasonryCard
             deal={d}
             aspect={MASONRY_ASPECTS[i % MASONRY_ASPECTS.length]}
-            priority={isHead}
+            priority={isLead}
           />
         );
         return (
           <div key={d.id} className="break-inside-avoid mb-2 sm:mb-3 lg:mb-4">
-            {isHead ? card : <AnimateIn delay={Math.min(i, 6) * 60}>{card}</AnimateIn>}
+            {isLead ? card : <AnimateIn delay={Math.min(i, 8) * 30}>{card}</AnimateIn>}
           </div>
         );
       })}
