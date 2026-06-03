@@ -61,6 +61,10 @@ interface InitialDealsBundle {
   hasMore:      boolean;
   originCounts: { all: number; local: number; intl: number } | undefined;
   storeOptions: Array<{ id: string; name: string; count: number }> | undefined;
+  /* True when /api/deals served the degraded curated-Amazon fallback.
+     Forwarded to DealFeed so it refetches client-side instead of
+     seeding a bogus empty/Amazon-only first paint. */
+  degraded:     boolean;
 }
 async function fetchInitialDeals(
   params: { country: string; category?: string; tier?: string; sort?: string; search?: string; origin?: string; stores?: string },
@@ -142,6 +146,7 @@ async function fetchInitialDeals(
       hasMore:      j.hasMore ?? false,
       originCounts: j.originCounts,
       storeOptions: Array.isArray(j.stores) ? j.stores : undefined,
+      degraded:     j.degraded === true,
     };
   } catch (err) {
     /* Same rationale — surface the underlying error to Vercel
@@ -330,6 +335,7 @@ export default async function DealsPage({
           initialOriginCounts={initial?.originCounts}
           initialStoreOptions={initial?.storeOptions}
           initialComparison={comparison}
+          initialDegraded={initial?.degraded}
         />
       </Suspense>
 

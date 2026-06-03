@@ -841,6 +841,13 @@ export async function GET(req: NextRequest) {
         stores: storesAggregate,
         provider: provider.id,
         suggestions,
+        /* True when the browse_deals RPC fell through to the curated
+           Amazon-only catalogue (a transient pool failure). The SSR
+           prefetch passes this to DealFeed so a degraded first paint
+           triggers a client refetch instead of sticking on a bogus
+           empty/Amazon-only view (the "Local is empty until I toggle"
+           bug, June 2026). */
+        degraded: looksLikeCuratedFallback,
         /* displayCurrency — the currency every item SHOULD be presented
            in to the requesting visitor. Added May 2026 v3 to harden
            the latent risk for downstream API consumers. Items still

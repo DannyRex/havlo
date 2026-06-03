@@ -109,6 +109,11 @@ interface DealFeedProps {
      a CompareAnchorCard header above the grid while the on-page search
      still matches this query. null/absent → grid only. */
   initialComparison?: { anchor: ProductGroup; query: string } | null;
+  /* True when the SSR /api/deals prefetch returned the degraded
+     curated-Amazon fallback (a transient pool failure). Forces a client
+     refetch on mount instead of seeding the bogus pool — see
+     hasUsableInitial below. */
+  initialDegraded?: boolean;
 }
 
 export default function DealFeed({
@@ -118,6 +123,7 @@ export default function DealFeed({
   initialOriginCounts,
   initialStoreOptions,
   initialComparison,
+  initialDegraded,
 }: DealFeedProps = {}) {
   /* Read initial filter state from URL params so /deals?category=phones
      (linked from homepage CategoryGrid tiles) lands on the correct
@@ -192,19 +198,44 @@ export default function DealFeed({
      server) so first paint shows real cards, not the skeleton. When
      props are absent (legacy callers, dev paths) we fall back to the
      old empty-array + loading=true behaviour. */
-  const [items, setItems]       = useState<Deal[]>(initialItems ?? []);
-  const [total, setTotal]       = useState(initialTotal ?? 0);
-  const [hasMore, setHasMore]   = useState(initialHasMore ?? false);
-  /* loading=false on first render IF we have server-passed items.
-     The first useEffect would otherwise re-fetch immediately and
-     show the skeleton anyway; we'll suppress that with a ref. */
-  const [loading, setLoading]   = useState(!initialItems);
+  /* Is the SSR seed trustworthy enough to keep + skip the first client
+     refetch (the no-flicker optimisation)?
+
+     Trustworthy when the prefetch actually responded, it ISN'T the
+     degraded curated-Amazon fallback, AND it's either real content OR a
+     legitimately-empty SEARCH result (an empty search is a real "no
+     matches" state with its own live-search recovery below).
+
+     NOT trustworthy — so seed empty + loading + let the mount fetch
+     recover — when:
+       • the prefetch failed entirely (initialItems undefined), or
+       • a non-search BROWSE view came back EMPTY (the catalog holds
+         thousands of local deals, so an empty default view is a
+         transient pool blip, not reality), or
+       • the response was the degraded curated-Amazon fallback.
+     This is what stops a momentary pool failure from stranding the page
+     on "No deals match those filters" until the user toggles a filter
+     and back (June 2026 bug). */
+  const seedProvided   = Array.isArray(initialItems);
+  const seedItems      = initialItems ?? [];
+  const seedHasContent = seedItems.length > 0;
+  const isSearchView   = initialSearch.trim().length > 0;
+  const seedIsTrustworthy =
+    seedProvided && !initialDegraded && (seedHasContent || isSearchView);
+
+  const [items, setItems]       = useState<Deal[]>(seedIsTrustworthy ? seedItems : []);
+  const [total, setTotal]       = useState(seedIsTrustworthy ? (initialTotal ?? 0) : 0);
+  const [hasMore, setHasMore]   = useState(seedIsTrustworthy ? (initialHasMore ?? false) : false);
+  /* loading=false on first render IF the seed is trustworthy. Otherwise
+     show the skeleton and let the mount fetch repopulate. */
+  const [loading, setLoading]   = useState(!seedIsTrustworthy);
   const [loadingMore, setLoadingMore] = useState(false);
   /* Track whether we've consumed the SSR'd initial fetch yet. The
      filter-change effect below skips its first run when this is
-     unset AND initialItems was provided — so the user doesn't see
-     a content → skeleton → content flicker on first paint. */
-  const hasConsumedInitialRef = useRef(!initialItems);
+     unset AND a trustworthy seed was provided — so the user doesn't see
+     a content → skeleton → content flicker on first paint. An
+     untrustworthy seed leaves this true, so the mount fetch runs. */
+  const hasConsumedInitialRef = useRef(!seedIsTrustworthy);
 
   const [category, setCategory] = useState(initialCategory);
   const [tier, setTier]         = useState<DiscountTier>(initialTier);
@@ -225,7 +256,7 @@ export default function DealFeed({
     useState<{
       all: number; local: number; intl: number;
       allDeals?: number; localDeals?: number; intlDeals?: number;
-    } | undefined>(initialOriginCounts);
+    } | undefined>(seedIsTrustworthy ? initialOriginCounts : undefined);
   /* Did-you-mean suggestions returned by /api/deals when the result
      list is empty AND a search query is present. Populates the
      pills on EmptySearchState. Empty array = no pills, falls back
@@ -298,7 +329,7 @@ export default function DealFeed({
   /* All stores currently available in the filtered pool. Comes back
      in the /api/deals response alongside items + counts. Empty until
      the first fetch lands. */
-  const [storeOptions, setStoreOptions] = useState<StoreOption[]>(initialStoreOptions ?? []);
+  const [storeOptions, setStoreOptions] = useState<StoreOption[]>(seedIsTrustworthy ? (initialStoreOptions ?? []) : []);
 
   /* Mobile-only view-mode toggle (grid masonry vs list rows). Tablet +
      desktop always show masonry — toggle UI is hidden via sm:hidden.
@@ -972,8 +1003,8 @@ export default function DealFeed({
           )}
 
           {/* Right cluster — desktop only. Mobile sort lives in the
-              view-mode toggle row right above the grid (grid/list
-              left, sort right). */}
+              view-mode toggle row below (still inside this sticky bar,
+              grid/list left, sort right). */}
           <div className="hidden sm:flex items-center gap-3 flex-shrink-0 ml-auto">
             {!loading && (
               <span className="text-xs text-ink-3 tabular-nums">
@@ -1011,6 +1042,60 @@ export default function DealFeed({
             </div>
           </div>
         </div>
+
+        {/* Mobile-only "shape this view" row — view-mode toggle (left)
+            + Sort (right). Lives INSIDE the sticky bar so the sort stays
+            pinned while scrolling, matching the CategoryNav above (June
+            2026 fix: it was a separate non-sticky row that scrolled away).
+            Desktop's sort sits in the row above, so this is sm:hidden. */}
+        <div className="mt-3 flex items-center justify-between gap-3 sm:hidden">
+          <div
+            role="group"
+            aria-label="View mode"
+            className="flex items-center gap-0.5 rounded-full bg-surface-2 border border-border p-0.5"
+          >
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              aria-label="Grid view"
+              aria-pressed={viewMode === "grid"}
+              className={`p-1.5 rounded-full transition-colors ${
+                viewMode === "grid"
+                  ? "bg-bg text-ink shadow-card"
+                  : "text-ink-3 hover:text-ink-2"
+              }`}
+            >
+              <LayoutGrid size={14} strokeWidth={viewMode === "grid" ? 2.5 : 2} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              aria-label="List view"
+              aria-pressed={viewMode === "list"}
+              className={`p-1.5 rounded-full transition-colors ${
+                viewMode === "list"
+                  ? "bg-bg text-ink shadow-card"
+                  : "text-ink-3 hover:text-ink-2"
+              }`}
+            >
+              <List size={14} strokeWidth={viewMode === "list" ? 2.5 : 2} />
+            </button>
+          </div>
+
+          <div className="relative">
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortOption)}
+              aria-label="Sort deals"
+              className="appearance-none bg-surface-2 border border-border rounded-full pl-3.5 pr-8 py-1.5 text-xs text-ink hover:border-border-strong outline-none cursor-pointer transition-colors"
+            >
+              {SORTS.map(({ value, label }) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-3 text-[10px]">▾</span>
+          </div>
+        </div>
       </div>
 
       {/* Category subscribe widget — appears whenever the user has
@@ -1029,59 +1114,6 @@ export default function DealFeed({
           />
         );
       })()}
-
-      {/* Mobile-only row above the grid: view-mode toggle on the
-          LEFT, Sort dropdown on the RIGHT. Grouped together because
-          both control how the grid below looks — feels like one
-          "shape this view" line. */}
-      <div className="flex items-center justify-between gap-3 mb-3 sm:hidden">
-        <div
-          role="group"
-          aria-label="View mode"
-          className="flex items-center gap-0.5 rounded-full bg-surface-2 border border-border p-0.5"
-        >
-          <button
-            type="button"
-            onClick={() => setViewMode("grid")}
-            aria-label="Grid view"
-            aria-pressed={viewMode === "grid"}
-            className={`p-1.5 rounded-full transition-colors ${
-              viewMode === "grid"
-                ? "bg-bg text-ink shadow-card"
-                : "text-ink-3 hover:text-ink-2"
-            }`}
-          >
-            <LayoutGrid size={14} strokeWidth={viewMode === "grid" ? 2.5 : 2} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("list")}
-            aria-label="List view"
-            aria-pressed={viewMode === "list"}
-            className={`p-1.5 rounded-full transition-colors ${
-              viewMode === "list"
-                ? "bg-bg text-ink shadow-card"
-                : "text-ink-3 hover:text-ink-2"
-            }`}
-          >
-            <List size={14} strokeWidth={viewMode === "list" ? 2.5 : 2} />
-          </button>
-        </div>
-
-        <div className="relative">
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortOption)}
-            aria-label="Sort deals"
-            className="appearance-none bg-surface-2 border border-border rounded-full pl-3.5 pr-8 py-1.5 text-xs text-ink hover:border-border-strong outline-none cursor-pointer transition-colors"
-          >
-            {SORTS.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-          <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-3 text-[10px]">▾</span>
-        </div>
-      </div>
 
       {/* Initial skeletons — match the loaded grid shape exactly so
           there's zero layout shift when items resolve. CSS Grid at

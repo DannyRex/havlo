@@ -251,6 +251,73 @@ const ORIGIN_COUNTS_TTL_MS = 5 * 60 * 1000;
 const ORIGIN_COUNTS_MAX_ENTRIES = 200;
 const originCountsCache = new Map<string, { value: OriginCounts; expires: number }>();
 
+/* ── Cross-border (Pass B) pool cache ──────────────────────────────
+   Pass B (browse_deals origin='intl', country=null) is the heaviest of
+   the three passes: it scans the whole is_international=true set (~6.7k
+   rows) and runs ~1-3s with high variance, regularly blowing the 2.5s
+   per-pass budget. When it times out, the merged pool loses EVERY
+   cross-border row, so the /deals "International" tab collapses to 0
+   (or to the few curated-Amazon rows) until the pool cache cycles —
+   the "intl deals not displaying" bug (June 2026).
+
+   Two properties make a dedicated cache the right fix:
+     1. Pass B is COUNTRY-BLIND (p_country=null) — one result serves all
+        six markets, so caching it once removes redundant slow RPCs.
+     2. Serving the last-good result on a timeout means a single slow
+        fetch can't empty the intl bucket.
+
+   Keyed on the country-invariant inputs only (category/sort/search/
+   discount/stores). Non-empty results cache for the standard pool TTL;
+   on timeout we fall back to the last-good value even if expired, so
+   intl only ever shows empty if Pass B has NEVER succeeded. */
+const INTL_POOL_TTL_MS = 5 * 60 * 1000;
+/* Generous vs the 2.5s per-pass budget: Pass B p95 is ~3s, it runs in
+   PARALLEL with the fast Pass A/C, and the result is cached + shared
+   across markets — so only a cold-cache fetch pays this, once per
+   window. Still well under Vercel's 30s ceiling. */
+const INTL_POOL_TIMEOUT_MS = 4000;
+const intlPoolCache = new Map<string, { data: BestOfferRow[]; expires: number }>();
+
+async function fetchCrossBorderPool(
+  supa: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  passBArgs: Record<string, unknown>,
+): Promise<BestOfferRow[]> {
+  const key = JSON.stringify({
+    cat:  passBArgs.p_category ?? null,
+    sort: passBArgs.p_sort ?? null,
+    q:    passBArgs.p_search ?? null,
+    min:  passBArgs.p_min_discount ?? 0,
+    st:   passBArgs.p_store_ids ?? null,
+  });
+  const now = Date.now();
+  const cached = intlPoolCache.get(key);
+  if (cached && cached.expires > now) return cached.data;
+
+  const res = await withTimeout(
+    supa.rpc("browse_deals", passBArgs) as unknown as Promise<{ data: unknown; error: { message: string } | null }>,
+    INTL_POOL_TIMEOUT_MS,
+    { data: null, error: { message: "timeout" } },
+    "browse_deals(intl)",
+  );
+  if (!res.error && Array.isArray(res.data)) {
+    const rows = res.data as unknown as BestOfferRow[];
+    /* Cache only NON-empty results — a transient empty/timeout must not
+       pin the intl bucket to 0 for the full TTL. */
+    if (rows.length > 0) {
+      intlPoolCache.set(key, { data: rows, expires: now + INTL_POOL_TTL_MS });
+      if (intlPoolCache.size > 16) {
+        intlPoolCache.forEach((v, k) => { if (v.expires <= now) intlPoolCache.delete(k); });
+      }
+    }
+    return rows;
+  }
+  /* Timeout/error: serve last-good (even if expired) so one slow fetch
+     can't empty the International tab. */
+  if (cached) return cached.data;
+  console.warn("[browse-db] Pass B (intl) failed, no cached fallback:", res.error?.message ?? "unknown");
+  return [];
+}
+
 export const dbBrowseProvider: BrowseProvider = {
   id: "db-products",
   name: "DB (live ingested products)",
@@ -469,9 +536,12 @@ export const dbBrowseProvider: BrowseProvider = {
        bar and degrade to the curated-only fallback. See FetchDealsOptions. */
     const TIMEOUT_MS = opts?.timeoutMs ?? 2500;
     const TIMEOUT_FALLBACK: RpcResp = { data: null, error: { message: "timeout" } };
-    const [passAResult, passBResult, passCResult, popularity] = await Promise.all([
+    const [passAResult, intlRows, passCResult, popularity] = await Promise.all([
       withTimeout(supa.rpc("browse_deals", passAArgs) as unknown as Promise<RpcResp>, TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(local)"),
-      withTimeout(supa.rpc("browse_deals", passBArgs) as unknown as Promise<RpcResp>, TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(intl)"),
+      /* Pass B (cross-border) goes through its own shared, country-blind
+         cache with stale-on-timeout — see fetchCrossBorderPool. Returns
+         the rows directly (not an RpcResp). */
+      fetchCrossBorderPool(supa, passBArgs),
       runPassC
         ? withTimeout(supa.rpc("browse_deals", passCArgs) as unknown as Promise<RpcResp>, TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(zero-disc)")
         : Promise.resolve(TIMEOUT_FALLBACK),
@@ -519,9 +589,9 @@ export const dbBrowseProvider: BrowseProvider = {
       /* Intentionally NO early return. Fall through so Pass B (intl)
          and Pass C (0%-local) rows survive a Pass A timeout. */
     }
-    if (passBResult.error) {
-      console.warn("[browse-db] browse_deals Pass B RPC error:", passBResult.error.message);
-    }
+    /* Pass B errors/timeouts are handled inside fetchCrossBorderPool
+       (it serves the last-good cross-border rows), so there's no
+       passBResult to inspect here. */
     if (runPassC && passCResult.error) {
       console.warn("[browse-db] browse_deals Pass C RPC error:", passCResult.error.message);
     }
@@ -562,7 +632,7 @@ export const dbBrowseProvider: BrowseProvider = {
       if (i < passCRows.length) interleaved.push(passCRows[i]);
     }
     merge(interleaved);
-    merge(passBResult.data as unknown as BestOfferRow[] | null);
+    merge(intlRows);
 
     /* Drop offers whose URL points at Google Shopping (legacy SerpAPI
        ingest residue). Without SerpAPI to resolve, those clicks land
