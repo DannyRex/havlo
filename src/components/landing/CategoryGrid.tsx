@@ -116,9 +116,14 @@ const fetchCategoryCounts = (country: Country) =>
       );
       return Object.fromEntries(entries);
     },
-    ["category-counts-v6-pool", country.code, browsable.map((c) => c.slug).join(",")],
+    ["category-counts-v7-pool", country.code, browsable.map((c) => c.slug).join(",")],
     {
-      revalidate: 1800, // 30 min — counts only move on ingest; keeps per-category pool pulls infrequent
+      /* 5 min. (The earlier 30-min TTL made the tile lag the /deals pill
+         badly after a data change — a fresh deploy or ingest could leave
+         the homepage showing the OLD count for half an hour while /deals
+         already showed the new one. The page is ISR-cached on top of this,
+         so the visible lag is ~the homepage revalidate window.) */
+      revalidate: 300,
       tags:       ["category-counts"],
     },
   );
