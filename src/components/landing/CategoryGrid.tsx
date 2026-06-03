@@ -1,10 +1,9 @@
-import { unstable_cache } from "next/cache";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { categories } from "@/lib/data/categories";
 import CategoryTileLink from "./CategoryTileLink";
-import { type Country, filterDealsForCountry } from "@/lib/country";
-import { getActiveBrowseProvider } from "@/lib/providers";
+import { type Country } from "@/lib/country";
+import { SITE_URL } from "@/lib/seo";
 import { formatCount } from "@/lib/utils";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
@@ -82,58 +81,46 @@ const browsable = categories.filter((c) => c.slug !== "all" && !c.hidden);
          filterDealsForCountry, whose broader cross-border set the tight
          head count under-counted (NG appliances tile 79 vs 192 shown).
 
-   v6 (now): compute the count the EXACT way /deals does — pull each
-         category's browse pool via provider.fetchDeals and run it through
-         filterDealsForCountry, then take `.length`. Tile == /api/deals
-         originCounts.all == deals displayed, by construction (the same two
-         functions, no separate count path that can drift). Cached 30 min
-         since counts only move on ingest (daily / twice-weekly).
+   v6: compute the count locally the EXACT way /deals does (provider.fetchDeals
+       + filterDealsForCountry). Correct, but a SEPARATE in-process cache on a
+       SEPARATE ISR cycle from /deals, so the tile and the pill could still
+       drift by their cache windows after a data change.
 
-   Cache key includes the country code so /uk and /ng don't
-   collide. Cache tag `category-counts` lets a future cron call
-   revalidateTag('category-counts') after each ingest run if we
-   want sub-5min freshness. */
-const fetchCategoryCounts = (country: Country) =>
-  unstable_cache(
-    async (): Promise<Record<string, number>> => {
-      const slugs = browsable.map((c) => c.slug);
-      /* Count each category EXACTLY as /deals does: fetch the category's
-         browse pool and run it through filterDealsForCountry — the same
-         provider.fetchDeals + country filter the route uses to build its
-         All-tab pill AND the displayed grid. So tile == All-tab pill ==
-         deals shown. On error we fall back to 0 (the tile stays clickable
-         and /deals handles the empty state). */
-      const provider = await getActiveBrowseProvider();
-      const entries = await Promise.all(
-        slugs.map(async (slug): Promise<readonly [string, number]> => {
-          try {
-            const pool = await provider.fetchDeals({ categorySlug: slug, sort: "relevance", country: country.code });
-            return [slug, filterDealsForCountry(pool, country, undefined).length] as const;
-          } catch {
-            return [slug, 0] as const;
-          }
-        }),
-      );
-      return Object.fromEntries(entries);
-    },
-    ["category-counts-v7-pool", country.code, browsable.map((c) => c.slug).join(",")],
-    {
-      /* 5 min. (The earlier 30-min TTL made the tile lag the /deals pill
-         badly after a data change — a fresh deploy or ingest could leave
-         the homepage showing the OLD count for half an hour while /deals
-         already showed the new one. The page is ISR-cached on top of this,
-         so the visible lag is ~the homepage revalidate window.) */
-      revalidate: 300,
-      tags:       ["category-counts"],
-    },
+   v7 (now): read the count straight from the SAME /api/deals endpoint /deals
+       reads — `originCounts.all` from that exact response. The tile isn't just
+       computed the same way, it's the SAME NUMBER from the SAME source, so it
+       cannot diverge from the All-tab pill. That endpoint is edge-cached (~60s)
+       + POOL_CACHE (5min) and shared with real /deals traffic, so these N reads
+       are cheap cache hits — which is what lets the homepage ISR stay short
+       (fast refresh) without extra DB load. On a (rare) fetch failure we fall
+       back to 0; the tile stays clickable and /deals handles the empty state. */
+async function fetchCategoryCounts(country: Country): Promise<Record<string, number>> {
+  const slugs = browsable.map((c) => c.slug);
+  const entries = await Promise.all(
+    slugs.map(async (slug): Promise<[string, number]> => {
+      try {
+        const res = await fetch(
+          `${SITE_URL}/api/deals?country=${country.code}&category=${encodeURIComponent(slug)}&origin=all`,
+          { next: { revalidate: 120 } },
+        );
+        if (!res.ok) return [slug, 0];
+        const data = await res.json();
+        const all = data?.originCounts?.all;
+        return [slug, typeof all === "number" ? all : 0];
+      } catch {
+        return [slug, 0];
+      }
+    }),
   );
+  return Object.fromEntries(entries);
+}
 
 /* `country` arrives as a prop from the page so this component stays
    statically renderable per /[country]/. The cookies() read here
    was the biggest single source of dynamic-SSR pressure — 60 RPCs
    per visit on a route that should be ISR-cached. */
 export default async function CategoryGrid({ country }: { country: Country }) {
-  const counts = await fetchCategoryCounts(country)();
+  const counts = await fetchCategoryCounts(country);
 
   return (
     <section className="py-12 sm:py-20 bg-bg">

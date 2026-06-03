@@ -49,7 +49,13 @@ import { proxiedImageUrl, downscaleCardImageUrl } from "@/lib/utils";
    Suspense (Hero streams immediately, only TrendingDeals +
    CategoryGrid sections wait for DB) so user-perceived TTFB is
    barely affected. */
-export const revalidate = 900;
+/* Lowered 900 -> 300 (June 2026) so the homepage category-count tiles
+   track the /deals All-tab pill closely (the user's "tile says 8 but the
+   grid loads 75" report — that gap was the 15-min ISR window serving an
+   old count). Affordable now because CategoryGrid reads the EDGE-CACHED
+   /api/deals (originCounts.all) instead of fanning out to the DB itself,
+   so a cold render at 300s is cheap cache hits, not fresh pool pulls. */
+export const revalidate = 300;
 
 export function generateStaticParams() {
   return COUNTRIES.map((c) => ({ country: c.code }));
