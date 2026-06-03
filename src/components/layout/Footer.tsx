@@ -23,6 +23,9 @@ const footerSections = [
     title: "Product",
     links: [
       { label: "Browse deals",  href: "/deals" },
+      /* Amazon deals hub — /[cc]/amazon. Bare /amazon is countrified by
+         middleware (added to COUNTRY_SCOPED) like /deals + /compare. */
+      { label: "Amazon deals",  href: "/amazon" },
       { label: "Find for less", href: "/compare" },
       /* Shop by brand — entry point into the brand-hub system (M2 SEO
          de-orphaning). Root-relative; middleware countrifies to
