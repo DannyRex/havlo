@@ -286,18 +286,18 @@ export default function TrendingDeals({
           <div>
             <div className="flex items-center gap-2 mb-1.5">
               <span className="relative flex h-2 w-2" aria-hidden="true">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 animate-ping" />
+                <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 motion-safe:animate-ping" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
               </span>
               <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-success">
-                Live
+                Trending now
               </span>
             </div>
             <h2 className="text-[26px] sm:text-3xl font-bold text-ink tracking-[-0.025em] leading-tight">
               Never overpay shopping online
             </h2>
             <p className="text-sm sm:text-base text-ink-2 mt-1.5 hidden sm:block">
-              Trending now: the biggest price drops we&apos;ve found across stores today.
+              The biggest price drops we&apos;ve found across stores today.
             </p>
           </div>
           {/* Country-prefixed href — a bare /deals would get bounced

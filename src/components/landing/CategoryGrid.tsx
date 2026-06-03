@@ -3,8 +3,8 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { categories } from "@/lib/data/categories";
 import CategoryTileLink from "./CategoryTileLink";
-import { type Country, isCrossBorderStore } from "@/lib/country";
-import { getSupabaseAdmin } from "@/lib/providers/db-client";
+import { type Country } from "@/lib/country";
+import { getActiveBrowseProvider } from "@/lib/providers";
 import { formatCount } from "@/lib/utils";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
@@ -66,33 +66,23 @@ const browsable = categories.filter((c) => c.slug !== "all" && !c.hidden);
          a pre-launch QA pass correctly flagged as "looks hardcoded".
          NG differed only because its 10 stores are is_international=false.
 
-   v4 (now): HEAD COUNT keyed on the two signals that actually vary
-         per market, mirroring filterDealsForCountry's two dominant
-         branches:
+     v4: HEAD COUNT on the `offers` table keyed on country-anchored OR a
+         per-market isCrossBorderStore allowlist. Distinct per country,
+         but it counted a DIFFERENT thing than /deals: `offers` rows
+         (multiple per product) with an allowlist intl set — whereas the
+         /deals all-tab pill counts `product_best_offers` (ONE row per
+         product) with intl = is_international AND store_country IS NULL.
+         So a tile's "N deals" never matched the count the visitor saw
+         after clicking through (user report June 2026: "count on the
+         deals-by-category card is different from the all tab count").
 
-           a) stores.country ILIKE '<cc>'   (anchored in this market)
-           b) stores.id IN (<cross-border set for this market>)
-
-         The cross-border set is resolved once per render from the
-         same isCrossBorderStore() allowlist /deals uses — so IN stays
-         tight (Shein banned, 3-store list) while UK/US/ZA/AE get the
-         China globals + Amazon-Global + ASOS + eBay variants their
-         shoppers can actually reach. Counts are now distinct per
-         country (e.g. fashion: NG 3.0k / UK 2.7k / US 2.4k / IN 0.16k
-         / ZA 2.1k / AE 2.1k) and track what the visitor sees after
-         clicking through to /deals.
-
-   Trade-off: still a *simplification* of filterDealsForCountry — it
-   omits the long-tail branches (native-roster substring match,
-   country: tags, untagged-currency fallback) that contribute a few
-   percent. That direction is safe: the tile slightly UNDER-promises
-   vs the full /deals filter rather than the old over-promise (the
-   "ZA shows 600 / /deals shows 21" class of bug). The tile click
-   lands on /deals which applies the full filter.
-
-   Egress: one ~60 KB stores fetch (id, name, country for ~1000 rows)
-   per render to resolve the cross-border set, then N zero-row HEAD
-   COUNTs. Cached 5 min per country, so amortised to near-free.
+   v5 (now): call the SAME getOriginCounts the /deals all-tab pill uses,
+         per category, and read `.all`. The tile number is now equal BY
+         CONSTRUCTION to the post-click /deals?...&origin=all count — same
+         function, same table, same country-aware intl rule. getOriginCounts
+         is memoised on a shared filter key, so the homepage render warms
+         the cache /deals reuses; cheaper than the old bespoke ~60 KB
+         stores fetch + per-category offers HEAD COUNT.
 
    Cache key includes the country code so /uk and /ng don't
    collide. Cache tag `category-counts` lets a future cron call
@@ -101,61 +91,27 @@ const browsable = categories.filter((c) => c.slug !== "all" && !c.hidden);
 const fetchCategoryCounts = (country: Country) =>
   unstable_cache(
     async (): Promise<Record<string, number>> => {
-      const supa = getSupabaseAdmin();
       const slugs = browsable.map((c) => c.slug);
-      if (!supa) {
-        return Object.fromEntries(slugs.map((s) => [s, 0]));
-      }
-
-      const upperCountry = country.code.toUpperCase();
-
-      /* Resolve this market's cross-border store UUIDs once. The stores
-         table is small (~1000 rows); we pull id+name+country and match
-         each store against the country's cross-border allowlist using
-         the exact isCrossBorderStore predicate /deals relies on. This
-         is what makes the per-country counts diverge instead of all
-         collapsing to the shared intl pool. */
-      const { data: storeRows } = await supa
-        .from("stores")
-        .select("id, name, country");
-      const crossBorderIds: string[] = [];
-      for (const s of storeRows ?? []) {
-        const name = (s as { name: string | null }).name ?? "";
-        if (isCrossBorderStore({ storeId: name, storeName: name, currency: "", tags: [] }, country.code)) {
-          crossBorderIds.push((s as { id: string }).id);
-        }
-      }
-
-      /* country-anchored OR on this market's cross-border set. When the
-         cross-border set is empty (shouldn't happen for our 6 markets,
-         but guard anyway) fall back to the anchor clause alone so the
-         filter stays valid. */
-      const orFilter = crossBorderIds.length > 0
-        ? `country.ilike.${upperCountry},id.in.(${crossBorderIds.join(",")})`
-        : `country.ilike.${upperCountry}`;
-
-      /* Per-category HEAD COUNT. `count: 'exact'` returns the
-         true count from Postgres; `head: true` transfers zero
-         rows back. The OR is scoped to the joined stores row via
-         PostgREST's foreignTable option. */
-      const counts: Record<string, number> = {};
-      await Promise.all(
-        slugs.map(async (slug) => {
-          const { count, error } = await supa
-            .from("offers")
-            .select("id, products!inner(category_slug), stores!inner(id, country)", {
-              count: "exact",
-              head:  true,
-            })
-            .eq("in_stock", true)
-            .eq("products.category_slug", slug)
-            .or(orFilter, { foreignTable: "stores" });
-          counts[slug] = error ? 0 : (count ?? 0);
+      /* Resolve the SAME browse provider /api/deals uses, then ask it for
+         each category's origin counts and read `.all`. Identical function,
+         table (product_best_offers) and country-aware intl rule as the
+         /deals all-tab pill, so the tile count matches by construction.
+         On a failed/empty count we fall the tile back to 0 (honest: it
+         stays clickable and the deals page handles the empty state). */
+      const provider = await getActiveBrowseProvider();
+      const entries = await Promise.all(
+        slugs.map(async (slug): Promise<readonly [string, number]> => {
+          try {
+            const oc = await provider.getOriginCounts({ categorySlug: slug, country: country.code });
+            return [slug, oc.all ?? 0] as const;
+          } catch {
+            return [slug, 0] as const;
+          }
         }),
       );
-      return counts;
+      return Object.fromEntries(entries);
     },
-    ["category-counts-v4", country.code, browsable.map((c) => c.slug).join(",")],
+    ["category-counts-v5-origincounts", country.code, browsable.map((c) => c.slug).join(",")],
     {
       revalidate: 300, // 5 min — tighter than the page's 30-min ISR
       tags:       ["category-counts"],
