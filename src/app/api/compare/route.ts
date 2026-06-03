@@ -156,24 +156,26 @@ async function synthesizeAnchorFromOfferRow(row: OfferRow): Promise<SearchOutput
   const partition = supaDeep && row.product_id
     ? await partitionDupesByVariantMatchDeep(
         supaDeep,
-        { id: row.product_id, title: row.title, brand: row.brand, priceNgn: visitingOffer.landedPrice },
+        { id: row.product_id, title: row.title, brand: row.brand, priceNgn: visitingOffer.price },
         dupes,
       )
     : partitionDupesByVariantMatch(
-        { title: row.title, brand: row.brand, priceNgn: visitingOffer.landedPrice },
+        { title: row.title, brand: row.brand, priceNgn: visitingOffer.price },
         dupes,
       );
   const rawAugmented = [visitingOffer, ...variantOffers(partition.likelyVariants)];
 
-  /* Dedupe by (storeId, rounded landed price) — same logic as the
+  /* Dedupe by (storeId, rounded RAW price) — same logic as the
      PDP's dedupAnchorOffers. QA report May 2026 found 4 identical
      93mobiles offers inflating storeCount to 4 when only 1 unique
      store-price existed. Round to nearest 100 NGN to collapse
-     trivial FX-rounding differences. */
+     trivial FX-rounding differences. Raw basis (#16/#123) so the
+     anchor's price math matches the listed price, not the landed
+     estimate. */
   const dedupSeen = new Set<string>();
   const augmentedOffers = rawAugmented.filter((o) => {
-    if (o.landedPrice <= 0) return false;
-    const key = `${o.storeId}|${Math.round(o.landedPrice / 100) * 100}`;
+    if (o.price <= 0) return false;
+    const key = `${o.storeId}|${Math.round(o.price / 100) * 100}`;
     if (dedupSeen.has(key)) return false;
     dedupSeen.add(key);
     return true;
@@ -202,8 +204,8 @@ async function synthesizeAnchorFromOfferRow(row: OfferRow): Promise<SearchOutput
     storageGb:     null,
     inches:        null,
     storeCount:    augmentedOffers.length,
-    bestPrice:     augmentedOffers.length > 0 ? Math.min(...augmentedOffers.map((o) => o.landedPrice)) : visitingOffer.landedPrice,
-    worstPrice:    augmentedOffers.length > 0 ? Math.max(...augmentedOffers.map((o) => o.landedPrice)) : visitingOffer.landedPrice,
+    bestPrice:     augmentedOffers.length > 0 ? Math.min(...augmentedOffers.map((o) => o.price)) : visitingOffer.price,
+    worstPrice:    augmentedOffers.length > 0 ? Math.max(...augmentedOffers.map((o) => o.price)) : visitingOffer.price,
     maxSavings:    0,
     offers:        augmentedOffers,
   };

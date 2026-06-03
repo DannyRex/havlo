@@ -223,7 +223,7 @@ export default async function LivePdpPage({ params, searchParams }: PageProps) {
   const normaliseTitle = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, "");
   const filteredDupes = countryFilteredDupes.filter((d) => {
     if (offer.title && normaliseTitle(d.title) === normaliseTitle(offer.title)) return false;
-    const best = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
+    const best = [...d.offers].sort((a, b) => a.price - b.price)[0]; // raw basis (#16/#123)
     const id = best?.offerId || (best?.storeId + ":" + d.key);
     if (seenIds.has(id)) return false;
     seenIds.add(id);

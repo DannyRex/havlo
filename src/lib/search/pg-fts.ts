@@ -386,8 +386,14 @@ function buildAnchorGroup(p: AnchorProduct): ProductGroup {
        that the category floor misses. The signal is conservative
        — only kicks in when the title matches a known flagship line. */
     .filter((o) => priceLooksPlausible(o.price, p.category_slug ?? "general", p.title))
-    .sort((a, b) => a.landedPrice - b.landedPrice);
-  const prices = offers.map((o) => o.landedPrice);
+    /* Raw price basis (#16/#123): bestPrice, worstPrice, and the dupe
+       "save" badge lead with the listed price, NOT the +30% cross-border
+       landed estimate, so the compare anchor, spectrum, chart, and dupe
+       cards all agree on the same "cheapest". The cross-border surcharge
+       is surfaced separately via landedCostExtra on the card, never baked
+       into the headline. */
+    .sort((a, b) => a.price - b.price);
+  const prices = offers.map((o) => o.price);
   return {
     key:            p.id,
     title:          p.title,
@@ -407,7 +413,7 @@ function buildAnchorGroup(p: AnchorProduct): ProductGroup {
 
 function ftsRowToDupe(row: FtsRow, anchor: ProductGroup): DupeResult {
   const offer = ftsRowToSingleOffer(row);
-  const rawSavings = Math.max(0, anchor.bestPrice - offer.landedPrice);
+  const rawSavings = Math.max(0, anchor.bestPrice - offer.price);
   const rawPercent = anchor.bestPrice > 0
     ? Math.max(0, Math.round((rawSavings / anchor.bestPrice) * 100))
     : 0;
@@ -431,8 +437,8 @@ function ftsRowToDupe(row: FtsRow, anchor: ProductGroup): DupeResult {
     storageGb:      null,
     inches:         null,
     storeCount:     1,
-    bestPrice:      offer.landedPrice,
-    worstPrice:     offer.landedPrice,
+    bestPrice:      offer.price,
+    worstPrice:     offer.price,
     maxSavings:     0,
     offers:         [offer],
     similarityScore: Math.min(100, Math.round(row.rank * 60)),
@@ -1134,8 +1140,8 @@ export async function pgFtsFindByProductId(
        variant offers can shift either extreme. storeCount stays
        informational; the compare anchor card derives its display
        count from offers.length directly. */
-    bestPrice:  augmentedOffers.length > 0 ? Math.min(...augmentedOffers.map((o) => o.landedPrice)) : anchor.bestPrice,
-    worstPrice: augmentedOffers.length > 0 ? Math.max(...augmentedOffers.map((o) => o.landedPrice)) : anchor.worstPrice,
+    bestPrice:  augmentedOffers.length > 0 ? Math.min(...augmentedOffers.map((o) => o.price)) : anchor.bestPrice,
+    worstPrice: augmentedOffers.length > 0 ? Math.max(...augmentedOffers.map((o) => o.price)) : anchor.worstPrice,
     storeCount: augmentedOffers.length,
   };
 

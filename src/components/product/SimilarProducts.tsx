@@ -39,11 +39,13 @@ interface Props {
    products. The compare page already does the per-offer breakdown
    when the user wants that level of detail. */
 function dupeToDeal(d: DupeResult): Deal {
-  /* Sort the dupe's offers by landed price (price + cross-border
-     shipping/customs estimate) so the card surfaces the truly
-     cheapest option including delivery. landedPrice falls back to
-     price when the offer isn't international. */
-  const best = [...d.offers].sort((a, b) => a.landedPrice - b.landedPrice)[0];
+  /* Pick the cheapest offer by RAW listed price (#16/#123) so the
+     card's headline (best.price) is actually the lowest price shown,
+     matching the spectrum/chart/compare basis. Sorting by landed here
+     while displaying best.price below could otherwise surface an offer
+     that ISN'T the cheapest listed price. The cross-border surcharge is
+     disclosed separately on the card, not folded into the sort. */
+  const best = [...d.offers].sort((a, b) => a.price - b.price)[0];
 
   return {
     /* Use the BEST offer's real offer_id so the card's link target
