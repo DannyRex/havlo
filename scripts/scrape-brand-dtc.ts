@@ -103,7 +103,7 @@ const BRAND_SKUS: BrandSku[] = [
   { brand: "dyson", brandName: "Dyson", storeId: "dyson-uk", storeName: "Dyson", country: "uk", currency: "USD",
     url: "https://www.dyson.co.uk/vacuum-cleaners/sticks/dyson-v15/detect-absolute-new",
     title: "Dyson V15 Detect Absolute Cordless Vacuum",
-    category: "Electronics", categorySlug: "electronics", // appliances merged into electronics (May 2026)
+    category: "Appliances", categorySlug: "appliances", // vacuum → appliances (split back out June 2026)
     fallbackPrice: 749 },
   { brand: "dyson", brandName: "Dyson", storeId: "dyson-uk", storeName: "Dyson", country: "uk", currency: "USD",
     url: "https://www.dyson.co.uk/hair-care/stylers/airwrap/multi-styler-complete-long",

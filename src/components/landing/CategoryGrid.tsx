@@ -9,6 +9,7 @@ import { formatCount } from "@/lib/utils";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
   BeautyIcon, SportsIcon, EarbudsIcon, ElectronicsIcon, HealthIcon,
+  AppliancesIcon,
 } from "@/components/ui/CategoryIcons";
 import type { ComponentType } from "react";
 
@@ -17,6 +18,7 @@ type IconComp = ComponentType<{ size?: number; className?: string }>;
 const ICON_FOR: Record<string, IconComp> = {
   phones:      PhoneIcon,
   electronics: ElectronicsIcon,
+  appliances:  AppliancesIcon,
   gaming:      GamingIcon,
   fashion:     FashionIcon,
   home:        HomeIcon,
@@ -32,11 +34,13 @@ const ICON_FOR: Record<string, IconComp> = {
    the data layer + /deals CategoryNav chips without disturbing the
    homepage grid's count/layout.
 
-   Health was hidden while the grid held 10 browsable tiles (an 11th
-   orphaned a tile on the 2- and 5-col breakpoints). The May 2026
-   Appliances→Electronics merge dropped the grid to 9, freeing the
-   slot — so Health is now promoted out of `hidden` and back to a
-   clean 10-tile grid. */
+   Grid balance: 10 browsable tiles keep the 2- and 5-col breakpoints
+   even (an 11th orphans a tile). June 2026 split Appliances back OUT of
+   Electronics (it had grown well past the thin inventory that drove the
+   May merge), so Appliances retakes a tile and Health goes back to
+   `hidden` — restoring the clean 10-tile grid. Health stays a /deals
+   CategoryNav chip + hub (CategoryNav doesn't honour `hidden`), so it
+   loses only its homepage tile. */
 const browsable = categories.filter((c) => c.slug !== "all" && !c.hidden);
 
 /* Per-category counts, cached by country.

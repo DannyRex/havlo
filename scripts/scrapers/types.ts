@@ -25,11 +25,14 @@ export const CATEGORY_MAP: Record<string, { category: string; slug: string; emoj
   "televisions":   { category: "Electronics",       slug: "electronics", emoji: "📺", gradient: "linear-gradient(135deg, #0f0c29 0%, #302b63 100%)" },
   "electronics":   { category: "Electronics",       slug: "electronics", emoji: "⚡", gradient: "linear-gradient(135deg, #141e30 0%, #243b55 100%)" },
   "audio":         { category: "Audio",             slug: "audio",       emoji: "🎧", gradient: "linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%)" },
-  /* Appliances merged into Electronics (May 2026) — keep the key so
-     merchant "appliances"/"home appliances" category pages still
-     resolve, but route the slug to electronics so scrapers never write
-     a fresh "appliances" row again. */
-  "appliances":    { category: "Electronics",        slug: "electronics", emoji: "🏠", gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" },
+  /* Appliances split back OUT of Electronics (June 2026 — reverses the
+     May 2026 merge; see migration 0068 + categorize.ts). Merchant
+     "appliances"/"home appliances" category pages resolve here and write
+     a real "appliances" row. This is the load-bearing path for appliance
+     products whose TITLE has no obvious keyword (e.g. "LG InstaView
+     Door-in-Door") — categorize.ts can't infer those from the title, so
+     the provider's own category page is what lands them correctly. */
+  "appliances":    { category: "Appliances",         slug: "appliances",  emoji: "🏠", gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" },
   "home":          { category: "Home & Kitchen",    slug: "home",        emoji: "🍳", gradient: "linear-gradient(135deg, #e44d26 0%, #f16529 100%)" },
   "fashion":       { category: "Fashion",           slug: "fashion",     emoji: "👗", gradient: "linear-gradient(135deg, #f953c6 0%, #b91d73 100%)" },
   "beauty":        { category: "Beauty",            slug: "beauty",      emoji: "✨", gradient: "linear-gradient(135deg, #f953c6 0%, #b91d73 100%)" },

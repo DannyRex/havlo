@@ -39,9 +39,12 @@ export const revalidate = 21600;
    header); only unlisted slugs are rejected up front. */
 export const dynamicParams = false;
 
-/* Pre-build every active market × real category (10 cats × 6 markets =
-   60 pages). Bounded + cheap; keeps the hubs crawl-ready on first
-   deploy rather than waiting for on-demand ISR. */
+/* Pre-build every active market × real category (11 cats × 6 markets =
+   66 pages). Bounded + cheap; keeps the hubs crawl-ready on first
+   deploy rather than waiting for on-demand ISR. Counts every non-"all"
+   category, including ones hidden from the homepage grid (health) and
+   the June 2026 Appliances re-split — hub routes are independent of the
+   homepage `hidden` flag. */
 export function generateStaticParams() {
   const cats = categories.filter((c) => c.slug !== "all");
   return ACTIVE_COUNTRIES.flatMap((country) =>

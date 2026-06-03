@@ -253,7 +253,7 @@ function computeDiscount(originalPrice: number, salePrice: number): number {
 const CATEGORY_USD_FLOOR: Record<string, number> = {
   phones:      30,    // ~₦40K
   computing:   60,    // ~₦80K
-  electronics: 12,    // ~₦15K (incl. former appliances)
+  electronics: 12,    // ~₦15K (appliances share this floor tier)
   audio:       4,     // ~₦5K
   gaming:      12,
   fashion:     2,
@@ -272,7 +272,7 @@ function inferCategoryFromTitle(title: string): string | null {
   if (/\b(airpods|headphone|headset|earbuds|earphone|speaker)\b/.test(t)) return "audio";
   if (/\b(tv|television|qled|oled)\b/.test(t)) return "electronics";
   if (/\b(playstation|ps5|ps4|xbox|nintendo|switch)\b/.test(t)) return "gaming";
-  if (/\b(fridge|washer|dryer|microwave)\b/.test(t)) return "electronics"; // appliances merged into electronics
+  if (/\b(fridge|washer|dryer|microwave)\b/.test(t)) return "electronics"; // floor-only: appliances share the electronics floor tier; categorize.ts sets the real "appliances" slug at ingest
   return null;
 }
 

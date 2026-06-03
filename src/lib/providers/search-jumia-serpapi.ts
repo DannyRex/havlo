@@ -134,7 +134,7 @@ const NGN_PER_USD = 1600;
 const CATEGORY_NGN_FLOOR: Record<string, number> = {
   phones:      30 * NGN_PER_USD,    // ~₦48K
   computing:   60 * NGN_PER_USD,    // ~₦96K
-  electronics: 12 * NGN_PER_USD,    // ~₦19K (incl. former appliances)
+  electronics: 12 * NGN_PER_USD,    // ~₦19K (appliances share this floor tier)
   audio:        4 * NGN_PER_USD,    // ~₦6K
   gaming:      12 * NGN_PER_USD,
   fashion:      2 * NGN_PER_USD,
@@ -154,7 +154,7 @@ function inferCategoryFromTitle(title: string): string | null {
   if (/\b(airpods|headphone|headset|earbuds|earphone|speaker|soundbar)\b/.test(t)) return "audio";
   if (/\b(tv|television|qled|oled)\b/.test(t)) return "electronics";
   if (/\b(playstation|ps5|ps4|xbox|nintendo|switch)\b/.test(t)) return "gaming";
-  if (/\b(fridge|washer|dryer|microwave|cooker|oven|generator)\b/.test(t)) return "electronics"; // appliances merged into electronics
+  if (/\b(fridge|washer|dryer|microwave|cooker|oven|generator)\b/.test(t)) return "electronics"; // floor-only: appliances share the electronics floor tier; categorize.ts sets the real "appliances" slug at ingest
   return null;
 }
 

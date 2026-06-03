@@ -46,10 +46,10 @@ const CATEGORIES: CatItem[] = [
   { label: "Fashion",    slug: "fashion",     Icon: FashionIcon },
   { label: "Beauty",     slug: "beauty",      Icon: BeautyIcon },
   { label: "Gaming",     slug: "gaming",      Icon: GamingIcon },
-  /* "Appliances" merged into the Electronics category (May 2026). Kept
-     as a concrete doorway chip — its own icon, but routes to the
-     merged ?category=electronics filter. */
-  { label: "Appliances", slug: "electronics", Icon: AppliancesIcon },
+  /* "Appliances" is its own category again (June 2026 — split back out
+     of the May 2026 Electronics merge now that its inventory is healthy).
+     Routes to ?category=appliances. */
+  { label: "Appliances", slug: "appliances", Icon: AppliancesIcon },
 ];
 
 interface Props {

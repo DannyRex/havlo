@@ -1,0 +1,85 @@
+-- ──────────────────────────────────────────────────────────────────
+-- Split the "appliances" category BACK OUT of "electronics" (#25).
+--
+-- Founder direction June 2026: reverse the May 2026 0065 merge. That
+-- merge folded Appliances into Electronics because both were thin and
+-- split the catalog's comparison value across two tiles. Appliance
+-- inventory has since grown to ~410 products (bigger than gaming /
+-- audio / phones / computing), so it earns its own browsable category
+-- and homepage tile again.
+--
+-- This migration re-labels existing rows. The application code shipped
+-- in the same change routes all FUTURE ingest back to "appliances":
+--   · src/lib/categorize.ts          — the appliance title rules
+--                                      (major / kitchen appliance,
+--                                      vacuum, AC / generator / fan /
+--                                      iron) now return slug
+--                                      "appliances" again. This is the
+--                                      ingest SSOT: categoryDisagreesWithTitle
+--                                      overrides any provider category.
+--   · src/lib/data/categories.ts     — Appliances tile restored
+--                                      (Health re-hidden to keep the
+--                                      homepage grid at 10 tiles).
+--   · src/lib/search/price-floor.ts  — appliances floor restored
+--                                      (15,000 NGN, same as electronics)
+--   · src/components/landing/Hero.tsx — "Appliances" doorway chip routes
+--                                      to ?category=appliances again
+--
+-- WHY SCOPED to ('electronics','home):
+--   0065 moved appliance rows INTO 'electronics'. Provider feeds also
+--   occasionally drop small kitchen appliances into 'home'. Re-scanning
+--   ONLY those two buckets means we un-do exactly the merge (plus pull
+--   the home-bucket strays our taxonomy calls appliances) WITHOUT ever
+--   overriding a deliberate phones / gaming / audio assignment. A title
+--   already filed as, say, phones is left untouched.
+--
+-- The title regex below is a faithful translation of the four appliance
+-- rules in categorize.ts (so existing rows are re-tagged the same way a
+-- fresh ingest of the same title would be). \y is the Postgres
+-- word-boundary class, so these match whole words only ("oven" does not
+-- fire on "proven", "dryer" does not fire on "hairdryer").
+--
+-- SAFETY:
+--   · Non-destructive: re-labels category_slug only. No rows deleted,
+--     no offers / price-history touched.
+--   · Scoped: only rows currently in 'electronics' or 'home' are
+--     considered. Every other category is untouched.
+--   · Idempotent: re-runs update zero rows once the split is done
+--     (matched rows are already 'appliances', which is out of scope).
+--
+-- OPTIONAL FOLLOW-UP (catches cross-category strays + verifies no drift):
+--   scripts/recategorise-appliances.ts re-checks EVERY product through
+--   categorize.ts itself (not a hand-translated regex) and reports /
+--   fixes any appliance mis-filed outside electronics/home (e.g. a robot
+--   vacuum a brand rule had parked under phones). Dry-run by default;
+--   needs the write key, so run it from CI / locally, not here.
+-- ──────────────────────────────────────────────────────────────────
+
+-- Diagnostic (uncomment to size the blast radius first):
+--
+--   select count(*) as appliance_rows
+--   from products
+--   where category_slug in ('electronics', 'home')
+--     and title ~* '\y(refrigerator|fridge|freezer|washer|washing\s*machine|tumble\s*dryer|dryer|dishwasher|microwave|oven|range|cooktop|stove|air\s*fryer|pressure\s*cooker|slow\s*cooker|rice\s*cooker|stand\s*mixer|kitchenaid|instant\s*pot|blender|toaster|kettle|coffee\s*maker|espresso\s*machine|vacuum|dyson\s*v[0-9]|robot\s*vacuum|roomba|air\s*conditioner|air\s*conditioning|split\s*ac|window\s*ac|ac\s*(?:inverter|split|unit)|standing\s*fan|ceiling\s*fan|rechargeable\s*fan|industrial\s*fan|water\s*heater|water\s*dispenser|electric\s*iron|steam\s*iron|clothes\s*iron|deep\s*freezer|chest\s*freezer|(?:petrol|diesel|power|inverter|portable|standby)\s*generator|generator\s*[0-9])\y';
+
+update products
+set    category_slug = 'appliances'
+where  category_slug in ('electronics', 'home')
+  and  title ~* '\y(refrigerator|fridge|freezer|washer|washing\s*machine|tumble\s*dryer|dryer|dishwasher|microwave|oven|range|cooktop|stove|air\s*fryer|pressure\s*cooker|slow\s*cooker|rice\s*cooker|stand\s*mixer|kitchenaid|instant\s*pot|blender|toaster|kettle|coffee\s*maker|espresso\s*machine|vacuum|dyson\s*v[0-9]|robot\s*vacuum|roomba|air\s*conditioner|air\s*conditioning|split\s*ac|window\s*ac|ac\s*(?:inverter|split|unit)|standing\s*fan|ceiling\s*fan|rechargeable\s*fan|industrial\s*fan|water\s*heater|water\s*dispenser|electric\s*iron|steam\s*iron|clothes\s*iron|deep\s*freezer|chest\s*freezer|(?:petrol|diesel|power|inverter|portable|standby)\s*generator|generator\s*[0-9])\y';
+
+
+-- ── Verification ──────────────────────────────────────────────────
+--   -- Appliances bucket should now be populated; spot-check it holds
+--   -- fridges / washers / vacuums / air fryers and NOT phones/laptops.
+--   select category_slug, count(*)
+--   from products
+--   where category_slug in ('appliances', 'electronics', 'home')
+--   group by category_slug
+--   order by 2 desc;
+--
+--   -- Sample the re-tagged rows to confirm they read as appliances.
+--   select title, category_slug
+--   from products
+--   where category_slug = 'appliances'
+--   order by random()
+--   limit 25;

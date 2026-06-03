@@ -54,7 +54,7 @@ const PAGE_SIZE    = 50;  // AliExpress max per call
 const CATEGORY_USD_FLOOR: Record<string, number> = {
   phones:      30,
   computing:   60,
-  electronics: 12,  // incl. former appliances (merged May 2026)
+  electronics: 12,  // appliances share this floor tier (June 2026 split)
   audio:       4,
   gaming:      12,
   fashion:     2,
@@ -123,7 +123,7 @@ function inferCategoryFromTitle(title: string): string | null {
   if (/\b(airpods|headphone|headset|earbuds|earphone|speaker)\b/.test(t)) return "audio";
   if (/\b(tv|television|qled|oled)\b/.test(t)) return "electronics";
   if (/\b(playstation|ps5|ps4|xbox|nintendo|switch)\b/.test(t)) return "gaming";
-  if (/\b(fridge|washer|dryer|microwave|air fryer)\b/.test(t)) return "electronics"; // appliances merged into electronics
+  if (/\b(fridge|washer|dryer|microwave|air fryer)\b/.test(t)) return "electronics"; // floor-only: appliances share the electronics floor tier; categorize.ts sets the real "appliances" slug at ingest
   return null;
 }
 

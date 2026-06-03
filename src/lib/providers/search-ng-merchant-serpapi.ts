@@ -69,14 +69,15 @@ function inferCategoryFromTitle(title: string): string | null {
   if (/\b(airpods|headphone|headset|earbuds|earphone|speaker|soundbar)\b/.test(t)) return "audio";
   if (/\b(tv|television|qled|oled)\b/.test(t)) return "electronics";
   if (/\b(playstation|ps5|ps4|xbox|nintendo|switch)\b/.test(t)) return "gaming";
-  if (/\b(fridge|washer|dryer|microwave|cooker|oven|generator)\b/.test(t)) return "electronics"; // appliances merged into electronics
+  if (/\b(fridge|washer|dryer|microwave|cooker|oven|generator)\b/.test(t)) return "appliances"; // June 2026: appliances split back out of electronics
   return null;
 }
 
 const CATEGORY_NGN_FLOOR: Record<string, number> = {
   phones:      30 * NGN_PER_USD,
   computing:   60 * NGN_PER_USD,
-  electronics: 12 * NGN_PER_USD,  // incl. former appliances (merged May 2026)
+  electronics: 12 * NGN_PER_USD,
+  appliances:  12 * NGN_PER_USD,  // same floor tier as electronics (June 2026 split)
   audio:        4 * NGN_PER_USD,
   gaming:      12 * NGN_PER_USD,
   fashion:      2 * NGN_PER_USD,

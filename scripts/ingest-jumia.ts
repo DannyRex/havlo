@@ -222,10 +222,10 @@ const QUERIES: JumiaQuery[] = [
   { q: "JBL speaker",                   categorySlug: "audio"       },
   { q: "Anker speaker",                 categorySlug: "audio"       },
 
-  /* Appliances (merged into electronics, May 2026) — same pattern.
+  /* Appliances (split back out of electronics, June 2026) — same pattern.
      Hisense and Scanfrost dominate NG white-goods listings on Jumia. */
-  { q: "Hisense fridge",                categorySlug: "electronics" },
-  { q: "Scanfrost washing machine",     categorySlug: "electronics" },
+  { q: "Hisense fridge",                categorySlug: "appliances"  },
+  { q: "Scanfrost washing machine",     categorySlug: "appliances"  },
 
   /* Fashion — branded sneakers / footwear gets product pages.
      "Sneakers" alone hits Jumia's category landing. */

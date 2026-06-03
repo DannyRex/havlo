@@ -77,7 +77,7 @@ const FLAGSHIP_SKUS: SkuQuery[] = [
   { q: "PlayStation 5 Slim",       categorySlug: "electronics" },
   { q: "AirPods Pro 2",            categorySlug: "audio" },
   { q: "Sony WH-1000XM5",          categorySlug: "audio" },
-  { q: "Dyson V15 Detect",         categorySlug: "electronics" }, // appliances merged into electronics (May 2026)
+  { q: "Dyson V15 Detect",         categorySlug: "appliances" }, // vacuum → appliances (split back out June 2026)
   { q: "Stanley Quencher tumbler", categorySlug: "home" },
   { q: "Nike Air Force 1",         categorySlug: "fashion" },
   { q: "Lego Technic",             categorySlug: "gaming" },

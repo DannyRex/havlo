@@ -51,8 +51,9 @@ import { getSupabaseAdmin } from "../src/lib/providers/db-client";
 import { pgFtsFindDupes } from "../src/lib/search/pg-fts";
 import { partitionDupesByVariantMatch } from "../src/lib/search/variant-pooling";
 
-// "appliances" merged into "electronics" (May 2026) — one slug now.
-const COMPARABLE_CATS = new Set(["phones", "computing", "gaming", "audio", "electronics"]);
+// Cross-store-comparable categories. Appliances split back out of
+// electronics (June 2026) — fridges/washers/ACs dedupe across stores too.
+const COMPARABLE_CATS = new Set(["phones", "computing", "gaming", "audio", "electronics", "appliances"]);
 const APPLY = process.argv.includes("--apply");
 const LIMIT = (() => {
   const a = process.argv.find((s) => s.startsWith("--limit="));

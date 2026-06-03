@@ -924,10 +924,13 @@ export function isLikelySameProduct(
        are real product identity. Loosening pools different SKUs. */
   const fam = anchor.family ?? detectQueryFamily(anchor.title);
   const isLenientFam = fam === "fashion" || fam === "beauty" || fam === "sports";
-  /* "appliances" folded into Electronics (May 2026) — appliance items
-     now carry the electronics family and fall into the strict bucket
-     below alongside phones/electronics/computing/audio/gaming. */
-  const isMediumFam  = fam === "home"    || fam === "health";
+  /* Appliances split back out of Electronics (June 2026). The appliance
+     family (kitchen appliances — air fryer, blender, rice cooker, etc.;
+     see families.ts) rejoins the medium bucket alongside home + health,
+     matching the bucket table above and the 0.4x–2.5x price band below:
+     capacity / pack-count matters when BOTH sides list it, but titles
+     often drop it on one side. */
+  const isMediumFam  = fam === "home" || fam === "appliance" || fam === "health";
 
   /* Size match — strict by default. For fashion/beauty: skip
      entirely (size regex doesn't match S/M/L/XL anyway). For
