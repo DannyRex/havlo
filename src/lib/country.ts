@@ -583,7 +583,7 @@ export const COUNTRY_STORES: Record<string, string[]> = {
     "graham and green", "grahamandgreen",
   ],
   us: [
-    "amazon.com", "walmart", "best buy", "bestbuy", "target", "newegg",
+    "amazon.com", "amazon-us", "amazon-com", "amazon us", "walmart", "best buy", "bestbuy", "target", "newegg",
     /* Bare "ebay" is intentionally ambiguous — eBay is a global
        marketplace. The UK roster has explicit "ebay.co.uk" /
        "ebay uk" / "ebay-uk" variants that match BEFORE this

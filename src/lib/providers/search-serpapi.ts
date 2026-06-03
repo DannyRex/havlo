@@ -55,8 +55,9 @@ function canonicaliseSource(raw: string): string {
 
   /* Amazon — collapse all known variants per market.
      Order matters: ".co.uk" is more specific than bare "amazon",
-     same for ".de" / ".ae" / ".in". The bare "amazon" / "amazon.com"
-     branches sit last so they don't swallow the others. */
+     same for ".de" / ".ae" / ".in". The explicit ".com" (US) branch and
+     the ambiguous bare "amazon" branch sit last so they don't swallow
+     the more-specific marketplaces. */
   if (lc.startsWith("amazon.co.uk") || lc.startsWith("amazon uk") ||
       lc === "amazon.co.uk-seller" || lc.includes("amazon.co.uk-seller")) {
     return "Amazon UK";
@@ -73,8 +74,14 @@ function canonicaliseSource(raw: string): string {
   if (lc.startsWith("amazon.ca") || lc.startsWith("amazon canada")) {
     return "Amazon Canada";
   }
-  if (lc === "amazon" || lc === "amazon.com" || lc.startsWith("amazon.com -") ||
-      lc.startsWith("amazon.com seller") || lc.startsWith("amazon - amazon")) {
+  if (lc === "amazon.com" || lc.startsWith("amazon.com -") ||
+      lc.startsWith("amazon.com seller") || lc.startsWith("amazon.com-seller")) {
+    return "Amazon US";
+  }
+  /* Bare "amazon" / "amazon - amazon" is genuinely ambiguous (any
+     marketplace), so it stays the generic store rather than being
+     force-tagged US. */
+  if (lc === "amazon" || lc.startsWith("amazon - amazon")) {
     return "Amazon";
   }
 
@@ -134,8 +141,10 @@ function inferStoreId(source: string): string {
     case "amazon canada":
     case "amazon.ca":
     case "amazon ca":             return "amazon-ca";
-    case "amazon":
-    case "amazon.com":            return "amazon";
+    case "amazon us":
+    case "amazon.com":
+    case "amazon-us":             return "amazon-us";
+    case "amazon":                return "amazon";
   }
 
   return source
