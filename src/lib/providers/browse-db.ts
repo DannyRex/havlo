@@ -373,6 +373,20 @@ export const dbBrowseProvider: BrowseProvider = {
        unique URL drops ~75-90%. */
     const PASS_MAX = 500;
 
+    /* Catalog-rotation seed (#17, migration 0066). A 6-hour time bucket:
+       browse_deals keeps strong discounts on top (10-pt bands) but a
+       seeded hash reshuffles WHICH in-band deals surface per seed, so a
+       repeat visitor pages across more of the catalog over the day rather
+       than seeing the same fixed top-N. Stable within each 6h block, so
+       the cache TTL — not the seed — still drives fetch frequency (no
+       extra egress); fresh across blocks. Requires migration 0066 (the
+       p_rotate_seed param) — applied June 2026; without it the RPC call
+       would error on the unknown arg, so don't ship this ahead of the
+       migration. seed=0 is the legacy strict-discount order. Only affects
+       the discount sort; newest/price are untouched by the rotation. */
+    const ROTATE_WINDOW_MS = 6 * 60 * 60 * 1000;
+    const rotateSeed = Math.floor(Date.now() / ROTATE_WINDOW_MS);
+
     const passABase = {
       p_category:       q.categorySlug && q.categorySlug !== "all" ? q.categorySlug : null,
       p_min_discount:   typeof q.minDiscount === "number" && q.minDiscount > 0 ? q.minDiscount : 0,
@@ -381,6 +395,7 @@ export const dbBrowseProvider: BrowseProvider = {
       p_store_ids:      q.stores && q.stores.length > 0 ? q.stores : null,
       p_max_rows:       PASS_MAX,
       p_zero_discount_only: false,
+      p_rotate_seed:    rotateSeed,
     };
 
     /* Pass A — country-local. Filter rows to is_international=false
