@@ -251,71 +251,89 @@ const ORIGIN_COUNTS_TTL_MS = 5 * 60 * 1000;
 const ORIGIN_COUNTS_MAX_ENTRIES = 200;
 const originCountsCache = new Map<string, { value: OriginCounts; expires: number }>();
 
-/* ── Cross-border (Pass B) pool cache ──────────────────────────────
-   Pass B (browse_deals origin='intl', country=null) is the heaviest of
-   the three passes: it scans the whole is_international=true set (~6.7k
-   rows) and runs ~1-3s with high variance, regularly blowing the 2.5s
-   per-pass budget. When it times out, the merged pool loses EVERY
-   cross-border row, so the /deals "International" tab collapses to 0
-   (or to the few curated-Amazon rows) until the pool cache cycles —
-   the "intl deals not displaying" bug (June 2026).
+/* ── Cross-border pool (country-AWARE) ─────────────────────────────
+   The cross-border slice of the /deals pool: every deal a given market
+   can reach that ISN'T anchored to that market (foreign-anchored stores
+   like Amazon UK for an NG shopper, plus globals like AliExpress with no
+   anchor at all).
 
-   Two properties make a dedicated cache the right fix:
-     1. Pass B is COUNTRY-BLIND (p_country=null) — one result serves all
-        six markets, so caching it once removes redundant slow RPCs.
-     2. Serving the last-good result on a timeout means a single slow
-        fetch can't empty the intl bucket.
+   History: this used to be browse_deals(origin='intl', p_country=null) —
+   a COUNTRY-BLIND top-500-by-discount slice of the whole is_international
+   set. That had two fatal flaws the June 2026 count audit exposed:
+     1. Country-blind -> each market only saw whichever 500 global rows
+        happened to rank highest, so a market's reachable cross-border
+        set was massively UNDER-counted (US fashion showed ~56 of 2,108
+        real; NG intl tab 227 of 3,942 real) and FLUCTUATED per instance.
+     2. The whole-is_international scan ran 1-3s and timed out often.
 
-   Keyed on the country-invariant inputs only (category/sort/search/
-   discount/stores). Non-empty results cache for the standard pool TTL;
-   on timeout we fall back to the last-good value even if expired, so
-   intl only ever shows empty if Pass B has NEVER succeeded. */
+   Now: a direct, country-aware product_best_offers query for stores NOT
+   anchored to the visitor's country (store_country != cc) OR with no
+   anchor (store_country IS NULL), ordered by discount. The route's
+   filterDealsForCountry then keeps only the market's allowlisted
+   cross-border set + globals, and isLocalToUser buckets them as intl.
+   This makes the intl tab (and the category/All-tab counts derived from
+   the same pool) DETERMINISTIC, country-accurate, and consistent across
+   instances. It also no longer depends on the is_international flag, so
+   that NG-centric currency proxy can be retired (see country.ts).
+
+   Cap at one PostgREST page (1000) ordered by discount: covers every
+   category/country reachable set except mega-fashion (AliExpress/Shein),
+   where it surfaces the top 1,000 by discount — still ~5-18x what the old
+   global slice showed, and consistent. Country+category+filter-keyed,
+   serve-last-good on error so a blip can't empty the tab. */
 const INTL_POOL_TTL_MS = 5 * 60 * 1000;
-/* Generous vs the 2.5s per-pass budget: Pass B p95 is ~3s, it runs in
-   PARALLEL with the fast Pass A/C, and the result is cached + shared
-   across markets — so only a cold-cache fetch pays this, once per
-   window. Still well under Vercel's 30s ceiling. */
-const INTL_POOL_TIMEOUT_MS = 4000;
+const INTL_POOL_MAX = 1000;
+const INTL_POOL_COLS =
+  "product_id,title,category_slug,brand,image_url,offer_id,store_id,url,current_price,original_price,discount_percent,currency,scraped_at,store_name,is_international,store_logo_url,store_country";
 const intlPoolCache = new Map<string, { data: BestOfferRow[]; expires: number }>();
 
 async function fetchCrossBorderPool(
   supa: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  countryCode: string,
   passBArgs: Record<string, unknown>,
 ): Promise<BestOfferRow[]> {
-  const key = JSON.stringify({
-    cat:  passBArgs.p_category ?? null,
-    sort: passBArgs.p_sort ?? null,
-    q:    passBArgs.p_search ?? null,
-    min:  passBArgs.p_min_discount ?? 0,
-    st:   passBArgs.p_store_ids ?? null,
-  });
+  const cc       = (countryCode || "").toUpperCase();
+  const cat      = (passBArgs.p_category ?? null) as string | null;
+  const search   = (passBArgs.p_search ?? null) as string | null;
+  const storeIds = (passBArgs.p_store_ids ?? null) as string[] | null;
+  const key = JSON.stringify({ cc, cat, q: search, st: storeIds });
   const now = Date.now();
   const cached = intlPoolCache.get(key);
   if (cached && cached.expires > now) return cached.data;
 
-  const res = await withTimeout(
-    supa.rpc("browse_deals", passBArgs) as unknown as Promise<{ data: unknown; error: { message: string } | null }>,
-    INTL_POOL_TIMEOUT_MS,
-    { data: null, error: { message: "timeout" } },
-    "browse_deals(intl)",
-  );
-  if (!res.error && Array.isArray(res.data)) {
-    const rows = res.data as unknown as BestOfferRow[];
-    /* Cache only NON-empty results — a transient empty/timeout must not
-       pin the intl bucket to 0 for the full TTL. */
-    if (rows.length > 0) {
-      intlPoolCache.set(key, { data: rows, expires: now + INTL_POOL_TTL_MS });
-      if (intlPoolCache.size > 16) {
-        intlPoolCache.forEach((v, k) => { if (v.expires <= now) intlPoolCache.delete(k); });
+  try {
+    let query = supa.from("product_best_offers").select(INTL_POOL_COLS);
+    /* Cross-border FOR THIS MARKET = foreign-anchored (store_country != cc)
+       OR global (store_country IS NULL). The route filters this down to the
+       market's allowlist + buckets it. */
+    if (cc) query = query.or(`store_country.is.null,store_country.neq.${cc}`);
+    if (cat && cat !== "all") query = query.eq("category_slug", cat);
+    if (search && search.trim()) query = query.ilike("title", `%${search.trim()}%`);
+    if (storeIds && storeIds.length > 0) query = query.in("store_id", storeIds);
+    query = query
+      .order("discount_percent", { ascending: false, nullsFirst: false })
+      .order("scraped_at", { ascending: false })
+      .limit(INTL_POOL_MAX);
+
+    const { data, error } = await query;
+    if (!error && Array.isArray(data)) {
+      const rows = data as unknown as BestOfferRow[];
+      if (rows.length > 0) {
+        intlPoolCache.set(key, { data: rows, expires: now + INTL_POOL_TTL_MS });
+        if (intlPoolCache.size > 48) {
+          intlPoolCache.forEach((v, k) => { if (v.expires <= now) intlPoolCache.delete(k); });
+        }
       }
+      return rows;
     }
-    return rows;
+    if (cached) return cached.data;
+    console.warn("[browse-db] cross-border pool query failed:", error?.message ?? "unknown");
+    return [];
+  } catch (e) {
+    if (cached) return cached.data;
+    console.warn("[browse-db] cross-border pool threw:", (e as Error).message);
+    return [];
   }
-  /* Timeout/error: serve last-good (even if expired) so one slow fetch
-     can't empty the International tab. */
-  if (cached) return cached.data;
-  console.warn("[browse-db] Pass B (intl) failed, no cached fallback:", res.error?.message ?? "unknown");
-  return [];
 }
 
 export const dbBrowseProvider: BrowseProvider = {
@@ -541,7 +559,7 @@ export const dbBrowseProvider: BrowseProvider = {
       /* Pass B (cross-border) goes through its own shared, country-blind
          cache with stale-on-timeout — see fetchCrossBorderPool. Returns
          the rows directly (not an RpcResp). */
-      fetchCrossBorderPool(supa, passBArgs),
+      fetchCrossBorderPool(supa, q.country ?? "", passBArgs),
       runPassC
         ? withTimeout(supa.rpc("browse_deals", passCArgs) as unknown as Promise<RpcResp>, TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(zero-disc)")
         : Promise.resolve(TIMEOUT_FALLBACK),
