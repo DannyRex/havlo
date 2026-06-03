@@ -74,7 +74,7 @@ export function merchantInquiryInternalNotification(a: InternalArgs): Email {
     ``,
     `Contact:    ${a.contactName ?? "(not provided)"} <${a.email}>`,
     `Store URL:  ${a.storeUrl}`,
-    `Feed URL:   ${a.feedUrl ?? "(none — ask for one)"}`,
+    `Feed URL:   ${a.feedUrl ?? "(none, ask for one)"}`,
     `Countries:  ${a.countries ?? "(not specified)"}`,
     `SKU count:  ${a.skuCount ?? "(not specified)"}`,
     ``,

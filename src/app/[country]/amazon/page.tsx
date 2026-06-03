@@ -35,7 +35,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const country = getCountry(params.country);
   const url = `${SITE_URL}/${country.code}/amazon`;
-  const title = `Amazon deals in ${country.name} — checked against price history`;
+  const title = `Amazon deals in ${country.name}: checked against price history`;
   const description = `The biggest Amazon price drops shoppable in ${country.name}, each checked against its price history so a deal is really a deal. See if Amazon is the cheapest before you buy.`;
   return {
     title,
@@ -108,8 +108,8 @@ export default async function AmazonDealsPage({
             The biggest Amazon price drops you can shop from {country.name},
             updated through the day. Tap any item to see its full price
             history, so you can tell a real markdown from a &ldquo;was&rdquo;
-            price that quietly crept up first &mdash; and to check whether
-            another store beats Amazon before you buy.
+            price that quietly crept up first, and check whether another
+            store beats Amazon before you buy.
           </p>
         </header>
 
@@ -117,7 +117,7 @@ export default async function AmazonDealsPage({
         <div className="mb-8 grid gap-3 sm:grid-cols-3">
           {[
             { t: "Verified by price history", d: "Every deal links to a chart of what it actually cost over time, so an inflated “discount” has nowhere to hide." },
-            { t: "Amazon vs everyone else",   d: "We show the same product at other stores too — so you only buy from Amazon when Amazon is genuinely the best price." },
+            { t: "Amazon vs everyone else",   d: "We show the same product at other stores too, so you only buy from Amazon when Amazon is genuinely the best price." },
             { t: "Shoppable from " + country.name, d: "Only Amazon offers that actually ship to your market, priced in your currency at the spot rate." },
           ].map((c) => (
             <div key={c.t} className="rounded-xl border border-border bg-surface p-4">
@@ -146,8 +146,8 @@ export default async function AmazonDealsPage({
         <p className="mt-8 text-[12px] text-ink-3 leading-relaxed max-w-2xl">
           As an Amazon Associate, Havlo may earn a commission from qualifying
           purchases made through links on this page, at no extra cost to you.
-          It never changes which deals we show or how we rank prices &mdash;
-          if another store is cheaper, we say so.
+          It never changes which deals we show or how we rank prices. If
+          another store is cheaper, we say so.
         </p>
 
         <div className="mt-6">
