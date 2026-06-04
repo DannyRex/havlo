@@ -134,6 +134,34 @@ const obiwezyConfig: MerchantConfig = {
   isProductUrl: isShopifyProductUrl,
 };
 
+/* ── Konga ─────────────────────────────────────────────────────────
+   General-merchandise marketplace (phones, electronics, appliances,
+   fashion, beauty). Moved to SerpAPI in June 2026 after Konga added
+   Cloudflare bot protection mid-May 2026 that defeats the Playwright
+   scraper (scripts/scrapers/konga.ts now hits the challenge wall).
+
+   URL shapes:
+     Product detail : /product/<slug>            (carries price markup)
+     Category        : /category/<slug>-<id>      (no per-product price)
+     Search          : /search?...                (no per-product price)
+   The Playwright scraper confirmed the product pattern via its
+   a[href*='/product/'] selector, so the product-URL gate keys on the
+   /product/ path prefix. Konga's rotating ?cid= campaign param is
+   already stripped by canonicaliseOfferUrl at ingest, so two runs of
+   the same SKU collapse onto one (store_id, url) row. */
+const kongaConfig: MerchantConfig = {
+  storeId:   "konga",
+  storeName: "Konga",
+  domain:    "konga.com",
+  isProductUrl: (u) => {
+    if (hasNonProductPath(u)) return false;
+    /* Konga product detail pages live under /product/<slug>. Category
+       pages (/category/<slug>-<id>) and search pages carry no
+       per-product price markup, so gate strictly on /product/. */
+    return u.pathname.startsWith("/product/");
+  },
+};
+
 /* ── Public export ────────────────────────────────────────────────
 
    ACTIVE: slot + kara — probed live (May 2026), SerpAPI returns
@@ -172,6 +200,12 @@ const obiwezyConfig: MerchantConfig = {
 export const NG_MERCHANT_CONFIGS: MerchantConfig[] = [
   slotConfig,
   karaConfig,
+  /* Konga — added June 2026 to replace the Cloudflare-walled Playwright
+     scraper. Konga publishes structured-data price markup on its
+     /product/ detail pages, so the SerpAPI google + site:konga.com
+     path lifts (price, currency) the same way the Slot + Kara configs
+     do. */
+  kongaConfig,
 ];
 
 /* Inactive configs surfaced separately so they're still accessible
@@ -288,5 +322,29 @@ export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
     "PlayStation UK used",
     "Apple Watch UK used",
     "AirPods UK used",
+  ],
+
+  /* Konga: broad general-merchandise marketplace. Lead with brand+model
+     SKUs across the verticals Konga stocks deepest — phones, computing,
+     TVs, appliances, audio, gaming, beauty. Brand+model queries surface
+     /product/ detail pages (which carry price markup); bare category
+     words ("Phones", "Smart TV") return Konga's category landings, which
+     don't. 14 queries to match Konga's wider catalog vs the phone-first
+     Slot/Kara lists. */
+  konga: [
+    "iPhone 15",
+    "Samsung Galaxy A",
+    "Tecno Spark",
+    "Infinix Hot",
+    "HP Pavilion laptop",
+    "Dell Inspiron laptop",
+    "Hisense TV",
+    "LG TV",
+    "Hisense fridge",
+    "Scanfrost washing machine",
+    "Oraimo earbuds",
+    "JBL speaker",
+    "PlayStation 5",
+    "Nivea body lotion",
   ],
 };

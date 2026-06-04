@@ -224,7 +224,18 @@ async function main() {
        browser launch. */
     // { name: "3C Hub",     probe: "https://www.3chub.com/",                        fn: () => scrapeThreeChub(page) },
     { name: "Slot",       probe: "https://slot.ng/",                              fn: () => scrapeSlot(page) },
-    { name: "Konga",      probe: "https://www.konga.com/category/phones-tablets-5261", fn: () => scrapeKonga(page) },
+    /* Konga disabled June 2026 — Konga added Cloudflare bot protection
+       around mid-May 2026, so its category URLs now return HTTP 200 with
+       a Cloudflare/captcha challenge page instead of product HTML. The
+       Playwright-stealth pass hangs on the challenge, and two of the
+       last four scheduled scrape-deals runs were CANCELLED from Konga
+       holding the browser open until the job timeout. Active path:
+       SerpAPI google + site:konga.com via NG_MERCHANT_CONFIGS, run by
+       `npm run ingest:ng-serpapi` (and `npm run ingest:konga` for a
+       Konga-only run). The scraper code in scrapers/konga.ts stays
+       parked for if/when a free fallback (residential proxy, partner
+       API) becomes available. */
+    // { name: "Konga",      probe: "https://www.konga.com/category/phones-tablets-5261", fn: () => scrapeKonga(page) },
     { name: "Kara",       probe: "https://kara.com.ng/mobile-phones",             fn: () => scrapeKara(page) },
     { name: "Obiwezy",    probe: "https://obiwezy.com/category/phones",           fn: () => scrapeObiwezy(page) },
     /* PayPorte excluded — their robots.txt has a site-wide Disallow.

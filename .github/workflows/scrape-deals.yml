@@ -260,15 +260,19 @@ jobs:
         run: npm run ingest:jumia
 
       # NG long-tail retailers via SerpAPI site:domain queries.
-      # Replaces the broken/silent Playwright scrapers for Slot + Kara
-      # (and future merchants added to NG_MERCHANT_CONFIGS). Same job
-      # as Jumia so dedup's `needs` chain doesn't have to widen, and
+      # Replaces the broken/silent Playwright scrapers for Slot + Kara +
+      # Konga (and future merchants added to NG_MERCHANT_CONFIGS). Same
+      # job as Jumia so dedup's `needs` chain doesn't have to widen, and
       # both jobs share the same SerpAPI credit pool.
-      # Cost: ~22 credits per run today (Slot 12 + Kara 10). Twice-
-      # weekly cron = ~176 credits/month, well under the Developer
-      # plan ceiling. Grows linearly with merchants added to the
-      # config — each new merchant adds its query-list count to the
-      # per-run cost.
+      # Konga joined this lane June 2026 after Konga's mid-May 2026
+      # Cloudflare bot wall killed its Playwright scraper; its 14-query
+      # list rides the same google + site:konga.com path as Slot + Kara.
+      # Cost: each query fires google + google_images = 2 credits, so
+      # ~72 credits per run today (Slot 12 + Kara 10 + Konga 14 queries =
+      # 36 queries x 2). Twice-weekly cron (~8.7 runs/month) = ~626
+      # credits/month, well under the 5,000 Developer plan ceiling.
+      # Grows linearly with merchants added to the config — each new
+      # merchant adds (its query-list count x 2) to the per-run cost.
       - name: Ingest NG long-tail merchants (SerpAPI site-filter) → Supabase
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
         run: npm run ingest:ng-serpapi

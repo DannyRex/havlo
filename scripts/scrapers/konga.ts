@@ -1,3 +1,4 @@
+/* DISABLED 2026-06 due to Konga Cloudflare bot protection — superseded by the SerpAPI lane (NG_MERCHANT_CONFIGS konga + npm run ingest:ng-serpapi). File retained, unreferenced from scripts/scrape.ts. */
 import { Page } from "playwright";
 import { RawDeal, resolveCategory, parseNaira } from "./types.js";
 
