@@ -739,6 +739,47 @@ function fallbackModel(brand: string, norm: string): string | null {
   return kept.join(" ");
 }
 
+/* ── Fragrance identity (lever 2) ──────────────────────────────────
+   Fragrances title as "<brand> <line> <concentration> <size> [<format>]"
+   (e.g. "Dior Sauvage Eau de Parfum 100ml"). The LINE ("sauvage") is the
+   product identity; concentration (edt/edp/parfum/elixir), format
+   (deodorant/shower gel/refill...) and size (ml) are VARIANT attributes
+   that should pool, not split the cluster. fragranceLineName takes the
+   words between the brand and the first such variant token. Elixir /
+   Extrait is a genuinely different juice, so it is kept ON the line
+   (distinct key from the base EDT/EDP). */
+const FRAGRANCE_CONCENTRATION = /\b(eau\s+de\s+parfum|eau\s+de\s+toilette|eau\s+de\s+cologne|edp|edt|edc|parfum|cologne|elixir|extrait)\b/i;
+const FRAGRANCE_FORMAT = /\b(deodorant|deo\s+stick|shower\s+gel|body\s+spray|after\s*shave|aftershave|body\s+lotion|hair\s+mist|travel\s+spray|refill|gift\s+set|shaving\s+gel|shampoo|balm)\b/i;
+
+function isFragranceTitle(norm: string): boolean {
+  return FRAGRANCE_CONCENTRATION.test(norm) || /\b(perfume|fragrance|cologne)\b/i.test(norm);
+}
+
+/* Extract the fragrance line name (the model identity) for a parsed brand.
+   Returns a compact slug ("sauvage", "sauvageelixir") or null. */
+function fragranceLineName(brand: string, norm: string): string | null {
+  const idx = norm.search(new RegExp(`\\b${brand}\\b`, "i"));
+  if (idx < 0) return null; // multi-word brand slug not present verbatim — skip
+  let after = norm.slice(idx + brand.length);
+  const hasElixir = /\belixir\b|\bextrait\b/i.test(after);
+  /* Cut at the first variant token: concentration / format / size / audience. */
+  const stopRe = new RegExp(
+    `(${FRAGRANCE_CONCENTRATION.source}|${FRAGRANCE_FORMAT.source}|` +
+      `\\b\\d+(?:\\.\\d+)?\\s*ml\\b|\\bfor\\s+(?:men|women|him|her|unisex)\\b|` +
+      `\\b(?:men|women|unisex|him|her|ladies|gents)\\b)`,
+    "i",
+  );
+  const stop = after.search(stopRe);
+  if (stop >= 0) after = after.slice(0, stop);
+  let line = after
+    .replace(/\b(perfume|fragrance|cologne|the|by|spray|natural|new|original|limited|edition|set)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (hasElixir && !/elixir|extrait/i.test(line)) line += " elixir";
+  const slug = line.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return slug.length >= 3 ? slug : null;
+}
+
 function findModel(brand: string | null, norm: string): string | null {
   if (!brand) return null;
   const hints = MODEL_HINTS[brand];
@@ -750,6 +791,17 @@ function findModel(brand: string | null, norm: string): string | null {
       }
     }
   }
+  /* Fragrance line-name (lever 2): runs BEFORE the SKU fallback, which
+     would otherwise fold the size into the model ("sauvage 100ml") and
+     shatter the cluster by size. Gated by isFragranceTitle, so non-
+     fragrances are untouched. The line ("sauvage") becomes the model ->
+     key "dior|sauvage"; not a loose-category word, so it pools through the
+     existing gate and collapses the EDT/EDP/Parfum/format/size variants. */
+  if (isFragranceTitle(norm)) {
+    const line = fragranceLineName(brand, norm);
+    if (line) return line;
+  }
+
   /* SKU-style fallback first ("Hisense 50A6K" → "50a6k") because
      it's the most discriminating signal when present. */
   const skuModel = fallbackModel(brand, norm);

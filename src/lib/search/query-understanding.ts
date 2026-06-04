@@ -929,7 +929,17 @@ export function isLikelySameProduct(
        Storage tier / chip generation / model year / console SKU
        are real product identity. Loosening pools different SKUs. */
   const fam = anchor.family ?? detectQueryFamily(anchor.title);
-  const isLenientFam = fam === "fashion" || fam === "beauty" || fam === "sports";
+  /* Fragrances (lever 2): titles carrying a concentration/format token have a
+     genuinely wide price spread across concentrations + sizes (a 100ml Parfum
+     can be ~2x a 60ml EDT of the same line), and those are VARIANTS that
+     should pool. Treat them as a lenient family so the signature-pooled
+     Sauvage cluster survives the price band + the strict size gate. */
+  const FRAGRANCE_RE =
+    /\b(eau de parfum|eau de toilette|eau de cologne|edp|edt|parfum|cologne|perfume|fragrance)\b/i;
+  const isFragrance =
+    FRAGRANCE_RE.test(anchor.title) || FRAGRANCE_RE.test(candidate.title);
+  const isLenientFam =
+    fam === "fashion" || fam === "beauty" || fam === "sports" || isFragrance;
   /* Appliances split back out of Electronics (June 2026). The appliance
      family (kitchen appliances — air fryer, blender, rice cooker, etc.;
      see families.ts) rejoins the medium bucket alongside home + health,
