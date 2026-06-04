@@ -13,6 +13,8 @@
    poisoning the client bundle with next/headers.
    ────────────────────────────────────────────────────────────────── */
 
+import { FX_GENERATED } from "./fx-rates.generated";
+
 export const COUNTRY_COOKIE = "havlo-country";
 export const DEFAULT_COUNTRY = "ng";
 
@@ -90,10 +92,14 @@ export function getCountry(code: string | undefined | null): Country {
 
 /* ── Currency formatting ────────────────────────────────────────── */
 
-/* Approximate FX → unit currency. Same as src/lib/utils.ts USD_TO_NGN
-   pattern; refresh quarterly or wire a real FX feed later.
-   Values are "1 USD = X local". */
-export const USD_FX: Record<Country["currency"], number> = {
+/* USD -> unit currency ("1 USD = X local"). Live values come from the
+   fx_rates table, mirrored into ./fx-rates.generated.ts by the daily FX
+   cron, so this stays a STATIC, client-safe, hydration-stable constant (no
+   DB import here; identical on server + client). The inline map is the
+   FALLBACK for any currency the generated file is missing. NGN follows the
+   storage rate (parallel-ish), not the official feed -- see the NGN policy
+   in scripts/fetch-fx-rates.ts. */
+const USD_FX_FALLBACK: Record<Country["currency"], number> = {
   USD: 1.00,
   NGN: 1600,
   GBP: 0.79,
@@ -102,6 +108,14 @@ export const USD_FX: Record<Country["currency"], number> = {
   INR: 83,
   ZAR: 18.5,
 };
+export const USD_FX: Record<Country["currency"], number> = (() => {
+  const out = { ...USD_FX_FALLBACK };
+  (Object.keys(out) as Country["currency"][]).forEach((k) => {
+    const v = FX_GENERATED[k];
+    if (typeof v === "number" && v > 0 && isFinite(v)) out[k] = v;
+  });
+  return out;
+})();
 
 /** Convert a USD amount to the country's local currency. */
 export function usdToLocal(usd: number, country: Country): number {
