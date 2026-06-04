@@ -180,7 +180,9 @@ jobs:
     needs: [scrape, ingest-aliexpress, ingest-ng-shopify]
     if: success() || failure()
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 20m (was 10m): the self-host + phash steps below add a few minutes on a
+    # backlog. Mirrors scrape-deals.yml's dedup job.
+    timeout-minutes: 20
     env:
       SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -209,3 +211,23 @@ jobs:
       - name: Seed missing price-history points
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
         run: npm run seed:price-history
+
+      # Self-host newly-ingested product images into Supabase Storage (#133).
+      # Mirrors the step in scrape-deals.yml so products ingested on free-daily
+      # days (AliExpress, NG Shopify, scraped) get hosted SAME-DAY instead of
+      # waiting for the next Mon/Thu run. Runs after dedup so it hosts canonical
+      # post-merge products; idempotent (only stored_image_at IS NULL rows);
+      # placeholder images are skipped + nulled. No-ops until migration 0076 +
+      # the public "product-images" bucket exist.
+      - name: Self-host new product images → Supabase Storage
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: npm run backfill:self-host-images -- --limit=3000
+
+      # Perceptual-hash the newly-self-hosted images (Phase 2 + 2a, #133).
+      # Mirrors scrape-deals.yml. Runs AFTER self-host so new rows hash from
+      # their Storage webp with the background-trim. Incremental (image_phash
+      # IS NULL only); Storage host unthrottled so it finishes in well under a
+      # minute. Feeds the brand-guarded cross-store image-pooling signal.
+      - name: Hash new product images (dHash for cross-store matching)
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: npm run backfill:image-phash -- --limit=3000
