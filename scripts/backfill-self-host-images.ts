@@ -36,19 +36,76 @@ const LIMIT = (() => {
   const a = process.argv.find((x) => x.startsWith("--limit="));
   return a ? Math.max(0, parseInt(a.split("=")[1], 10) || 0) : 0; // 0 = no cap
 })();
-const CONCURRENCY = 8;
+const CONCURRENCY = 32;
 
-/* Fetch image bytes via the production img-proxy (handles Referer + Kara
-   page->og:image + the SSRF allowlist). Returns null on any failure so the
-   row is left on its merchant URL. */
-async function fetchViaProxy(merchantUrl: string): Promise<Buffer | null> {
+const BROWSER_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17 Safari/605.1.15";
+
+/* Referer-gated merchant image hosts (the non-empty subset of
+   /api/img-proxy's HOST_REFERER). Fetching these direct needs the merchant's
+   own domain as Referer or they 4xx; everything else fetches with no Referer. */
+const HOST_REFERER: Record<string, string> = {
+  "m.media-amazon.com":              "https://www.amazon.com/",
+  "images-na.ssl-images-amazon.com": "https://www.amazon.com/",
+  "images-eu.ssl-images-amazon.com": "https://www.amazon.co.uk/",
+  "media-amazon.com":                "https://www.amazon.com/",
+  "images.asos-media.com":           "https://www.asos.com/",
+  "ae-pic-a1.aliexpress-media.com":  "https://www.aliexpress.com/",
+  "ae-pic-a1.aliexpress.com":        "https://www.aliexpress.com/",
+  "ae01.alicdn.com":                 "https://www.aliexpress.com/",
+  "i5.walmartimages.com":            "https://www.walmart.com/",
+  "i5.walmartimages.ca":             "https://www.walmart.ca/",
+  "pisces.bbystatic.com":            "https://www.bestbuy.com/",
+  "media.currys.biz":                "https://www.currys.co.uk/",
+  "johnlewis.scene7.com":            "https://www.johnlewis.com/",
+  "media.johnlewiscontent.com":      "https://www.johnlewis.com/",
+  "media.4rgos.it":                  "https://www.argos.co.uk/",
+  "i.dell.com":                      "https://www.dell.com/",
+  "image.boohooamplience.com":       "https://www.boohoo.com/",
+  "img.shopstyle.com":               "https://www.shopstyle.com/",
+};
+
+function refererFor(host: string): string | null {
+  if (host in HOST_REFERER) return HOST_REFERER[host];
+  for (const [h, ref] of Object.entries(HOST_REFERER)) {
+    if (host.endsWith("." + h)) return ref;
+  }
+  return null;
+}
+
+/* Fetch image bytes. DIRECT from the merchant (spreads connections across many
+   origins -> real concurrency, and avoids the Vercel proxy round-trip) with
+   the correct per-host Referer. Falls back to the production img-proxy for
+   Kara (whose image_url is a PAGE URL the proxy resolves to a fresh og:image)
+   and for any direct fetch that fails or returns non-image bytes. */
+async function fetchImage(merchantUrl: string): Promise<Buffer | null> {
+  let host = "";
+  try { host = new URL(merchantUrl).hostname; } catch { return null; }
+
+  const karaPage = host === "kara.com.ng" || host.endsWith(".kara.com.ng");
+  if (!karaPage) {
+    try {
+      const headers: Record<string, string> = {
+        "user-agent": BROWSER_UA,
+        "accept": "image/avif,image/webp,image/*,*/*",
+      };
+      const ref = refererFor(host);
+      if (ref) headers["referer"] = ref;
+      const res = await fetch(merchantUrl, { headers, redirect: "follow", signal: AbortSignal.timeout(15_000) });
+      if (res.ok && (res.headers.get("content-type") ?? "").startsWith("image/")) {
+        const ab = await res.arrayBuffer();
+        if (ab.byteLength > 0 && ab.byteLength <= 8_000_000) return Buffer.from(ab);
+      }
+    } catch { /* fall through to the proxy */ }
+  }
+
+  /* Proxy fallback (Kara og:image, or a direct fetch that didn't yield an image). */
   try {
     const res = await fetch(`${SITE}/api/img-proxy?url=${encodeURIComponent(merchantUrl)}`, {
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(15_000),
       headers: { "user-agent": "havlo-image-rehost/1.0" },
     });
-    if (!res.ok) return null;
-    if (!(res.headers.get("content-type") ?? "").startsWith("image/")) return null;
+    if (!res.ok || !(res.headers.get("content-type") ?? "").startsWith("image/")) return null;
     const ab = await res.arrayBuffer();
     if (ab.byteLength === 0 || ab.byteLength > 8_000_000) return null;
     return Buffer.from(ab);
@@ -95,7 +152,7 @@ async function main(): Promise<void> {
   let hosted = 0, skipped = 0, failed = 0, done = 0;
 
   async function processOne(row: { id: string; image_url: string }): Promise<void> {
-    const bytes = await fetchViaProxy(row.image_url);
+    const bytes = await fetchImage(row.image_url);
     if (!bytes) { skipped++; return; }
     const webp = await normalizeToWebp(bytes);
     if (!webp) { skipped++; return; }
