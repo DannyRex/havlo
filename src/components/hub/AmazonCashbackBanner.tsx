@@ -17,15 +17,9 @@ export default function AmazonCashbackBanner({ country }: { country: Country }) 
     <Link
       href={`/${country.code}/cashback`}
       aria-label={`Earn ${rate}% cashback on Amazon orders. Cashback coming soon, join the waitlist`}
-      className="group relative block overflow-hidden rounded-2xl border border-success/30 bg-gradient-to-r from-success/10 via-success/5 to-transparent p-5 sm:p-6 mb-8 hover:border-success/50 transition-colors"
+      className="group block rounded-2xl border border-success/30 bg-success/5 p-5 sm:p-6 mb-8 hover:border-success/50 transition-colors"
     >
-      {/* Soft decorative glow, hidden from a11y tree */}
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-success/10 blur-2xl"
-      />
-
-      <div className="relative flex items-center gap-4 sm:gap-5">
+      <div className="flex items-center gap-4 sm:gap-5">
         {/* Percent badge */}
         <span className="shrink-0 grid place-items-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-success/15 text-success">
           <BadgePercent size={26} strokeWidth={2} aria-hidden="true" />
