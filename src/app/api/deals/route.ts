@@ -3,6 +3,7 @@ import { getActiveBrowseProvider } from "@/lib/providers";
 import { spaceByStore } from "@/lib/providers/curated-helper";
 import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore, isCrossBorderStore } from "@/lib/country";
+import { getPrecomputedOriginCounts } from "@/lib/deals/precomputed-counts";
 import { isStoreSearchUrl } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import { fetchSearchSuggestions } from "@/lib/search/suggestions";
@@ -509,22 +510,12 @@ export async function GET(req: NextRequest) {
     const qualifyingLocal = qualifyingCountryFiltered.filter(isLocalToUser);
     const qualifyingIntl  = qualifyingCountryFiltered.filter((d) => !isLocalToUser(d));
 
-    /* originCounts (the All / Local / Intl tab pills) are ALWAYS derived
-       from the in-memory filtered pool — the SAME list that produces the
-       items + `total` below — so each pill equals the number of cards the
-       grid actually paginates through.
-
-       Browse-mode previously used a separate product_best_offers head
-       count to "surface catalog truth beyond the 3-pass cap". But that
-       count's intl rule (is_international AND store_country IS NULL) is
-       TIGHTER than filterDealsForCountry's cross-border set, so it
-       UNDER-counted the displayed pool — NG appliances read pill 79 vs
-       192 deals shown. User report June 2026: "the category-card / All-tab
-       count doesn't match the deals displayed." Pool-derived counts cap
-       with the 3-pass pool, but so does the grid, so count == displayed.
-       (The homepage category tiles compute the SAME number via
-       provider.fetchDeals + filterDealsForCountry — see CategoryGrid.) */
-    const originCounts = {
+    /* Pool-derived origin counts — the SAME list that produces items +
+       `total` below, so each pill equals the cards the grid paginates.
+       Used directly for SEARCH (must reflect results + gate live-search at
+       originCounts.all < LIVE_SEARCH_THRESHOLD) and tier-filtered views, and
+       as the FALLBACK when the precomputed table is unavailable. */
+    const poolOriginCounts = {
       all:   qualifyingCountryFiltered.length,
       local: qualifyingLocal.length,
       intl:  qualifyingIntl.length,
@@ -532,6 +523,20 @@ export async function GET(req: NextRequest) {
       localDeals: qualifyingLocal.filter((d) => d.discountPercent > 0).length,
       intlDeals:  qualifyingIntl.filter((d) => d.discountPercent > 0).length,
     };
+
+    /* Default BROWSE view (no search, no tier): prefer the accurate
+       precomputed counts (category_reach_counts, cron-maintained) so the
+       pill == the homepage tile and isn't truncated by the 3-pass display
+       cap (fashion read 249 for ZA vs 2,157 real). A single cheap indexed
+       read; returns null → falls back to the pool counts when the table is
+       missing/stale. The grid still paginates the shallow pool, so for a few
+       mega categories the count exceeds the rendered cards — DealFeed
+       discloses "showing the top N" (no contradiction). */
+    const isPlainBrowse = !(search && search.trim()) && userMinDiscount === 0;
+    const precomputedCounts = isPlainBrowse
+      ? await getPrecomputedOriginCounts(country, category)
+      : null;
+    const originCounts = precomputedCounts ?? poolOriginCounts;
 
     /* Items pool: qualifying pool, narrowed to the user's origin choice. */
     let qualifyingByOrigin =

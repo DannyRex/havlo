@@ -1,0 +1,50 @@
+name: Compute category counts
+
+# Refreshes the category_reach_counts table (migration 0071) with the TRUE
+# per-country reachable deal counts, so the homepage tiles + /deals pills can
+# read a tiny precomputed table instead of scanning the whole product_best_
+# offers view at request time (that request-time scan caused the June-2026
+# connection-pool incident). The compute is a single GENTLE sequential pass,
+# off the request path, once a day.
+#
+# Cadence: daily 06:30 UTC — after the 05:00 Mon/Thu big scrape + the daily
+# free scrape have run and ingest has settled. The reader treats rows older
+# than 48h as stale and falls back to live pool-derived counts, so one missed
+# run degrades gracefully rather than serving wrong numbers.
+#
+# GitHub Actions (not Vercel/Supabase cron): free on the public repo, run logs
+# preserved, and a red run is a visible signal. Needs the service-role key to
+# UPSERT — same secret the scrape/ingest jobs already use.
+
+on:
+  schedule:
+    - cron: "30 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  compute:
+    runs-on: ubuntu-latest
+    # Generous headroom; the script finishes in a few seconds under normal
+    # catalog size (one sequential ~10-page read + an UPSERT of ~66 rows).
+    timeout-minutes: 10
+    env:
+      SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compute + upsert category counts
+        run: npx tsx scripts/compute-category-counts.ts

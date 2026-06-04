@@ -490,6 +490,26 @@ export function isGlobalIntlStore(storeId: string, storeName: string): boolean {
   return matchesAny(id, GLOBAL_INTL_STORES) || matchesAny(name, GLOBAL_INTL_STORES);
 }
 
+/* Is this deal LOCAL to the visitor's country? The /deals route's inline
+   `isLocalToUser` closure is byte-identical to this; the precomputed-counts
+   cron (compute-category-counts.ts) uses THIS so its origin buckets match the
+   grid's exactly. Precedence: DB store_country → JS roster → global-store veto
+   → currency. Keep the two in sync. */
+export function isDealLocalToCountry(
+  d: { storeId: string; storeName: string; storeCountry?: string | null; currency: string },
+  country: Country,
+): boolean {
+  if (d.storeCountry) {
+    return d.storeCountry.toLowerCase() === country.code.toLowerCase();
+  }
+  const sc = inferStoreCountry(d.storeId, d.storeName);
+  if (sc !== null) {
+    return sc.toLowerCase() === country.code.toLowerCase();
+  }
+  if (isGlobalIntlStore(d.storeId, d.storeName)) return false;
+  return d.currency === country.currency;
+}
+
 /* Per-country anchored stores. The filter doesn't strictly require
    these (untagged intl rows pass through too) but having them mapped
    lets future code prioritize "real" country stores in ranking +

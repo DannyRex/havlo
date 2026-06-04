@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getCountry, filterDealsForCountry } from "@/lib/country";
+import { getPrecomputedCategoryCounts } from "@/lib/deals/precomputed-counts";
 import { categories } from "@/lib/data/categories";
 
 /* /api/category-counts?country=cc
@@ -33,6 +34,16 @@ export async function GET(req: NextRequest) {
   const empty = Object.fromEntries(browsable.map((c) => [c.slug, 0]));
 
   try {
+    /* Prefer the precomputed `category_reach_counts` table — accurate +
+       a single cheap indexed read. Returns null (→ falls through to the
+       live per-category loop below) when the table is missing/empty/stale,
+       so this is safe before migration 0071 + the cron exist. */
+    const pre = await getPrecomputedCategoryCounts(country);
+    if (pre) {
+      const counts = Object.fromEntries(browsable.map((c) => [c.slug, pre[c.slug] ?? 0]));
+      return json({ counts, country: cc }, "s-maxage=120, stale-while-revalidate=600");
+    }
+
     const provider = await getActiveBrowseProvider();
     if (!provider) {
       return json({ counts: empty, country: cc }, "no-store");
