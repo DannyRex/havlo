@@ -41,7 +41,8 @@
     "fetch:fx": "tsx --tsconfig tsconfig.scripts.json scripts/fetch-fx-rates.ts",
     "sweep:stale-offers": "tsx --tsconfig tsconfig.scripts.json scripts/sweep-stale-offers.ts",
     "scrape:brand-dtc": "tsx --tsconfig tsconfig.scripts.json scripts/scrape-brand-dtc.ts",
-    "backfill:images": "tsx --tsconfig tsconfig.scripts.json scripts/backfill-product-images.ts"
+    "backfill:images": "tsx --tsconfig tsconfig.scripts.json scripts/backfill-product-images.ts",
+    "backfill:self-host-images": "tsx --tsconfig tsconfig.scripts.json scripts/backfill-self-host-images.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.0",

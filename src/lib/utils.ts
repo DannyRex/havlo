@@ -317,6 +317,13 @@ const DIRECT_LOAD_IMAGE_HOSTS = new Set([
      those are different TLDs and remain in the proxy allowlist with
      their proper Referer rewrites. */
   "amazonaws.com",
+  /* Supabase Storage — our OWN self-hosted product images
+     (<project-ref>.supabase.co/storage/v1/object/public/product-images/...).
+     Public bucket, behind Supabase's CDN, no Referer, already a normalized
+     webp -> serve direct (no proxy hop, no adblock concern). The
+     subdomain-suffix matcher (".supabase.co") covers the project host.
+     Pipeline: migration 0076 + scripts/backfill-self-host-images.ts. */
+  "supabase.co",
 ]);
 
 /* Wrap an external image URL through /api/img-proxy unless its host
