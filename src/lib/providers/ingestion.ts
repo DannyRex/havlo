@@ -17,6 +17,7 @@ import { canonicaliseOfferUrl } from "@/lib/url-helpers";
 import { priceLooksPlausible } from "@/lib/search/price-floor";
 import { FX_GENERATED } from "@/lib/fx-rates.generated";
 import { rewriteMerchantUrl } from "@/lib/merchant-url-rewrite";
+import { isPlaceholderImageUrl } from "@/lib/utils";
 
 /* Secret-scrubber leakage guard. The upstream provider chain has a
    middleware that replaces detected secrets (JWTs, API keys, OAuth
@@ -260,7 +261,12 @@ function dealToProductRow(d: Deal, signature: string | null) {
     category_slug: correctedSlug,
     brand: parsed.brand,
     model: parsed.model,
-    image_url: d.imageUrl ?? null,
+    /* Drop literal "no image" placeholder graphics (a pharmacy Shopify
+       template, medplus's image-place-holder.png, ...) at the source: store
+       NULL so the Havlo logo fallback renders instead of leaking a foreign
+       placeholder into our cards. Strictly better than the prior behaviour,
+       which stored the placeholder URL verbatim. */
+    image_url: d.imageUrl && !isPlaceholderImageUrl(d.imageUrl) ? d.imageUrl : null,
     /* Empty-string signature → NULL in the DB. buildSignature returns
        "" when it can't extract both brand AND model (May 2026 audit:
        69% of catalog falls into this bucket — Fashion, Beauty, etc.).

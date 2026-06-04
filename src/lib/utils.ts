@@ -349,6 +349,34 @@ function isDirectLoadHost(hostname: string): boolean {
   return false;
 }
 
+/* Literal "no image available" placeholder graphics that some merchant feeds
+   hand us as the product image: a pharmacy Shopify template
+   ("online-pharmacy-product-image-placeholder"), medplus's
+   "image-place-holder.png", and similar. These are NOT real product photos --
+   a single grey "no image" PNG reused across many SKUs. Storing/self-hosting
+   one leaks a foreign placeholder into our product cards AND collapses dozens
+   of unrelated products to one perceptual-hash. Treat a matching URL as "no
+   image" so the Havlo logo fallback (ResilientImage) renders instead.
+
+   DELIBERATELY does NOT match gstatic / encrypted-tbn thumbnails -- those are
+   real (if low-res) product images, not placeholders. Substring match is
+   indexOf-based to stay ES5-safe for the public bundle. */
+const PLACEHOLDER_IMAGE_PATTERNS = [
+  "placeholder", "place-holder", "place_holder",
+  "no-image", "noimage", "no_image", "no-img", "noimg",
+  "default-product", "default-image", "default_image", "defaultimage",
+  "coming-soon", "comingsoon", "image-not", "not-available",
+  "image_not_found", "imagenotfound", "no-photo", "nopic",
+];
+export function isPlaceholderImageUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const u = url.toLowerCase();
+  for (let i = 0; i < PLACEHOLDER_IMAGE_PATTERNS.length; i++) {
+    if (u.indexOf(PLACEHOLDER_IMAGE_PATTERNS[i]) !== -1) return true;
+  }
+  return false;
+}
+
 export function proxiedImageUrl(rawUrl: string | null | undefined): string {
   if (!rawUrl) return "";
   if (rawUrl.startsWith("/")) return rawUrl;

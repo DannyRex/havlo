@@ -29,6 +29,7 @@ try {
 
 import { getSupabaseAdmin } from "../src/lib/providers/db-client";
 import { normalizeToWebp, uploadProductImage } from "../src/lib/providers/storage";
+import { isPlaceholderImageUrl } from "../src/lib/utils";
 
 const SITE = process.env.SITE ?? "https://havlo.io";
 const DRY_RUN = process.argv.includes("--dry-run");
@@ -152,6 +153,18 @@ async function main(): Promise<void> {
   let hosted = 0, skipped = 0, failed = 0, done = 0;
 
   async function processOne(row: { id: string; image_url: string }): Promise<void> {
+    /* A literal "no image" placeholder (older ingest, or a feed not guarded at
+       ingest time) must never be hosted -- it would leak a foreign placeholder
+       into our cards and collide dozens of unrelated products to one hash.
+       Null the pointer so the Havlo fallback renders, and clear any phash so it
+       can't drive pooling. */
+    if (isPlaceholderImageUrl(row.image_url)) {
+      if (!DRY_RUN) {
+        await supa!.from("products").update({ image_url: null, image_phash: null }).eq("id", row.id);
+      }
+      skipped++;
+      return;
+    }
     const bytes = await fetchImage(row.image_url);
     if (!bytes) { skipped++; return; }
     const webp = await normalizeToWebp(bytes);
