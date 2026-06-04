@@ -32,7 +32,7 @@ try {
 } catch {/* */}
 
 import { getSupabaseAdmin } from "../src/lib/providers/db-client";
-import { buildSignature } from "../src/lib/search/normalize";
+import { buildSignature, isLooseCategoryModel } from "../src/lib/search/normalize";
 
 interface ProductRow {
   id:        string;
@@ -113,8 +113,22 @@ async function main() {
     list.push(id);
     groupsByKey.set(key, list);
   }
+  /* Guard: NEVER physically merge a loose-category signature
+     (brand|<category>, e.g. "mango|dress", "clinique|lipstick"). The
+     lever-1 brand dictionary (Jun 2026) made many fashion/beauty items
+     parse such signatures, but brand+category alone is NOT a product
+     identity -- physically merging them would irreversibly collapse every
+     Mango dress into one row (the May 2026 over-pool). They keep their
+     signature, but the DESTRUCTIVE merge here is gated to keys that carry
+     a real model/identity. Fragrance line keys ("dior|sauvage"), real
+     model keys ("apple|iphone 15") and inches-refined keys
+     ("lg|oled c3|55in") all pass; bare brand|<loose-category> does not. */
+  const isLooseKey = (key: string): boolean => {
+    const parts = key.split("|");
+    return parts.length === 2 && isLooseCategoryModel(parts[1]);
+  };
   const dupGroups = Array.from(groupsByKey.entries())
-    .filter(([, ids]) => ids.length > 1);
+    .filter(([key, ids]) => ids.length > 1 && !isLooseKey(key));
 
   console.log(`▶ Duplicate groups: ${dupGroups.length}`);
   console.log(`  Total duplicate rows to merge: ${
