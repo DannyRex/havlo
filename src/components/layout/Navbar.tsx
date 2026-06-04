@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, Tag, Search, Info, Coins, BookOpen, Menu, X } from "lucide-react";
+import { Home, Tag, Search, Info, Coins, BookOpen, Menu, X, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import Logo from "@/components/ui/Logo";
@@ -44,6 +44,7 @@ const navLinks = [
   { href: "/deals",    label: "Deals",         Icon: Tag      },
   { href: "/compare",  label: "Find for less", Icon: Search   },
   { href: "/cashback", label: "Cashback",      Icon: Coins    },
+  { href: "/amazon",   label: "Save with Amazon", Icon: ShoppingBag },
   { href: "/blog",     label: "Blog",          Icon: BookOpen },
   { href: "/about",    label: "About",         Icon: Info     },
 ];
