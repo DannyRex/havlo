@@ -19,6 +19,7 @@ import MasonryCard from "@/components/deals/MasonryCard";
 import { pdpUrlForDeal } from "@/lib/pdp-url";
 import { categories as ALL_CATEGORIES } from "@/lib/data/categories";
 import { cn, formatCount } from "@/lib/utils";
+import { useHideOnScrollDown } from "@/lib/use-hide-on-scroll";
 import type { Deal } from "@/types";
 
 type SortKey = "recommended" | "discount" | "price-asc" | "price-desc" | "newest";
@@ -83,6 +84,10 @@ export default function AmazonDealsBrowser({
   useEffect(() => {
     setShuffleSeed(Math.floor(Math.random() * 2 ** 31));
   }, []);
+
+  /* Mobile headroom: hide the sticky filter bar on scroll-down, reveal on
+     scroll-up (same as the /deals feed). Desktop stays pinned. */
+  const filtersHidden = useHideOnScrollDown();
 
   /* Category chips: the canonical list, narrowed to those actually
      present in the Amazon set (keeps order + display names). */
@@ -166,6 +171,19 @@ export default function AmazonDealsBrowser({
 
   return (
     <div>
+      {/* Sticky filter bar with mobile HEADROOM (parity with /deals):
+          category chips + count/sort controls. position:sticky pins it
+          under the navbar once scrolled to the top; on mobile it slides up
+          behind the navbar on scroll-DOWN (-translate-y-full, no overshoot)
+          and reappears on scroll-UP. Desktop stays pinned. Full-bleed
+          negates the page's px-4/6/8 gutters. */}
+      <div
+        className={cn(
+          "sticky top-16 z-30 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 pt-3 pb-3 mb-4 bg-bg border-b border-border",
+          "transition-transform duration-300 ease-out motion-reduce:transition-none",
+          filtersHidden ? "-translate-y-full sm:translate-y-0" : "translate-y-0",
+        )}
+      >
       {/* Category chips */}
       <div className="flex gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
         {catOptions.map((c) => {
@@ -190,7 +208,7 @@ export default function AmazonDealsBrowser({
       </div>
 
       {/* Count + country/sort controls */}
-      <div className="mt-3 mb-4 flex flex-wrap items-center justify-between gap-2">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[13px] text-ink-3 tabular-nums">
           {formatCount(filtered.length)} {filtered.length === 1 ? "deal" : "deals"}
         </p>
@@ -218,6 +236,7 @@ export default function AmazonDealsBrowser({
             options={SORTS}
           />
         </div>
+      </div>
       </div>
 
       {/* Grid */}

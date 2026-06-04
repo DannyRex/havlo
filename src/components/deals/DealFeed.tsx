@@ -15,6 +15,7 @@ import LiveResults from "@/components/compare/LiveResults";
 import CompareAnchorCard from "@/components/compare/CompareAnchorCard";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { cn, formatCount } from "@/lib/utils";
+import { useHideOnScrollDown } from "@/lib/use-hide-on-scroll";
 import { categories } from "@/lib/data/categories";
 import { logSearchEvent } from "@/lib/search/log-search";
 import type { Deal, DiscountTier, OriginFilter, SortOption } from "@/types";
@@ -336,6 +337,10 @@ export default function DealFeed({
      Default: grid. Persisted in localStorage so the user's choice
      sticks across sessions. */
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
+
+  /* Mobile headroom: the sticky filter bar slides up behind the navbar on
+     scroll-DOWN and reappears on scroll-UP; desktop stays pinned. */
+  const filtersHidden = useHideOnScrollDown();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -940,10 +945,18 @@ export default function DealFeed({
           The sort dropdown JSX is inlined twice rather than extracted
           to a helper — duplication is small (~10 lines), avoids the
           render overhead of a tiny client subcomponent. */}
-      {/* Filter row — NON-sticky: it scrolls away with the content
-          (user preference, June 2026) instead of pinning, so the mobile
-          feed gets the full screen once the user scrolls past it. */}
-      <div className="-mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg border-b border-border">
+      {/* Sticky filter row with mobile HEADROOM: position:sticky pins it
+          under the navbar once scrolled to the top; on mobile it then
+          slides up behind the navbar on scroll-DOWN (-translate-y-full,
+          which tucks under the opaque z-40 navbar, no overshoot) and
+          reappears on scroll-UP. Desktop (sm+) stays pinned. */}
+      <div
+        className={cn(
+          "sticky top-16 z-30 -mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg border-b border-border",
+          "transition-transform duration-300 ease-out motion-reduce:transition-none",
+          filtersHidden ? "-translate-y-full sm:translate-y-0" : "translate-y-0",
+        )}
+      >
         {/* Row 1 — CategoryNav (always full-width). The previous
             attempt to inline the mobile sort here overlapped the
             rightmost chip even with `overflow-hidden` because
