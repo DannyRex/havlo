@@ -50,7 +50,7 @@ import { partitionDupesByVariantMatchDeep } from "@/lib/search/variant-pooling-d
 import { selectLineConfigs } from "@/lib/search/line-configs";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
 import { fetchProductMeta } from "@/lib/offers/fetch-product-description";
-import { usdToNgn, cleanTitle, formatPriceForUser } from "@/lib/utils";
+import { usdToNgn, cleanTitle, formatPriceForUser, convertForUser } from "@/lib/utils";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { getCategory } from "@/lib/data/categories";
 import { slugifyBrand } from "@/lib/hubs";
@@ -1184,17 +1184,22 @@ export default async function ProductPage({ params }: PageProps) {
 
   /* Build offer block — single Offer when only one store, or
      AggregateOffer when multiple stores carry the same product
-     (perStoreOffers from computeAnchorStats above). lowPrice /
-     highPrice are in the visiting offer's currency to match the
-     other PDP signals; numbers come from the country-aware
-     effectiveLandedPrice rollup the spectrum already uses. */
+     (perStoreOffers from computeAnchorStats above). Prices are emitted
+     in the VISITOR's display currency (country.currency) and derived via
+     convertForUser -- the SAME conversion the visible on-page price uses
+     -- so the structured data can never contradict what the user reads.
+     (Launch QA caught the old form: the AggregateOffer emitted effectiveNgn
+     NGN numbers under priceCurrency: offer.currency, e.g. lowPrice 36680
+     tagged USD on a GBP page -- a machine-facing contradiction.) */
+  const jsonLowNgn  = Math.min(...perStoreOffers.map((o) => o.effectiveNgn));
+  const jsonHighNgn = Math.max(...perStoreOffers.map((o) => o.effectiveNgn));
   const offerBlock = perStoreOffers.length > 1
     ? {
         "@type":         "AggregateOffer",
         url:             productUrl,
-        priceCurrency:   offer.currency,
-        lowPrice:        Math.min(...perStoreOffers.map((o) => o.effectiveNgn)),
-        highPrice:       Math.max(...perStoreOffers.map((o) => o.effectiveNgn)),
+        priceCurrency:   country.currency,
+        lowPrice:        Math.round(convertForUser(jsonLowNgn, country, "NGN") * 100) / 100,
+        highPrice:       Math.round(convertForUser(jsonHighNgn, country, "NGN") * 100) / 100,
         offerCount:      perStoreOffers.length,
         availability:    offer.in_stock
           ? "https://schema.org/InStock"
@@ -1204,8 +1209,8 @@ export default async function ProductPage({ params }: PageProps) {
     : {
         "@type":         "Offer",
         url:             productUrl,
-        priceCurrency:   offer.currency,
-        price:           offer.current_price,
+        priceCurrency:   country.currency,
+        price:           Math.round(convertForUser(offer.current_price, country, offer.currency === "USD" ? "USD" : "NGN") * 100) / 100,
         availability:    offer.in_stock
           ? "https://schema.org/InStock"
           : "https://schema.org/OutOfStock",

@@ -593,7 +593,7 @@ export function formatPriceDeltaForUser(
 /* Shared conversion path. Avoids duplicating the
    source-currency-aware math between the adaptive + exact
    formatters. */
-function convertForUser(
+export function convertForUser(
   amount:         number,
   country:        Country,
   sourceCurrency: "NGN" | "USD",
