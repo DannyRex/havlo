@@ -354,7 +354,9 @@ jobs:
     # ~3 min of runner time on a no-op dedup.
     if: success() || failure()
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 10 -> 20 (Jun 2026): the self-host-images step below adds a few minutes
+    # for newly-ingested products (steady-state ~hundreds/run; capped at 3000).
+    timeout-minutes: 20
     env:
       SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -387,6 +389,17 @@ jobs:
       - name: Seed missing price-history points
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
         run: npm run seed:price-history
+
+      # Self-host newly-ingested product images into Supabase Storage (#133).
+      # Runs after dedup so it hosts the canonical post-merge products, not
+      # duplicates about to be collapsed. Fetches merchant images direct
+      # (concurrency 32) and uploads normalized webp; idempotent (only rows
+      # with stored_image_at IS NULL). Steady-state is a few hundred new
+      # images/run (~30s); --limit=3000 caps a runaway. No-ops until migration
+      # 0076 + the public "product-images" bucket exist.
+      - name: Self-host new product images → Supabase Storage
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: npm run backfill:self-host-images -- --limit=3000
 
   # ── Job 5: Send the weekly newsletter digest. Runs after dedup
   #          completes so the digest pulls the freshly-deduped
