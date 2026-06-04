@@ -43,8 +43,7 @@ import { newsletterDigest } from "../../src/lib/email/templates/newsletter-diges
 import { sendEmail } from "../../src/lib/email/send";
 import { unsubscribeLink, unsubscribeHeaders } from "../../src/lib/email/unsubscribe-token";
 import { categories } from "../../src/lib/data/categories";
-import { getClickThroughUrl } from "../../src/lib/utils";
-import { appendSignature } from "../../src/lib/go-signing";
+import { pdpUrlForDeal } from "../../src/lib/pdp-url";
 import type { Country } from "../../src/lib/country";
 import type { Deal } from "../../src/types";
 
@@ -178,7 +177,12 @@ async function buildDigestDeals(
       originalDisplay: d.originalPrice > d.salePrice ? formatLocal(orig, country) : null,
       discountPercent: d.discountPercent ?? 0,
       storeName:       d.storeName,
-      url:             `${SITE_URL}${appendSignature(getClickThroughUrl(d))}`,
+      /* Link to OUR PDP, not a signed click-through straight to the
+         merchant. Landing on the product page first means the visit is
+         tracked (pdp_views + analytics), the reader sees the price
+         history / cross-store compare before buying, and the affiliate
+         click still happens via the PDP's "Visit store" CTA. */
+      url:             `${SITE_URL}${pdpUrlForDeal(country.code, d)}`,
     };
   });
 }
