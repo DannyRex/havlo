@@ -359,6 +359,18 @@ jobs:
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
         run: npm run dedup
 
+      # Seed a "tracking starts now" price-history point for any offer
+      # ingested this cycle that doesn't have one yet (#24). Runs AFTER
+      # dedup so it seeds the canonical post-merge offers, not duplicates
+      # that are about to be collapsed. Mirrors the identical step in
+      # scrape-free-daily.yml's dedup job: without it, a product ingested
+      # on the Mon/Thu run rendered an empty price chart until the next
+      # free-daily seed (Tue/Fri) caught it. Idempotent + no API credits;
+      # no-ops until migration 0067 is applied.
+      - name: Seed missing price-history points
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: npm run seed:price-history
+
   # ── Job 5: Send the weekly newsletter digest. Runs after dedup
   #          completes so the digest pulls the freshly-deduped
   #          catalog, not a half-ingested snapshot.
