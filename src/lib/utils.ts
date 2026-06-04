@@ -404,8 +404,12 @@ export function formatNaira(amount: number): string {
   }).format(amount)}`;
 }
 
-/** Approximate NGN per 1 USD — update periodically */
-export const USD_TO_NGN = 1_600;
+/** USD->NGN baseline. Aligned with the fx_rate('USD','NGN') seed + fallback
+ *  in migration 0072 (SQL RPCs used 1650, this used 1600 — the drift 0072/0073
+ *  unify). The LIVE rate lives in the fx_rates table and is read by the SQL
+ *  price RPCs; this client-safe constant is the sync fallback for the TS
+ *  layer (utils stays free of any DB import so it ships in client bundles). */
+export const USD_TO_NGN = 1_650;
 
 export function formatUSD(amount: number): string {
   return new Intl.NumberFormat("en-US", {

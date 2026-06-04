@@ -1,0 +1,40 @@
+name: Refresh FX rates
+
+# Daily currency-rate refresh into the fx_rates table (migration 0072) that
+# the SQL RPCs (via fx_rate()) and TS (via src/lib/fx.ts) read instead of a
+# hardcoded USD->NGN. Runs at 03:00 UTC -- BEFORE the 05:00 scrape/ingest
+# workflows, so a day's ingest normalises USD offers at the fresh rate.
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  fx:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # NGN policy: the API reports the OFFICIAL naira rate, which runs
+      # below the parallel/street rate used for USD goods (likely why 1650
+      # was hardcoded). Leave this UNSET to keep the manually-set NGN row
+      # untouched (the other 5 currencies still refresh live). Set it to
+      # manage NGN live as official x premium, e.g. "1.2" for a ~20% spread.
+      # NGN_PARALLEL_PREMIUM: "1.2"
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch + upsert FX rates
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: npm run fetch:fx

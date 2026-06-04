@@ -59,7 +59,7 @@ export interface MerchantConfig {
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
 
-const NGN_PER_USD = 1600;
+const NGN_PER_USD = 1650;
 
 function inferCategoryFromTitle(title: string): string | null {
   const t = title.toLowerCase();

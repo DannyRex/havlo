@@ -138,7 +138,7 @@ async function embedText(
         category:     d.category,
         store_id:     d.storeId,
         price_ngn:    d.currency === "USD"
-                        ? Math.round(d.salePrice * 1600)
+                        ? Math.round(d.salePrice * 1650)
                         : d.salePrice,
         image_url:    d.imageUrl ?? null,
         brand:        ext?.brand ?? null,
@@ -268,7 +268,7 @@ async function embedImages(
       title:          x.deal.title,
       category:       x.deal.category,
       store_id:       x.deal.storeId,
-      price_ngn:      x.deal.currency === "USD" ? Math.round(x.deal.salePrice * 1600) : x.deal.salePrice,
+      price_ngn:      x.deal.currency === "USD" ? Math.round(x.deal.salePrice * 1650) : x.deal.salePrice,
       image_url:      x.deal.imageUrl,
       image_emb:      embeddings[j],
       image_url_hash: sha256(x.deal.imageUrl),

@@ -1102,7 +1102,7 @@ export async function ingestDeals(
      Drops are logged (not silent) so we notice if a real legit
      sub-floor deal gets rejected — that would be a flagship-floor
      map tuning issue we want to surface. */
-  const USD_TO_NGN = 1_600;  // matches price-floor.ts USD_TO_NGN
+  const USD_TO_NGN = 1_650;  // ingest plausibility floor; aligned with fx_rate() seed (0072) + utils.ts
   const refusedAsBogus: Array<{ title: string; storeId: string; ngn: number }> = [];
   const offerWritesPlausible: typeof offerWrites = [];
   for (const w of offerWrites) {
