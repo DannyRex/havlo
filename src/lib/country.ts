@@ -101,7 +101,7 @@ export function getCountry(code: string | undefined | null): Country {
    in scripts/fetch-fx-rates.ts. */
 const USD_FX_FALLBACK: Record<Country["currency"], number> = {
   USD: 1.00,
-  NGN: 1600,
+  NGN: 1650,
   GBP: 0.79,
   EUR: 0.92,
   AED: 3.67,

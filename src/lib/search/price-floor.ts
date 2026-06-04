@@ -142,15 +142,16 @@ export function priceLooksPlausible(
   return priceNgn >= floor;
 }
 
+import { FX_GENERATED } from "@/lib/fx-rates.generated";
 /* Live-deal variant: live-search rows store prices in USD even for
    non-NG markets (SerpAPI normalises). Convert to NGN before
    applying the floor. The flagship floor map is in NGN so this is
    the conversion cost we pay once per row.
 
-   Approximate FX (matches the Country.USD_FX table). Could pull
-   from there but importing creates a cross-module dep cycle —
-   inline is fine for a constant we update quarterly anyway. */
-const USD_TO_NGN = 1_600;
+   Single-sourced from the build-time FX mirror (fx-rates.generated.ts is a
+   leaf constant -- no imports, so no dep cycle) so this floor reads the same
+   USD->NGN rate as country.USD_FX and utils.USD_TO_NGN, never a stale one. */
+const USD_TO_NGN = FX_GENERATED.NGN ?? 1_600;
 
 export function priceLooksPlausibleForLiveDeal(
   priceUsd: number,

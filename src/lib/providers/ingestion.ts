@@ -15,6 +15,7 @@ import { categoryDisagreesWithTitle } from "@/lib/categorize";
 import { categories } from "@/lib/data/categories";
 import { canonicaliseOfferUrl } from "@/lib/url-helpers";
 import { priceLooksPlausible } from "@/lib/search/price-floor";
+import { FX_GENERATED } from "@/lib/fx-rates.generated";
 import { rewriteMerchantUrl } from "@/lib/merchant-url-rewrite";
 
 /* Secret-scrubber leakage guard. The upstream provider chain has a
@@ -1102,7 +1103,7 @@ export async function ingestDeals(
      Drops are logged (not silent) so we notice if a real legit
      sub-floor deal gets rejected — that would be a flagship-floor
      map tuning issue we want to surface. */
-  const USD_TO_NGN = 1_650;  // ingest plausibility floor; aligned with fx_rate() seed (0072) + utils.ts
+  const USD_TO_NGN = FX_GENERATED.NGN ?? 1_650;  // ingest plausibility floor; shared FX mirror so it tracks the same USD->NGN as engine/display
   const refusedAsBogus: Array<{ title: string; storeId: string; ngn: number }> = [];
   const offerWritesPlausible: typeof offerWrites = [];
   for (const w of offerWrites) {

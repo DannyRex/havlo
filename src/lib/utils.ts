@@ -404,12 +404,17 @@ export function formatNaira(amount: number): string {
   }).format(amount)}`;
 }
 
-/** USD->NGN baseline. Aligned with the fx_rate('USD','NGN') seed + fallback
- *  in migration 0072 (SQL RPCs used 1650, this used 1600 — the drift 0072/0073
- *  unify). The LIVE rate lives in the fx_rates table and is read by the SQL
- *  price RPCs; this client-safe constant is the sync fallback for the TS
- *  layer (utils stays free of any DB import so it ships in client bundles). */
-export const USD_TO_NGN = 1_650;
+import { FX_GENERATED } from "@/lib/fx-rates.generated";
+/** USD->NGN baseline, SINGLE-SOURCED from the build-time FX mirror
+ *  (fx-rates.generated.ts), which the daily FX cron rewrites from the
+ *  fx_rates table -- the same table the SQL price RPCs read via fx_rate().
+ *  So the engine rate (this), the display rate (country.USD_FX, which also
+ *  reads the mirror) and the DB/SQL rate are ONE number by construction and
+ *  cannot drift apart (this closes the launch-QA "1650 vs 1600" split). The
+ *  literal is only a fallback if the generated file is ever missing NGN.
+ *  The mirror is a static client-safe constant, so utils stays DB-import-free
+ *  and still ships in client bundles. */
+export const USD_TO_NGN = FX_GENERATED.NGN ?? 1_650;
 
 export function formatUSD(amount: number): string {
   return new Intl.NumberFormat("en-US", {

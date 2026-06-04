@@ -11,7 +11,7 @@
    behaviour-neutral on deploy; the first cron run refreshes them to live. */
 export const FX_GENERATED: Record<string, number> = {
   USD: 1,
-  NGN: 1600,
+  NGN: 1650,
   GBP: 0.79,
   EUR: 0.92,
   AED: 3.67,

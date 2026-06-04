@@ -125,13 +125,13 @@ interface GoogleImagesResponse {
 
 /* ── Mapping helpers ─────────────────────────────────────────────── */
 
-/* USD-equivalent floor (re-using SerpAPI Google Shopping's table
-   for consistency). Jumia is NGN-priced, so we convert to NGN
-   floors via a static FX rate. ~₦1650 = $1 baseline (aligned with the
-   fx_rate() seed in migration 0072 + utils.ts USD_TO_NGN). The floors
-   below catch obvious mis-parsed prices (₦5 iPhone, etc.) before they
-   reach the UI. */
-const NGN_PER_USD = 1650;
+import { FX_GENERATED } from "@/lib/fx-rates.generated";
+/* USD-equivalent floor (re-using SerpAPI Google Shopping's table for
+   consistency). Jumia is NGN-priced, so we convert to NGN floors via the
+   shared build-time FX mirror (fx-rates.generated.ts) so this floor reads
+   the same USD->NGN rate as the engine/display, never a stale literal. The
+   floors below catch obvious mis-parsed prices (₦5 iPhone) before the UI. */
+const NGN_PER_USD = FX_GENERATED.NGN ?? 1650;
 const CATEGORY_NGN_FLOOR: Record<string, number> = {
   phones:      30 * NGN_PER_USD,    // ~₦48K
   computing:   60 * NGN_PER_USD,    // ~₦96K
