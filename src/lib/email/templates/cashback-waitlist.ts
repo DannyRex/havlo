@@ -33,13 +33,13 @@ export function cashbackWaitlistConfirmation({ country }: Args): Email {
   const dealsUrl = `${SITE_URL}/${cc}/deals`;
 
   const subject   = "You're on the cashback list";
-  const preheader = "We'll email you the day cashback ships. Until then, nothing.";
+  const preheader = "We'll email you when cashback is ready. Until then, nothing.";
 
   /* ── HTML body ──────────────────────────────────────────────── */
 
   const body = `
 ${paragraph("Hi,")}
-${paragraph(`You're in. We're a few weeks from launching cashback (actual accounts, actual payouts). When it ships, I'll email you here with what you've earned on qualifying stores, and how to withdraw.`)}
+${paragraph(`You're in. Cashback (real money back on what you'd buy anyway) is still in build. When it's ready, I'll email you here with how it works, which stores qualify, and how withdrawals happen.`)}
 ${paragraph(`Until then, keep using Havlo to ${textLink({ url: dealsUrl, label: "find cheaper deals across the stores you already know" })}.`)}
 ${signature("Danny")}
 ${spacer(8)}
@@ -51,7 +51,7 @@ ${spacer(8)}
 
   const text = plainTextShell({
     body: [
-      `You're in. We're a few weeks from launching cashback (actual accounts, actual payouts). When it ships, I'll email you here with what you've earned on qualifying stores, and how to withdraw.`,
+      `You're in. Cashback (real money back on what you'd buy anyway) is still in build. When it's ready, I'll email you here with how it works, which stores qualify, and how withdrawals happen.`,
       ``,
       `Until then, keep using Havlo to find cheaper deals across the stores you already know: ${dealsUrl}`,
     ],
