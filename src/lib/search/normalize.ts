@@ -101,6 +101,10 @@ const BRAND_ALIAS: Record<string, string> = {
   harmankardon: "harman",
   /* iRobot's Roomba is the household name */
   roomba:    "irobot",
+  /* Fashion/beauty: collapse the full house name to its short brand
+     slug so "Christian Dior Sauvage" and "Dior Sauvage" share one
+     signature brand (the data has both forms for the same fragrance). */
+  "christian dior": "dior",
 };
 
 export interface ProductSignature {
@@ -175,6 +179,52 @@ const FASHION_BEAUTY_BRANDS: string[] = [
   /* Single-word adds */
   "dkny", "akkriti", "ecru", "pantaloons", "lume",
   "bedoyecta", "clarins", "nivea", "remy",
+
+  /* ── Expanded fashion/beauty dictionary (launch QA, Jun 2026).
+     Seeded data-driven from the top brands among 8,127 null-signature
+     fashion/beauty products (mango, topshop, the Dior Sauvage cluster,
+     clinique, afnan, armaf, levis, crocs...) plus the major global
+     labels. Multi-word forms are listed first so getSortedBrands()
+     length-sorting prefers them over any single-word substring.
+     NOTE: a parsed brand alone does NOT pool a generic-title item
+     (isLooseCategoryModel still gates brand|<category> out of the pool).
+     This lever lifts brand EXTRACTION so (a) the FTS/embedding matchers
+     and SKU'd/identifiable items can pool, (b) the compare brand gate is
+     precise, and (c) brand labels/SEO improve. The brand|type|attribute
+     signature (lever 2) is the follow-up that pools the generic +
+     fragrance long tail. ── */
+
+  /* Fashion houses + high-street (multi-word first) */
+  "river island", "miss selfridge", "fashion union", "motel rocks",
+  "princess polly", "frankies bikinis", "new look", "jack wills",
+  "ted baker", "fred perry", "stone island", "the north face",
+  "dr martens", "and other stories", "jacqueline de yong",
+  "selected homme", "the couture club", "good for nothing",
+  "marc jacobs", "michael kors",
+  "topshop", "topman", "abercrombie", "hollister", "crocs", "arket",
+  "levis", "rayban", "allsaints", "collusion", "missguided", "bershka",
+  "stradivarius", "uniqlo", "primark", "boohoo", "prettylittlething",
+  "nastygal", "superdry", "reiss", "whistles", "monki", "timberland",
+  "birkenstock", "ugg", "patagonia", "columbia", "carhartt", "lacoste",
+  "barbour", "napapijri", "siksilk", "castore", "bardot", "jdy",
+  "diesel", "zara", "mango",
+
+  /* Beauty + fragrance (multi-word first) */
+  "christian dior", "estee lauder", "yves saint laurent",
+  "dolce gabbana", "paco rabanne", "jean paul gaultier", "tom ford",
+  "maison margiela", "viktor rolf", "thierry mugler", "franck olivier",
+  "jacques bogart", "swiss arabian", "ard al zaafaran",
+  "charlotte tilbury", "rare beauty", "huda beauty",
+  "anastasia beverly hills", "urban decay", "too faced",
+  "la roche posay", "first aid beauty", "drunk elephant",
+  "sol de janeiro", "mario badescu", "bobbi brown", "real techniques",
+  "wet n wild", "sigma beauty", "max factor", "milk makeup",
+  "kylie cosmetics", "elizabeth arden", "the ordinary",
+  "dior", "clinique", "lancome", "chanel", "givenchy", "versace",
+  "creed", "mugler", "afnan", "armaf", "amouage", "lattafa", "rasasi",
+  "ajmal", "armani", "revlon", "bourjois", "nyx", "nars", "morphe",
+  "cerave", "cetaphil", "loreal", "ysl", "prada", "gucci", "burberry",
+  "valentino", "guerlain", "shiseido", "olaplex", "redken",
 ];
 
 const ALL_BRANDS = [...BRANDS, ...FASHION_BEAUTY_BRANDS];
@@ -195,7 +245,7 @@ const BRANDS_BY_LENGTH = ALL_BRANDS.slice().sort((a, b) => b.length - a.length);
    OS platform). Genuine Google hardware (Pixel, Nest) doesn't have
    another competing brand in the title, so the fallback to the
    ambiguous match still produces the right answer. */
-const AMBIGUOUS_BRANDS = new Set<string>(["google"]);
+const AMBIGUOUS_BRANDS = new Set<string>(["google", "mango"]);
 
 function findBrand(norm: string): string | null {
   let ambiguousFallback: string | null = null;

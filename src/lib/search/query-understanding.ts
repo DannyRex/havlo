@@ -370,8 +370,14 @@ const KNOWN_BRANDS = new Set([
   "dyson", "shark", "ninja", "kitchenaid", "bosch", "miele",
   // Footwear / fashion
   "nike", "adidas", "puma", "reebok", "vans", "converse", "newbalance",
+  "crocs", "timberland", "birkenstock", "ugg", "lacoste", "topshop",
+  "mango", "abercrombie", "hollister", "arket", "levis", "allsaints",
+  "missguided", "bershka", "uniqlo", "primark", "boohoo", "superdry", "diesel",
   // Beauty / fragrance
   "fenty", "rimmel", "maybelline", "loreal", "estee", "clinique",
+  "dior", "lancome", "chanel", "givenchy", "versace", "creed", "armani",
+  "afnan", "armaf", "amouage", "lattafa", "rasasi", "ajmal", "revlon",
+  "nyx", "nars", "cerave", "cetaphil", "morphe", "olaplex",
 ]);
 
 export function extractQueryBrand(query: string): string | null {
