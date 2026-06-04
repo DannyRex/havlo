@@ -213,6 +213,18 @@ async function main() {
   console.log(`  Offers re-pointed: ${movedOffers}`);
   console.log(`  Duplicate products removed: ${deletedRows}`);
   console.log("");
+
+  /* Refresh the cheapest-offer matview that product_best_offers joins
+     (migration 0075) now that offers are settled post-dedup, so /deals +
+     PDP + count reads stay cheap (precomputed) instead of recomputing the
+     LATERAL per query. Non-fatal: a failed call (e.g. 0075 not applied yet)
+     just logs and leaves the matview briefly stale until the next ingest. */
+  const { error: refreshErr } = await supa.rpc("refresh_cheapest_offers");
+  console.log(refreshErr
+    ? `  ⚠ cheapest-offer matview refresh skipped: ${refreshErr.message}`
+    : `  ✓ cheapest-offer matview refreshed`);
+  console.log("");
+
   console.log("Run this to verify the new histogram:");
   console.log("  select case when stores=1 then 'single' when stores=2 then '2 stores' else '3+ stores' end as bucket, count(*)");
   console.log("  from (select p.id, count(distinct o.store_id) as stores from products p join offers o on o.product_id=p.id group by p.id) sub");
