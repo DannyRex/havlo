@@ -401,6 +401,19 @@ jobs:
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
         run: npm run backfill:self-host-images -- --limit=3000
 
+      # Perceptual-hash newly-ingested product images (Phase 2 + 2a, #133).
+      # Runs AFTER self-host so each new product is hashed from its Storage
+      # webp -- the same consistent source the whole catalog was re-hashed
+      # from, with the Phase 2a background-trim so product-on-white photos no
+      # longer collapse to one hash. Incremental: only rows with image_phash
+      # IS NULL; the Storage host is unthrottled so a few hundred new rows
+      # finish in well under a minute. --limit caps a runaway. No-op once
+      # every image_url row already has a hash. Feeds the isLikelySameProduct
+      # phash fast-path that pools the same product across stores.
+      - name: Hash new product images (dHash for cross-store matching)
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: npm run backfill:image-phash -- --limit=3000
+
   # ── Job 5: Send the weekly newsletter digest. Runs after dedup
   #          completes so the digest pulls the freshly-deduped
   #          catalog, not a half-ingested snapshot.

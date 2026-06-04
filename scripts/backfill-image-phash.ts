@@ -19,6 +19,14 @@
      npx tsx scripts/backfill-image-phash.ts --limit=200       # smoke test
      npx tsx scripts/backfill-image-phash.ts --store=essenza   # one store
      npx tsx scripts/backfill-image-phash.ts --dry-run         # no writes
+     npx tsx scripts/backfill-image-phash.ts --rehash-all      # recompute EVERY
+       # row's hash in place (used after a hash-algorithm change, e.g. the
+       # Phase 2a trim). Drops the "phash IS NULL" filter and overwrites.
+       # Reads from image_url, which now points at our Supabase Storage CDN
+       # for every hosted product, so the whole catalog hashes from one
+       # consistent source. Storage is our own infra: the per-merchant
+       # politeness throttle is bypassed for it so the re-hash isn't capped
+       # at 4-at-a-time.
    ───────────────────────────────────────────────────────────────── */
 
 try { process.loadEnvFile?.(".env.local"); } catch { /* env may be set externally */ }
@@ -34,6 +42,19 @@ const arg  = (n: string) => { const f = argv.find((a) => a.startsWith(`--${n}=`)
 const LIMIT      = arg("limit") ? Number(arg("limit")) : null;
 const STORE_FILT = arg("store");
 const DRY_RUN    = argv.includes("--dry-run");
+const REHASH_ALL = argv.includes("--rehash-all");
+
+/* Total concurrent fetches. Higher for a full re-hash since the source is
+   our own Storage CDN (see hostParallel below), not throttled merchant CDNs. */
+const TOTAL_PARALLEL = REHASH_ALL ? 48 : PARALLEL_FETCHES;
+
+/* Our Supabase Storage CDN needs no politeness throttle. After self-hosting
+   (#133) every image_url is one Storage host, so the per-merchant cap would
+   choke a full re-hash to 4-at-a-time. Treat Storage as unthrottled; keep the
+   polite caps for genuine merchant CDNs (brand-new, not-yet-hosted rows). */
+const STORAGE_HOST_RE = /(^|\.)supabase\.co$/i;
+const hostParallel = (h: string): number => (STORAGE_HOST_RE.test(h) ? TOTAL_PARALLEL : PER_HOST_PARALLEL);
+const hostDelay    = (h: string): number => (STORAGE_HOST_RE.test(h) ? 0 : PER_HOST_DELAY_MS);
 
 /* ── Per-host throttling (mirrors backfill-identifiers-jsonld.ts) ── */
 interface HostState { inFlight: number; lastStartMs: number; queue: Array<() => void> }
@@ -45,9 +66,10 @@ function getHostState(h: string): HostState {
 }
 async function acquireHostSlot(host: string): Promise<void> {
   const s = getHostState(host);
-  if (s.inFlight < PER_HOST_PARALLEL) {
+  if (s.inFlight < hostParallel(host)) {
+    const delay = hostDelay(host);
     const since = Date.now() - s.lastStartMs;
-    if (since < PER_HOST_DELAY_MS) await new Promise((r) => setTimeout(r, PER_HOST_DELAY_MS - since));
+    if (delay && since < delay) await new Promise((r) => setTimeout(r, delay - since));
     s.inFlight++; s.lastStartMs = Date.now(); return;
   }
   await new Promise<void>((resolve) => {
@@ -58,7 +80,10 @@ function releaseHostSlot(host: string) {
   const s = getHostState(host);
   s.inFlight--;
   const next = s.queue.shift();
-  if (next) setTimeout(next, PER_HOST_DELAY_MS);
+  if (next) {
+    const delay = hostDelay(host);
+    if (delay) setTimeout(next, delay); else next();
+  }
 }
 
 interface Job { productId: string; imageUrl: string }
@@ -99,7 +124,7 @@ async function runPool(jobs: Job[], onProgress: (done: number, total: number, hi
     active.push(p);
     return true;
   };
-  for (let i = 0; i < Math.min(PARALLEL_FETCHES, jobs.length); i++) startNext();
+  for (let i = 0; i < Math.min(TOTAL_PARALLEL, jobs.length); i++) startNext();
   while (active.length > 0) await Promise.race(active);
   return results;
 }
@@ -108,8 +133,12 @@ async function main() {
   const supa = getSupabaseAdmin();
   if (!supa) { console.error("Missing Supabase env"); process.exit(1); }
 
-  /* Paginated load — products with image_url but NULL phash. */
-  console.log("Loading products needing phash backfill...");
+  /* Paginated load. Incremental mode: products with image_url but NULL phash.
+     Re-hash mode (--rehash-all): EVERY product with an image_url, overwriting
+     any existing hash with the freshly-computed one. */
+  console.log(REHASH_ALL
+    ? "Loading ALL products with an image_url for a full re-hash (overwrite in place)..."
+    : "Loading products needing phash backfill...");
   const PAGE = 1000;
   type Row = { id: string; image_url: string };
   const rows: Row[] = [];
@@ -118,8 +147,8 @@ async function main() {
       .from("products")
       .select("id, image_url")
       .not("image_url", "is", null)
-      .is("image_phash", null)
       .range(from, from + PAGE - 1);
+    if (!REHASH_ALL) q = q.is("image_phash", null);
     if (LIMIT && rows.length + PAGE > LIMIT) q = q.limit(LIMIT - rows.length);
     const { data: page, error } = await q;
     if (error) { console.error("Fetch failed:", error.message); process.exit(1); }
@@ -144,7 +173,7 @@ async function main() {
 
   if (filtered.length === 0) { console.log("Nothing to backfill."); return; }
   const jobs: Job[] = filtered.map((r) => ({ productId: r.id, imageUrl: r.image_url }));
-  console.log(`Loaded ${rows.length} products${STORE_FILT ? ` (${filtered.length} after store filter)` : ""}. Concurrency: ${PARALLEL_FETCHES} total / ${PER_HOST_PARALLEL} per host.`);
+  console.log(`Loaded ${rows.length} products${STORE_FILT ? ` (${filtered.length} after store filter)` : ""}. Concurrency: ${TOTAL_PARALLEL} total${REHASH_ALL ? " (Storage unthrottled)" : ` / ${PER_HOST_PARALLEL} per merchant host`}.`);
   if (DRY_RUN) console.log("(dry-run: will NOT write to DB)");
 
   const startMs = Date.now();
@@ -160,18 +189,27 @@ async function main() {
 
   if (DRY_RUN) { console.log("Dry-run: skipping DB writes."); return; }
 
-  /* Write in small batches. Each row is one column UPDATE so we can't
-     usefully upsert; just sequential per-row UPDATEs. bigint needs
-     `as` cast through string because Supabase JS client doesn't
-     natively encode JS bigint to PG bigint without explicit
-     stringification. */
-  let updated = 0; let failed = 0;
-  for (const r of hits) {
-    const { error: e } = await supa
-      .from("products")
-      .update({ image_phash: r.hash!.toString() })
-      .eq("id", r.productId);
-    if (e) failed++; else updated++;
+  /* Write the hashes back. Each row is a single-column UPDATE keyed by id
+     (no usable bulk-upsert since we're only touching one column on existing
+     rows), but we run them in CONCURRENT batches instead of one-at-a-time:
+     16k sequential round-trips took ~13min and dominated a full re-hash,
+     while the compute phase finished in ~2min. bigint must be stringified --
+     the supabase-js client won't encode a JS bigint to PG bigint directly. */
+  const WRITE_CONCURRENCY = 24;
+  let updated = 0; let failed = 0; let writeDone = 0;
+  for (let i = 0; i < hits.length; i += WRITE_CONCURRENCY) {
+    const batch = hits.slice(i, i + WRITE_CONCURRENCY);
+    await Promise.all(batch.map(async (r) => {
+      const { error: e } = await supa
+        .from("products")
+        .update({ image_phash: r.hash!.toString() })
+        .eq("id", r.productId);
+      if (e) failed++; else updated++;
+    }));
+    writeDone = Math.min(writeDone + WRITE_CONCURRENCY, hits.length);
+    if (writeDone % 2000 === 0 || writeDone === hits.length) {
+      console.log(`  wrote ${writeDone}/${hits.length} (failed=${failed})`);
+    }
   }
   console.log(`Wrote ${updated} phash updates. ${failed} failed.`);
 }
