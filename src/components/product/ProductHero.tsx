@@ -329,7 +329,7 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
                      178,800 NGN and rendered as "£178,800" on /uk
                      (user-reported). NG pages looked correct only because
                      NGN already matches the page currency. */
-                  ? <><span className="font-semibold text-ink">{displayStore}</span> may not ship directly to {country.name}. The same product is available locally at <span className="font-semibold text-ink">{displayStoreName(localAlternative.storeName)}</span> for <span className="font-semibold text-ink">{formatLocal(convertToUserCurrency(localAlternative.price, "NGN", country), country)}</span>.</>
+                  ? <><span className="font-semibold text-ink">{displayStore}</span> may not ship directly to {country.name}. The same product is available at <span className="font-semibold text-ink">{displayStoreName(localAlternative.storeName)}</span> for <span className="font-semibold text-ink">{formatLocal(convertToUserCurrency(localAlternative.price, "NGN", country), country)}</span>.</>
                   : <><span className="font-semibold text-ink">{displayStore}</span> may not ship directly to {country.name} - visit the store to confirm shipping options before ordering.</>}
               </div>
             </div>
@@ -338,7 +338,7 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
                 href={localAlternative.url}
                 className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-ink text-bg text-sm font-semibold whitespace-nowrap hover:bg-ink-2 transition-colors"
               >
-                View local price
+                View at {displayStoreName(localAlternative.storeName)}
               </a>
             )}
           </div>
