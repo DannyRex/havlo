@@ -108,11 +108,10 @@ export default function PriceResults({
                  isBest ? "border-success/40 bg-success/[0.04]" : "border-border"
                }`}>
               {/* Rank */}
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                   style={{
-                     background: isBest ? "linear-gradient(135deg,#FFD600,#FF9900)" : "rgba(255,255,255,0.06)",
-                     color: isBest ? "#000" : "#94a3b8",
-                   }}>
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                     isBest ? "text-black" : "bg-surface-2 text-ink-3"
+                   }`}
+                   style={isBest ? { background: "linear-gradient(135deg,#FFD600,#FF9900)" } : undefined}>
                 {isBest ? <Trophy size={12} /> : i + 1}
               </div>
 
