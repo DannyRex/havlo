@@ -319,6 +319,19 @@ jobs:
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
         run: npm run ingest:uk-retailers
 
+      # Cross-border marketplace ingest (SHEIN + Temu). SerpAPI has no
+      # native SHEIN/Temu engine, so this reuses the google_shopping
+      # provider with retailer-suffixed queries ("<sku> SHEIN") filtered
+      # to on-target rows -- same shape as the UK step above. Fashion/
+      # beauty SKUs only, 4 markets, ~80 credits/run (~694/month) within
+      # the SerpAPI plan headroom. NOTE: Temu pulled its Google Shopping
+      # listings on 2025-04-09 so its yield is ~0; if the run's kept=
+      # counts confirm that after launch, change the command to
+      # `npm run ingest:cross-border -- --merchants=shein`.
+      - name: Ingest cross-border (SHEIN + Temu) deals → Supabase
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
+        run: npm run ingest:cross-border
+
   # ── Job 5: Dedup pass. Re-keys product signatures with the compact
   #          'brand|model[|inches]' form and merges any near-
   #          duplicates the four ingest jobs just created. Pure DB
