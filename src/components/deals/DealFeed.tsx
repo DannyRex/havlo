@@ -1006,7 +1006,7 @@ export default function DealFeed({
              the 4rem top-16 offset) while scrolling down; sm:translate-y-0
              pins it open on desktop regardless. */
           filtersHidden
-            ? "translate-y-[calc(-100%-4rem)] sm:translate-y-0"
+            ? "translate-y-[calc(-100%_-_4rem)] sm:translate-y-0"
             : "translate-y-0",
         )}
       >
