@@ -42,6 +42,7 @@ import {
   rollupPriceHistory,
   fetchProductPriceTimeseries,
   sanitisePriceTimeseries,
+  type PriceHistoryPoint,
 } from "@/lib/search/price-history";
 import { effectiveLandedPrice, landedTotal, LANDED_RATE } from "@/lib/landed-price";
 import { partitionDupesByVariantMatch, variantOffers, type PartitionResult } from "@/lib/search/variant-pooling";
@@ -1075,6 +1076,46 @@ export default async function ProductPage({ params }: PageProps) {
       };
     }
   }
+
+  /* ── No-history fallback: synthesise a single "first reading" point ──
+     A freshly-ingested TRACKED product carries a live price but zero
+     offer_price_history rows until its price first changes OR the daily
+     seed:price-history backfill runs, a 1-2 day window (the backfill
+     runs on the free-daily cron, not on the Mon/Thu scrape that creates
+     most new rows). Left empty, the chart shows a bare "No price activity
+     yet" panel, which reads as inconsistent next to every other product's
+     flat hold-line (user report, June 2026: "why no activity instead of
+     a straight line like others?").
+
+     Hand the chart the SAME single point a seed row would produce: today's
+     cross-store CHEAPEST price (so the chart's "Lowest" equals the
+     spectrum's cheapest and can never claim an all-time low above a price
+     a store is selling at right now), tagged with the live pool's store
+     count (so the chart footer's provenance matches the "Compare across N
+     stores" headline, with no fluctuating store count). The chart's existing
+     single-point path draws the flat line and the verdict honestly reads
+     "Just started tracking". Once a real history row lands,
+     priceTimeseriesSane is non-empty and this fallback disappears on its
+     own. Curated / live-search anchors (non-UUID product_id) are never
+     tracked, so they keep the empty state. */
+  const isTrackedProduct =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      offer.product_id ?? "",
+    );
+  const spectrumLowNgn = perStoreOffers.length > 0
+    ? Math.min(...perStoreOffers.map((o) => o.effectiveNgn))
+    : anchorPriceNgn;
+  const chartPoints: PriceHistoryPoint[] =
+    priceTimeseriesSane && priceTimeseriesSane.length > 0
+      ? priceTimeseriesSane
+      : isTrackedProduct && spectrumLowNgn > 0
+        ? [{
+            day:         new Date().toISOString().slice(0, 10),
+            minPriceNgn: Math.round(spectrumLowNgn),
+            storeCount:  totalStores,
+          }]
+        : (priceTimeseriesSane ?? []);
+
   const breadcrumb = buildBreadcrumbList([
     { name: "Havlo",          url: `${SITE_URL}/${country.code}` },
     { name: country.name,     url: `${SITE_URL}/${country.code}` },
@@ -1294,15 +1335,11 @@ export default async function ProductPage({ params }: PageProps) {
                             hasn't accumulated rows yet. Forward-
                             looking copy invites the visitor back. */}
           <PriceHistoryChart
-            points={priceTimeseriesSane ?? []}
+            points={chartPoints}
             currentNgn={anchorPriceNgn}
             country={country}
             visitingStoreName={displayStoreName(offer.store_name)}
-            dataSource={
-              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(offer.product_id ?? "")
-                ? "tracked"
-                : "curated"
-            }
+            dataSource={isTrackedProduct ? "tracked" : "curated"}
           />
         </div>
 
