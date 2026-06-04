@@ -1253,10 +1253,17 @@ export default function DealFeed({
         </div>
       )}
 
-      {/* End of feed */}
+      {/* End of feed. The active pill (activeCounts.total) is the TRUE
+          reachable count; the grid renders the top-by-discount band of the
+          (deliberately shallow, for egress) display pool. For a few mega
+          categories the count exceeds the cards rendered, so disclose that
+          honestly rather than claiming "that's all" — the numbers must
+          never contradict the pill above. */}
       {!loading && !hasMore && items.length > 0 && liveItems.length === 0 && !liveLoading && (
         <p className="text-center text-xs text-ink-3 mt-12">
-          That&apos;s all {formatCount(total)} deals for now.
+          {activeCounts && activeCounts.total > total + 24
+            ? `Showing the top ${formatCount(total)} of ${formatCount(activeCounts.total)} — refine by category or store to see more.`
+            : `That's all ${formatCount(activeCounts?.total ?? total)} deals for now.`}
         </p>
       )}
     </div>
