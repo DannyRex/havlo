@@ -8,22 +8,28 @@
 -- Fix: precompute the cheapest-offer-id per product into a small
 -- materialized view, then redefine the product_best_offers VIEW to JOIN it
 -- instead of re-running the LATERAL. Crucially this uses CREATE OR REPLACE
--- VIEW with IDENTICAL output columns (same names / order / types as the
--- 0022 def), so the view's row type is preserved and browse_deals's
--- `returns setof product_best_offers` (and every other dependent RPC) keeps
--- working WITHOUT being dropped + recreated. The expensive LATERAL now runs
--- once per refresh (off-request cron) instead of on every query.
+-- VIEW with IDENTICAL output columns to the CURRENT live definition (the
+-- 0032 def: 18 columns, is_deal at position 13, scraped_at at 14, and NO
+-- source_country -- 0032 dropped it for egress). Same names / order / types
+-- means the view's row type is preserved, so browse_deals's
+-- `returns table(...)` reading FROM product_best_offers (and every other
+-- dependent RPC) keeps working WITHOUT the view being dropped + recreated.
+-- The expensive LATERAL now runs once per refresh (off-request cron)
+-- instead of on every query.
 --
--- SAFE FAILURE MODE: if any column here doesn't match the existing view,
--- the CREATE OR REPLACE VIEW simply errors and the old view stays intact --
--- nothing breaks.
+-- SAFE FAILURE MODE: if any column here doesn't match the existing view by
+-- name/order/type, the CREATE OR REPLACE VIEW simply errors and the old
+-- view stays intact -- nothing breaks. (This is how the first attempt was
+-- caught: it was built off the stale 0022 column order and PostgreSQL
+-- rejected it cleanly with "cannot change name of view column".)
 --
--- ROLLBACK: re-run the 0022 product_best_offers view def (the LATERAL
+-- ROLLBACK: re-run the 0032 product_best_offers view def (the LATERAL
 -- version), then `drop materialized view if exists mv_cheapest_offer;` and
 -- `drop function if exists refresh_cheapest_offers();`.
 
 -- 1) Precompute cheapest in-stock offer id per product (WITH DATA = populated
---    on create, so the view below has rows immediately).
+--    on create, so the view below has rows immediately). Same selection rule
+--    as the live view's LATERAL: in-stock only, lowest current_price wins.
 create materialized view if not exists mv_cheapest_offer as
 select
   p.id as product_id,
@@ -44,8 +50,8 @@ create unique index if not exists mv_cheapest_offer_product_id_idx
   on mv_cheapest_offer (product_id);
 
 -- 2) Redefine the view to join the matview. SAME columns/order/types as the
---    0022 definition -> CREATE OR REPLACE succeeds without a drop, so all
---    dependent RPCs are untouched.
+--    0032 definition (is_deal present, source_country absent) -> CREATE OR
+--    REPLACE succeeds without a drop, so all dependent RPCs are untouched.
 create or replace view product_best_offers as
 select
   p.id                   as product_id,
@@ -60,8 +66,8 @@ select
   o.original_price,
   o.discount_percent,
   o.currency,
+  o.is_deal,
   o.scraped_at,
-  o.source_country,
   s.name                 as store_name,
   s.is_international,
   s.logo_url             as store_logo_url,
