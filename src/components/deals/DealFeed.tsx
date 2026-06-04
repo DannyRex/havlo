@@ -15,7 +15,6 @@ import LiveResults from "@/components/compare/LiveResults";
 import CompareAnchorCard from "@/components/compare/CompareAnchorCard";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { cn, formatCount } from "@/lib/utils";
-import { useHideOnScrollDown } from "@/lib/use-hide-on-scroll";
 import { categories } from "@/lib/data/categories";
 import { logSearchEvent } from "@/lib/search/log-search";
 import type { Deal, DiscountTier, OriginFilter, SortOption } from "@/types";
@@ -337,11 +336,6 @@ export default function DealFeed({
      Default: grid. Persisted in localStorage so the user's choice
      sticks across sessions. */
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-
-  /* Mobile only: collapse the sticky filter bar while scrolling DOWN so
-     the product grid reclaims the screen, and slide it back on scroll-UP.
-     Desktop ignores this (the transform is gated sm:translate-y-0). */
-  const filtersHidden = useHideOnScrollDown();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -946,30 +940,10 @@ export default function DealFeed({
           The sort dropdown JSX is inlined twice rather than extracted
           to a helper — duplication is small (~10 lines), avoids the
           render overhead of a tiny client subcomponent. */}
-      {/* Sticky filter row sits at top-16 (right under the navbar).
-          History: previously had bg-bg/85 + backdrop-blur-xl, which
-          flickered during scroll for the same reason the original
-          navbar fix had to drop frosted glass — backdrop-filter on a
-          position:sticky element re-samples and re-blurs the
-          background every frame, so content visibly strobes through.
-          User reported the regression: "flickering is back when
-          scrolling, affecting the navbar" — read as the navbar
-          flicker because the two bars sit visually adjacent.
-          Switched to solid bg-bg + no blur, matching Navbar.tsx's
-          treatment. A solid filter row reads as one continuous
-          surface with the navbar above it. */}
-      <div
-        className={cn(
-          "sticky top-16 z-30 -mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg border-b border-border",
-          "transition-transform duration-300 ease-out motion-reduce:transition-none",
-          /* Mobile: slide the whole bar up out of view (its own height +
-             the 4rem top-16 offset) while scrolling down; sm:translate-y-0
-             pins it open on desktop regardless. */
-          filtersHidden
-            ? "translate-y-[calc(-100%_-_4rem)] sm:translate-y-0"
-            : "translate-y-0",
-        )}
-      >
+      {/* Filter row — NON-sticky: it scrolls away with the content
+          (user preference, June 2026) instead of pinning, so the mobile
+          feed gets the full screen once the user scrolls past it. */}
+      <div className="-mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg border-b border-border">
         {/* Row 1 — CategoryNav (always full-width). The previous
             attempt to inline the mobile sort here overlapped the
             rightmost chip even with `overflow-hidden` because
