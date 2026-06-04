@@ -336,6 +336,63 @@ async function fetchCrossBorderPool(
   }
 }
 
+/* ── LOCAL-POOL durability (stale-on-timeout) ─────────────────────────
+   Mirror of fetchCrossBorderPool for the country-LOCAL browse_deals
+   passes (A = discounted-local, C = zero-discount-local). Pure in-memory
+   cache + a roomier timeout — adds NO new DB queries.
+
+   Root cause this fixes (June 2026): browse_deals(local, p_country=X) for
+   a HEAVY market is the slowest RPC in the wave (NG ~1.9s cold, ~3,020
+   in-stock offers). On a cold Vercel/Supabase connection it intermittently
+   crossed the 2.5s pass timeout, returned empty local, and that empty pool
+   got cached by POOL_CACHE for 5 min — and the SSR seed is origin=local,
+   so /deals first-painted a BLANK grid. Per-instance cache + per-cold-start
+   variance made it look country-random ("every country except UK broke").
+
+   Fix: cache the last GOOD local rows per country+filter and serve them on
+   a later timeout/error instead of empty. Same per-instance caveat as
+   intlPoolCache; KV/Upstash is the cross-instance upgrade. */
+const LOCAL_POOL_TTL_MS = 5 * 60 * 1000;
+const localPoolCache = new Map<string, { data: BestOfferRow[]; expires: number }>();
+function localPoolKey(tag: string, args: Record<string, unknown>): string {
+  return JSON.stringify({
+    tag,
+    cc:   String(args.p_country ?? "").toUpperCase(),
+    cat:  args.p_category ?? null,
+    q:    args.p_search ?? null,
+    st:   args.p_store_ids ?? null,
+    sort: args.p_sort ?? null,
+    md:   args.p_min_discount ?? 0,
+    z:    args.p_zero_discount_only ?? false,
+  });
+}
+/* `errored` = the pass timed out or the RPC errored. On a clean run we
+   refresh the cache (only when non-empty, so a genuinely empty market
+   never overwrites good rows). On error we serve the last good rows for
+   this exact key — a few-minutes-stale local list always beats a blank
+   grid. A SUCCESSFUL empty result is passed through untouched. */
+function reconcileLocalPool(
+  tag: string,
+  args: Record<string, unknown>,
+  rows: BestOfferRow[],
+  errored: boolean,
+): BestOfferRow[] {
+  const key = localPoolKey(tag, args);
+  const now = Date.now();
+  const cached = localPoolCache.get(key);
+  if (!errored) {
+    if (rows.length > 0) {
+      localPoolCache.set(key, { data: rows, expires: now + LOCAL_POOL_TTL_MS });
+      if (localPoolCache.size > 64) {
+        localPoolCache.forEach((v, k) => { if (v.expires <= now) localPoolCache.delete(k); });
+      }
+    }
+    return rows;
+  }
+  if (cached) return cached.data;
+  return rows;
+}
+
 export const dbBrowseProvider: BrowseProvider = {
   id: "db-products",
   name: "DB (live ingested products)",
@@ -553,15 +610,21 @@ export const dbBrowseProvider: BrowseProvider = {
        budget via opts so a cold serverless connection doesn't trip the
        bar and degrade to the curated-only fallback. See FetchDealsOptions. */
     const TIMEOUT_MS = opts?.timeoutMs ?? 2500;
+    /* Local passes (A + C) get a roomier budget than the 2.5s default —
+       browse_deals(local) is the heaviest RPC (NG ~1.9s cold) and the one
+       that blanked /deals when killed at 2.5s. 4s mirrors the cross-border
+       pool; the passes run in parallel so the wave's wall-time is max(),
+       not sum. The homepage's longer opts.timeoutMs still overrides. */
+    const LOCAL_TIMEOUT_MS = opts?.timeoutMs ?? 4000;
     const TIMEOUT_FALLBACK: RpcResp = { data: null, error: { message: "timeout" } };
     const [passAResult, intlRows, passCResult, popularity] = await Promise.all([
-      withTimeout(supa.rpc("browse_deals", passAArgs) as unknown as Promise<RpcResp>, TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(local)"),
+      withTimeout(supa.rpc("browse_deals", passAArgs) as unknown as Promise<RpcResp>, LOCAL_TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(local)"),
       /* Pass B (cross-border) goes through its own shared, country-blind
          cache with stale-on-timeout — see fetchCrossBorderPool. Returns
          the rows directly (not an RpcResp). */
       fetchCrossBorderPool(supa, q.country ?? "", passBArgs),
       runPassC
-        ? withTimeout(supa.rpc("browse_deals", passCArgs) as unknown as Promise<RpcResp>, TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(zero-disc)")
+        ? withTimeout(supa.rpc("browse_deals", passCArgs) as unknown as Promise<RpcResp>, LOCAL_TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(zero-disc)")
         : Promise.resolve(TIMEOUT_FALLBACK),
       /* Popularity already has its own .catch fallback path; just
          add the timeout so a slow query can't push the parallel
@@ -641,8 +704,21 @@ export const dbBrowseProvider: BrowseProvider = {
        Pass B (intl) stays separate — it serves a different bucket
        (cross-border) and the country-filter at the API layer keeps
        intl from polluting local-only views regardless. */
-    const passARows = (passAResult.data as unknown as BestOfferRow[] | null) ?? [];
-    const passCRows = (passCResult.data as unknown as BestOfferRow[] | null) ?? [];
+    /* Serve last-good local rows on a pass timeout/error instead of empty
+       (reconcileLocalPool). This is what stops a single slow
+       browse_deals(local) from blanking /deals. The noCuratedFallback
+       caller already threw above on a Pass A error, so that path never
+       reaches here with a degraded Pass A. */
+    const passARows = reconcileLocalPool(
+      "A", passAArgs,
+      (passAResult.data as unknown as BestOfferRow[] | null) ?? [],
+      !!passAResult.error,
+    );
+    const passCRows = reconcileLocalPool(
+      "C", passCArgs,
+      (passCResult.data as unknown as BestOfferRow[] | null) ?? [],
+      !!(runPassC && passCResult.error),
+    );
     const interleaved: BestOfferRow[] = [];
     const maxLen = Math.max(passARows.length, passCRows.length);
     for (let i = 0; i < maxLen; i++) {
