@@ -16,7 +16,7 @@ export default function AmazonCashbackBanner({ country }: { country: Country }) 
   return (
     <Link
       href={`/${country.code}/cashback`}
-      aria-label={`Earn ${rate}% cashback on Amazon orders — cashback coming soon, join the waitlist`}
+      aria-label={`Earn ${rate}% cashback on Amazon orders. Cashback coming soon, join the waitlist`}
       className="group relative block overflow-hidden rounded-2xl border border-success/30 bg-gradient-to-r from-success/10 via-success/5 to-transparent p-5 sm:p-6 mb-8 hover:border-success/50 transition-colors"
     >
       {/* Soft decorative glow, hidden from a11y tree */}

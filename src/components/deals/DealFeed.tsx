@@ -1262,7 +1262,7 @@ export default function DealFeed({
       {!loading && !hasMore && items.length > 0 && liveItems.length === 0 && !liveLoading && (
         <p className="text-center text-xs text-ink-3 mt-12">
           {activeCounts && activeCounts.total > total + 24
-            ? `Showing the top ${formatCount(total)} of ${formatCount(activeCounts.total)} — refine by category or store to see more.`
+            ? `Showing the top ${formatCount(total)} of ${formatCount(activeCounts.total)}. Filter by category or store to surface more.`
             : `That's all ${formatCount(activeCounts?.total ?? total)} deals for now.`}
         </p>
       )}
