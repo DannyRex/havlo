@@ -276,19 +276,13 @@ const originCountsCache = new Map<string, { value: OriginCounts; expires: number
    instances. It also no longer depends on the is_international flag, so
    that NG-centric currency proxy can be retired (see country.ts).
 
-   ONE 1000-row page ordered by discount — this is the cross-border slice
-   of the DISPLAY pool only (the grid paints ~100 cards initially then
-   lazy-loads), kept deliberately SHALLOW for Supabase egress. The
-   ACCURATE per-category cross-border COUNT is NOT read off this pool
-   anymore (that truncated fashion to ~250 for ZA vs 2,157 real) — it now
-   comes from the slim, cached reachable-counts helper (src/lib/deals/
-   reachable-counts.ts), so the pool can stay cheap while the pill/tile
-   counts are exact. The grid still shows the top-by-discount band; for a
-   few mega categories the count exceeds the rendered cards and DealFeed
-   discloses "showing the top N". Country+category+filter-keyed cache,
+   Cap at one PostgREST page (1000) ordered by discount: covers every
+   category/country reachable set except mega-fashion (AliExpress/Shein),
+   where it surfaces the top 1,000 by discount — still ~5-18x what the old
+   global slice showed, and consistent. Country+category+filter-keyed,
    serve-last-good on error so a blip can't empty the tab. */
 const INTL_POOL_TTL_MS = 5 * 60 * 1000;
-const INTL_POOL_MAX = 1000;        // shallow display slice; counts come from the helper
+const INTL_POOL_MAX = 1000;
 const INTL_POOL_COLS =
   "product_id,title,category_slug,brand,image_url,offer_id,store_id,url,current_price,original_price,discount_percent,currency,scraped_at,store_name,is_international,store_logo_url,store_country";
 const intlPoolCache = new Map<string, { data: BestOfferRow[]; expires: number }>();
@@ -308,10 +302,10 @@ async function fetchCrossBorderPool(
   if (cached && cached.expires > now) return cached.data;
 
   try {
+    let query = supa.from("product_best_offers").select(INTL_POOL_COLS);
     /* Cross-border FOR THIS MARKET = foreign-anchored (store_country != cc)
        OR global (store_country IS NULL). The route filters this down to the
-       market's allowlist + buckets it. One shallow page (display only). */
-    let query = supa.from("product_best_offers").select(INTL_POOL_COLS);
+       market's allowlist + buckets it. */
     if (cc) query = query.or(`store_country.is.null,store_country.neq.${cc}`);
     if (cat && cat !== "all") query = query.eq("category_slug", cat);
     if (search && search.trim()) query = query.ilike("title", `%${search.trim()}%`);
@@ -340,71 +334,6 @@ async function fetchCrossBorderPool(
     console.warn("[browse-db] cross-border pool threw:", (e as Error).message);
     return [];
   }
-}
-
-/* ── LOCAL-POOL durability (stale-on-timeout) ─────────────────────────
-   Mirror of fetchCrossBorderPool for the country-LOCAL browse_deals
-   passes (A = discounted-local, C = zero-discount-local).
-
-   Root cause this fixes (June 2026): browse_deals(local, p_country=X)
-   for a HEAVY market is the slowest RPC in the wave (NG ~1.9s cold vs
-   UK ~0.7s — NG carries the largest local catalog, ~3,020 in-stock
-   offers). On a cold Vercel fn + cold Supabase connection it
-   intermittently crossed the pass timeout, returned empty, and that
-   EMPTY local result then got cached by the route's POOL_CACHE for 5
-   min — poisoning that country on that instance. Because the SSR seed
-   fetches origin=local (DealFeed's local-first default), an empty local
-   pool meant /deals first-painted a BLANK grid. Per-instance cache +
-   per-cold-start variance made it look country-random ("every country
-   except UK is broken"). The SAME timeout also undercounted the
-   homepage category tiles (CategoryGrid calls fetchDeals per category),
-   so NG (warm) showed 1k+ tiles while a timed-out market read far lower.
-
-   Fix: cache the last GOOD local rows per country+filter and serve them
-   when a later pass times out / errors, instead of empty. Combined with
-   the raised LOCAL_TIMEOUT_MS budget, a single slow RPC can no longer
-   empty (or undercount) a market. Same per-instance-cache caveat as
-   intlPoolCache — KV/Upstash is the documented cross-instance upgrade. */
-const LOCAL_POOL_TTL_MS = 5 * 60 * 1000;
-const localPoolCache = new Map<string, { data: BestOfferRow[]; expires: number }>();
-function localPoolKey(tag: string, args: Record<string, unknown>): string {
-  return JSON.stringify({
-    tag,
-    cc:   String(args.p_country ?? "").toUpperCase(),
-    cat:  args.p_category ?? null,
-    q:    args.p_search ?? null,
-    st:   args.p_store_ids ?? null,
-    sort: args.p_sort ?? null,
-    md:   args.p_min_discount ?? 0,
-    z:    args.p_zero_discount_only ?? false,
-  });
-}
-/* `errored` = the pass timed out or the RPC returned an error. On a
-   clean run we refresh the cache (only when non-empty, so a genuinely
-   empty market never overwrites good rows). On error we serve the last
-   good rows for this exact key — even if past their TTL, a few-minutes-
-   stale local list always beats a blank grid. A SUCCESSFUL empty result
-   (a market with no local inventory) is passed through untouched. */
-function reconcileLocalPool(
-  tag: string,
-  args: Record<string, unknown>,
-  rows: BestOfferRow[],
-  errored: boolean,
-): BestOfferRow[] {
-  const key = localPoolKey(tag, args);
-  const now = Date.now();
-  const cached = localPoolCache.get(key);
-  if (!errored) {
-    if (rows.length > 0) {
-      localPoolCache.set(key, { data: rows, expires: now + LOCAL_POOL_TTL_MS });
-      if (localPoolCache.size > 64) {
-        localPoolCache.forEach((v, k) => { if (v.expires <= now) localPoolCache.delete(k); });
-      }
-    }
-    return rows;
-  }
-  if (cached) return cached.data;
-  return rows;
 }
 
 export const dbBrowseProvider: BrowseProvider = {
@@ -624,23 +553,15 @@ export const dbBrowseProvider: BrowseProvider = {
        budget via opts so a cold serverless connection doesn't trip the
        bar and degrade to the curated-only fallback. See FetchDealsOptions. */
     const TIMEOUT_MS = opts?.timeoutMs ?? 2500;
-    /* Local passes (A + C) get a roomier budget than the 2.5s default.
-       browse_deals(local) is the heaviest RPC (NG ~1.9s cold) and is the
-       one that, when killed at 2.5s on a cold connection, blanked /deals.
-       4s mirrors the cross-border pool and stays far under Vercel's 30s
-       fn ceiling; the passes run in parallel so the wave's wall-time is
-       max(passes), not the sum. The homepage's longer opts.timeoutMs
-       still overrides when present. */
-    const LOCAL_TIMEOUT_MS = opts?.timeoutMs ?? 4000;
     const TIMEOUT_FALLBACK: RpcResp = { data: null, error: { message: "timeout" } };
     const [passAResult, intlRows, passCResult, popularity] = await Promise.all([
-      withTimeout(supa.rpc("browse_deals", passAArgs) as unknown as Promise<RpcResp>, LOCAL_TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(local)"),
+      withTimeout(supa.rpc("browse_deals", passAArgs) as unknown as Promise<RpcResp>, TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(local)"),
       /* Pass B (cross-border) goes through its own shared, country-blind
          cache with stale-on-timeout — see fetchCrossBorderPool. Returns
          the rows directly (not an RpcResp). */
       fetchCrossBorderPool(supa, q.country ?? "", passBArgs),
       runPassC
-        ? withTimeout(supa.rpc("browse_deals", passCArgs) as unknown as Promise<RpcResp>, LOCAL_TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(zero-disc)")
+        ? withTimeout(supa.rpc("browse_deals", passCArgs) as unknown as Promise<RpcResp>, TIMEOUT_MS, TIMEOUT_FALLBACK, "browse_deals(zero-disc)")
         : Promise.resolve(TIMEOUT_FALLBACK),
       /* Popularity already has its own .catch fallback path; just
          add the timeout so a slow query can't push the parallel
@@ -720,22 +641,8 @@ export const dbBrowseProvider: BrowseProvider = {
        Pass B (intl) stays separate — it serves a different bucket
        (cross-border) and the country-filter at the API layer keeps
        intl from polluting local-only views regardless. */
-    /* Serve last-good local rows on a pass timeout/error instead of
-       empty (see reconcileLocalPool). This is what stops a single slow
-       browse_deals(local) from blanking /deals + undercounting the
-       homepage tiles for a heavy market. The noCuratedFallback caller
-       already threw above on a Pass A error, so for that path we never
-       reach here with a degraded Pass A. */
-    const passARows = reconcileLocalPool(
-      "A", passAArgs,
-      (passAResult.data as unknown as BestOfferRow[] | null) ?? [],
-      !!passAResult.error,
-    );
-    const passCRows = reconcileLocalPool(
-      "C", passCArgs,
-      (passCResult.data as unknown as BestOfferRow[] | null) ?? [],
-      !!(runPassC && passCResult.error),
-    );
+    const passARows = (passAResult.data as unknown as BestOfferRow[] | null) ?? [];
+    const passCRows = (passCResult.data as unknown as BestOfferRow[] | null) ?? [];
     const interleaved: BestOfferRow[] = [];
     const maxLen = Math.max(passARows.length, passCRows.length);
     for (let i = 0; i < maxLen; i++) {

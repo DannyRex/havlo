@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { spaceByStore } from "@/lib/providers/curated-helper";
 import { getServerCountry } from "@/lib/country-server";
-import { filterDealsForCountry, getCountry, isDealLocalToCountry, isCrossBorderStore } from "@/lib/country";
-import { getReachableOriginCounts } from "@/lib/deals/reachable-counts";
+import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore, isCrossBorderStore } from "@/lib/country";
 import { isStoreSearchUrl } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import { fetchSearchSuggestions } from "@/lib/search/suggestions";
@@ -465,13 +464,31 @@ export async function GET(req: NextRequest) {
        shoppers. AliExpress / Shein / Temu / DHgate → no anchor
        → INTL for everyone. Falls back to the currency check when
        the store can't be inferred (rare, niche scrapers). */
-    /* Bucketing logic now lives in the shared isDealLocalToCountry
-       (country.ts) so the /deals grid + pills and the homepage tiles
-       (reachable-counts.ts) can never bucket a store differently. Same
-       precedence: DB store_country → JS roster → global-store veto →
-       currency. */
-    const isLocalToUser = (d: typeof broadCountryFiltered[0]): boolean =>
-      isDealLocalToCountry(d, country);
+    const isLocalToUser = (d: typeof broadCountryFiltered[0]): boolean => {
+      /* Primary signal: DB-tagged store_country (Deal.storeCountry).
+         Restored on the RPC return in migration 0038 + threaded
+         through rowToDeal. Authoritative because it covers stores
+         the hardcoded JS COUNTRY_STORES roster doesn't enumerate
+         (the ~600 stores backfilled by migration 0037 from
+         offer.source_query). Before this, /za/deals?origin=local
+         showed 4 items even though the head count was 159 ZA-
+         tagged offers — the JS roster only knew 2 of the 94
+         ZA-anchored stores in the DB. */
+      if (d.storeCountry) {
+        return d.storeCountry.toLowerCase() === country.code.toLowerCase();
+      }
+      /* Fallback 1: JS roster check (covers the curated/AliExpress
+         paths where storeCountry is undefined). */
+      const storeCountry = inferStoreCountry(d.storeId, d.storeName);
+      if (storeCountry !== null) {
+        return storeCountry.toLowerCase() === country.code.toLowerCase();
+      }
+      /* Fallback 2: explicit global cross-border stores (AliExpress /
+         Shein / Temu / DHgate) are NEVER local. */
+      if (isGlobalIntlStore(d.storeId, d.storeName)) return false;
+      /* Fallback 3: currency match for fully-untagged rows. */
+      return d.currency === country.currency;
+    };
 
     /* Apply user's origin choice to the BROAD pool — this is the
        pool that drives the Stores dropdown. Country + origin are
@@ -492,10 +509,22 @@ export async function GET(req: NextRequest) {
     const qualifyingLocal = qualifyingCountryFiltered.filter(isLocalToUser);
     const qualifyingIntl  = qualifyingCountryFiltered.filter((d) => !isLocalToUser(d));
 
-    /* Pool-derived origin counts — used as-is for SEARCH (they must
-       reflect the search-RESULT pool, and they gate the live-search
-       fallback at originCounts.all < LIVE_SEARCH_THRESHOLD below). */
-    const poolOriginCounts = {
+    /* originCounts (the All / Local / Intl tab pills) are ALWAYS derived
+       from the in-memory filtered pool — the SAME list that produces the
+       items + `total` below — so each pill equals the number of cards the
+       grid actually paginates through.
+
+       Browse-mode previously used a separate product_best_offers head
+       count to "surface catalog truth beyond the 3-pass cap". But that
+       count's intl rule (is_international AND store_country IS NULL) is
+       TIGHTER than filterDealsForCountry's cross-border set, so it
+       UNDER-counted the displayed pool — NG appliances read pill 79 vs
+       192 deals shown. User report June 2026: "the category-card / All-tab
+       count doesn't match the deals displayed." Pool-derived counts cap
+       with the 3-pass pool, but so does the grid, so count == displayed.
+       (The homepage category tiles compute the SAME number via
+       provider.fetchDeals + filterDealsForCountry — see CategoryGrid.) */
+    const originCounts = {
       all:   qualifyingCountryFiltered.length,
       local: qualifyingLocal.length,
       intl:  qualifyingIntl.length,
@@ -503,24 +532,6 @@ export async function GET(req: NextRequest) {
       localDeals: qualifyingLocal.filter((d) => d.discountPercent > 0).length,
       intlDeals:  qualifyingIntl.filter((d) => d.discountPercent > 0).length,
     };
-
-    /* originCounts (the All / Local / Intl pills + the homepage tiles).
-       BROWSE mode now reads the TRUE reachable count from a slim, cached
-       projection of the whole in-stock view (getReachableOriginCounts),
-       NOT the capped 3-pass display pool. June 2026 count audit: the
-       pool-derived count TRUNCATED cross-border-heavy categories
-       UNEVENLY — ZA fashion read 249 of a real 2,157 — because the pool
-       caps cross-border at 1000. The helper counts off a ~150 KB shared
-       cached read (a big NET egress cut vs the old per-category pool
-       loop) and uses the SAME isDealLocalToCountry the grid buckets with,
-       so pill == homepage tile, exactly. The grid still paginates the
-       capped pool, so for a few mega categories the pill can exceed the
-       rendered cards — DealFeed discloses that honestly ("showing the
-       top N"). SEARCH keeps the pool count (reflects results + gates
-       live-search). */
-    const originCounts = (search && search.trim())
-      ? poolOriginCounts
-      : await getReachableOriginCounts(country, category, userMinDiscount);
 
     /* Items pool: qualifying pool, narrowed to the user's origin choice. */
     let qualifyingByOrigin =

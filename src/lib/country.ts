@@ -490,28 +490,6 @@ export function isGlobalIntlStore(storeId: string, storeName: string): boolean {
   return matchesAny(id, GLOBAL_INTL_STORES) || matchesAny(name, GLOBAL_INTL_STORES);
 }
 
-/* Is this deal LOCAL to the visitor's country? Shared single source of
-   truth for the /deals origin bucketing — used by both /api/deals (the
-   grid + pills) and the reachable-counts helper (homepage tiles), so a
-   tile count can never bucket differently from the /deals pill. Primary
-   signal is DB-tagged store_country; falls back to the JS roster, then
-   the global-store veto, then currency. Mirrors the prose at the old
-   inline `isLocalToUser` in /api/deals. */
-export function isDealLocalToCountry(
-  d: { storeId: string; storeName: string; storeCountry?: string | null; currency: string },
-  country: Country,
-): boolean {
-  if (d.storeCountry) {
-    return d.storeCountry.toLowerCase() === country.code.toLowerCase();
-  }
-  const sc = inferStoreCountry(d.storeId, d.storeName);
-  if (sc !== null) {
-    return sc.toLowerCase() === country.code.toLowerCase();
-  }
-  if (isGlobalIntlStore(d.storeId, d.storeName)) return false;
-  return d.currency === country.currency;
-}
-
 /* Per-country anchored stores. The filter doesn't strictly require
    these (untagged intl rows pass through too) but having them mapped
    lets future code prioritize "real" country stores in ranking +
