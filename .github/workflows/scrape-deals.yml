@@ -186,8 +186,15 @@ jobs:
     #     the May 18 manual trigger right after the Developer-plan
     #     credit top-up — the script reached "de Audio" before
     #     getting killed, with all 6 countries × ~6 categories
-    #     still to go. 25m gives ~2x headroom for current scale).
-    timeout-minutes: 25
+    #     still to go. 25m gave headroom THEN, but by late May 2026 the job
+    #     outgrew it too: the May 28 + Jun 1 scheduled runs were CANCELLED at
+    #     25m15s, which cascades to SKIP the dependent dedup + send-newsletter
+    #     jobs and shows the whole run as cancelled (so SerpAPI data stopped
+    #     refreshing + no newsletter went out). Bumped to 50m. The SerpAPI
+    #     call count is fixed (6 countries × categories), so this adds time,
+    #     not credits. If it ever times out again, SPLIT into per-country
+    #     ingest jobs rather than bumping further.
+    timeout-minutes: 50
     env:
       SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
