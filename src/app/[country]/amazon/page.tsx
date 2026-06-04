@@ -105,7 +105,7 @@ export default async function AmazonDealsPage({
             Amazon deals
           </span>
           <h1 className="text-2xl sm:text-4xl font-bold text-ink tracking-[-0.025em] leading-[1.08] mb-3">
-            Save on your next Amazon purchase
+            Don&apos;t overpay on Amazon
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-base leading-relaxed">
             Every Amazon price drop we track, checked against its price

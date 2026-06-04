@@ -41,8 +41,8 @@ export default function AmazonCashbackBanner({ country }: { country: Country }) 
             Amazon order
           </h2>
           <p className="text-[13px] sm:text-sm text-ink-2 mt-1 max-w-xl">
-            Money back on top of the price drops below. Join the waitlist to
-            get it the moment cashback launches.
+            Money back on top of the price drops below. Join the waitlist and
+            we&apos;ll email you when it goes live.
           </p>
         </div>
 

@@ -22,7 +22,7 @@ export default function AmazonPromo({ country }: { country: Country }) {
                 Amazon deals
               </span>
               <h2 className="text-[22px] sm:text-2xl font-bold text-ink tracking-[-0.02em] leading-tight">
-                Save on your next Amazon purchase
+                Don&apos;t overpay on Amazon
               </h2>
               <p className="text-sm sm:text-base text-ink-2 mt-1.5 max-w-2xl">
                 Every Amazon price drop we track, checked against its real
