@@ -74,34 +74,53 @@ function signedToUint64(s: bigint): bigint {
       4. Pack into a 64-bit bigint.
       5. Convert to signed-int64 representation for PG. */
 export async function computeImagePHash(imageBuffer: Buffer): Promise<bigint | null> {
+  /* Phase 2a (Jun 2026): TRIM the uniform background BEFORE the 9x8 downscale
+     so the PRODUCT fills the grid. Product-on-white-background photos (the
+     dominant apparel/beauty style) otherwise reduce to a near-uniform grid,
+     where dozens of unrelated products hash to the SAME 64-bit value -- the
+     measured collision (12 unrelated products sharing one hash) that made
+     image-based pooling unsafe. The hash is computed on the trimmed image;
+     the STORED/displayed image is unchanged (trim is hash-only). trim() can
+     throw on a fully-uniform image, so fall back to the untrimmed pipeline. */
+  let pixels: Buffer;
   try {
-    const pixels = await sharp(imageBuffer)
+    pixels = await sharp(imageBuffer)
+      .trim({ threshold: 10 })
       .resize(HASH_W, HASH_H, { fit: "fill" })
       .grayscale()
       .raw()
       .toBuffer();
-    /* Sanity: sharp must return exactly W*H bytes for 8-bit greyscale. */
-    if (pixels.length !== HASH_W * HASH_H) return null;
-
-    let hash = BigInt(0);
-    let bit = 0;
-    for (let r = 0; r < HASH_H; r++) {
-      for (let c = 0; c < HASH_W - 1; c++) {
-        const left  = pixels[r * HASH_W + c];
-        const right = pixels[r * HASH_W + c + 1];
-        if (left > right) {
-          hash |= BigInt(1) << BigInt(bit);
-        }
-        bit++;
-      }
-    }
-    return uint64ToSignedBigInt(hash);
   } catch {
-    /* Decode failure (corrupt image, unsupported format, truncated
-       fetch). Caller should retry with a different source if
-       available, or fall back to NULL. */
-    return null;
+    try {
+      pixels = await sharp(imageBuffer)
+        .resize(HASH_W, HASH_H, { fit: "fill" })
+        .grayscale()
+        .raw()
+        .toBuffer();
+    } catch {
+      /* Decode failure (corrupt image, unsupported format, truncated
+         fetch). Caller should retry with a different source if available,
+         or fall back to NULL. */
+      return null;
+    }
   }
+
+  /* Sanity: sharp must return exactly W*H bytes for 8-bit greyscale. */
+  if (pixels.length !== HASH_W * HASH_H) return null;
+
+  let hash = BigInt(0);
+  let bit = 0;
+  for (let r = 0; r < HASH_H; r++) {
+    for (let c = 0; c < HASH_W - 1; c++) {
+      const left  = pixels[r * HASH_W + c];
+      const right = pixels[r * HASH_W + c + 1];
+      if (left > right) {
+        hash |= BigInt(1) << BigInt(bit);
+      }
+      bit++;
+    }
+  }
+  return uint64ToSignedBigInt(hash);
 }
 
 /** Fetch + hash in one call. Returns null on any failure (network
