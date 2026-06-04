@@ -56,6 +56,47 @@ const SORTS: { value: SortOption; label: string }[] = [
   { value: "price_desc", label: "Price: high → low" },
 ];
 
+/* Hide-on-scroll for the mobile sticky filter bar. That bar pins three
+   rows (category nav + tier/store filters + view/sort toggle) right under
+   the navbar, which on a phone eats ~30-40% of the viewport before any
+   product shows. This returns `true` while the user is scrolling DOWN
+   (browsing the feed) so the bar can slide out of view, and `false` when
+   they scroll UP (reaching for the filters) so it slides back. Desktop is
+   never affected: the transform that consumes this is gated behind
+   sm:translate-y-0, so the bar stays put at >=640px.
+
+   rAF-throttled with an 8px delta deadzone so micro-scrolls and momentum
+   jitter don't strobe it, and a threshold so it never hides while the
+   user is still near the top of the page. setHidden(x) with an unchanged
+   value is a no-op in React, so this only re-renders on a direction
+   change, not on every scroll frame. */
+function useHideOnScrollDown(threshold = 140): boolean {
+  const [hidden, setHidden] = useState(false);
+  const lastY = useRef(0);
+  const ticking = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    lastY.current = window.scrollY;
+    const onScroll = () => {
+      if (ticking.current) return;
+      ticking.current = true;
+      window.requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const delta = y - lastY.current;
+        if (Math.abs(delta) > 8) {
+          if (delta > 0 && y > threshold) setHidden(true);
+          else if (delta < 0) setHidden(false);
+          lastY.current = y;
+        }
+        ticking.current = false;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [threshold]);
+  return hidden;
+}
+
 /* ── Skeleton tile rendered during initial load ────────────────── */
 function SkeletonTile({ aspect }: { aspect: string }) {
   return (
@@ -336,6 +377,11 @@ export default function DealFeed({
      Default: grid. Persisted in localStorage so the user's choice
      sticks across sessions. */
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
+
+  /* Mobile only: collapse the sticky filter bar while scrolling DOWN so
+     the product grid reclaims the screen, and slide it back on scroll-UP.
+     Desktop ignores this (the transform is gated sm:translate-y-0). */
+  const filtersHidden = useHideOnScrollDown();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -952,7 +998,18 @@ export default function DealFeed({
           Switched to solid bg-bg + no blur, matching Navbar.tsx's
           treatment. A solid filter row reads as one continuous
           surface with the navbar above it. */}
-      <div className="sticky top-16 z-30 -mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg border-b border-border">
+      <div
+        className={cn(
+          "sticky top-16 z-30 -mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg border-b border-border",
+          "transition-transform duration-300 ease-out motion-reduce:transition-none",
+          /* Mobile: slide the whole bar up out of view (its own height +
+             the 4rem top-16 offset) while scrolling down; sm:translate-y-0
+             pins it open on desktop regardless. */
+          filtersHidden
+            ? "translate-y-[calc(-100%-4rem)] sm:translate-y-0"
+            : "translate-y-0",
+        )}
+      >
         {/* Row 1 — CategoryNav (always full-width). The previous
             attempt to inline the mobile sort here overlapped the
             rightmost chip even with `overflow-hidden` because
