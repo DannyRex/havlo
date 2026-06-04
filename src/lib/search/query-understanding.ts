@@ -768,30 +768,22 @@ export function isLikelySameProduct(
     if (aBrandRaw && cBrandRaw && aBrandRaw === cBrandRaw) return true;
   }
 
-  /* ── Image perceptual-hash fast-path (Phase 2 product-match upgrade)
+  /* ── Image perceptual-hash signal (Phase 2, hardened Phase 2a/3)
      ─────────────────────────────────────────────────────────────
-     When both sides have a precomputed dHash and they're within
-     PHASH_SAME_PRODUCT_THRESHOLD (6) bits of each other, the same
-     product photo is in use — almost certainly the manufacturer's
-     stock image rebroadcast by both retailers. That's a same-
-     product signal with virtually no false positives in product
-     photography.
+     A matching product dHash USED to be an unconditional fast-path
+     accept here, BEFORE the brand/type gates. That made it a latent
+     mis-pool hazard: product-on-white photos (apparel/beauty), shared
+     "no image" placeholders, and gstatic thumbnails collapse dozens of
+     UNRELATED, overwhelmingly brand-less products to one hash, and the
+     accept fired before any contradiction gate could veto. The Phase 2a
+     background-trim (see phash.ts) cut the worst collision from 84 to 25
+     products, but a residual ~8 brand-less collision groups remain.
 
-     Conservative band: <= 6 of 64 bits differ (~10% pixel pattern
-     divergence). Below this we admit the candidate without running
-     the lexical gates; above it we let the gates decide on their
-     own evidence.
-
-     Imported lazily to avoid pulling the sharp dependency into the
-     query-understanding module's edge-runtime callers — the hash
-     comparison itself is pure-JS bigint math, no native deps. */
-  if (anchor.imagePhash != null && candidate.imagePhash != null) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { hammingDistance, PHASH_SAME_PRODUCT_THRESHOLD } = require("./phash") as typeof import("./phash");
-    if (hammingDistance(anchor.imagePhash, candidate.imagePhash) <= PHASH_SAME_PRODUCT_THRESHOLD) {
-      return true;
-    }
-  }
+     So the phash signal is no longer a global accept. It now lives at
+     the token-overlap gate below, gated on a SAME KNOWN BRAND, where it
+     can only rescue a genuine same-product pair whose titles are worded
+     too differently to share tokens -- never override a brand, type,
+     audience, or model-variant contradiction. See that gate for detail. */
 
   /* Brand: when both sides have explicit brand info, they must
      match. When either side is missing (parser miss / unbranded
@@ -829,7 +821,29 @@ export function isLikelySameProduct(
      overlap on length>=3 non-brand non-stopword tokens. Cheap and
      defensive. */
   if (!shareSignificantTokens(anchor.title, candidate.title, aBrand ?? cBrand)) {
-    return false;
+    /* Image rescue (Phase 2a/3 guarded image pooling). The SAME product is
+       sometimes listed with titles too differently-worded to share tokens
+       (a terse merchant feed vs a verbose one). A matching product dHash
+       rescues that pair -- but ONLY when both sides carry the SAME KNOWN
+       brand. That brand guard is what makes image pooling safe: the residual
+       dHash collisions that survive the Phase 2a background-trim are shared
+       "no image" placeholders, one pharmacy's box template across many drugs,
+       and low-res gstatic thumbnails -- all across DIFFERENT, overwhelmingly
+       brand-LESS products. Requiring a shared known brand neutralises every
+       such collision while still admitting the genuine same-brand same-image
+       pair. We reach this point only after the brand/type/audience gates have
+       already agreed, and the variant/number/letter model gates BELOW still
+       run, so a reused base image can never pool iPhone 15 with iPhone 15 Pro.
+       Imported lazily so edge-runtime callers don't pull in sharp; the hamming
+       compare is pure bigint math. */
+    let imageRescues = false;
+    if (aBrand && cBrand && aBrand === cBrand &&
+        anchor.imagePhash != null && candidate.imagePhash != null) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { hammingDistance, PHASH_SAME_PRODUCT_THRESHOLD } = require("./phash") as typeof import("./phash");
+      imageRescues = hammingDistance(anchor.imagePhash, candidate.imagePhash) <= PHASH_SAME_PRODUCT_THRESHOLD;
+    }
+    if (!imageRescues) return false;
   }
 
   /* Family: both classified, must match. Either side null → fall
