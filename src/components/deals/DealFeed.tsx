@@ -15,6 +15,7 @@ import LiveResults from "@/components/compare/LiveResults";
 import CompareAnchorCard from "@/components/compare/CompareAnchorCard";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { cn, formatCount } from "@/lib/utils";
+import { useHideOnScrollDown } from "@/lib/use-hide-on-scroll";
 import { categories } from "@/lib/data/categories";
 import { logSearchEvent } from "@/lib/search/log-search";
 import type { Deal, DiscountTier, OriginFilter, SortOption } from "@/types";
@@ -55,47 +56,6 @@ const SORTS: { value: SortOption; label: string }[] = [
   { value: "price_asc",  label: "Price: low → high" },
   { value: "price_desc", label: "Price: high → low" },
 ];
-
-/* Hide-on-scroll for the mobile sticky filter bar. That bar pins three
-   rows (category nav + tier/store filters + view/sort toggle) right under
-   the navbar, which on a phone eats ~30-40% of the viewport before any
-   product shows. This returns `true` while the user is scrolling DOWN
-   (browsing the feed) so the bar can slide out of view, and `false` when
-   they scroll UP (reaching for the filters) so it slides back. Desktop is
-   never affected: the transform that consumes this is gated behind
-   sm:translate-y-0, so the bar stays put at >=640px.
-
-   rAF-throttled with an 8px delta deadzone so micro-scrolls and momentum
-   jitter don't strobe it, and a threshold so it never hides while the
-   user is still near the top of the page. setHidden(x) with an unchanged
-   value is a no-op in React, so this only re-renders on a direction
-   change, not on every scroll frame. */
-function useHideOnScrollDown(threshold = 140): boolean {
-  const [hidden, setHidden] = useState(false);
-  const lastY = useRef(0);
-  const ticking = useRef(false);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    lastY.current = window.scrollY;
-    const onScroll = () => {
-      if (ticking.current) return;
-      ticking.current = true;
-      window.requestAnimationFrame(() => {
-        const y = window.scrollY;
-        const delta = y - lastY.current;
-        if (Math.abs(delta) > 8) {
-          if (delta > 0 && y > threshold) setHidden(true);
-          else if (delta < 0) setHidden(false);
-          lastY.current = y;
-        }
-        ticking.current = false;
-      });
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [threshold]);
-  return hidden;
-}
 
 /* ── Skeleton tile rendered during initial load ────────────────── */
 function SkeletonTile({ aspect }: { aspect: string }) {
