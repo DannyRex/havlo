@@ -40,6 +40,11 @@ interface Props {
   aspect: string;
   /** Show the small INTL chip on items priced in a non-local currency */
   showOriginBadge?: boolean;
+  /** Show the per-card "Earn N% soon" cashback badge. Default true. Set
+      false on surfaces where a single page-level cashback banner already
+      covers every card (e.g. the Amazon hub, where all items qualify), so
+      the badge isn't repeated on every tile. */
+  showCashback?: boolean;
   /** Above-the-fold cards opt in to eager + high-priority image loading
       so the LCP pixel arrives without waiting for the lazy heuristic. */
   priority?: boolean;
@@ -139,7 +144,7 @@ function ResilientImage({ deal, priority }: { deal: Deal; priority: boolean }) {
   );
 }
 
-export default function MasonryCard({ deal, aspect, showOriginBadge = true, priority = false, linkHref }: Props) {
+export default function MasonryCard({ deal, aspect, showOriginBadge = true, priority = false, linkHref, showCashback = true }: Props) {
   const { country } = useCountry();
   const router      = useRouter();
   const dealCcy = deal.currency as Country["currency"];
@@ -356,7 +361,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
             propagation + the default to keep the parent click from
             also firing, then routes to the country-aware cashback
             page imperatively via next/navigation. */}
-        {cashback && (
+        {showCashback && cashback && (
           /* Cashback badge — discoverability fix (QA Bucket 4 #11):
              previously it looked like a static label and shoppers
              didn't realise it was a shortcut to the cashback page.

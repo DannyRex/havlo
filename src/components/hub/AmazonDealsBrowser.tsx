@@ -13,7 +13,7 @@
    consistent order regardless of the per-visitor display currency
    MasonryCard converts to. */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Globe, ArrowUpDown } from "lucide-react";
 import MasonryCard from "@/components/deals/MasonryCard";
 import { pdpUrlForDeal } from "@/lib/pdp-url";
@@ -141,6 +141,24 @@ export default function AmazonDealsBrowser({
   }, [cat, market]);
 
   const visible = filtered.slice(0, reveal);
+  const hasMore = filtered.length > visible.length;
+
+  /* Infinite scroll: a sentinel near the bottom auto-grows the reveal
+     window when it nears the viewport, instead of a "Show more" button.
+     Callback ref disconnects the prior observer when the node changes or
+     unmounts (e.g. once everything's revealed). Cheap + in-memory: the
+     Amazon corpus is bounded (~350), so revealing more never fetches. */
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const sentinelRef = useCallback((node: HTMLDivElement | null) => {
+    observerRef.current?.disconnect();
+    if (!node) return;
+    observerRef.current = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setReveal((r) => r + REVEAL_STEP); },
+      { rootMargin: "600px" },
+    );
+    observerRef.current.observe(node);
+  }, []);
+
   const clearFilters = () => {
     setCat("all");
     setMarket("all");
@@ -212,6 +230,11 @@ export default function AmazonDealsBrowser({
               aspect="aspect-[4/5]"
               priority={i < 4}
               linkHref={pdpUrlForDeal(countryCode, deal)}
+              /* Every item on this page is an Amazon offer and all qualify
+                 for the 2% cashback, so the page-level banner covers it.
+                 Suppress the per-card "Earn N% soon" badge to avoid
+                 repeating it on every tile. */
+              showCashback={false}
             />
           ))}
         </div>
@@ -230,18 +253,9 @@ export default function AmazonDealsBrowser({
         </div>
       )}
 
-      {/* Show more */}
-      {filtered.length > visible.length && (
-        <div className="mt-6 flex justify-center">
-          <button
-            type="button"
-            onClick={() => setReveal((r) => r + REVEAL_STEP)}
-            className="px-5 py-2.5 rounded-full border border-border bg-surface-2 text-ink-2 text-[13px] font-semibold hover:text-ink hover:border-ink/40 transition-colors"
-          >
-            Show {Math.min(REVEAL_STEP, filtered.length - visible.length)} more
-          </button>
-        </div>
-      )}
+      {/* Infinite-scroll sentinel — auto-loads the next page as it nears
+          the viewport, replacing the old "Show more" button. */}
+      {hasMore && <div ref={sentinelRef} className="h-10 mt-6" aria-hidden="true" />}
     </div>
   );
 }
