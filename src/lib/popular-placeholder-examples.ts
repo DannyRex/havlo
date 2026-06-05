@@ -14,9 +14,11 @@
    our markets — NG/UK/US spot-checked, e.g. Nike Air Force 1 → 45/55/32,
    iPhone 15 Pro → 15/15/11 — so the example never leads to an empty
    search. They span categories (phones / computing / sports / audio /
-   gaming / wearable / beauty / home) so the rotation feels broad, and
+   gaming / wearable / tv / eyewear) so the rotation feels broad, and
    they're global-iconic brands that carry across all six markets (the
-   catalog is cross-border).
+   catalog is cross-border). LG OLED TV (22 products) and Ray-Ban (20)
+   re-verified June 2026 via the FTS search; both far outcover the items
+   they replaced (Dyson Airwrap 8, Stanley Quencher 4).
 
    Kept async + cached so the caller (homepage SSR) and its signature
    don't change, and so a dynamic source can be reintroduced later without
@@ -36,8 +38,8 @@ const CURATED: string[] = [
   "AirPods Pro",         // audio
   "PlayStation 5",       // gaming
   "Apple Watch",         // wearable
-  "Dyson Airwrap",       // beauty / appliances
-  "Stanley Quencher",    // home
+  "LG OLED TV",          // tv
+  "Ray-Ban",             // fashion / eyewear
 ];
 
 export { CURATED as PLACEHOLDER_EXAMPLES };
