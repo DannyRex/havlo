@@ -28,6 +28,8 @@ import {
   extractRequiredNumbers,
   extractRequiredModelTokens,
   extractVariantTokens,
+  extractQueryBrand,
+  candidateHasBrand,
 } from "./query-understanding";
 import type { PartitionResult } from "./variant-pooling";
 
@@ -192,6 +194,19 @@ async function partitionFallback(
   const anchorVariants = extractVariantTokens(anchor.title);
   const anchorEnrich  = enrichMap.get(anchor.id);
 
+  /* Fashion/beauty brand gate (June 2026) — see partitionDupesByVariantMatch
+     (sync) for the full rationale. A brand-less knockoff ("GG", "Amiri") with a
+     near-identical apparel title was sailing into the spectrum via the
+     embedding auto-accept, over-counting the PDP store count vs the brand-gated
+     /compare path. Require the candidate to carry the anchor's brand before the
+     (expensive) deep match can promote it to a same-product variant. Gated to
+     fashion/beauty (category_slug) so electronics whose brand-name differs from
+     its line-name ("Apple"/"iPhone 15") is never dropped. */
+  const fam = (anchor.family ?? "").toLowerCase();
+  const fashionBrandGate = (fam === "fashion" || fam === "beauty")
+    && !!(anchorBrand || extractQueryBrand(anchor.title));
+  const anchorBrandForGate = anchorBrand || extractQueryBrand(anchor.title);
+
   const anchorDeep: DeepMatchProduct = {
     id:               anchor.id,
     title:            anchor.title,
@@ -219,7 +234,11 @@ async function partitionFallback(
       const dEnrich = enrichMap.get(d.key);
       const sim = cosineSim(anchorEnrich, dEnrich);
       const candidate = toDeepProduct({ ...d, id: d.key }, dEnrich, sim);
-      const isVariant = await isLikelySameProductDeep(supa, anchorDeep, candidate);
+      /* Fashion/beauty: a candidate that doesn't carry the anchor's brand can
+         never be a same-product variant -- skip the deep match (and its judge
+         call) entirely so a brand-less knockoff can't be embedding-rescued. */
+      const isVariant = (!fashionBrandGate || candidateHasBrand(d.title, anchorBrandForGate))
+        && await isLikelySameProductDeep(supa, anchorDeep, candidate);
       return { d, isVariant };
     }));
     for (const { d, isVariant } of verdicts) {

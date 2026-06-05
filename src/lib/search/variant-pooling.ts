@@ -31,6 +31,8 @@ import {
   extractRequiredNumbers,
   extractRequiredModelTokens,
   extractVariantTokens,
+  extractQueryBrand,
+  candidateHasBrand,
 } from "./query-understanding";
 
 export interface PartitionResult {
@@ -88,6 +90,24 @@ export function partitionDupesByVariantMatch(
   const anchorModels  = extractRequiredModelTokens(anchor.title);
   const anchorVariants = extractVariantTokens(anchor.title);
 
+  /* Fashion/beauty brand gate (June 2026). In apparel + cosmetics the brand IS
+     the discriminator (no model/numeric markers), and luxury knockoff spam
+     reuses one dropship photo + title template under many brand names ("Tommy
+     Hilfiger ... Track Jacket" vs "GG / Amiri ... Track Jacket"). The shallow
+     gate only rejects on a RECOGNISED brand mismatch, so a brand-LESS knockoff
+     ("GG", "Amiri" — not in the brand dictionary) with a near-identical title
+     slips into the spectrum, over-counting the PDP "Compare prices across N
+     stores" against the correctly brand-gated /compare path. Require the
+     candidate to carry the anchor's brand before it can be a same-product
+     variant -- mirrors the /compare pid path's candidateHasBrand filter so the
+     two surfaces agree. Gated to fashion/beauty (category_slug) so an
+     electronics match whose brand-name differs from its line-name ("Apple" vs
+     an "iPhone 15" title) is never dropped. */
+  const fam = (anchor.family ?? "").toLowerCase();
+  const fashionBrandGate = (fam === "fashion" || fam === "beauty")
+    && !!(anchorBrand || extractQueryBrand(anchor.title));
+  const anchorBrandForGate = anchorBrand || extractQueryBrand(anchor.title);
+
   function looksLikeSibling(d: DupeResult): boolean {
     const dBrand = (d.brand ?? "").toLowerCase().trim();
     if (!anchorBrand || !dBrand || anchorBrand !== dBrand) return false;
@@ -123,10 +143,11 @@ export function partitionDupesByVariantMatch(
        family (from category_slug) so detection inside the gate
        isn't repeated for every dupe. When omitted, the gate
        falls back to detecting family from the anchor title. */
-    const isVariant = isLikelySameProduct(
-      { title: anchor.title, brand: anchor.brand, priceNgn: anchor.priceNgn, family: anchor.family ?? null },
-      { title: d.title,      brand: d.brand,      priceNgn: d.bestPrice },
-    );
+    const isVariant = (!fashionBrandGate || candidateHasBrand(d.title, anchorBrandForGate))
+      && isLikelySameProduct(
+        { title: anchor.title, brand: anchor.brand, priceNgn: anchor.priceNgn, family: anchor.family ?? null },
+        { title: d.title,      brand: d.brand,      priceNgn: d.bestPrice },
+      );
     if (isVariant) {
       likelyVariants.push(d);
     } else if (looksLikeSibling(d)) {
