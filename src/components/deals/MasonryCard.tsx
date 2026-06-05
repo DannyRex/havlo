@@ -431,7 +431,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
               restores the inline "store · time" layout desktop already
               had. suppressHydrationWarning — timeAgo reads Date.now(), so
               SSR/CSR can differ at a minute/day boundary; harmless. */}
-          <span className="shrink-0 ml-auto sm:ml-0" suppressHydrationWarning>{timeAgo(deal.postedAt)}</span>
+          <span className="shrink-0 ml-auto sm:ml-0" suppressHydrationWarning>found {timeAgo(deal.postedAt).toLowerCase()}</span>
         </div>
 
         <p className="text-[12px] sm:text-[13px] font-medium text-ink leading-snug line-clamp-2 mb-1 sm:mb-1.5 tracking-[-0.005em]">

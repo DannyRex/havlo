@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import ThemeProvider from "@/components/ui/ThemeProvider";
+import ScrollReset from "@/components/ui/ScrollReset";
 import { CountryProvider } from "@/components/providers/CountryProvider";
 import JsonLd from "@/components/seo/JsonLd";
 import DeferredConsentStack from "@/components/seo/DeferredConsentStack";
@@ -204,6 +205,7 @@ export default function RootLayout({
               a one-frame flag flash on non-NG country pages — a documented,
               accepted trade-off for an ISR-able site. */}
           <CountryProvider>
+            <ScrollReset />
             <Navbar />
             <main className="flex-1">{children}</main>
             <Footer />

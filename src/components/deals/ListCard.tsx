@@ -192,7 +192,7 @@ export default function ListCard({ deal, linkHref }: Props) {
           <span className="font-medium truncate text-ink-2">{displayStore}</span>
           {/* suppressHydrationWarning — same SSR/CSR Date.now()
               divergence as the masonry version. */}
-          <span className="shrink-0" suppressHydrationWarning>{timeAgo(deal.postedAt)}</span>
+          <span className="shrink-0" suppressHydrationWarning>found {timeAgo(deal.postedAt).toLowerCase()}</span>
         </div>
 
         <p className="mt-1.5 text-[13px] font-medium text-ink leading-snug line-clamp-2 tracking-[-0.005em]">
