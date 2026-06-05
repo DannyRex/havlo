@@ -39,7 +39,7 @@ export async function generateMetadata({
   const country = getCountry(params.country);
   const url = `${SITE_URL}/${country.code}/amazon`;
   const title = `Amazon deals in ${country.name}: checked against price history`;
-  const description = `Real Amazon markdowns across the UK, US, India and more, each checked against its own price history. We tag the ones at their lowest in 30 days. Filter by country and category, sorted by the biggest markdown.`;
+  const description = `Every Amazon price drop we track, checked against its real price history, across the UK, US, India and more. We tag the ones at their lowest price in 30 days. Filter by country and category.`;
   return {
     title,
     description,
@@ -108,9 +108,9 @@ export default async function AmazonDealsPage({
             Don&apos;t overpay on Amazon
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-base leading-relaxed">
-            Real Amazon markdowns, each checked against its own price history.
-            We tag the ones sitting at their lowest in 30 days, so you can spot
-            a genuine deal at a glance and tap any item for the full history.
+            Every Amazon price drop we track, checked against its real price
+            history. We tag the ones at their lowest price in 30 days, so a good
+            deal is easy to spot.
           </p>
         </header>
 
@@ -124,7 +124,7 @@ export default async function AmazonDealsPage({
         ) : (
           <div className="rounded-2xl border border-border bg-surface p-8 text-center">
             <p className="text-ink-2 text-sm">
-              No Amazon markdowns right now. Check back soon, or{" "}
+              No Amazon price drops right now. Check back soon, or{" "}
               <Link href={`/${country.code}/deals`} className="text-ink underline underline-offset-4">
                 browse all deals
               </Link>.
