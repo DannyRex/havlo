@@ -911,6 +911,72 @@ function tokensOf(s: string): string[] {
     .filter((w) => w.length > 1 && !STOP.has(w));
 }
 
+/* ── Distinctive-token gate (fashion/beauty over-pooling fix) ───────────
+   Generic dropship listings ("Designer Shoulder Bags for Women - Versatile
+   Crossbody Bag", "Men's Slim Fit Wool Blend Suit Jacket") share dozens of
+   filler words but no IDENTITY. Title embeddings rate them ~0.95 cosine, so
+   the deep matcher's embedding admission pooled wildly-different products as
+   "the same" (June 2026 validation: ~3% fashion precision). This gate strips
+   the filler and keeps only IDENTIFYING tokens (brand / model / material /
+   pattern), then requires the two titles' identifying-token sets to broadly
+   AGREE before fashion/beauty may pool. A listing with no identifying token
+   (pure generic) can never assert a cross-store match -- which is the honest
+   outcome, because it genuinely cannot be matched. Electronics/phones/etc are
+   never gated (they match on brand+model already). */
+const FASHION_FILLER = new Set<string>([
+  /* generic marketing descriptors */
+  "designer","luxury","luxurious","fashion","fashionable","style","styles","stylish","trendy","chic",
+  "classic","vintage","retro","elegant","premium","quality","high","end","sense","niche","simple",
+  "modern","new","hot","selling","sell","soft","light","large","small","mini","micro","big","capacity",
+  "everyday","casual","commuter","commuting","outdoor","indoor","sport","sports","business","professional",
+  "formal","waterproof","breathable","durable","comfortable","comfort","adjustable","portable","wireless",
+  "multifunctional","multi","functional","super","ultra","versatile","inspired","handheld","cross","border",
+  /* demographics + fit */
+  "men","mens","man","women","womens","woman","ladies","lady","unisex","kids","boys","girls","male","female",
+  "slim","regular","tailored","skinny","relaxed","oversized","fit","fitted","wear","ready",
+  /* product-type nouns (a TYPE is shared by different products of that type) */
+  "bag","bags","handbag","handbags","purse","tote","clutch","crossbody","shoulder","underarm","sling",
+  "satchel","backpack","wallet","shoe","shoes","sneaker","sneakers","trainer","trainers","boot","boots",
+  "sandal","sandals","heel","heels","flat","flats","footwear","board","watch","watches","wristwatch",
+  "shirt","tshirt","tee","top","tops","blouse","tunic","jacket","blazer","coat","suit","dress","skirt",
+  "jeans","trousers","pants","short","shorts","brief","briefs","boxer","boxers","underwear","hoodie",
+  "sweater","jumper","cardigan","wig","wigs","hair","dryer","trimmer","trimmers","clipper","clippers",
+  "frontal","lace","poster","flag","tapestry","decor","art","wall",
+  /* connectors / units / packaging */
+  "for","with","and","the","of","by","to","in","on","set","sets","pack","piece","pieces","pcs","free",
+  "shipping","ship","delivery","inch","cm","mm","ml","density","drawn","pre","cut","plucked","glueless",
+]);
+
+/** Identifying tokens only: drops filler, colours, and pure numbers (sizes /
+    years / units), keeping brand / model / material / pattern words. */
+export function distinctiveTokens(title: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const t of tokensOf(title)) {
+    if (FASHION_FILLER.has(t)) continue;
+    if (COLOR_GROUPS[t]) continue;     // colours handled by the colour gate, not identity
+    if (/^\d+$/.test(t)) continue;     // pure numbers: sizes / years / unit counts
+    if (seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out;
+}
+
+/** Jaccard overlap (0..1) of two titles' identifying-token sets. Returns 0 when
+    EITHER side has no identifying token -- a generic listing we must not assert
+    a cross-store match for. Callers gate fashion/beauty pooling on a threshold. */
+export function distinctiveOverlap(a: string, b: string): number {
+  const ta = distinctiveTokens(a);
+  const tb = distinctiveTokens(b);
+  if (ta.length === 0 || tb.length === 0) return 0;
+  const sb = new Set(tb);
+  let inter = 0;
+  for (const t of ta) if (sb.has(t)) inter++;
+  const union = ta.length + tb.length - inter;
+  return union === 0 ? 0 : inter / union;
+}
+
 export function buildSignature(
   title: string,
   identifiers?: ProductIdentifiers,

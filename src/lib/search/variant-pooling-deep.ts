@@ -31,7 +31,15 @@ import {
   extractQueryBrand,
   candidateHasBrand,
 } from "./query-understanding";
-import { titlesColorConflict } from "./normalize";
+import { titlesColorConflict, distinctiveOverlap } from "./normalize";
+
+/* Descriptive families (fashion/beauty/home/health/sports) pool only when the
+   two titles' IDENTIFYING tokens (brand / model / material, with generic filler
+   + colour + size stripped) agree at least this much. Generic dropship listings
+   have no identifying token -> overlap 0 -> never pool. 0.7 keeps near-identical
+   listings (e.g. "JW Pei Dumpling Bag" across stores, "Health & Her Menopause
+   Multivitamin") while splitting cross-brand / cross-model / generic noise. */
+const DESCRIPTIVE_OVERLAP_MIN = 0.7;
 import type { PartitionResult } from "./variant-pooling";
 
 /* Sibling detection is identical to variant-pooling.ts's sync
@@ -207,6 +215,15 @@ async function partitionFallback(
      its line-name ("Apple"/"iPhone 15") is never dropped. */
   const fam = (anchor.family ?? "").toLowerCase();
   const fashionFamily = fam === "fashion" || fam === "beauty";
+  /* The distinctive-token overlap gate applies to DESCRIPTIVE families whose
+     titles are long prose and whose identity is word-based (brand/model/line),
+     so dropping pure-number size/year tokens is safe. Core-electronics families
+     (electronics/phones/computing/audio) and number-identity ones (gaming
+     consoles/LEGO, appliance model codes) are EXCLUDED: there a model NUMBER is
+     the identity ("S24" vs "S24 Ultra", "PS5", LEGO "42222"), so this gate would
+     wrongly merge or split them -- their existing brand+model matcher handles it. */
+  const descriptiveFamily = fashionFamily
+    || fam === "home" || fam === "health" || fam === "sports" || fam === "appliances";
   const fashionBrandGate = fashionFamily
     && !!(anchorBrand || extractQueryBrand(anchor.title));
   const anchorBrandForGate = anchorBrand || extractQueryBrand(anchor.title);
@@ -245,7 +262,8 @@ async function partitionFallback(
          (2) a DIFFERENT canonical colour means a different SKU -- so the
              embedding/judge can never pool a white jacket with a navy one.
          Electronics is unaffected (colour variants share a product_id). */
-      const isVariant = (!fashionBrandGate || candidateHasBrand(d.title, anchorBrandForGate))
+      const isVariant = (!descriptiveFamily || distinctiveOverlap(anchor.title, d.title) >= DESCRIPTIVE_OVERLAP_MIN)
+        && (!fashionBrandGate || candidateHasBrand(d.title, anchorBrandForGate))
         && !(fashionFamily && titlesColorConflict(anchor.title, d.title))
         && await isLikelySameProductDeep(supa, anchorDeep, candidate);
       return { d, isVariant };
