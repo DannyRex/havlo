@@ -25,8 +25,8 @@ export default function AmazonPromo({ country }: { country: Country }) {
                 Don&apos;t overpay on Amazon
               </h2>
               <p className="text-sm sm:text-base text-ink-2 mt-1.5 max-w-2xl">
-                Every Amazon price drop we track, checked against its real
-                price history.
+                Every Amazon price drop we track comes with its price history,
+                so you can tell if it&apos;s really a deal.
               </p>
             </div>
             <span className="shrink-0 inline-flex items-center gap-1.5 text-sm font-semibold text-ink group-hover:gap-2.5 transition-all">
