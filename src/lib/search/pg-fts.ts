@@ -28,6 +28,12 @@ import { isLooseCategoryModel } from "./normalize";
 import type {
   SearchOutput, ProductGroup, StoreOffer, DupeResult, SearchSuggestion,
 } from "./index";
+/* Type-only (erased at build) so it can't create a runtime import cycle:
+   pdp-stats -> country -> pg-fts. computeAnchorStats itself is pulled in via
+   a dynamic import inside computeAnchorSpectrum, matching the country helpers
+   this module already lazy-loads (see isOfferAllowedForCountry below). */
+import type { AnchorStats } from "@/lib/pdp-stats";
+import type { Country } from "@/lib/country";
 
 /* ── Row shapes ───────────────────────────────────────────────────── */
 
@@ -963,7 +969,7 @@ export async function pgFtsFindSimilar(
    Returns empty if the product_id doesn't exist or has no offers. */
 export async function pgFtsFindByProductId(
   productId: string,
-  opts?: { limit?: number },
+  opts?: { limit?: number; country?: Country },
 ): Promise<SearchOutput> {
   const supa = getSupabaseAdmin();
   if (!supa) return { mode: "empty", query: productId, suggestions: [] };
@@ -983,70 +989,16 @@ export async function pgFtsFindByProductId(
     return { mode: "empty", query: anchorPayload.title, suggestions: [] };
   }
 
-  /* Dupes pipeline. Mirror pgFtsFindSimilar's gates so a pid-anchored
-     search applies the SAME filters as a text-anchored search —
-     audit May 2026 flagged that pid-anchored dupes missed variant /
-     numeric-model / brand gates, which let an iPhone 15 Pro Max
-     PDP-CTA click reveal iPhone 16 alternatives that the same
-     anchor text-search would have filtered out.
-
-     Requirements are extracted from the ANCHOR.TITLE (not a user
-     query — pid resolution has no user-typed string to lean on).
-     That's safe: the anchor's stored title is canonical for the
-     product. */
-  const { data: similarMatches } = await supa.rpc("search_products_fts", {
-    q: anchor.title,
-    max_results: 30,  /* halved May 2026 v3 for Supabase egress relief */
-  });
-
-  const anchorBrand        = anchor.brand ?? extractQueryBrand(anchor.title);
-  const anchorFamily       = detectQueryFamily(anchor.title);
-  const anchorIsAccessory  = looksLikeAccessory(anchor.title);
-
-  /* Broad FTS candidate pool — every row that passes the
-     correctness gates (brand, family, accessory, suspicious,
-     plausibility, usable URL). The cheaper-only restriction is
-     deliberately deferred until AFTER the partition step so
-     same-product matches at the same or higher price still merge
-     into the anchor's spectrum.
-
-     Why this is split out from a single dupes list: the prior
-     version applied `< anchor.bestPrice * 0.99` here, before
-     partitioning. For any product where the anchor store happened
-     to be the cheapest (user report May 2026: AMOUROUD Lunar
-     Vetiver EDP 100ML at Essenza was the cheapest of 6 stores
-     carrying it) the partition received zero candidates → no
-     variant augmentation → /compare's anchor section showed 1
-     store while the PDP CTA (which uses a lenient dupes search +
-     the same variant partition) correctly showed 6.
-
-     Splitting fixes the drift: same-product matches augment the
-     anchor regardless of price; only the cheaper-alternatives
-     RAIL filters to cheaper, below. */
-  const broadDupes: DupeResult[] = ((similarMatches as FtsRow[]) ?? [])
-    .filter((r) => r.product_id !== productId)
-    .filter((r) => !anchor.category || anchor.category === "general" || r.category_slug === anchor.category)
-    .filter((r) => priceLooksPlausible(priceInNgn(r.current_price, r.currency), r.category_slug, r.title))
-    .filter((r) => isUsableMerchantUrl(r.url))
-    /* Accessory match-flip: if the anchor itself is an accessory
-       (a case, cable, stand, etc.) we want other accessories as
-       alternatives, not the parent product. Otherwise drop
-       accessories so a phone anchor doesn't pull in cases. */
-    .filter((r) => anchorIsAccessory ? looksLikeAccessory(r.title) : !looksLikeAccessory(r.title))
-    .filter((r) => !looksSuspicious(r.title))
-    // Drop luxury-trademark counterfeits ("...Interlocking G", "Super Clone")
-    .filter((r) => !looksCounterfeit(r.title))
-    /* Family gate. Anchor family inferred from title; candidates
-       must match. Skipped when family is null (allows broad
-       'gift for mum'-style anchors to surface anything). */
-    .filter((r) => !anchorFamily || detectFamily(r.title) === anchorFamily)
-    /* Brand gate: a Nike anchor must surface Nike alternatives. */
-    .filter((r) => candidateHasBrand(r.title, anchorBrand))
-    /* Family compatibility — drops cross-family same-brand rows
-       (Nike Dunk → Nike Crew Socks). alternativeFamilyMatches is
-       stricter than familiesIncompatible for the dupes path. */
-    .filter((r) => alternativeFamilyMatches(anchor.title, r.title))
-    .map((r) => ftsRowToDupe(r, anchor));
+  /* Candidate pool — the EXACT same source + params the PDP uses
+     (pgFtsFindDupes(title, 0, { limit: 30, strict: false }), see
+     fetchDupesCached in /[country]/p/[id]/page.tsx), so the shared
+     computeAnchorSpectrum below sees identical inputs on both surfaces and the
+     store count cannot drift. (June 2026: this used search_products_fts +
+     a manual gate chain, which read 15 stores for a PUMA tee where the PDP's
+     pgFtsFindDupes read 9.) pgFtsFindDupes already applies the brand / family
+     / accessory / plausibility / URL gates internally; computeAnchorSpectrum
+     excludes the anchor product + country-filters. */
+  const broadDupes = await pgFtsFindDupes(anchor.title, 0, { limit: 30, strict: false });
 
   /* Variant-aware augmentation. The strict signature pool above
      misses real same-product matches whenever the brand/model
@@ -1073,76 +1025,28 @@ export async function pgFtsFindByProductId(
      "apple|iphone 15" rather than a UUID) we keep the sync path —
      the bulk SELECT would just return nothing for the anchor since
      the key isn't a real product_id. */
-  const supaForDeep = getSupabaseAdmin();
-  const anchorIsRealId = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(anchor.key);
-  const partition = supaForDeep && anchorIsRealId
-    ? await partitionDupesByVariantMatchDeep(
-        supaForDeep,
-        { id: anchor.key, title: anchor.title, brand: anchor.brand, priceNgn: anchor.bestPrice },
-        broadDupes,
-      )
-    : partitionDupesByVariantMatch(
-        { title: anchor.title, brand: anchor.brand, priceNgn: anchor.bestPrice },
-        broadDupes,
-      );
-  /* Belt-and-braces re-veto on every variant offer before folding into
-     the anchor pool. The deep partition's isLikelySameProductDeep
-     SHOULD have rejected cross-generation / cross-tier variants via
-     its Stage 2.5 veto — but post-deploy testing kept surfacing
-     MacBook M3/M5 and M4-Pro/M4-base leaks despite the deep veto
-     being in place. Whatever the upstream cause (function-instance
-     code drift? cached deep verdict from before veto landed?
-     unexplained call path?), the FINAL gate here gives us a
-     guaranteed clean output regardless of upstream behaviour.
-
-     Checks the same three signals as deepMatchVeto:
-       - numeric model markers (16 vs 14, 15 vs 17)
-       - letter-glued model tokens (s24 vs s25)
-       - variant tokens (m4 vs m5, Pro vs Air)
-     Applied to anchor.title vs offer.productTitle (the variant's
-     own title, set by variantOffers from the DupeResult). When the
-     productTitle equals the anchor title (no variant pooling — same
-     product re-titled to anchor), the check trivially passes.
-     Same applied to anchor.offers in case any sibling-pooled offer
-     carries a divergent productTitle. */
-  const aNum = extractRequiredNumbers(anchor.title);
-  const aMod = extractRequiredModelTokens(anchor.title);
-  const aVar = extractVariantTokens(anchor.title);
-  const passesFinalVeto = (offerTitle: string): boolean => {
-    if (!offerTitle || offerTitle === anchor.title) return true;
-    const cNum = extractRequiredNumbers(offerTitle);
-    const cMod = extractRequiredModelTokens(offerTitle);
-    const cVar = extractVariantTokens(offerTitle);
-    /* Number-based veto: BOTH must have unique-to-themselves numbers. */
-    if (aNum.filter((n) => !cNum.includes(n)).length > 0 &&
-        cNum.filter((n) => !aNum.includes(n)).length > 0) return false;
-    /* Model-token-based veto: BOTH must have unique-to-themselves model tokens. */
-    if (aMod.filter((m) => !cMod.includes(m)).length > 0 &&
-        cMod.filter((m) => !aMod.includes(m)).length > 0) return false;
-    /* Variant-token-based veto: bidirectional exhaustive — any asymmetry vetoes. */
-    if (aVar.some((v) => !cVar.includes(v)) ||
-        cVar.some((v) => !aVar.includes(v))) return false;
-    return true;
-  };
-  const filteredAnchorOffers = anchor.offers.filter((o) =>
-    passesFinalVeto(o.productTitle ?? anchor.title),
+  /* Shared anchor-spectrum (June 2026). The SINGLE function the PDP's "Compare
+     prices across N stores" CTA also calls (computeAnchorSpectrum), so the two
+     surfaces run the SAME country filter, the SAME brand-gated variant
+     partition, the SAME belt-and-braces model veto, and the SAME
+     computeAnchorStats count -- they can no longer drift (the 3-vs-1 store
+     report). comparableOffers ARE the counted set, so this card's rows equal
+     its storeCount, which equals the PDP CTA. The candidate pool (broadDupes)
+     is compare's own FTS source; the shared function owns everything from the
+     partition onward. anchor.category is the slug, used as the family for the
+     fashion brand gate + the outlier band. */
+  const spectrum = await computeAnchorSpectrum(
+    { productId, title: anchor.title, brand: anchor.brand, priceNgn: anchor.bestPrice, family: anchor.category },
+    anchor.offers,
+    broadDupes,
+    opts?.country?.code ?? "ng",
   );
-  const filteredVariantOffers = variantOffers(partition.likelyVariants)
-    .filter((o) => passesFinalVeto(o.productTitle ?? anchor.title));
-  const augmentedOffers = [
-    ...filteredAnchorOffers,
-    ...filteredVariantOffers,
-  ];
   const augmentedAnchor: ProductGroup = {
     ...anchor,
-    offers:    augmentedOffers,
-    /* Recompute bestPrice/worstPrice from the augmented set —
-       variant offers can shift either extreme. storeCount stays
-       informational; the compare anchor card derives its display
-       count from offers.length directly. */
-    bestPrice:  augmentedOffers.length > 0 ? Math.min(...augmentedOffers.map((o) => o.price)) : anchor.bestPrice,
-    worstPrice: augmentedOffers.length > 0 ? Math.max(...augmentedOffers.map((o) => o.price)) : anchor.worstPrice,
-    storeCount: augmentedOffers.length,
+    offers:     spectrum.comparableOffers,
+    bestPrice:  spectrum.comparableOffers.length > 0 ? Math.min(...spectrum.comparableOffers.map((o) => o.price)) : anchor.bestPrice,
+    worstPrice: spectrum.comparableOffers.length > 0 ? Math.max(...spectrum.comparableOffers.map((o) => o.price)) : anchor.worstPrice,
+    storeCount: spectrum.totalStores,
   };
 
   /* Cheaper-alternatives rail — apply the cheaper-only filter HERE
@@ -1150,7 +1054,7 @@ export async function pgFtsFindByProductId(
      see same-or-higher-priced variants for spectrum augmentation.
      Score + slice mirror the chain that used to live inline on the
      pre-partition broad list. */
-  const dupesForRail = partition.otherProducts
+  const dupesForRail = spectrum.otherProducts
     .filter((d) => d.savingsPercent > 0)
     .slice(0, limit * 2)
     .sort((a, b) => {
@@ -1207,4 +1111,123 @@ export async function pgFtsAnchorOffersByProductId(
   const anchorPayload = await fetchAnchorProductWithSiblings(productId);
   if (!anchorPayload) return [];
   return buildAnchorGroup(anchorPayload).offers;
+}
+
+/* ── Single shared anchor-spectrum builder ──────────────────────────
+   ONE source of truth for "this product, across stores": the offer set +
+   canonical store count that BOTH the PDP (the "Compare prices across N
+   stores" CTA + PriceComparisonBar + chart seed) and /compare (the anchor
+   card) render. Before this, each surface fetched candidates and counted
+   stores through its own pipeline, so the same product could read 3 stores
+   on the PDP and 1 on /compare (June 2026 report) -- different candidate
+   source, different filters, different final count. Both now call this
+   function, so they cannot drift.
+
+   Inputs the caller already holds:
+     baseOffers     the product's own offers (pgFtsAnchorOffersByProductId
+                    for a real DB product, or a synthesised single offer for
+                    a live/oid anchor).
+     candidateDupes FTS neighbours to test for same-product variants
+                    (pgFtsFindDupes). Country-filtered here (idempotent: a
+                    caller that already filtered passes through unchanged).
+   Pipeline: country-filter -> brand-gated deep variant partition (image-phash
+   / embedding / judge fast-paths + the fashion brand gate) -> fold the matched
+   variant offers into baseOffers -> computeAnchorStats (accessory + outlier +
+   used handling + same-store/same-price dedup + new-only count). */
+export interface AnchorSpectrum {
+  totalStores:      number;
+  perStoreOffers:   AnchorStats["perStoreOffers"];
+  priceStats:       AnchorStats["priceStats"];
+  /** Full StoreOffers behind totalStores (cheapest-first, new-only). A caller
+      that RENDERS rows uses these so the displayed rows ARE the counted set. */
+  comparableOffers: StoreOffer[];
+  /** baseOffers + variant offers, pre-stats. */
+  spectrumOffers:   StoreOffer[];
+  likelyVariants:   DupeResult[];
+  siblingVariants:  DupeResult[];
+  otherProducts:    DupeResult[];
+}
+
+export async function computeAnchorSpectrum(
+  anchor:         { productId: string | null; title: string; brand: string | null; priceNgn: number; family: string | null },
+  baseOffers:     StoreOffer[],
+  candidateDupes: DupeResult[],
+  countryCode:    string,
+): Promise<AnchorSpectrum> {
+  /* Dynamic imports break the pdp-stats -> country -> pg-fts module cycle
+     (country.ts imports this file). Both modules are fully loaded by the time
+     this async function runs, so there's no init-order hazard. */
+  const { computeAnchorStats } = await import("@/lib/pdp-stats");
+  const { getCountry, isOfferAllowedForCountry } = await import("@/lib/country");
+  const country = getCountry(countryCode);
+
+  /* Exclude the anchor product from its own candidate pool (its offers are
+     already in baseOffers). Done here so every caller is normalised the same
+     way regardless of what it passes. */
+  const deAnchored = anchor.productId
+    ? candidateDupes.filter((d) => d.key !== anchor.productId)
+    : candidateDupes;
+
+  /* Country filter (idempotent). NG keeps everything; other markets drop
+     offers not shoppable from there, dropping a dupe only if it loses ALL
+     its offers. */
+  const countryDupes = country.code === "ng"
+    ? deAnchored
+    : deAnchored
+        .map((d) => ({ ...d, offers: d.offers.filter((o) => isOfferAllowedForCountry(o, country)) }))
+        .filter((d) => d.offers.length > 0);
+
+  /* Brand-gated variant partition. Deep path when we have a real product_id;
+     sync fallback for a synthesised anchor. family threads through so
+     fashion/beauty get their brand gate + the wider outlier band in stats. */
+  const supa = getSupabaseAdmin();
+  const isRealId = !!anchor.productId && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(anchor.productId);
+  const partition = supa && isRealId
+    ? await partitionDupesByVariantMatchDeep(
+        supa,
+        { id: anchor.productId as string, title: anchor.title, brand: anchor.brand, priceNgn: anchor.priceNgn, family: anchor.family },
+        countryDupes,
+      )
+    : partitionDupesByVariantMatch(
+        { title: anchor.title, brand: anchor.brand, priceNgn: anchor.priceNgn, family: anchor.family },
+        countryDupes,
+      );
+
+  /* Belt-and-braces final veto (was inline in pgFtsFindByProductId; now shared
+     so the PDP gets it too). The deep partition SHOULD already reject
+     cross-generation / cross-tier variants, but post-deploy testing kept
+     surfacing MacBook M3/M5 and M4-Pro/M4-base leaks, so this guarantees a
+     clean spectrum regardless of upstream drift. Runs BEFORE computeAnchorStats
+     so totalStores counts exactly what survives. */
+  const aNum = extractRequiredNumbers(anchor.title);
+  const aMod = extractRequiredModelTokens(anchor.title);
+  const aVar = extractVariantTokens(anchor.title);
+  const passesFinalVeto = (offerTitle: string | undefined): boolean => {
+    const t = offerTitle ?? anchor.title;
+    if (!t || t === anchor.title) return true;
+    const cNum = extractRequiredNumbers(t);
+    const cMod = extractRequiredModelTokens(t);
+    const cVar = extractVariantTokens(t);
+    if (aNum.filter((n) => !cNum.includes(n)).length > 0 &&
+        cNum.filter((n) => !aNum.includes(n)).length > 0) return false;
+    if (aMod.filter((m) => !cMod.includes(m)).length > 0 &&
+        cMod.filter((m) => !aMod.includes(m)).length > 0) return false;
+    if (aVar.some((v) => !cVar.includes(v)) ||
+        cVar.some((v) => !aVar.includes(v))) return false;
+    return true;
+  };
+  const spectrumOffers = [...baseOffers, ...variantOffers(partition.likelyVariants)]
+    .filter((o) => passesFinalVeto(o.productTitle));
+  const stats = computeAnchorStats(spectrumOffers, anchor.priceNgn, country, anchor.family, anchor.title);
+
+  return {
+    totalStores:      stats.totalStores,
+    perStoreOffers:   stats.perStoreOffers,
+    priceStats:       stats.priceStats,
+    comparableOffers: stats.comparableOffers,
+    spectrumOffers,
+    likelyVariants:   partition.likelyVariants,
+    siblingVariants:  partition.siblingVariants,
+    otherProducts:    partition.otherProducts,
+  };
 }

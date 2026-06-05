@@ -34,9 +34,8 @@ import { unstable_cache } from "next/cache";
 import { COUNTRIES } from "@/lib/country";
 import { SITE_URL, buildBreadcrumbList, buildHreflangAlternates, canonicalGtin, cleanMpn } from "@/lib/seo";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
-import { pgFtsFindDupes, pgFtsAnchorOffersByProductId } from "@/lib/search/pg-fts";
+import { pgFtsFindDupes, pgFtsAnchorOffersByProductId, computeAnchorSpectrum, type AnchorSpectrum } from "@/lib/search/pg-fts";
 import { isOfferAllowedForCountry, filterDealsForCountry } from "@/lib/country";
-import { computeAnchorStats } from "@/lib/pdp-stats";
 import {
   fetchProductPriceHistory,
   rollupPriceHistory,
@@ -45,8 +44,6 @@ import {
   type PriceHistoryPoint,
 } from "@/lib/search/price-history";
 import { effectiveLandedPrice, landedTotal, LANDED_RATE } from "@/lib/landed-price";
-import { partitionDupesByVariantMatch, variantOffers, type PartitionResult } from "@/lib/search/variant-pooling";
-import { partitionDupesByVariantMatchDeep } from "@/lib/search/variant-pooling-deep";
 import { selectLineConfigs } from "@/lib/search/line-configs";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
 import { fetchProductMeta } from "@/lib/offers/fetch-product-description";
@@ -899,48 +896,35 @@ export default async function ProductPage({ params }: PageProps) {
      DO NOT call partitionDupesByVariantMatchDeep (or any other uncached
      fetch / DB write) directly in this render path. It will defeat the
      ISR again. Keep new heavy reads behind unstable_cache. */
-  const fetchPartitionCached = unstable_cache(
+  /* Shared anchor-spectrum (June 2026). ONE function -- computeAnchorSpectrum
+     -- builds the offer set + canonical store count for BOTH this PDP (the
+     "Compare prices across N stores" CTA + PriceComparisonBar + chart seed)
+     and the /compare anchor card (pgFtsFindByProductId calls the same
+     function). Before this they each pooled + counted via their own pipeline
+     and drifted (the 3-vs-1 store report). It owns: country filter -> brand-
+     gated deep variant partition -> belt-and-braces model veto -> the
+     augment -> computeAnchorStats. Wrapped in unstable_cache for the same
+     ISR reason the partition was (the deep path does embedding + judge IO);
+     the spectrum result is plain JSON so it caches cleanly. `partition`
+     remains the variable name downstream (rail + Other configs) -- it's now
+     the shared spectrum object. */
+  const fetchSpectrumCached = unstable_cache(
     async (
-      productId: string | null,
-      title: string,
-      brand: string | null,
-      priceNgn: number,
-      family: string | null,
-      dupes: typeof countryFilteredDupes,
-    ): Promise<PartitionResult> => {
-      const supa = productId ? getSupabaseAdmin() : null;
-      if (supa && productId) {
-        return partitionDupesByVariantMatchDeep(
-          supa,
-          { id: productId, title, brand, priceNgn, family },
-          dupes,
-        );
-      }
-      return partitionDupesByVariantMatch({ title, brand, priceNgn, family }, dupes);
-    },
-    ["pdp-variant-partition-v1"],
+      anchorArg:   { productId: string | null; title: string; brand: string | null; priceNgn: number; family: string | null },
+      baseOffers:  typeof anchorOffers,
+      dupes:       typeof countryFilteredDupes,
+      countryCode: string,
+    ): Promise<AnchorSpectrum> => computeAnchorSpectrum(anchorArg, baseOffers, dupes, countryCode),
+    ["pdp-anchor-spectrum-v1"],
     { revalidate: 1800, tags: ["pdp-partition"] },
   );
-  const partition = await fetchPartitionCached(
-    offer.product_id,
-    offer.title,
-    offer.brand,
-    anchorPriceNgn,
-    offer.category_slug ?? null,
+  const partition = await fetchSpectrumCached(
+    { productId: offer.product_id, title: offer.title, brand: offer.brand, priceNgn: anchorPriceNgn, family: offer.category_slug ?? null },
+    anchorOffers,
     countryFilteredDupes,
+    country.code,
   );
-  const augmentedAnchorOffers = [
-    ...anchorOffers,
-    ...variantOffers(partition.likelyVariants),
-  ];
-
-  const { totalStores, perStoreOffers } = computeAnchorStats(
-    augmentedAnchorOffers,
-    anchorPriceNgn,
-    country,
-    offer.category_slug ?? null,
-    offer.title,
-  );
+  const { totalStores, perStoreOffers } = partition;
 
   /* Strip variants from the "You may also like" rail. They're now
      plotted on the spectrum as same-product price points; rendering

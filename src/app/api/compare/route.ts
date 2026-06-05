@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchByKey } from "@/lib/search";
-import { pgFtsFindSimilar, pgFtsFindByProductId, pgFtsFindDupes } from "@/lib/search/pg-fts";
-import { partitionDupesByVariantMatch, variantOffers } from "@/lib/search/variant-pooling";
-import { partitionDupesByVariantMatchDeep } from "@/lib/search/variant-pooling-deep";
-import { getSupabaseAdmin } from "@/lib/providers/db-client";
+import { pgFtsFindSimilar, pgFtsFindByProductId, pgFtsFindDupes, computeAnchorSpectrum } from "@/lib/search/pg-fts";
 import { getServerCountry } from "@/lib/country-server";
 import { getCountry, isOfferAllowedForCountry, COUNTRIES } from "@/lib/country";
 import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
@@ -107,7 +104,7 @@ function offerRowToStoreOffer(row: OfferRow): StoreOffer {
   };
 }
 
-async function synthesizeAnchorFromOfferRow(row: OfferRow): Promise<SearchOutput> {
+async function synthesizeAnchorFromOfferRow(row: OfferRow, countryCode: string): Promise<SearchOutput> {
   const visitingOffer = offerRowToStoreOffer(row);
 
   /* Find similar products via FTS. Lenient mode here (strict: false)
@@ -117,7 +114,7 @@ async function synthesizeAnchorFromOfferRow(row: OfferRow): Promise<SearchOutput
      looser candidate set into likelyVariants (spectrum pool),
      siblingVariants (excluded from rail), and otherProducts (true
      cross-tier alternatives the user wants to discover). */
-  const rawDupes = await pgFtsFindDupes(row.title, 0, { limit: 24, strict: false });
+  const rawDupes = await pgFtsFindDupes(row.title, 0, { limit: 30, strict: false });
 
   /* Drop the anchor itself from the candidate pool. pgFtsFindDupes
      returns every product matching the title — including the anchor
@@ -152,34 +149,19 @@ async function synthesizeAnchorFromOfferRow(row: OfferRow): Promise<SearchOutput
      happy path; ~200-500ms more per ambiguous-band judge call on
      cold cache (warms forever). Hidden behind DEEP_MATCH=1 env so
      it can be A/B'd in production. */
-  const supaDeep = row.product_id ? getSupabaseAdmin() : null;
-  const partition = supaDeep && row.product_id
-    ? await partitionDupesByVariantMatchDeep(
-        supaDeep,
-        { id: row.product_id, title: row.title, brand: row.brand, priceNgn: visitingOffer.price },
-        dupes,
-      )
-    : partitionDupesByVariantMatch(
-        { title: row.title, brand: row.brand, priceNgn: visitingOffer.price },
-        dupes,
-      );
-  const rawAugmented = [visitingOffer, ...variantOffers(partition.likelyVariants)];
-
-  /* Dedupe by (storeId, rounded RAW price) — same logic as the
-     PDP's dedupAnchorOffers. QA report May 2026 found 4 identical
-     93mobiles offers inflating storeCount to 4 when only 1 unique
-     store-price existed. Round to nearest 100 NGN to collapse
-     trivial FX-rounding differences. Raw basis (#16/#123) so the
-     anchor's price math matches the listed price, not the landed
-     estimate. */
-  const dedupSeen = new Set<string>();
-  const augmentedOffers = rawAugmented.filter((o) => {
-    if (o.price <= 0) return false;
-    const key = `${o.storeId}|${Math.round(o.price / 100) * 100}`;
-    if (dedupSeen.has(key)) return false;
-    dedupSeen.add(key);
-    return true;
-  });
+  /* Shared anchor-spectrum (June 2026) — the SAME computeAnchorSpectrum the PDP
+     CTA and the /compare pid path call, so the oid fallback can't drift from
+     them. baseOffers is the single visiting offer; the function folds in
+     same-product variants, country-filters, runs the model veto, and counts
+     via computeAnchorStats. comparableOffers ARE the counted set, so this
+     card's rows equal its storeCount. */
+  const spectrum = await computeAnchorSpectrum(
+    { productId: row.product_id ?? null, title: row.title, brand: row.brand, priceNgn: visitingOffer.price, family: row.category_slug ?? null },
+    [visitingOffer],
+    dupes,
+    countryCode,
+  );
+  const augmentedOffers = spectrum.comparableOffers;
 
   /* anchor.key — when product_id is available, this is the canonical
      PDP-routable id. When only offer_id exists (synthesised anchor
@@ -203,7 +185,7 @@ async function synthesizeAnchorFromOfferRow(row: OfferRow): Promise<SearchOutput
     model:         null,
     storageGb:     null,
     inches:        null,
-    storeCount:    augmentedOffers.length,
+    storeCount:    spectrum.totalStores,
     bestPrice:     augmentedOffers.length > 0 ? Math.min(...augmentedOffers.map((o) => o.price)) : visitingOffer.price,
     worstPrice:    augmentedOffers.length > 0 ? Math.max(...augmentedOffers.map((o) => o.price)) : visitingOffer.price,
     maxSavings:    0,
@@ -226,7 +208,7 @@ async function synthesizeAnchorFromOfferRow(row: OfferRow): Promise<SearchOutput
        suppress more-expensive siblings" missed cases where a sibling
        was on deeper promo than the anchor. See pg-fts.ts buildSimilar
        result for the full rationale. */
-    dupes:  partition.otherProducts,
+    dupes:  spectrum.otherProducts,
   };
 }
 
@@ -338,7 +320,11 @@ export async function GET(req: NextRequest) {
        state, two well-named branches, single empty fallback. */
     let result: SearchOutput | null = null;
     if (pid) {
-      result = await pgFtsFindByProductId(pid);
+      /* Pass country so the shared computeAnchorSpectrum counts stores over the
+         country-shoppable set -- the storeCount must already be correct here,
+         since the downstream filterByCountry only prunes offers (it can't
+         re-derive the canonical new-only count). */
+      result = await pgFtsFindByProductId(pid, { country });
     }
     const pidMissedOrAbsent = !result || result.mode === "empty";
     if (pidMissedOrAbsent && q.trim()) {
@@ -419,7 +405,7 @@ export async function GET(req: NextRequest) {
     if (filtered.mode === "empty" && oid) {
       const offerRow = await fetchOfferById(oid);
       if (offerRow) {
-        const synthesised = await synthesizeAnchorFromOfferRow(offerRow);
+        const synthesised = await synthesizeAnchorFromOfferRow(offerRow, country.code);
         const synthFiltered = country.code === "ng"
           ? synthesised
           : filterByCountry(synthesised, country);

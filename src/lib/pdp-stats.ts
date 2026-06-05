@@ -62,6 +62,10 @@ export interface AnchorStats {
       first by effectiveNgn so cheapest-store lookups are
       O(1) via perStoreOffers[0]. */
   perStoreOffers: PerStoreOffer[];
+  /** The full StoreOffers behind totalStores (one per store, cheapest-first,
+      new-only with all-used fallback). For callers that RENDER the rows (the
+      /compare anchor card) so the displayed rows ARE the counted set. */
+  comparableOffers: StoreOffer[];
 }
 
 /* Same-store + same-price dedup on the RAW merchant price (#16: the PDP
@@ -198,6 +202,18 @@ export function computeAnchorStats(
   const newStoreCount    = perStoreOffers.filter((r) => !r.isUsed).length;
   const comparableStores = newStoreCount > 0 ? newStoreCount : perStoreOffers.length;
 
+  /* The canonical store set behind totalStores, as full StoreOffers (one per
+     store, cheapest-first), so a caller that RENDERS rows (the /compare anchor
+     card) shows exactly the set we counted -- no second, divergent dedup. Same
+     new-only + all-used fallback + price>0 + sort as perStoreOffers/totalStores
+     above, just preserving the whole offer (url, title, logo) instead of the
+     thin per-store projection. */
+  const pricedOffers = dedupedFiltered.filter((o) => o.price > 0);
+  const newPriced    = pricedOffers.filter((o) => !isUsedListing(o.storeName, o.productTitle));
+  const comparableOffers = (newPriced.length > 0 ? newPriced : pricedOffers)
+    .slice()
+    .sort((a, b) => a.price - b.price);
+
   return {
     totalStores: Math.max(1, comparableStores),
     priceStats: effectives.length > 1
@@ -209,5 +225,6 @@ export function computeAnchorStats(
         }
       : undefined,
     perStoreOffers,
+    comparableOffers,
   };
 }
