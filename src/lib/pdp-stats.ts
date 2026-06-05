@@ -185,8 +185,21 @@ export function computeAnchorStats(
 
   const effectives = perStoreOffers.map((r) => r.effectiveNgn);
 
+  /* totalStores MUST count the SAME set the PriceComparisonBar headlines, or
+     ProductHero's "Compare prices across N stores" CTA contradicts the bar
+     sitting right beneath it (reported June 2026). The bar plots its spectrum,
+     every "across N stores" label, and its dots over the NEW-only, priced
+     subset (used/refurb become a separate labelled line; zero-price rows are
+     dropped). dedupedFiltered.length counted both, so a 6-new + 2-used product
+     headlined "across 8 stores" above a 6-store spectrum. Recount off
+     perStoreOffers (already price>0 filtered) minus used, mirroring the bar's
+     exact all-used fallback (PriceComparisonBar L168-169): when EVERY listing
+     is used, keep counting them all since there's no new price to compare. */
+  const newStoreCount    = perStoreOffers.filter((r) => !r.isUsed).length;
+  const comparableStores = newStoreCount > 0 ? newStoreCount : perStoreOffers.length;
+
   return {
-    totalStores: Math.max(1, dedupedFiltered.length),
+    totalStores: Math.max(1, comparableStores),
     priceStats: effectives.length > 1
       ? {
           thisPriceNgn: anchorPriceNgn,
