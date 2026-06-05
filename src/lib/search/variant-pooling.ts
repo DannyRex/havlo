@@ -34,6 +34,7 @@ import {
   extractQueryBrand,
   candidateHasBrand,
 } from "./query-understanding";
+import { titlesColorConflict } from "./normalize";
 
 export interface PartitionResult {
   /** Dupes that look like genuine same-product variants — their
@@ -104,7 +105,8 @@ export function partitionDupesByVariantMatch(
      electronics match whose brand-name differs from its line-name ("Apple" vs
      an "iPhone 15" title) is never dropped. */
   const fam = (anchor.family ?? "").toLowerCase();
-  const fashionBrandGate = (fam === "fashion" || fam === "beauty")
+  const fashionFamily = fam === "fashion" || fam === "beauty";
+  const fashionBrandGate = fashionFamily
     && !!(anchorBrand || extractQueryBrand(anchor.title));
   const anchorBrandForGate = anchorBrand || extractQueryBrand(anchor.title);
 
@@ -143,7 +145,15 @@ export function partitionDupesByVariantMatch(
        family (from category_slug) so detection inside the gate
        isn't repeated for every dupe. When omitted, the gate
        falls back to detecting family from the anchor title. */
+    /* Fashion/beauty colour-conflict gate (June 2026). A same-brand white
+       jacket and a navy one share every remaining token (colour is a stopword
+       in the lexical overlap), so they over-pooled as "the same product across
+       stores". Split them when both titles resolve a DIFFERENT canonical colour
+       (shades fold to a primary group so "navy" vs "blue" does NOT split).
+       Fashion/beauty only -- electronics colour variants share a product_id by
+       design and must keep pooling. */
     const isVariant = (!fashionBrandGate || candidateHasBrand(d.title, anchorBrandForGate))
+      && !(fashionFamily && titlesColorConflict(anchor.title, d.title))
       && isLikelySameProduct(
         { title: anchor.title, brand: anchor.brand, priceNgn: anchor.priceNgn, family: anchor.family ?? null },
         { title: d.title,      brand: d.brand,      priceNgn: d.bestPrice },

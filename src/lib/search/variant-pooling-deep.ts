@@ -31,6 +31,7 @@ import {
   extractQueryBrand,
   candidateHasBrand,
 } from "./query-understanding";
+import { titlesColorConflict } from "./normalize";
 import type { PartitionResult } from "./variant-pooling";
 
 /* Sibling detection is identical to variant-pooling.ts's sync
@@ -203,7 +204,8 @@ async function partitionFallback(
      fashion/beauty (category_slug) so electronics whose brand-name differs from
      its line-name ("Apple"/"iPhone 15") is never dropped. */
   const fam = (anchor.family ?? "").toLowerCase();
-  const fashionBrandGate = (fam === "fashion" || fam === "beauty")
+  const fashionFamily = fam === "fashion" || fam === "beauty";
+  const fashionBrandGate = fashionFamily
     && !!(anchorBrand || extractQueryBrand(anchor.title));
   const anchorBrandForGate = anchorBrand || extractQueryBrand(anchor.title);
 
@@ -234,10 +236,14 @@ async function partitionFallback(
       const dEnrich = enrichMap.get(d.key);
       const sim = cosineSim(anchorEnrich, dEnrich);
       const candidate = toDeepProduct({ ...d, id: d.key }, dEnrich, sim);
-      /* Fashion/beauty: a candidate that doesn't carry the anchor's brand can
-         never be a same-product variant -- skip the deep match (and its judge
-         call) entirely so a brand-less knockoff can't be embedding-rescued. */
+      /* Fashion/beauty gates (skip the expensive deep match + judge entirely):
+         (1) the candidate must carry the anchor's brand (brand-less knockoffs
+             can't be embedding-rescued), and
+         (2) a DIFFERENT canonical colour means a different SKU -- so the
+             embedding/judge can never pool a white jacket with a navy one.
+         Electronics is unaffected (colour variants share a product_id). */
       const isVariant = (!fashionBrandGate || candidateHasBrand(d.title, anchorBrandForGate))
+        && !(fashionFamily && titlesColorConflict(anchor.title, d.title))
         && await isLikelySameProductDeep(supa, anchorDeep, candidate);
       return { d, isVariant };
     }));

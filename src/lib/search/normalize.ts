@@ -853,6 +853,58 @@ function findColor(norm: string): string | null {
   return m ? m[0].toLowerCase().replace(/\s+/g, "") : null;
 }
 
+/* ── Canonical colour extraction (fashion/beauty matcher gate) ──────────
+   Shades fold into a PRIMARY group so cross-store naming variance does NOT
+   false-split a real same-product pair ("navy" vs "blue" → both blue), while a
+   clearly-different colour still splits ("black" vs "white"). Used ONLY by the
+   fashion/beauty colour-conflict gate in the variant partition, where a same-
+   brand white jacket and a navy one are different SKUs that must not pool.
+   NOTE intentionally NOT wired into electronics matching, where colour
+   variants share a product_id by design. */
+const COLOR_GROUPS: Record<string, string> = {
+  black: "black", jet: "black", onyx: "black",
+  white: "white", ivory: "white", cream: "white", offwhite: "white", "off-white": "white", pearl: "white", eggshell: "white",
+  grey: "grey", gray: "grey", charcoal: "grey", slate: "grey", graphite: "grey", ash: "grey", smoke: "grey",
+  silver: "silver",
+  gold: "gold", "rose gold": "gold", rosegold: "gold", champagne: "gold",
+  blue: "blue", navy: "blue", royal: "blue", cobalt: "blue", indigo: "blue", denim: "blue", teal: "blue", sky: "blue", aqua: "blue",
+  red: "red", burgundy: "red", maroon: "red", wine: "red", crimson: "red", scarlet: "red", cherry: "red",
+  green: "green", olive: "green", emerald: "green", mint: "green", sage: "green", khaki: "green", forest: "green", lime: "green",
+  pink: "pink", rose: "pink", blush: "pink", fuchsia: "pink", magenta: "pink", salmon: "pink",
+  purple: "purple", violet: "purple", lavender: "purple", lilac: "purple", plum: "purple", mauve: "purple",
+  yellow: "yellow", mustard: "yellow", lemon: "yellow",
+  orange: "orange", coral: "orange", peach: "orange", rust: "orange", apricot: "orange",
+  brown: "brown", tan: "brown", beige: "brown", camel: "brown", taupe: "brown", chocolate: "brown", mocha: "brown", nude: "brown", caramel: "brown", coffee: "brown",
+};
+/* Word-boundary alternation over every colour term, longest-first so
+   "rose gold" / "off white" win over "rose" / "white". */
+const COLOR_TERMS = Object.keys(COLOR_GROUPS).sort((a, b) => b.length - a.length);
+const COLOR_TERM_RE = new RegExp(`\\b(${COLOR_TERMS.map((t) => t.replace(/[-\s]/g, "[-\\s]?")).join("|")})\\b`, "gi");
+
+/** Resolve a title to a single canonical colour group, or null when there's no
+    colour OR more than one distinct group (multi-/two-tone → no clean signal,
+    so the gate stays off). */
+export function extractCanonicalColor(title: string): string | null {
+  const lc = ` ${title.toLowerCase()} `;
+  const groups = new Set<string>();
+  let m: RegExpExecArray | null;
+  COLOR_TERM_RE.lastIndex = 0;
+  while ((m = COLOR_TERM_RE.exec(lc)) !== null) {
+    const term = m[1].toLowerCase().replace(/[-\s]+/g, (s) => (s.includes("-") ? "-" : " ")).trim();
+    const g = COLOR_GROUPS[term] ?? COLOR_GROUPS[term.replace(/[-\s]/g, "")];
+    if (g) groups.add(g);
+  }
+  return groups.size === 1 ? Array.from(groups)[0] : null;
+}
+
+/** True only when BOTH titles resolve a (different) canonical colour. A title
+    with no colour, or a multi-colour title, never triggers a conflict. */
+export function titlesColorConflict(a: string, b: string): boolean {
+  const ca = extractCanonicalColor(a);
+  const cb = extractCanonicalColor(b);
+  return ca !== null && cb !== null && ca !== cb;
+}
+
 function tokensOf(s: string): string[] {
   return stripPunct(s)
     .split(/\s+/)
