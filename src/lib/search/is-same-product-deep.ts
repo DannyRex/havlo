@@ -55,6 +55,9 @@ export interface DeepMatchProduct {
      it to the candidate. NULL when neither side had an embedding. */
   similarityToAnchor?: number | null;
   storeId?:          string | null;
+  /** Denoised SerpAPI snippet + attributes (migration 0077), passed to the
+      LLM judge to disambiguate near-identical fashion/beauty titles. */
+  attributes?:       string | null;
 }
 
 export interface DeepMatchOptions {
@@ -249,6 +252,7 @@ export async function isLikelySameProductDeep(
       id:        anchor.id,
       title:     anchor.title,
       brand:     anchor.brand ?? undefined,
+      attributes: anchor.attributes ?? undefined,
       priceNgn:  anchor.priceNgn,
       storeId:   anchor.storeId ?? undefined,
     },
@@ -256,6 +260,7 @@ export async function isLikelySameProductDeep(
       id:        candidate.id,
       title:     candidate.title,
       brand:     candidate.brand ?? undefined,
+      attributes: candidate.attributes ?? undefined,
       priceNgn:  candidate.priceNgn,
       storeId:   candidate.storeId ?? undefined,
     },

@@ -35,6 +35,7 @@
    ────────────────────────────────────────────────────────────────── */
 
 import type { Deal } from "@/types";
+import { buildAttributes } from "./search-serpapi";
 
 const SERPAPI_ENDPOINT = "https://serpapi.com/search.json";
 
@@ -219,6 +220,7 @@ function mapToDeal(
     id:              `serp-${config.storeId}-${Date.now().toString(36)}-${idx}`,
     title,
     description:     title,
+    attributes:      buildAttributes(r.snippet, exts),
     category:        inferredCat ?? "general",
     categorySlug:    inferredCat ?? "all",
     storeId:         config.storeId,

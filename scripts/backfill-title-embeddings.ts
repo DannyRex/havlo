@@ -34,12 +34,12 @@ async function main() {
      resume gracefully on subsequent runs without re-embedding. */
   console.log("Loading products needing embeddings...");
   const PAGE = 1000;
-  type Row = { id: string; title: string };
+  type Row = { id: string; title: string; attributes: string | null };
   const rows: Row[] = [];
   for (let from = 0; ; from += PAGE) {
     let q = supa
       .from("products")
-      .select("id, title")
+      .select("id, title, attributes")
       .is("title_embedding", null)
       .range(from, from + PAGE - 1);
     if (LIMIT && rows.length + PAGE > LIMIT) q = q.limit(LIMIT - rows.length);
@@ -61,7 +61,10 @@ async function main() {
 
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE);
-    const embeddings = await embedTitles(batch.map((r) => r.title));
+    /* Embed "title | attributes" so the colour/material/audience SerpAPI gave
+       us (migration 0077) lands in the vector for thin fashion/beauty titles.
+       Attributes-less rows embed exactly as before. */
+    const embeddings = await embedTitles(batch.map((r) => (r.attributes ? `${r.title} | ${r.attributes}` : r.title)));
 
     const successes = embeddings.filter((e) => e !== null).length;
     totalEmbedded += successes;

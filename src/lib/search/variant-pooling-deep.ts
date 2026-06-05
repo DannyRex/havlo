@@ -73,6 +73,7 @@ interface Enrichment {
   google_shopping_id: string | null;
   image_phash:        string | null;
   title_embedding:    string | null;
+  attributes:         string | null;
 }
 
 /** Parse pgvector text format "[0.1,0.2,...]" to a Float32Array.
@@ -128,6 +129,7 @@ function toDeepProduct(
     imagePhash:          enrich?.image_phash ? BigInt(enrich.image_phash) : null,
     similarityToAnchor:  similarity,
     storeId:             d.storeId ?? null,
+    attributes:          enrich?.attributes ?? null,
   };
 }
 
@@ -163,7 +165,7 @@ export async function partitionDupesByVariantMatchDeep(
   const allIds = [anchor.id, ...dupeIds];
   const { data: enriched, error } = await supa
     .from("products")
-    .select("id, gtin, mpn, google_shopping_id, image_phash, title_embedding")
+    .select("id, gtin, mpn, google_shopping_id, image_phash, title_embedding, attributes")
     .in("id", allIds);
   if (error) {
     /* DB failure — fall through to the sync gates only, no Phase 3/4
@@ -219,6 +221,7 @@ async function partitionFallback(
     mpn:              anchorEnrich?.mpn ?? null,
     googleShoppingId: anchorEnrich?.google_shopping_id ?? null,
     imagePhash:       anchorEnrich?.image_phash ? BigInt(anchorEnrich.image_phash) : null,
+    attributes:       anchorEnrich?.attributes ?? null,
   };
 
   const likelyVariants:  DupeResult[] = [];

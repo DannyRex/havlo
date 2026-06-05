@@ -67,6 +67,7 @@
 import type { SearchProvider, SearchQuery } from "./types";
 import { ProviderError } from "./types";
 import type { Deal } from "@/types";
+import { buildAttributes } from "./search-serpapi";
 
 const SERPAPI_ENDPOINT = "https://serpapi.com/search.json";
 const JUMIA_DOMAIN     = "jumia.com.ng";
@@ -276,6 +277,7 @@ function mapToDeal(
     id: `serp-jumia-${Date.now().toString(36)}-${i}`,
     title,
     description: title,
+    attributes: buildAttributes(r.snippet, exts),
     category: "general",
     categorySlug: "all",
     storeId: "jumia",

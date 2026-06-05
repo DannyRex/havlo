@@ -257,6 +257,10 @@ function dealToProductRow(d: Deal, signature: string | null) {
   return {
     title: cleanedTitle,
     description: d.description ?? null,
+    /* Denoised SerpAPI snippet + attribute extensions (migration 0077). NULL
+       for providers that only echo the title. Feeds the title embedding + the
+       match-judge so thin fashion/beauty titles match better. */
+    attributes: d.attributes ?? null,
     category: correctedCategory,
     category_slug: correctedSlug,
     brand: parsed.brand,

@@ -55,6 +55,10 @@ export interface JudgeInput {
   brand?:   string | null;
   priceNgn?: number | null;
   storeId?: string | null;
+  /** Denoised SerpAPI snippet + attributes (migration 0077). Surfaced to the
+      judge as a `details:` line so it can tell apart fashion/beauty items whose
+      titles are near-identical but whose colour/material/audience differ. */
+  attributes?: string | null;
 }
 
 export interface JudgeResult {
@@ -112,6 +116,7 @@ function buildPrompt(anchor: JudgeInput, candidate: JudgeInput): string {
   const fmt = (p: JudgeInput): string => {
     const parts = [`title: ${p.title}`];
     if (p.brand) parts.push(`brand: ${p.brand}`);
+    if (p.attributes) parts.push(`details: ${p.attributes.slice(0, 200)}`);
     if (p.priceNgn != null) parts.push(`price_ngn: ${p.priceNgn}`);
     if (p.storeId) parts.push(`store: ${p.storeId}`);
     return parts.join(" | ");

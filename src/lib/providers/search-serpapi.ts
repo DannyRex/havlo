@@ -25,6 +25,29 @@ interface SerpShoppingResult {
   serpapi_product_api?: string;
   delivery?: string;
   tag?: string;             // e.g. "SALE", "BEST MATCH"
+  /** Short description sentence Google sometimes attaches to a result. */
+  snippet?: string;
+  /** Attribute / badge chips, e.g. ["Black", "Leather", "Men's", "Free
+      delivery"]. Mostly commerce noise, but for fashion/beauty often carries
+      the colour/material/audience the title omits — buildAttributes denoises. */
+  extensions?: string[];
+}
+
+/* Strip commerce noise (shipping / returns / promo / sponsored / "by Brand")
+   from SerpAPI extensions + snippet, keep genuine attribute text, and join into
+   one compact string for products.attributes. Returns undefined when nothing
+   useful survives (so ingestion stores NULL, not "" ). */
+const ATTR_NOISE_RE = /\b(free|delivery|shipping|returns?|warranty|in stock|out of stock|sponsored|\bad\b|ads?|save|sale|deal|% off|off\b|cashback|coupon|installments?|pay|financing|by\s)/i;
+export function buildAttributes(snippet?: string, extensions?: string[]): string | undefined {
+  const exts = (extensions ?? [])
+    .map((e) => e.trim())
+    .filter((e) => e.length > 1 && e.length <= 40 && !ATTR_NOISE_RE.test(e) && !/^\d+(\.\d+)?$/.test(e));
+  const snip = (snippet ?? "").trim();
+  const parts: string[] = [];
+  if (snip && snip.length <= 300) parts.push(snip);
+  if (exts.length) parts.push(exts.join(", "));
+  const joined = parts.join(" · ").replace(/\s+/g, " ").trim();
+  return joined.length > 2 ? joined.slice(0, 500) : undefined;
 }
 
 interface SerpResponse {
@@ -361,6 +384,7 @@ function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | nu
     id: `serp-${Date.now().toString(36)}-${i}`,
     title,
     description: title,
+    attributes: buildAttributes(r.snippet, r.extensions),
     category: "general",
     categorySlug: "all",
     storeId,

@@ -106,6 +106,15 @@ export interface Deal {
       the title can't be caught here; that needs ingest-time
       condition capture the read-only catalog doesn't expose yet. */
   isUsed?: boolean;
+
+  /** Denoised extra product text the source returned beyond the title -- for
+      SerpAPI Google Shopping that's `snippet` + the attribute `extensions`
+      ("Black", "Leather", "Men's", a short description sentence), promo/shipping
+      noise stripped. Persisted to products.attributes (migration 0077) and fed
+      to BOTH the title embedding and the LLM match-judge so fashion/beauty
+      pairs (where the title is thin) have more to match on. Optional: most
+      providers echo the title and leave this undefined. */
+  attributes?: string;
 }
 
 export interface PriceResult {
