@@ -28,6 +28,7 @@ import "server-only";
 import { cache } from "react";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { isSyntheticId } from "@/lib/pdp-url";
+import { fetchOffersAt30dLow } from "@/lib/search/price-history";
 import { categories } from "@/lib/data/categories";
 import type { Deal } from "@/types";
 
@@ -270,7 +271,18 @@ export const fetchAllAmazonOffers = cache(async (
     console.warn(`[hubs] all-amazon error:`, error.message);
     return [];
   }
-  return dealsFromRows((data ?? []) as HubRow[]);
+  const deals = dealsFromRows((data ?? []) as HubRow[]);
+  /* History-derived "Lowest in 30 days" flag (#F2). The Amazon hub renders
+     MasonryCards, which already carry the badge -- but only if the offer is
+     flagged. The /deals feed enriches via fetchOffersAt30dLow; the Amazon hub
+     never did, so the badge never lit and the page's "checked against its
+     price history" promise lived only in the tap-through chart. Enrich here so
+     the history check is visible ON the card: a single cached RPC over the
+     rendered set, safe-degrading to no badge when unavailable. */
+  const lowSet = await fetchOffersAt30dLow(deals.map((d) => d.id));
+  return lowSet.size === 0
+    ? deals
+    : deals.map((d) => (lowSet.has(d.id) ? { ...d, at30DayLow: true } : d));
 });
 
 /* ── Brand catalogue per country ──────────────────────────────────
