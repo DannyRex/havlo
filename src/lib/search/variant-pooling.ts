@@ -34,12 +34,13 @@ import {
   extractQueryBrand,
   candidateHasBrand,
 } from "./query-understanding";
-import { titlesColorConflict, distinctiveOverlap } from "./normalize";
+import { titlesColorConflict, distinctiveOverlap, titlesTechConflict } from "./normalize";
+import { isDescriptiveProduct } from "./families";
 
 /* Mirror of variant-pooling-deep: descriptive families pool only when
    identifying tokens (brand/model/material) overlap this much. See that file +
    normalize's distinctiveOverlap for the rationale (June 2026 over-pooling fix). */
-const DESCRIPTIVE_OVERLAP_MIN = 0.7;
+const DESCRIPTIVE_OVERLAP_MIN = 0.75;
 
 export interface PartitionResult {
   /** Dupes that look like genuine same-product variants — their
@@ -113,8 +114,7 @@ export function partitionDupesByVariantMatch(
   const fashionFamily = fam === "fashion" || fam === "beauty";
   /* See variant-pooling-deep: the overlap gate covers descriptive/word-based
      families; number-identity families (electronics/gaming/appliances) are out. */
-  const descriptiveFamily = fashionFamily
-    || fam === "home" || fam === "health" || fam === "sports" || fam === "appliances";
+  const descriptiveFamily = isDescriptiveProduct(anchor.title);
   const fashionBrandGate = fashionFamily
     && !!(anchorBrand || extractQueryBrand(anchor.title));
   const anchorBrandForGate = anchorBrand || extractQueryBrand(anchor.title);
@@ -162,8 +162,9 @@ export function partitionDupesByVariantMatch(
        Fashion/beauty only -- electronics colour variants share a product_id by
        design and must keep pooling. */
     const isVariant = (!descriptiveFamily || distinctiveOverlap(anchor.title, d.title) >= DESCRIPTIVE_OVERLAP_MIN)
+      && !titlesTechConflict(anchor.title, d.title)
       && (!fashionBrandGate || candidateHasBrand(d.title, anchorBrandForGate))
-      && !(fashionFamily && titlesColorConflict(anchor.title, d.title))
+      && !(descriptiveFamily && titlesColorConflict(anchor.title, d.title))
       && isLikelySameProduct(
         { title: anchor.title, brand: anchor.brand, priceNgn: anchor.priceNgn, family: anchor.family ?? null },
         { title: d.title,      brand: d.brand,      priceNgn: d.bestPrice },

@@ -945,6 +945,12 @@ const FASHION_FILLER = new Set<string>([
   /* connectors / units / packaging */
   "for","with","and","the","of","by","to","in","on","set","sets","pack","piece","pieces","pcs","free",
   "shipping","ship","delivery","inch","cm","mm","ml","density","drawn","pre","cut","plucked","glueless",
+  /* fragrance concentration + volume + pack units: shared by every flanker of
+     a scent, so they must NOT count as identity. Without this, "Givenchy
+     Irresistible EDP 100ml" and "Givenchy Irresistible Nectar EDP 100ml"
+     overlap at ~0.8 (edp + 100ml inflate it) and pool as the same perfume. */
+  "edp","edt","edc","parfum","perfume","cologne","eau","fragrance","spray","oz","cl","fl",
+  "gram","grams","kg","litre","liter","capsules","tablets","count",
 ]);
 
 /** Identifying tokens only: drops filler, colours, and pure numbers (sizes /
@@ -956,6 +962,7 @@ export function distinctiveTokens(title: string): string[] {
     if (FASHION_FILLER.has(t)) continue;
     if (COLOR_GROUPS[t]) continue;     // colours handled by the colour gate, not identity
     if (/^\d+$/.test(t)) continue;     // pure numbers: sizes / years / unit counts
+    if (/^\d+(\.\d+)?(ml|cl|l|oz|g|kg|mg|gsm)$/.test(t)) continue;  // volume/weight (perfume 100ml, food 400g)
     if (seen.has(t)) continue;
     seen.add(t);
     out.push(t);
@@ -975,6 +982,64 @@ export function distinctiveOverlap(a: string, b: string): number {
   for (const t of ta) if (sb.has(t)) inter++;
   const union = ta.length + tb.length - inter;
   return union === 0 ? 0 : inter / union;
+}
+
+/* ── Panel-tech + storage-capacity conflict (number-identity over-pool fix) ──
+   TVs over-pooled across panel types ("LG 4K OLED" vs "LG 4K QNED") and
+   consoles/phones across storage ("Xbox Series S 1TB" vs "512GB"), because the
+   one-word spec difference sits among many shared tokens. These families keep
+   the model matcher (so PS5 == PlayStation 5), but like the colour gate we
+   SPLIT when both titles resolve a DIFFERENT value on the same axis. Asymmetric
+   (one side unspecified) never conflicts, so a terse listing still pools with a
+   detailed one. */
+const PANEL_TERMS = ["oled", "qned", "qled", "nanocell", "plasma", "miniled"];
+const PANEL_RE = new RegExp(`\\b(${PANEL_TERMS.join("|")})\\b`, "gi");
+function extractPanel(title: string): string | null {
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  PANEL_RE.lastIndex = 0;
+  while ((m = PANEL_RE.exec(title.toLowerCase())) !== null) seen.add(m[1].toLowerCase());
+  return seen.size === 1 ? Array.from(seen)[0] : null;
+}
+const CAPACITY_RE = /\b(\d+)\s?(gb|tb)\b/gi;
+function extractCapacity(title: string): string | null {
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  CAPACITY_RE.lastIndex = 0;
+  while ((m = CAPACITY_RE.exec(title.toLowerCase())) !== null) seen.add(`${m[1]}${m[2].toLowerCase()}`);
+  /* Two capacities present (e.g. "8GB RAM 256GB ROM") is ambiguous -> no clean
+     signal, stay silent rather than risk splitting on the RAM token. */
+  return seen.size === 1 ? Array.from(seen)[0] : null;
+}
+/* Alphanumeric model/SKU code (letter+digit): TV tiers "C5"/"G5"/"B5",
+   "QN70F"/"Q8F", phone "S24"/"S23", "X6725B", headphone "1000XM5". Excludes
+   resolutions (4K), capacities (256GB), volumes (100ml), ordinals (4th). Two
+   DIFFERENT single codes => different model tier => different product. When a
+   title carries 2+ codes (e.g. "S24 5G") it's ambiguous, so stay silent. */
+function extractModelCode(title: string): string | null {
+  const codes = new Set<string>();
+  for (const t of title.toLowerCase().split(/[^a-z0-9]+/)) {
+    if (t.length < 2 || t.length > 7) continue;
+    if (!/[a-z]/.test(t) || !/\d/.test(t)) continue;
+    if (/^\d+k$/.test(t)) continue;                              // 4k / 8k resolution
+    if (/^\d+(\.\d+)?(gb|tb|mb|ml|cl|oz|g|kg|mg)$/.test(t)) continue; // capacity / volume
+    if (/^\d+(st|nd|rd|th)$/.test(t)) continue;                  // 4th gen ordinals
+    codes.add(t);
+  }
+  return codes.size === 1 ? Array.from(codes)[0] : null;
+}
+/** True when two titles name DIFFERENT TV panel types, DIFFERENT single storage
+    capacities, or DIFFERENT single model codes -- different SKUs that must not
+    pool as one product. Asymmetric/ambiguous cases never conflict, so a terse
+    listing still pools with a detailed one. */
+export function titlesTechConflict(a: string, b: string): boolean {
+  const pa = extractPanel(a), pb = extractPanel(b);
+  if (pa && pb && pa !== pb) return true;
+  const ca = extractCapacity(a), cb = extractCapacity(b);
+  if (ca && cb && ca !== cb) return true;
+  const ma = extractModelCode(a), mb = extractModelCode(b);
+  if (ma && mb && ma !== mb) return true;
+  return false;
 }
 
 export function buildSignature(

@@ -96,6 +96,29 @@ export const PRODUCT_FAMILIES: Record<string, string[]> = {
   phone:       ["iphone", "galaxy", "pixel", "tecno", "infinix", "redmi", "oneplus", "smartphone", "phone"],
 };
 
+/* Families whose identity is a model NUMBER / SKU (phone "S24", console
+   "PS5", laptop "M4", tv panel+model) where the descriptive distinctive-
+   token overlap gate would wrongly merge or split legitimate matches. Every
+   OTHER family -- apparel, footwear, fragrance, jewellery, furniture, toys,
+   and UNDETECTED titles -- is "descriptive" and DOES get the overlap gate.
+   That is what makes the gate robust to a wrong category_slug: NG fashion
+   mislabelled 'electronics' still detects as footwear / null by TITLE, so it
+   is gated regardless. TVs/consoles keep the matcher but get a targeted
+   panel/capacity conflict gate (see normalize titlesTechConflict). */
+export const NUMBER_IDENTITY_FAMILIES = new Set<string>([
+  "phone", "tablet", "laptop", "desktop", "camera",
+  "earbuds", "headphones", "speaker", "mouse", "keyboard",
+  "watch", "ereader", "console", "game", "tv",
+]);
+
+/* True when the title is a descriptive (non-number-identity) product, so the
+   distinctive-token overlap gate should apply. Null family (unclassified --
+   dresses, perfumes, rings, bags, chairs) counts as descriptive. */
+export function isDescriptiveProduct(title: string): boolean {
+  const fam = detectFamily(title);
+  return !fam || !NUMBER_IDENTITY_FAMILIES.has(fam);
+}
+
 /* Single-word tokens that are dangerous as substrings. 'phone' lives
    inside 'headphones', 'tv' inside 'savetv', 'switch' inside
    'lightswitch'. For these we require a real word boundary. */
