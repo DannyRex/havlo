@@ -31,8 +31,8 @@ import {
   extractQueryBrand,
   candidateHasBrand,
 } from "./query-understanding";
-import { titlesColorConflict, distinctiveOverlap, titlesTechConflict } from "./normalize";
-import { isDescriptiveProduct } from "./families";
+import { titlesColorConflict, distinctiveOverlap, titlesTechConflict, titlesConcentrationConflict, hasModelIdentity } from "./normalize";
+import { isDescriptiveProduct, detectFamily } from "./families";
 
 /* Descriptive products (detected family is NOT number-identity) pool only when
    the two titles' IDENTIFYING tokens (brand / model / material, with generic
@@ -225,6 +225,10 @@ async function partitionFallback(
      else (apparel, footwear, fragrance, jewellery, furniture, toys, and
      unclassified titles) gets the overlap gate regardless of its slug. */
   const descriptiveFamily = isDescriptiveProduct(anchor.title);
+  /* Generic TV anchor ("LG 4K Smart TV" -- no panel type, no model code) can't
+     be reliably matched to a specific model, so it must not pool every TV in the
+     line. Number-identity, so the overlap gate doesn't catch it. */
+  const genericTvAnchor = detectFamily(anchor.title) === "tv" && !hasModelIdentity(anchor.title);
   const fashionBrandGate = fashionFamily
     && !!(anchorBrand || extractQueryBrand(anchor.title));
   const anchorBrandForGate = anchorBrand || extractQueryBrand(anchor.title);
@@ -263,8 +267,10 @@ async function partitionFallback(
          (2) a DIFFERENT canonical colour means a different SKU -- so the
              embedding/judge can never pool a white jacket with a navy one.
          Electronics is unaffected (colour variants share a product_id). */
-      const isVariant = (!descriptiveFamily || distinctiveOverlap(anchor.title, d.title) >= DESCRIPTIVE_OVERLAP_MIN)
+      const isVariant = !genericTvAnchor
+        && (!descriptiveFamily || distinctiveOverlap(anchor.title, d.title) >= DESCRIPTIVE_OVERLAP_MIN)
         && !titlesTechConflict(anchor.title, d.title)
+        && !titlesConcentrationConflict(anchor.title, d.title)
         && (!fashionBrandGate || candidateHasBrand(d.title, anchorBrandForGate))
         && !(descriptiveFamily && titlesColorConflict(anchor.title, d.title))
         && await isLikelySameProductDeep(supa, anchorDeep, candidate);

@@ -1042,6 +1042,33 @@ export function titlesTechConflict(a: string, b: string): boolean {
   return false;
 }
 
+/** Whether a title carries a concrete model identity (panel type or alphanumeric
+    model code). Used to suppress pooling for GENERIC electronics anchors
+    ("LG 4K Smart TV") that would otherwise pool every model in the line. */
+export function hasModelIdentity(title: string): boolean {
+  return extractPanel(title) !== null || extractModelCode(title) !== null;
+}
+
+/* Fragrance concentration: a different concentration is a different SKU
+   ("Dior Sauvage Parfum" vs "...EDP"). Colour-safe (none of these are colours),
+   unlike open-ended flavour/flanker names. "parfum" as a line name ("Le Parfum")
+   matches on both sides so it self-cancels; only a genuine EDP-vs-EDT-style
+   mismatch conflicts. */
+const CONCENTRATION_TERMS = ["extrait", "parfum", "cologne", "edp", "edt", "edc"];
+const CONCENTRATION_RE = new RegExp(`\\b(${CONCENTRATION_TERMS.join("|")})\\b`, "gi");
+function extractConcentration(title: string): string | null {
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  CONCENTRATION_RE.lastIndex = 0;
+  while ((m = CONCENTRATION_RE.exec(title.toLowerCase())) !== null) seen.add(m[1].toLowerCase());
+  return seen.size === 1 ? Array.from(seen)[0] : null;
+}
+/** True when two titles name a DIFFERENT single fragrance concentration. */
+export function titlesConcentrationConflict(a: string, b: string): boolean {
+  const ca = extractConcentration(a), cb = extractConcentration(b);
+  return ca !== null && cb !== null && ca !== cb;
+}
+
 export function buildSignature(
   title: string,
   identifiers?: ProductIdentifiers,

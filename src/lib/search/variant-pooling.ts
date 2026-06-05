@@ -34,8 +34,8 @@ import {
   extractQueryBrand,
   candidateHasBrand,
 } from "./query-understanding";
-import { titlesColorConflict, distinctiveOverlap, titlesTechConflict } from "./normalize";
-import { isDescriptiveProduct } from "./families";
+import { titlesColorConflict, distinctiveOverlap, titlesTechConflict, titlesConcentrationConflict, hasModelIdentity } from "./normalize";
+import { isDescriptiveProduct, detectFamily } from "./families";
 
 /* Mirror of variant-pooling-deep: descriptive families pool only when
    identifying tokens (brand/model/material) overlap this much. See that file +
@@ -115,6 +115,8 @@ export function partitionDupesByVariantMatch(
   /* See variant-pooling-deep: the overlap gate covers descriptive/word-based
      families; number-identity families (electronics/gaming/appliances) are out. */
   const descriptiveFamily = isDescriptiveProduct(anchor.title);
+  /* See variant-pooling-deep: generic TV anchor with no model identity. */
+  const genericTvAnchor = detectFamily(anchor.title) === "tv" && !hasModelIdentity(anchor.title);
   const fashionBrandGate = fashionFamily
     && !!(anchorBrand || extractQueryBrand(anchor.title));
   const anchorBrandForGate = anchorBrand || extractQueryBrand(anchor.title);
@@ -161,8 +163,10 @@ export function partitionDupesByVariantMatch(
        (shades fold to a primary group so "navy" vs "blue" does NOT split).
        Fashion/beauty only -- electronics colour variants share a product_id by
        design and must keep pooling. */
-    const isVariant = (!descriptiveFamily || distinctiveOverlap(anchor.title, d.title) >= DESCRIPTIVE_OVERLAP_MIN)
+    const isVariant = !genericTvAnchor
+      && (!descriptiveFamily || distinctiveOverlap(anchor.title, d.title) >= DESCRIPTIVE_OVERLAP_MIN)
       && !titlesTechConflict(anchor.title, d.title)
+      && !titlesConcentrationConflict(anchor.title, d.title)
       && (!fashionBrandGate || candidateHasBrand(d.title, anchorBrandForGate))
       && !(descriptiveFamily && titlesColorConflict(anchor.title, d.title))
       && isLikelySameProduct(
