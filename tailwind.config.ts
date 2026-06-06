@@ -16,9 +16,9 @@ const config: Config = {
       colors: {
         // Brand
         brand: {
-          DEFAULT: "#0057FF",
-          hover:   "#0041CC",
-          subtle:  "rgba(0, 87, 255, 0.08)",
+          DEFAULT: "#16A34A",
+          hover:   "#15803D",
+          subtle:  "rgba(22, 163, 74, 0.08)",
         },
         // Semantic surfaces (use bg-bg, bg-surface, etc.)
         bg:           "rgb(var(--bg-rgb) / <alpha-value>)",
@@ -43,8 +43,8 @@ const config: Config = {
       boxShadow: {
         card:        "0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06)",
         "card-hover":"0 4px 14px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04)",
-        "brand":     "0 6px 20px rgba(0, 87, 255, 0.20)",
-        "input":     "0 0 0 4px rgba(0, 87, 255, 0.10)",
+        "brand":     "0 6px 20px rgba(22, 163, 74, 0.20)",
+        "input":     "0 0 0 4px rgba(22, 163, 74, 0.10)",
       },
       borderRadius: {
         xl: "0.875rem",

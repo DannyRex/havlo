@@ -343,7 +343,7 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
     >
       {/* Hero sits on a FLAT bg-bg so it reads as one continuous
           white surface with the opaque white navbar above it. A faint
-          blue radial wash used to live here (rgba(0,87,255,0.05)); at
+          blue radial wash used to live here (rgba(22,163,74,0.05)); at
           the top of the page it tinted the body a subtle grey-blue
           that broke the unity with the pure-white navbar — user report
           May 2026: "the navbar is white and the main body seems grey
@@ -454,7 +454,7 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
           style={{ animationDelay: "160ms" }}
         >
           <div
-            className={`composer p-4 sm:p-5 ${focused ? "shadow-[0_8px_28px_rgba(0,87,255,0.10)]" : ""}`}
+            className={`composer p-4 sm:p-5 ${focused ? "shadow-[0_8px_28px_rgba(22,163,74,0.10)]" : ""}`}
           >
             <textarea
               ref={taRef}

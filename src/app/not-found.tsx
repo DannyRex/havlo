@@ -48,7 +48,7 @@ export default function NotFound() {
         <span
           aria-hidden
           className="w-1.5 h-1.5 rounded-full"
-          style={{ background: "#0057FF" }}
+          style={{ background: "#16A34A" }}
         />
         404 error
       </span>

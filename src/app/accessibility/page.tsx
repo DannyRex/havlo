@@ -46,7 +46,7 @@ const sections = [
     bullets: [
       "Keyboard-only navigation - every interactive element must be reachable with Tab and operable with Enter/Space.",
       "Screen readers - primary flows tested with VoiceOver (macOS, iOS) and NVDA (Windows). Product cards, filters, and the compare grid have proper ARIA labels.",
-      "Color contrast - body text 4.5:1 minimum, large text 3:1 minimum (WCAG AA thresholds). Brand color (#0057FF) passes against the white surface.",
+      "Color contrast - body text 4.5:1 minimum, large text 3:1 minimum (WCAG AA thresholds). Body and UI text use the high-contrast ink colors; the brand green (#16A34A) is reserved for buttons, accents, and large/bold labels, where it meets the 3:1 threshold.",
       "Zoom and responsive layout - content remains usable up to 200% browser zoom on a 320px-wide viewport.",
       "Form labels and errors - every input has an associated label; validation errors announce to assistive tech.",
       "Motion preferences - animations respect prefers-reduced-motion; no auto-playing video.",

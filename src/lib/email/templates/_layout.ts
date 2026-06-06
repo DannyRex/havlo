@@ -39,7 +39,7 @@
 
 export const tokens = {
   /* Brand */
-  brand:        "#0057FF",
+  brand:        "#16A34A",
   brandHover:   "#0044CC",
 
   /* Text */

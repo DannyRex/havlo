@@ -137,7 +137,7 @@ h1, h2, h3, h4, h5, h6 {
 ::-webkit-scrollbar-thumb { background: rgb(var(--border-strong-rgb)); border-radius: 999px; border: 2px solid rgb(var(--bg-rgb)); }
 ::-webkit-scrollbar-thumb:hover { background: rgb(var(--ink-3-rgb)); }
 
-::selection { background: rgba(0, 87, 255, 0.18); color: rgb(var(--ink-rgb)); }
+::selection { background: rgba(22, 163, 74, 0.18); color: rgb(var(--ink-rgb)); }
 
 /* No-scrollbar utility for horizontal chip rails */
 .no-scrollbar { scrollbar-width: none; }
@@ -151,10 +151,10 @@ h1, h2, h3, h4, h5, h6 {
   /* Buttons */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-white text-sm transition-all duration-150;
-    background: #0057FF;
+    background: #16A34A;
   }
-  .btn-primary:hover { background: #0041CC; }
-  .btn-primary:focus-visible { outline: 2px solid #0057FF; outline-offset: 2px; }
+  .btn-primary:hover { background: #15803D; }
+  .btn-primary:focus-visible { outline: 2px solid #16A34A; outline-offset: 2px; }
 
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm transition-all duration-150;
@@ -194,8 +194,8 @@ h1, h2, h3, h4, h5, h6 {
   }
   .input-field::placeholder { color: rgb(var(--ink-3-rgb)); }
   .input-field:focus {
-    border-color: #0057FF;
-    box-shadow: 0 0 0 4px rgba(0, 87, 255, 0.10);
+    border-color: #16A34A;
+    box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.10);
   }
 
   /* Composer (dupe.com style search box) */
@@ -212,8 +212,8 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   }
   .composer:focus-within {
-    border-color: rgba(0, 87, 255, 0.55);
-    box-shadow: 0 0 0 4px rgba(0, 87, 255, 0.12);
+    border-color: rgba(22, 163, 74, 0.55);
+    box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.12);
   }
   .composer textarea {
     @apply w-full bg-transparent outline-none resize-none text-base leading-relaxed;
