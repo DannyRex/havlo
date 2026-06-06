@@ -113,11 +113,22 @@ export default function Navbar() {
           translucent background visibly strobes through the bar
           (user report: "the background behind the navbar flickers").
           Mobile was already opaque after an earlier "navbar shakes on
-          scroll" fix; this extends that opaque, transform-free,
-          most-scroll-stable treatment to every width. A solid header
-          beats a frosted one that flickers. */}
+          scroll" fix; this extends that opaque treatment to every width.
+          A solid header beats a frosted one that flickers.
+
+          iOS Safari follow-up (June 2026): the OPAQUE sticky bar still
+          flickered/jittered during momentum scroll on iPhone — WebKit
+          re-rasterises a position:sticky element every frame unless it's on
+          its own compositor layer. translateZ(0) + backface-visibility:hidden
+          promote it to a GPU layer so it paints once and stays put. This is
+          safe here only because there's no backdrop-filter anymore (the filter
+          re-sampling — NOT the transform — was the original flicker cause).
+          The header's transform makes it a containing block, but CountrySelect's
+          dropdown is position:absolute (relative to its own wrapper) and the
+          mobile drawer is a SIBLING (fixed, z-50 > z-40), so neither is
+          affected. */}
       <header
-        className="sticky top-0 z-40 border-b border-border bg-bg"
+        className="sticky top-0 z-40 border-b border-border bg-bg [transform:translateZ(0)] [backface-visibility:hidden] [-webkit-backface-visibility:hidden]"
       >
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
 
