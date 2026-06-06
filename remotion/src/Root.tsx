@@ -2,6 +2,7 @@ import { Composition } from "remotion";
 import { HavloPriceDrop, PRICEDROP_DURATION } from "./HavloPriceDrop";
 import { HavloExplainer, EXPLAINER_DURATION } from "./HavloExplainer";
 import { BrandProof } from "./BrandProof";
+import { CursorJourney } from "./CursorJourney";
 import type { ThemeName } from "./brand";
 import type { MarketKey } from "./data";
 
@@ -39,6 +40,10 @@ export const RemotionRoot: React.FC = () => {
       {/* Brand cards / CTA proof, one per theme. */}
       <Composition id="BrandProof-Dark" component={BrandProof} defaultProps={{ theme: "dark" as const }} durationInFrames={120} fps={30} width={1920} height={1080} />
       <Composition id="BrandProof-Light" component={BrandProof} defaultProps={{ theme: "light" as const }} durationInFrames={120} fps={30} width={1920} height={1080} />
+
+      {/* Continuous cursor journey over REAL green havlo.io screenshots:
+          home → MacBook Air M4 autocomplete → live 4-store compare → CTA. */}
+      <Composition id="CursorJourney" component={CursorJourney} durationInFrames={510} fps={30} width={1920} height={1080} />
 
       {/* Standalone ~9s hook, one per theme (brand-refreshed). */}
       <Composition id="HavloPriceDrop-Dark" component={HavloPriceDrop} defaultProps={{ theme: "dark" as const }} durationInFrames={PRICEDROP_DURATION} fps={30} width={1920} height={1080} />

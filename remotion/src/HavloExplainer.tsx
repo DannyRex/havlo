@@ -22,10 +22,12 @@ import { SceneCTA } from "./scenes/SceneCTA";
 export const EXPLAINER_DURATION = 964;
 const F = () => linearTiming({ durationInFrames: 16 });
 
-export interface ExplainerProps {
+// `type` (not `interface`): Remotion's <Composition> constrains props to
+// `Record<string, unknown>`, which a named interface doesn't satisfy.
+export type ExplainerProps = {
   theme: ThemeName;
   market: MarketKey;
-}
+};
 
 export const HavloExplainer: React.FC<ExplainerProps> = ({ theme, market }) => {
   const ctx: Ctx = { theme: THEMES[theme], market: MARKETS[market] };
