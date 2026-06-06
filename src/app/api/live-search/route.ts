@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
+import { revalidateTag } from "next/cache";
 import { getActiveSearchProviders, ProviderError } from "@/lib/providers";
 import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry } from "@/lib/country";
@@ -294,6 +295,29 @@ export async function GET(req: NextRequest) {
      in-flight Supabase writes before they completed. waitUntil()
      guarantees the persist call completes before the function ends. */
   if (persistSet.length > 0) {
+    /* Bust the browse cache for THIS country so the offers we're about
+       to persist surface on the next /deals load instead of waiting out
+       the SSR fetch's 60/600s window. /[country]/deals tags its
+       /api/deals SSR fetch with `deals:{country}`; revalidateTag purges
+       every category variant for this country on demand.
+
+       Why this is the "instant reflection" fix the user asked for:
+       compare-page live search already writes fresh SerpAPI offers into
+       the catalog (ingestDeals below). The data was always saved — it
+       just sat behind a 10-minute browse cache. This invalidation makes
+       a save reflect on the very next /deals visit, in every country
+       (and category) where a live search ingested rows, at ZERO extra
+       SerpAPI cost (pure cache bust over data already being written).
+
+       Called here in request scope — NOT inside the waitUntil persist —
+       so it runs within an active Next request context. The tag is
+       marked stale now; the next /deals request re-queries the
+       now-populated catalog. The persist commits within ~1s (waitUntil),
+       well before a user navigates compare → deals, so the refetch sees
+       the new rows. Targeted per-country: every other country keeps its
+       egress-saving cache untouched. */
+    revalidateTag(`deals:${countryCode.toLowerCase()}`);
+
     /* In-flight guard — collapse concurrent persists of the same
        {country}:{query} (the StrictMode / rapid-re-search double-
        fire) to a single ingestDeals run. Two concurrent runs race

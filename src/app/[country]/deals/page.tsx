@@ -130,7 +130,23 @@ async function fetchInitialDeals(
        600s window — they don't benefit from faster cycling and the
        longer window keeps Fluid CPU + Supabase egress in check. */
     const isRotatingSort = !params.sort || params.sort === "relevance";
-    const res = await fetch(url, { next: { revalidate: isRotatingSort ? 60 : 600 } });
+    /* On-demand invalidation hook. /api/live-search calls
+       revalidateTag(`deals:{country}`) right after a compare-page live
+       search persists fresh SerpAPI offers into the catalog. Tagging
+       this SSR fetch lets that bust purge the cached browse response for
+       the affected country on demand — so newly-ingested deals reflect
+       on the very next /deals load (any category) instead of waiting out
+       the 60/600s window below. The time-based revalidate stays as the
+       egress-friendly fallback for everything else; the tag only fires
+       when a live search actually wrote new rows. Coarse per-country tag
+       (not per-category) because an ingested deal can land in any
+       category, so the whole country's browse must refresh. */
+    const res = await fetch(url, {
+      next: {
+        revalidate: isRotatingSort ? 60 : 600,
+        tags: ["deals", `deals:${params.country.toLowerCase()}`],
+      },
+    });
     if (!res.ok) {
       /* Log the status so Vercel captures the SSR-time failure.
          Previously `if (!res.ok) return null` silently degraded to
