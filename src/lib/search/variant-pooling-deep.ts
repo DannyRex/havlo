@@ -31,7 +31,7 @@ import {
   extractQueryBrand,
   candidateHasBrand,
 } from "./query-understanding";
-import { titlesColorConflict, distinctiveOverlap, titlesTechConflict, titlesConcentrationConflict, hasModelIdentity } from "./normalize";
+import { titlesColorConflict, distinctiveOverlap, titlesTechConflict, titlesConcentrationConflict, hasModelCode } from "./normalize";
 import { isDescriptiveProduct, detectFamily } from "./families";
 
 /* Descriptive products (detected family is NOT number-identity) pool only when
@@ -228,7 +228,7 @@ async function partitionFallback(
   /* Generic TV anchor ("LG 4K Smart TV" -- no panel type, no model code) can't
      be reliably matched to a specific model, so it must not pool every TV in the
      line. Number-identity, so the overlap gate doesn't catch it. */
-  const genericTvAnchor = detectFamily(anchor.title) === "tv" && !hasModelIdentity(anchor.title);
+  const genericTvAnchor = detectFamily(anchor.title) === "tv" && !hasModelCode(anchor.title);
   const fashionBrandGate = fashionFamily
     && !!(anchorBrand || extractQueryBrand(anchor.title));
   const anchorBrandForGate = anchorBrand || extractQueryBrand(anchor.title);

@@ -108,7 +108,11 @@ export const PRODUCT_FAMILIES: Record<string, string[]> = {
 export const NUMBER_IDENTITY_FAMILIES = new Set<string>([
   "phone", "tablet", "laptop", "desktop", "camera",
   "earbuds", "headphones", "speaker", "mouse", "keyboard",
-  "watch", "ereader", "console", "game", "tv",
+  "ereader", "console", "game", "tv",
+  /* NOTE 'watch' is intentionally DESCRIPTIVE, not number-identity: watches
+     identify by WORD model ("Sekonda Wilson" vs "Classic" vs "Flex"), so the
+     overlap gate must split them. Numbered watch lines (Apple Watch Series 9 vs
+     10) are handled by the Series/Gen conflict in normalize.titlesTechConflict. */
 ]);
 
 /* True when the title is a descriptive (non-number-identity) product, so the

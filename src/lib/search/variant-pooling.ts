@@ -34,7 +34,7 @@ import {
   extractQueryBrand,
   candidateHasBrand,
 } from "./query-understanding";
-import { titlesColorConflict, distinctiveOverlap, titlesTechConflict, titlesConcentrationConflict, hasModelIdentity } from "./normalize";
+import { titlesColorConflict, distinctiveOverlap, titlesTechConflict, titlesConcentrationConflict, hasModelCode } from "./normalize";
 import { isDescriptiveProduct, detectFamily } from "./families";
 
 /* Mirror of variant-pooling-deep: descriptive families pool only when
@@ -116,7 +116,7 @@ export function partitionDupesByVariantMatch(
      families; number-identity families (electronics/gaming/appliances) are out. */
   const descriptiveFamily = isDescriptiveProduct(anchor.title);
   /* See variant-pooling-deep: generic TV anchor with no model identity. */
-  const genericTvAnchor = detectFamily(anchor.title) === "tv" && !hasModelIdentity(anchor.title);
+  const genericTvAnchor = detectFamily(anchor.title) === "tv" && !hasModelCode(anchor.title);
   const fashionBrandGate = fashionFamily
     && !!(anchorBrand || extractQueryBrand(anchor.title));
   const anchorBrandForGate = anchorBrand || extractQueryBrand(anchor.title);

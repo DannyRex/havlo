@@ -1028,18 +1028,46 @@ function extractModelCode(title: string): string | null {
   }
   return codes.size === 1 ? Array.from(codes)[0] : null;
 }
-/** True when two titles name DIFFERENT TV panel types, DIFFERENT single storage
-    capacities, or DIFFERENT single model codes -- different SKUs that must not
-    pool as one product. Asymmetric/ambiguous cases never conflict, so a terse
-    listing still pools with a detailed one. */
+/** Whether a title carries an alphanumeric model code (TV tier, phone SKU). */
+export function hasModelCode(title: string): boolean {
+  return extractModelCode(title) !== null;
+}
+/* Major TV brands. Used to split cross-brand TVs (Samsung OLED vs LG OLED),
+   which otherwise pool because TVs aren't brand-gated. Scoped to pairs where
+   BOTH titles carry a panel term (clearly TVs), so the words can't misfire as
+   adjectives ("sharp design") on non-TV products. */
+const TV_BRANDS = ["lg","samsung","sony","tcl","hisense","panasonic","philips","toshiba","sharp","jvc","hitachi","blaupunkt","cello","loewe","metz"];
+function extractTvBrand(title: string): string | null {
+  const lc = title.toLowerCase();
+  for (const b of TV_BRANDS) if (new RegExp(`\\b${b}\\b`).test(lc)) return b;
+  return null;
+}
+/** True when two titles name DIFFERENT TV panel types, DIFFERENT TV brands (same
+    panel), DIFFERENT single storage capacities, or DIFFERENT single model codes
+    -- different SKUs that must not pool. Asymmetric/ambiguous cases never
+    conflict, so a terse listing still pools with a detailed one. */
 export function titlesTechConflict(a: string, b: string): boolean {
   const pa = extractPanel(a), pb = extractPanel(b);
-  if (pa && pb && pa !== pb) return true;
+  if (pa && pb) {
+    if (pa !== pb) return true;                       // different panel type
+    const ba = extractTvBrand(a), bb = extractTvBrand(b);
+    if (ba && bb && ba !== bb) return true;           // same panel, different TV brand
+  }
   const ca = extractCapacity(a), cb = extractCapacity(b);
   if (ca && cb && ca !== cb) return true;
   const ma = extractModelCode(a), mb = extractModelCode(b);
   if (ma && mb && ma !== mb) return true;
+  const sa = extractSeriesNumber(a), sb = extractSeriesNumber(b);
+  if (sa && sb && sa !== sb) return true;                // Apple Watch Series 9 vs 10, Gen 4 vs 5
   return false;
+}
+/* Numbered model-line designator ("Series 9", "Gen 4", "Mark 3"). A different
+   number is a different generation -- splits word-model families (watches) whose
+   only numeric differentiator is the series, where the bare digit was stripped. */
+const SERIES_RE = /\b(?:series|gen|generation|mark|mk|version)\s*\.?\s*(\d{1,3})\b/i;
+function extractSeriesNumber(title: string): string | null {
+  const m = title.toLowerCase().match(SERIES_RE);
+  return m ? m[1] : null;
 }
 
 /** Whether a title carries a concrete model identity (panel type or alphanumeric
