@@ -773,6 +773,15 @@ export function sanitizeLabel(raw: string): string {
 
 export function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
+  /* Within the last 12h, show the hour so a freshly-found deal reads
+     "found 8h ago" instead of a flat "today" (minutes / "Just now" under 1h).
+     12-24h stays "Today". */
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 12) {
+    if (hours >= 1) return `${hours}h ago`;
+    const mins = Math.floor(diff / 60000);
+    return mins >= 1 ? `${mins}m ago` : "Just now";
+  }
   const days = Math.floor(diff / 86400000);
   if (days === 0) return "Today";
   if (days === 1) return "Yesterday";
