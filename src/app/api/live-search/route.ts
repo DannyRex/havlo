@@ -48,6 +48,16 @@ export async function GET(req: NextRequest) {
     ? parseInt(req.nextUrl.searchParams.get("limit")!, 10)
     : 24;
 
+  /* tier=free → fast phase-1 teaser. Runs ONLY the free providers
+     (AliExpress affiliate today), skips the paid SerpAPI lane, skips the
+     DB write-back, and bypasses the SerpAPI budget + rate gates (it
+     spends no credits). The compare client fires this ALONGSIDE the full
+     request so the live section paints AliExpress results in ~0.5s while
+     the ~1.5s Google Shopping call is still in flight, then swaps in the
+     complete set when the full request lands. No extra SerpAPI cost: the
+     paid call + persist still happen exactly once, in the full request. */
+  const freeTierOnly = req.nextUrl.searchParams.get("tier") === "free";
+
   if (!q) {
     return NextResponse.json({ error: "Query required" }, { status: 400 });
   }
@@ -58,7 +68,7 @@ export async function GET(req: NextRequest) {
      means this only ever counts genuine cache-miss (credit-
      spending) hits. In-memory + per-instance — see lib/rate-limit.ts;
      a shared store (Vercel KV / Upstash) is the robust upgrade. */
-  if (!rateLimit(`live-search:${clientIp(req)}`, 20, 60_000)) {
+  if (!freeTierOnly && !rateLimit(`live-search:${clientIp(req)}`, 20, 60_000)) {
     return NextResponse.json(
       { items: [], providers: [], error: "Rate limit exceeded. Try again shortly." },
       { status: 429, headers: { "Cache-Control": "no-store" } },
@@ -87,8 +97,11 @@ export async function GET(req: NextRequest) {
      Failsafe: withinBudget returns `allowed: true` on Supabase
      unreachability — never silently kill live search because of a
      DB outage. */
-  const budget = await withinBudget();
-  if (!budget.allowed) {
+  /* Free teaser spends no SerpAPI credit, so it bypasses the budget
+     gate entirely (null → the not-allowed branch is skipped, and the
+     withinBudget DB round-trip is saved off the fast path). */
+  const budget = freeTierOnly ? null : await withinBudget();
+  if (budget && !budget.allowed) {
     console.warn(
       `[live-search] monthly budget threshold hit: ${budget.calls}/${budget.cap} for ${budget.monthKey}`,
     );
@@ -135,25 +148,60 @@ export async function GET(req: NextRequest) {
     (COST_ORDER[a.id] ?? 99) - (COST_ORDER[b.id] ?? 99)
   );
 
+  /* Fan-out split by cost tier. The leading run of FREE providers
+     (AliExpress affiliate, Amazon PA-API when active) bills no SerpAPI
+     credit, so there is no cost reason to serialise them — fire them
+     CONCURRENTLY and the wall-time collapses from sum() to max(). The
+     paid SerpAPI lane (plus any trailing free backfill like pg-fts at
+     the end of the cost order) keeps the original SEQUENTIAL early-exit
+     so we never bill serpapi-jumia when serpapi-shopping alone sufficed.
+     Result composition + ordering match the old single walk; only the
+     free leaders now overlap. */
+  const firstPaidIdx = sortedProviders.findIndex((p) => p.id.includes("serpapi"));
+  const splitAt = firstPaidIdx === -1 ? sortedProviders.length : firstPaidIdx;
+  const leadingFree = sortedProviders.slice(0, splitAt);
+  const rest = sortedProviders.slice(splitAt);
+
   const items: Deal[] = [];
   let paidProviderCallCount = 0;
-  for (const provider of sortedProviders) {
-    if (items.length >= ENOUGH_FOR_USER) {
-      /* Have enough — skip remaining providers entirely. This is the
-         primary cost-saver: in the typical case where AliExpress (free)
-         and Amazon PA-API return ~10-15 results, the SerpAPI providers
-         never fire. */
-      break;
-    }
-    try {
-      const providerResults = await provider.searchDeals({ q, countryCode, limit });
-      items.push(...providerResults);
-      if (provider.id.includes("serpapi")) paidProviderCallCount++;
-    } catch (err) {
-      if (err instanceof ProviderError) {
-        console.warn(`[live-search] ${provider.id} failed:`, err.message);
+
+  if (leadingFree.length > 0) {
+    const settled = await Promise.allSettled(
+      leadingFree.map((p) => p.searchDeals({ q, countryCode, limit })),
+    );
+    settled.forEach((res, i) => {
+      if (res.status === "fulfilled") {
+        items.push(...res.value);
       } else {
-        console.warn(`[live-search] ${provider.id} threw:`, err);
+        const reason = res.reason;
+        const msg = reason instanceof Error ? reason.message : String(reason);
+        console.warn(`[live-search] ${leadingFree[i].id} failed:`, msg);
+      }
+    });
+  }
+
+  /* Paid lane + trailing free backfill — SEQUENTIAL with early-exit.
+     Skipped entirely for the phase-1 free teaser (freeTierOnly), which
+     must stay credit-free; the full request that fires alongside runs
+     this lane and persists once. */
+  if (!freeTierOnly) {
+    for (const provider of rest) {
+      if (items.length >= ENOUGH_FOR_USER) {
+        /* Have enough — skip remaining providers. Cost-saver: when the
+           free leaders return ~10-15 results, the SerpAPI lane never
+           fires. */
+        break;
+      }
+      try {
+        const providerResults = await provider.searchDeals({ q, countryCode, limit });
+        items.push(...providerResults);
+        if (provider.id.includes("serpapi")) paidProviderCallCount++;
+      } catch (err) {
+        if (err instanceof ProviderError) {
+          console.warn(`[live-search] ${provider.id} failed:`, err.message);
+        } else {
+          console.warn(`[live-search] ${provider.id} threw:`, err);
+        }
       }
     }
   }
@@ -294,7 +342,7 @@ export async function GET(req: NextRequest) {
      the runtime would tear down the serverless context, killing the
      in-flight Supabase writes before they completed. waitUntil()
      guarantees the persist call completes before the function ends. */
-  if (persistSet.length > 0) {
+  if (!freeTierOnly && persistSet.length > 0) {
     /* Bust the browse cache for THIS country so the offers we're about
        to persist surface on the next /deals load instead of waiting out
        the SSR fetch's 60/600s window. /[country]/deals tags its

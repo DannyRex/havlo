@@ -266,8 +266,13 @@ export default function LiveResults({ items, loading, providers }: Props) {
         </p>
       </div>
 
-      {/* Masonry — left-to-right column distribution, varying aspects */}
-      {loading ? (
+      {/* Masonry — left-to-right column distribution, varying aspects.
+          Skeletons show ONLY before any result has landed. Once the
+          phase-1 free-tier teaser paints items, we keep showing them
+          while the full (SerpAPI) request finishes in the background —
+          a "finding more" cue sits below instead of a full skeleton
+          wipe (progressive load). */}
+      {loading && items.length === 0 ? (
         <>
           <div className="flex gap-3 sm:hidden">
             <SkeletonColumn count={4} gapClass="gap-3" startIndex={0} />
@@ -302,6 +307,18 @@ export default function LiveResults({ items, loading, providers }: Props) {
             ))}
           </div>
         </>
+      )}
+
+      {/* Progressive cue — the teaser is up, the full Google Shopping
+          pass is still in flight. Subtle, matches the header pulse. */}
+      {loading && items.length > 0 && (
+        <div className="flex items-center justify-center gap-2 mt-6 text-xs text-ink-3">
+          <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 animate-ping" />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-success" />
+          </span>
+          Finding more live deals across stores…
+        </div>
       )}
     </section>
   );

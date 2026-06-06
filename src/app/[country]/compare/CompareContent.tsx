@@ -64,6 +64,10 @@ export default function CompareContent({
      search also spawns a duplicate server-side persist run — the
      concurrency that orphaned products in the catalog. */
   const lastLiveQueryRef = useRef<string>("");
+  /* Guards the two-phase live fetch: once the FULL (authoritative)
+     response lands for a query, a late-arriving free-tier teaser must
+     not overwrite it. Reset at the start of each fetchLive. */
+  const fullDoneRef = useRef<boolean>(false);
 
   /* True only on the very first mount when the server SSR-seeded
      `result`. Flipped off in the URL-load effect after we skip the
@@ -79,19 +83,51 @@ export default function CompareContent({
        previous one, so this only collapses true duplicates. */
     if (lastLiveQueryRef.current === trimmed) return;
     lastLiveQueryRef.current = trimmed;
+    fullDoneRef.current = false;
     setLiveLoading(true);
     setLiveResults([]);
     setLiveProviders([]);
-    try {
-      const res = await fetch(`/api/live-search?q=${encodeURIComponent(trimmed)}&limit=12`);
-      const data = await res.json();
-      setLiveResults(Array.isArray(data.items) ? (data.items as Deal[]) : []);
-      setLiveProviders(Array.isArray(data.providers) ? (data.providers as string[]) : []);
-    } catch {
-      setLiveResults([]);
-    } finally {
-      setLiveLoading(false);
-    }
+
+    const enc = encodeURIComponent(trimmed);
+    const stillCurrent = () => lastLiveQueryRef.current === trimmed;
+
+    /* Two-phase progressive load. The live section's latency is
+       dominated by the paid Google Shopping (SerpAPI) call (~1.5s);
+       AliExpress (free) returns in ~0.5s. Fire BOTH concurrently:
+
+         Phase 1 (tier=free) — AliExpress only, no SerpAPI, no persist.
+           Paints the section fast so it isn't blank during the wait.
+         Phase 2 (full) — the authoritative pipeline (free + SerpAPI
+           fallback + DB write-back). Replaces the teaser when it lands.
+
+       No extra SerpAPI cost: the paid call + persist happen exactly once
+       (in phase 2). The teaser is a free read that the user sees sooner. */
+    const teaser = fetch(`/api/live-search?q=${enc}&limit=12&tier=free`)
+      .then((r) => r.json())
+      .then((data) => {
+        /* Apply the teaser only if it's still the active query AND the
+           full result hasn't already landed (full always wins). */
+        if (!stillCurrent() || fullDoneRef.current) return;
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          setLiveResults(data.items as Deal[]);
+        }
+      })
+      .catch(() => { /* best-effort; phase 2 below is authoritative */ });
+
+    const full = fetch(`/api/live-search?q=${enc}&limit=12`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!stillCurrent()) return;
+        fullDoneRef.current = true;
+        setLiveResults(Array.isArray(data.items) ? (data.items as Deal[]) : []);
+        setLiveProviders(Array.isArray(data.providers) ? (data.providers as string[]) : []);
+      })
+      /* If the full request fails, KEEP whatever the teaser already
+         painted rather than wiping it — graceful degradation. */
+      .catch(() => { /* keep teaser results if any */ });
+
+    await Promise.allSettled([teaser, full]);
+    if (stillCurrent()) setLiveLoading(false);
   }, []);
 
   /* ── key-based direct lookup (from homepage cards) ─────────────────── */
