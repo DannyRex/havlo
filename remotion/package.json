@@ -1,0 +1,24 @@
+{
+  "name": "havlo-remotion",
+  "version": "1.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Remotion video compositions for Havlo feature explainers. Renders MP4s consumed by the Next.js app (public/videos). NOT part of the app bundle.",
+  "scripts": {
+    "studio": "remotion studio",
+    "render:pricedrop": "remotion render HavloPriceDrop out/havlo-pricedrop.mp4",
+    "still:pricedrop": "remotion still HavloPriceDrop out/pricedrop-frame.png --frame=150",
+    "upgrade": "remotion upgrade"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.473",
+    "@remotion/google-fonts": "^4.0.473",
+    "@remotion/transitions": "^4.0.473",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.473",
+    "typescript": "^6.0.3"
+  }
+}

@@ -51,3 +51,8 @@ scripts/data-cache/
 # Generated marketing artefacts (price-gap social cards + manifest).
 # Re-generate with scripts/generate-price-gap-cards.ts.
 scripts/output/
+
+# Remotion render output (large MP4s; re-render from remotion/src
+# compositions). The composition SOURCE is committed; the rendered
+# videos that ship live in public/videos/ (added deliberately, kept small).
+remotion/out/

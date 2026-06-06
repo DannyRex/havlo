@@ -1,0 +1,4 @@
+# Remotion video workspace — render tooling + brand video MP4s. Not part
+# of the Next app build; excluded so it isn't typechecked/bundled by the
+# Vercel build and the rendered MP4s aren't uploaded on every deploy.
+remotion
