@@ -81,9 +81,15 @@ export default function Footer() {
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 mb-12">
           {/* Brand */}
           <div>
-            <Link href="/" className="inline-block mb-4" aria-label="Havlo home">
+            <Link href="/" className="inline-block mb-3" aria-label="Havlo home">
               <Logo size={28} />
             </Link>
+            {/* Primary tagline (June 2026) — sits directly under the
+                footer logo. "smarter" takes the brand deal-green so the
+                tagline carries the same accent as the brand videos. */}
+            <p className="text-[15px] font-semibold text-ink mb-3">
+              Shop <span className="text-success">smarter.</span>
+            </p>
             {/* Footer blurb — brand statement, not a re-pitch. The hero
                 H1 + bottom-CTA already cover the 'paste a link / find
                 it for less' action copy; repeating it here was triple-
