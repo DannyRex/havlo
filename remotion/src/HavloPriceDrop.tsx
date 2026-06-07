@@ -9,7 +9,7 @@ import { SceneCTA } from "./scenes/SceneCTA";
 
 /* Standalone ~9s hook (good for social / a looping hero on its own).
    Refreshed to the new brand (req 10): green, silver-metal logo, real
-   copy, Samsung Galaxy S26 Ultra, "Shop smarter." close. Reuses the same
+   copy, iPhone 17 Pro Max, "Shop smarter." close. Reuses the same
    brand-correct scenes as the full explainer, so it never drifts. */
 export const PRICEDROP_DURATION = 276; // 195 + 95 - 14 transition
 

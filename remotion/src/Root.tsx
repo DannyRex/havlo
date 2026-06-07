@@ -2,19 +2,26 @@ import { Composition } from "remotion";
 import { HavloPriceDrop, PRICEDROP_DURATION } from "./HavloPriceDrop";
 import { HavloExplainer, EXPLAINER_DURATION } from "./HavloExplainer";
 import { BrandProof } from "./BrandProof";
-import { CursorFlow, CURSORFLOW_DURATION, type Device } from "./CursorFlow";
+import { CursorFlow, CURSORFLOW_DURATION, type Device, type Country } from "./CursorFlow";
 import type { ThemeName } from "./brand";
 import type { MarketKey } from "./data";
 
-/* Cursor demo variant matrix: device × theme. Desktop is 1920×1080
-   landscape (browser chrome); mobile is 1080×1920 portrait (phone
-   chrome). Walks search → PDP (spectrum + history) → compare. */
-const FLOW_VARIANTS: { device: Device; theme: ThemeName; w: number; h: number }[] = [
-  { device: "desktop", theme: "light", w: 1920, h: 1080 },
-  { device: "desktop", theme: "dark", w: 1920, h: 1080 },
-  { device: "mobile", theme: "light", w: 1080, h: 1920 },
-  { device: "mobile", theme: "dark", w: 1080, h: 1920 },
+/* Cursor demo variant matrix: country × device × theme (12 total).
+   Desktop is 1920×1080 landscape (browser chrome); mobile is 1080×1920
+   portrait (phone chrome). Each walks search → PDP (spectrum + history)
+   → "Compare across N stores" → live compare, in local currency. */
+const FLOW_COUNTRIES: Country[] = ["uk", "ng", "us"];
+const FLOW_DEVICES: { device: Device; w: number; h: number }[] = [
+  { device: "desktop", w: 1920, h: 1080 },
+  { device: "mobile", w: 1080, h: 1920 },
 ];
+const FLOW_THEMES: ThemeName[] = ["light", "dark"];
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const FLOW_VARIANTS = FLOW_COUNTRIES.flatMap((country) =>
+  FLOW_DEVICES.flatMap((d) =>
+    FLOW_THEMES.map((theme) => ({ country, device: d.device, theme, w: d.w, h: d.h }))
+  )
+);
 
 /* Explainer variant matrix: market × theme. Render any via Studio or
    `npx remotion render Explainer-<market>-<theme> out/<name>.mp4`.
@@ -56,10 +63,10 @@ export const RemotionRoot: React.FC = () => {
           stores" → live 4-store compare → "Shop smarter." end card. */}
       {FLOW_VARIANTS.map((v) => (
         <Composition
-          key={`flow-${v.device}-${v.theme}`}
-          id={`CursorFlow-${v.device === "desktop" ? "Desktop" : "Mobile"}-${v.theme === "dark" ? "Dark" : "Light"}`}
+          key={`flow-${v.country}-${v.device}-${v.theme}`}
+          id={`CursorFlow-${v.country.toUpperCase()}-${cap(v.device)}-${cap(v.theme)}`}
           component={CursorFlow}
-          defaultProps={{ device: v.device, theme: v.theme }}
+          defaultProps={{ country: v.country, device: v.device, theme: v.theme }}
           durationInFrames={CURSORFLOW_DURATION}
           fps={30}
           width={v.w}
