@@ -74,6 +74,12 @@ interface CliArgs {
      filters to high-value cats. --mode=deals forces all to deals
      mode (legacy / emergency fallback). */
   forceMode?: "deals" | "market";
+  /* --enrich: keep full-price rows (not just discounted) for market-mode
+     categories so the PDP spectrum + /compare capture the honest price
+     range. Gated to one day/week (Wednesday) in the workflow to bound the
+     extra DB writes. Costs no extra SerpAPI credits — same searches, we
+     just retain more of each response. */
+  enrich?: boolean;
 }
 
 function parseArgs(): CliArgs {
@@ -91,6 +97,8 @@ function parseArgs(): CliArgs {
       args.forceMode = "market";
     } else if (arg === "--mode=deals") {
       args.forceMode = "deals";
+    } else if (arg === "--enrich") {
+      args.enrich = true;
     }
   }
   return args;
@@ -178,6 +186,7 @@ async function main() {
   console.log(`  Countries:  ${args.countries.join(", ")}`);
   console.log(`  Categories: ${targetCategories.map((c) => c.slug).join(", ")}`);
   console.log(`  Limit:      ${args.perCategoryLimit} items / search`);
+  if (args.enrich) console.log("  Enrich:     ON — keeping full-price rows for market-mode (high-value) categories");
   console.log("");
 
   const startedAt = Date.now();
@@ -195,11 +204,17 @@ async function main() {
              keep the suffix for promo density. --mode= override
              forces all categories to the same mode. */
           const categoryMode = inferModeForCategory(category.slug, args.forceMode);
+          /* --enrich keeps full-price rows, but ONLY for market-mode
+             (high-value) categories — the spectrum-worthy ones with
+             stable MSRPs. Deals-mode categories stay deal-only even on
+             the enrichment run. Costs no extra SerpAPI credits. */
+          const keepFullPrice = !!args.enrich && categoryMode === "market";
           const deals = await provider.searchDeals({
             q: category.name,
             countryCode: country,
             limit: args.perCategoryLimit,
             mode: categoryMode,
+            keepFullPrice,
           });
 
           // Tag every deal with the source category so /api/deals

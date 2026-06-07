@@ -78,6 +78,15 @@ export interface SearchQuery {
           cron to populate the spectrum + 'cheaper alternatives' rail
           with honest market data, not just promo data. */
   mode?: "deals" | "market";
+  /** Enrichment toggle (default false). When true, the SerpAPI result
+      mapper KEEPS full-price listings (no old_price / SALE tag required)
+      so the catalog captures the honest price spectrum, not just
+      discounted rows. Orthogonal to `mode`: `mode` controls the QUERY
+      (deals suffix + recency), `keepFullPrice` controls the RESULT
+      FILTER. Set only on the weekly Wednesday enrichment run for
+      high-value categories; live-search and the Mon/Fri deal cron leave
+      it false so the deals feed stays deal-only. */
+  keepFullPrice?: boolean;
 }
 
 export interface OriginCounts {

@@ -321,7 +321,7 @@ function isGoogleRelayUrl(u: string): boolean {
   }
 }
 
-function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | null {
+function mapToDeal(r: SerpShoppingResult, i: number, country: string, keepFullPrice = false): Deal | null {
   const saleNative = r.extracted_price;
   const originalNative = r.extracted_old_price;     // undefined ⇒ not on sale
   /* Prefer `link` (direct merchant URL) over `product_link` (Google
@@ -353,10 +353,13 @@ function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | nu
     ? `/api/go?url=${encodeURIComponent(url)}`
     : url;
 
-  // Skip non-deals: this is a *deals* page, not a generic product feed.
-  // We require either an explicit old_price OR a SALE tag from Google.
+  // Skip non-deals UNLESS we're enriching. The deals feed (live-search +
+  // the Mon/Fri deal cron) is a *deals* page, so it requires an explicit
+  // old_price OR a Google SALE tag. The weekly Wednesday enrichment run
+  // (keepFullPrice) keeps full-price listings too, so the PDP spectrum +
+  // /compare see the honest market range, not just discounted rows.
   const hasSaleTag = (r.tag ?? "").toLowerCase().includes("sale");
-  if (!originalNative && !hasSaleTag) return null;
+  if (!keepFullPrice && !originalNative && !hasSaleTag) return null;
 
   // Normalise to USD so prices across markets are comparable
   const sale = toUSD(saleNative, country);
@@ -364,7 +367,8 @@ function mapToDeal(r: SerpShoppingResult, i: number, country: string): Deal | nu
   const discountPercent = computeDiscount(original, sale);
 
   // After USD rounding, a "fake" discount can collapse to 0 — drop those too
-  if (discountPercent === 0 && !hasSaleTag) return null;
+  // (but keep genuine full-price rows on the enrichment run).
+  if (!keepFullPrice && discountPercent === 0 && !hasSaleTag) return null;
 
   // Reject implausibly-low prices — same logic as pg-fts dupe filter,
   // applied here before the UI sees the data.
@@ -457,6 +461,7 @@ export const serpapiSearchProvider: SearchProvider = {
        for market mode — recency biases toward fresh promos, which is
        the opposite of what market mode wants. */
     const mode = query.mode ?? "deals";
+    const keepFullPrice = query.keepFullPrice ?? false;
     const isBrandedQuery = /\b(airpods?|iphone|ipad|macbook|galaxy|playstation|ps[45]|xbox|airmax|jordan|yeezy|samba|dunk)\b/i.test(q);
     const alreadyHasDealKeyword = /deal|sale|discount|offer/i.test(q);
     const effectiveQuery = mode === "market"
@@ -511,7 +516,7 @@ export const serpapiSearchProvider: SearchProvider = {
 
     // Map then filter — keep limit applied to *kept* results, not raw
     const mapped = results
-      .map((r, i) => mapToDeal(r, i, country))
+      .map((r, i) => mapToDeal(r, i, country, keepFullPrice))
       .filter((d): d is Deal => d !== null);
 
     return mapped.slice(0, limit);

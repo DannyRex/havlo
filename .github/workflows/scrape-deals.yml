@@ -40,6 +40,11 @@ on:
         type:        boolean
         required:    false
         default:     false
+      enrich:
+        description: "Force full-price enrichment for high-value categories (auto-on Wednesdays)"
+        type:        boolean
+        required:    false
+        default:     false
 
 # Required so the auto-injected GITHUB_TOKEN can `git push` the refreshed deals
 # back to the repo. Without this, the default token is read-only on `contents`
@@ -230,7 +235,18 @@ jobs:
       # 'Audio' returns ~20 deals total per country, which felt sparse.
       - name: Ingest SerpAPI live deals → Supabase
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
-        run: npm run ingest -- --limit=50
+        run: |
+          FLAGS="--limit=50"
+          # Wednesday (UTC day-of-week 3), OR a manual run with enrich=true:
+          # keep full-price rows for the high-value (market-mode) categories
+          # so the PDP spectrum + /compare capture the honest market range,
+          # not just discounts. No extra SerpAPI credits — same searches, we
+          # just retain more of each response. Mon/Fri stay deals-only.
+          if [ "$(date -u +%u)" = "3" ] || [ "${{ inputs.enrich }}" = "true" ]; then
+            FLAGS="$FLAGS --enrich"
+            echo "::notice::Full-price enrichment ON (high-value categories)"
+          fi
+          npm run ingest -- $FLAGS
 
   # ── Job 4a: Jumia ingest via SerpAPI's dedicated `engine=jumia`.
   #           Replaces the Playwright Jumia scraper which Cloudflare
