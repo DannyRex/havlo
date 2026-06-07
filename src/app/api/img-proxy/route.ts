@@ -41,6 +41,14 @@ const HOST_REFERER: Record<string, string> = {
   "i.dell.com":                       "https://www.dell.com/",
   "image.boohooamplience.com":        "https://www.boohoo.com/",
   "img.shopstyle.com":                "https://www.shopstyle.com/",
+  /* THG (The Hut Group) shared CDN — serves product images for
+     LookFantastic, Cult Beauty, MyProtein, ESPA, Dermstore and every
+     other THG brand from static.thcdn.com / images.thcdn.com. Open CDN
+     (it has to load for Google Shopping PLAs); verified 200 with no
+     Referer. The bare entry covers all *.thcdn.com subdomains via the
+     suffix matcher below. Without it, pasted LookFantastic/THG links fell
+     back to the Havlo H placeholder on /p/live. */
+  "thcdn.com":                        "",
   /* Konga, 3C Hub, Jumia don't enforce Referer; allow but no rewrite. */
   "www-konga-com-res.cloudinary.com": "",
   "www.3chub.com":                    "",
