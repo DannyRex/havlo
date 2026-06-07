@@ -87,7 +87,8 @@ export default function AmazonDealsBrowser({
 
   /* Mobile headroom: hide the sticky filter bar on scroll-down, reveal on
      scroll-up (same as the /deals feed). Desktop stays pinned. */
-  const filtersHidden = useHideOnScrollDown();
+  const filterBarRef = useRef<HTMLDivElement>(null);
+  const filtersHidden = useHideOnScrollDown(filterBarRef);
 
   /* Category chips: the canonical list, narrowed to those actually
      present in the Amazon set (keeps order + display names). */
@@ -178,6 +179,7 @@ export default function AmazonDealsBrowser({
           and reappears on scroll-UP. Desktop stays pinned. Full-bleed
           negates the page's px-4/6/8 gutters. */}
       <div
+        ref={filterBarRef}
         className={cn(
           "sticky top-16 z-30 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 pt-3 pb-3 mb-4 bg-bg border-b border-border",
           "transition-transform duration-300 ease-out motion-reduce:transition-none",

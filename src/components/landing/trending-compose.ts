@@ -36,10 +36,22 @@ export const TARGET = 16;
    mobile (columns-2), i.e. the above-the-fold band. */
 export const HEAD = 4;
 
+/* A deal has a usable image when imageUrl is a non-empty string. An
+   imageless card renders as a clean-but-empty placeholder, so we float
+   imaged products to the front of every pick (below). */
+const hasImage = (d: Deal): boolean =>
+  typeof d.imageUrl === "string" && d.imageUrl.trim().length > 0;
+
 /* Pull n unique items from `bucket` into `out`, deduping via `seen`.
-   randomize=true uses a partial Fisher-Yates so each call returns a
-   fresh random subset; randomize=false takes the first n in order
-   (the SSR-stable default the server + first client render share). */
+   randomize=true uses Fisher-Yates so each call returns a fresh random
+   subset; randomize=false takes them in order (the SSR-stable default
+   the server + first client render share).
+
+   Image priority: within each pick we take imaged deals first and only
+   fall back to imageless ones if the bucket can't fill n — so the grid
+   leads with real product photos but never under-fills. The stable
+   partition preserves the (random or natural) order inside each group,
+   so the SSR-deterministic HEAD still matches byte-for-byte. */
 function selectFrom(
   bucket: Deal[],
   n: number,
@@ -48,16 +60,19 @@ function selectFrom(
   seen: Set<string>,
 ): void {
   if (n <= 0 || bucket.length === 0) return;
-  const arr = randomize ? [...bucket] : bucket;
+  const arr = [...bucket];
   if (randomize) {
-    const limit = Math.min(n, arr.length);
-    for (let i = 0; i < limit; i++) {
-      const j = i + Math.floor(Math.random() * (arr.length - i));
+    /* Full shuffle (not partial) so the image-first partition below
+       samples imaged deals from across the whole bucket, not just the
+       first n positions. */
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
   }
+  const ordered = [...arr.filter(hasImage), ...arr.filter((d) => !hasImage(d))];
   let added = 0;
-  for (const d of arr) {
+  for (const d of ordered) {
     if (added >= n) break;
     if (seen.has(d.id)) continue;
     seen.add(d.id);

@@ -339,8 +339,11 @@ export default function DealFeed({
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
   /* Mobile headroom: the sticky filter bar slides up behind the navbar on
-     scroll-DOWN and reappears on scroll-UP; desktop stays pinned. */
-  const filtersHidden = useHideOnScrollDown();
+     scroll-DOWN and reappears on scroll-UP; desktop stays pinned. The ref
+     lets the hook hide it only once it's actually pinned, so translating
+     it up never leaves a gap above the grid. */
+  const filterBarRef = useRef<HTMLDivElement>(null);
+  const filtersHidden = useHideOnScrollDown(filterBarRef);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -951,6 +954,7 @@ export default function DealFeed({
           which tucks under the opaque z-40 navbar, no overshoot) and
           reappears on scroll-UP. Desktop (sm+) stays pinned. */}
       <div
+        ref={filterBarRef}
         className={cn(
           "sticky top-16 z-30 -mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg border-b border-border",
           "transition-transform duration-300 ease-out motion-reduce:transition-none",

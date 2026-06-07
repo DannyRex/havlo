@@ -46,6 +46,11 @@ interface Props {
 export default function StoreFilter({ stores, selected, onChange, fillRow = false }: Props) {
   const [open, setOpen]     = useState(false);
   const [search, setSearch] = useState("");
+  /* Mobile on-screen-keyboard handling (visualViewport effect below):
+     kbInset = px the keyboard covers at the bottom; vvHeight = visible
+     viewport height. Used to float the bottom sheet above the keypad. */
+  const [kbInset, setKbInset]   = useState(0);
+  const [vvHeight, setVvHeight] = useState<number | null>(null);
 
   /* Mobile-sheet swipe-to-dismiss. The grabber bar at the top of
      the sheet was previously a visual signifier only — the user
@@ -130,42 +135,59 @@ export default function StoreFilter({ stores, selected, onChange, fillRow = fals
     };
   }, [open]);
 
-  /* Desktop-only autofocus. When the popover opens on md+ screens,
-     drop the cursor straight into the store-search input so a long
-     roster (UK carries ~27 stores) is filterable by typing right
-     away. Gated on the SAME md breakpoint that splits the desktop
-     popover from the mobile bottom sheet, so opening the sheet on a
-     phone never pops the on-screen keyboard — the sheet stays put
-     until the user taps the field.
+  /* Autofocus the store-search input when the panel opens — on BOTH
+     desktop (popover) and mobile (bottom sheet). Mobile autofocus used
+     to be suppressed to keep the keyboard down, but the sheet now floats
+     above the keyboard (visualViewport effect below) so dropping the
+     cursor straight into the field is what users expect (June 2026) and
+     a long roster (UK ~27 stores) is filterable by typing immediately.
 
-     Keyed on triggerRect (not a bare rAF) because the desktop panel
-     only mounts once the trigger's rect is measured by the effect
-     above; waiting for triggerRect guarantees desktopPanelRef is
-     populated by the time we focus. hasFocusedRef pins this to one
-     focus per open so the scroll/resize re-measures that also update
-     triggerRect don't steal focus back mid-scroll. The query is
-     scoped to desktopPanelRef because panelBody renders in BOTH the
-     desktop popover and the mobile sheet, so a shared ref on the
-     input would resolve to whichever mounted last. */
+     Scoped to the MOUNTED panel's ref because panelBody renders in both
+     shells — a shared input query would resolve to whichever mounted
+     last. Desktop waits for triggerRect (its panel only mounts once the
+     rect is measured); the mobile sheet mounts on open. hasFocusedRef
+     pins this to one focus per open so the scroll/resize re-measures
+     don't yank focus back mid-scroll. */
   useEffect(() => {
     if (!open) {
       hasFocusedRef.current = false;
       return;
     }
     if (hasFocusedRef.current) return;
-    if (!triggerRect) return;            // desktop panel not mounted yet
     if (typeof window === "undefined") return;
-    if (!window.matchMedia("(min-width: 768px)").matches) {
-      /* Mobile sheet — leave focus alone. Mark handled so we don't
-         re-check on every triggerRect tick. */
-      hasFocusedRef.current = true;
-      return;
-    }
-    desktopPanelRef.current
-      ?.querySelector<HTMLInputElement>('input[type="text"]')
-      ?.focus();
+    const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+    if (isDesktop && !triggerRect) return; // desktop panel not mounted yet
+    const panel = isDesktop ? desktopPanelRef.current : sheetPanelRef.current;
+    const input = panel?.querySelector<HTMLInputElement>('input[type="text"]');
+    if (!input) return;
+    input.focus();
     hasFocusedRef.current = true;
   }, [open, triggerRect]);
+
+  /* Mobile keyboard inset. The bottom sheet is anchored to the LAYOUT
+     viewport's bottom, which does NOT shrink when the on-screen keyboard
+     opens — so as the user typed and the list shrank, the sheet (and its
+     search box) slid behind the keypad. Track window.visualViewport to
+     learn how much the keyboard covers, then float the sheet above it and
+     cap its height to the visible band (both applied in the sheet style
+     below). Recomputes on resize + scroll (iOS fires both as the keyboard
+     animates). */
+  useEffect(() => {
+    if (!open || typeof window === "undefined") { setKbInset(0); setVvHeight(null); return; }
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      setKbInset(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
+      setVvHeight(Math.round(vv.height));
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, [open]);
 
   /* Close on outside click. Treats the trigger wrapper, the
      desktop popover panel, and the mobile sheet panel as "inside"
@@ -229,7 +251,7 @@ export default function StoreFilter({ stores, selected, onChange, fillRow = fals
       {/* Search + count indicator. The count makes it explicit how
           many stores are available so users understand the list
           scrolls when the visible portion doesn't show all of them. */}
-      <div className="p-3 border-b border-border space-y-2">
+      <div className="shrink-0 p-3 border-b border-border space-y-2">
         <input
           type="text"
           value={search}
@@ -253,7 +275,7 @@ export default function StoreFilter({ stores, selected, onChange, fillRow = fals
           scroll technically worked. max-h-96 (384px ≈ 10-11 rows)
           balances "see more at a glance" against "don't overflow
           the viewport on shorter screens." */}
-      <ul className="max-h-[60vh] md:max-h-96 overflow-y-auto py-1.5">
+      <ul className="flex-1 min-h-0 md:flex-none md:max-h-96 overflow-y-auto py-1.5">
         {visible.length === 0 ? (
           <li className="px-4 py-3 text-[13px] text-ink-3 text-center">
             No stores match &ldquo;{search}&rdquo;
@@ -300,7 +322,7 @@ export default function StoreFilter({ stores, selected, onChange, fillRow = fals
       </ul>
 
       {/* Footer */}
-      <div className="px-3 py-2 border-t border-border flex items-center justify-between">
+      <div className="shrink-0 px-3 py-2 border-t border-border flex items-center justify-between">
         <button
           type="button"
           onClick={clearAll}
@@ -430,6 +452,13 @@ export default function StoreFilter({ stores, selected, onChange, fillRow = fals
                 /* Snap back smoothly on release, but follow the
                    finger 1:1 while actively dragging. */
                 transition: isDragging ? "none" : "transform 0.2s ease-out",
+                /* Float above the on-screen keyboard: bottom sits on top
+                   of the keypad (kbInset), and the sheet is capped to the
+                   visible viewport so its search box + list never hide
+                   behind the keyboard. Falls back to the bottom-0 /
+                   max-h-[85vh] classes when visualViewport is absent. */
+                bottom: kbInset,
+                maxHeight: vvHeight ? Math.round(vvHeight * 0.92) : undefined,
               }}
             >
               {/* Drag area — handle + title bar. The pointer-event
@@ -444,6 +473,7 @@ export default function StoreFilter({ stores, selected, onChange, fillRow = fals
                   panelBody below keeps default touch-action so its
                   internal scroll list still works. */}
               <div
+                className="shrink-0"
                 onPointerDown={onDragPointerDown}
                 onPointerMove={onDragPointerMove}
                 onPointerUp={onDragPointerEnd}
