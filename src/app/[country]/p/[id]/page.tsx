@@ -92,13 +92,20 @@ const PriceHistoryChart    = dynamic(
    on every request. 1 hour is a sensible default — the underlying
    price/availability changes slowly enough that an hour of staleness
    is invisible to users, and the warm cache keeps SSR latency low. */
-/* ISR window bumped May 2026 v3 from 1h → 6h to cut Vercel Fluid
-   Active CPU. PDP content (anchor offer + dupes + price-history)
-   changes slowly — Mon+Thu ingest is the only real source of
-   freshness, and any stale window between cron runs is irrelevant
-   to user trust. 6h means each unique PDP regenerates ~4× per day
-   instead of ~24×. */
-export const revalidate = 21600;
+/* ISR window. Bumped May 2026 v3 from 1h → 6h to cut Vercel Fluid
+   Active CPU; reverted to 1h June 2026 to MATCH /api/compare's 1h edge
+   cache (s-maxage=3600). The PDP's "Compare prices across N stores" CTA
+   and the spectrum bar both render a store count from the ISR-frozen
+   anchor pool, while /compare recomputes it live behind a 1h cache —
+   so a 6h PDP vs a 1h /compare drifted (the NG 14-vs-15 report, where a
+   15th cross-border listing landed after the PDP last froze at 14).
+   Same window on both surfaces ⇒ same refresh cadence ⇒ no drift.
+   Tradeoff: ~4× more PDP regens/day (the reason for the 6h bump). PDP
+   content only really changes on the Mon+Thu ingest, so most of that is
+   wasted work — if Fluid CPU tightens again, prefer on-demand
+   revalidation (revalidatePath) fired FROM the ingest cron over
+   re-raising this time window. */
+export const revalidate = 3600;
 
 interface PageProps {
   params: { country: string; id: string };
@@ -878,7 +885,7 @@ export default async function ProductPage({ params }: PageProps) {
      on ambiguous pairs (see match-judge.ts), and a match_decisions write
      that memoises each verdict. Any uncached fetch/write in a render path
      opts the WHOLE /[country]/p/[id] route OUT of static rendering, so
-     the `export const revalidate = 21600` above silently never took
+     the `export const revalidate = 3600` above silently never took
      effect: every PDP hit rendered dynamically (x-vercel-cache: MISS,
      private, no-store), ran the full Supabase fan-out, and paid 3-5s
      TTFB on the single highest-traffic page type on the site. It was the
@@ -890,7 +897,7 @@ export default async function ProductPage({ params }: PageProps) {
      dupe-set, country) per 30-min window instead of on every request,
      and the verdict-memoisation write still happens on cache miss. The
      candidate pool is passed as an argument so a changed dupe set
-     re-partitions; the 30-min TTL stays tighter than the page's 6h ISR
+     re-partitions; the 30-min TTL stays tighter than the page's 1h ISR
      so the rail can't drift further than the page itself.
 
      DO NOT call partitionDupesByVariantMatchDeep (or any other uncached
