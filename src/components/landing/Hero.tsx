@@ -436,8 +436,17 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
               country. The longer "stores you already know"
               variant is now the brand-consistency framing surfaced
               elsewhere on the page (StoreLogos section) so the
-              hero stays compact. */}
-          Paste a link or search any product. Havlo finds it cheaper in {countryPhrase(countryCode, countryName)}.
+              hero stays compact.
+
+              "across {storeCount} stores" names the scope and right-sizes
+              the "any product" promise: you can search anything, and we
+              compare it across the stores we actually track in this
+              country, not the entire web. The count is the same dynamic
+              storeCount the marquee + trust pill use (never a hardcoded
+              guess), so the number can't drift from what we really cover.
+              When the search lands outside that set, EmptySearchState's
+              paste-a-link recovery is the graceful next step. */}
+          Search any product or paste a link. Havlo finds it cheaper across {formatCount(storeCount)} stores in {countryPhrase(countryCode, countryName)}.
         </p>
 
         {/* Composer — mobile-optimised.
