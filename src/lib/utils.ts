@@ -484,6 +484,22 @@ export function usdToNgn(usd: number): number {
   return Math.round(usd * USD_TO_NGN);
 }
 
+/* Convert any FX_GENERATED-supported currency to NGN (Havlo's base unit).
+   FX_GENERATED is "1 USD = X <currency>", so NGN per 1 unit of `currency`
+   is FX_GENERATED.NGN / FX_GENERATED[currency]. Generalises usdToNgn so
+   the paste->sniff flow stops rendering a GBP/EUR price as raw NGN<amount>
+   (which a non-NGN market then shows as £0 — the LookFantastic report,
+   June 2026). NGN and unknown/missing currencies pass through unchanged
+   (we don't fabricate a rate we don't have). */
+export function currencyToNgn(amount: number, currency: string | null | undefined): number {
+  const cur = (currency ?? "NGN").toUpperCase();
+  if (cur === "NGN") return Math.round(amount);
+  const rate = FX_GENERATED[cur];
+  if (!rate || rate <= 0) return Math.round(amount);
+  const ngnPerUsd = FX_GENERATED.NGN ?? USD_TO_NGN;
+  return Math.round(amount * (ngnPerUsd / rate));
+}
+
 export function formatCompact(amount: number): string {
   if (amount >= 1_000_000) return `₦${(amount / 1_000_000).toFixed(1)}M`;
   if (amount >= 1_000) return `₦${(amount / 1_000).toFixed(0)}K`;

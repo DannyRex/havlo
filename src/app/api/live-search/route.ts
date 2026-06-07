@@ -22,6 +22,18 @@ import { detectFamily, alternativeFamilyMatches } from "@/lib/search/families";
 import { priceLooksPlausibleForLiveDeal } from "@/lib/search/price-floor";
 import { ingestDeals } from "@/lib/providers/ingestion";
 import { withinBudget, recordSerpApiCall } from "@/lib/serpapi-budget";
+import { inferCategoryFromTitle } from "@/lib/categorize";
+
+/* Categories where live cross-store SerpAPI matching is reliable — they
+   carry clear model numbers (iPhone 15, MacBook M4, RTX 4090, PS5, WH-
+   1000XM5). Everything else (beauty, fashion, health, home, sports, and
+   unclassifiable queries) over-pools on fuzzy tokens and returns the wrong
+   product, so we keep only the FREE lanes there. June 2026: a pasted Fenty
+   skincare URL surfaced a random Matalan dress (matched "Vanilla") at
+   SerpAPI cost — exactly the case this gate suppresses. */
+const PAID_SEARCH_CATEGORIES = new Set([
+  "electronics", "phones", "computing", "audio", "gaming", "appliances",
+]);
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import type { Deal } from "@/types";
 
@@ -162,6 +174,20 @@ export async function GET(req: NextRequest) {
   const leadingFree = sortedProviders.slice(0, splitAt);
   const rest = sortedProviders.slice(splitAt);
 
+  /* Category gate on the PAID SerpAPI lane (June 2026). Cross-store live
+     matching is only reliable for model-numbered categories; for fuzzy
+     ones (beauty/fashion/…) and unclassifiable queries it returns the
+     wrong product at a credit's cost. Unless the query confidently
+     classifies into PAID_SEARCH_CATEGORIES, drop the serpapi providers and
+     keep only the free trailing lanes (pg-fts catalog) so we never bill
+     SerpAPI for a query we can't match well. */
+  const cat = inferCategoryFromTitle(q);
+  const allowPaidSearch = cat !== null && PAID_SEARCH_CATEGORIES.has(cat);
+  const rest2 = allowPaidSearch ? rest : rest.filter((p) => !p.id.includes("serpapi"));
+  if (!allowPaidSearch && rest2.length !== rest.length) {
+    console.log(`[live-search] paid lane gated off (category=${cat ?? "unclassified"}) for q="${q.slice(0, 60)}"`);
+  }
+
   const items: Deal[] = [];
   let paidProviderCallCount = 0;
 
@@ -185,7 +211,7 @@ export async function GET(req: NextRequest) {
      must stay credit-free; the full request that fires alongside runs
      this lane and persists once. */
   if (!freeTierOnly) {
-    for (const provider of rest) {
+    for (const provider of rest2) {
       if (items.length >= ENOUGH_FOR_USER) {
         /* Have enough — skip remaining providers. Cost-saver: when the
            free leaders return ~10-15 results, the SerpAPI lane never

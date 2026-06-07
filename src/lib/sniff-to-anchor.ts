@@ -8,7 +8,7 @@
    confusion the test report flagged.
    ────────────────────────────────────────────────────────────────── */
 
-import { usdToNgn } from "@/lib/utils";
+import { currencyToNgn } from "@/lib/utils";
 import type { ProductGroup, StoreOffer } from "@/lib/search";
 import type { SniffResult } from "@/app/api/sniff/route";
 
@@ -83,9 +83,10 @@ export function sniffToAnchor(sniff: SniffResult): ProductGroup | null {
 
   const hasPrice = typeof sniff.price === "number" && sniff.price > 0;
   const currency = (sniff.currency ?? "NGN").toUpperCase();
-  const priceNgn = hasPrice
-    ? (currency === "USD" ? usdToNgn(sniff.price as number) : (sniff.price as number))
-    : 0;
+  /* Normalise the sniffed price to NGN regardless of source currency.
+     Was USD-only, so a GBP/EUR paste (e.g. LookFantastic £62) stored the
+     raw number as NGN and the UK page rendered ₦62 → £0. */
+  const priceNgn = hasPrice ? currencyToNgn(sniff.price as number, currency) : 0;
   const storeId = inferStoreId(sniff.store ?? "external");
 
   const offer: StoreOffer = {
