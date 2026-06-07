@@ -76,6 +76,24 @@ function parseNumber(v: string | string[] | undefined, fallback = 0): number {
    instead of rendering a broken or layout-breaking price. */
 const PRICE_MAX = 1_000_000_000;
 
+/* Derive a readable product name from a merchant URL's slug — the
+   fallback when a /p/live link carries no `t=` (pre-fix anchor links that
+   omitted the title, plus shared/bookmarked URLs). Picks the longest
+   hyphenated, letter-bearing path segment and de-slugifies it; cleanTitle
+   still sanitises the result at the call site. */
+function deriveTitleFromUrl(rawUrl: string): string {
+  try {
+    const segs = new URL(rawUrl).pathname.split("/").filter(Boolean);
+    const slug = segs
+      .filter((s) => /[a-z]/i.test(s) && s.includes("-"))
+      .sort((a, b) => b.length - a.length)[0];
+    if (!slug) return "";
+    return slug.replace(/-+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
+  } catch {
+    return "";
+  }
+}
+
 function searchParamsToOffer(sp: PageProps["searchParams"]): OfferData | null {
   /* Sanitize, then cap, the title. The `t=` param is fully
      attacker-controllable and flows into BOTH the visible hero and the
@@ -87,7 +105,7 @@ function searchParamsToOffer(sp: PageProps["searchParams"]): OfferData | null {
      2000-char value before it can become a 2000-char browser-tab label.
      Clean-then-cap (not cap-then-clean) so a tag straddling the 200th
      char can't leave a dangling fragment. Finding #12. */
-  const title  = cleanTitle(single(sp.t)).slice(0, 200);
+  const titleParam = cleanTitle(single(sp.t)).slice(0, 200);
   /* Unwrap `/api/go?url=<abs>` relay wrappers (SerpAPI Google-relay
      rows carry Deal.url in that form) to the absolute merchant URL.
      Without this, the `new URL()` parse below throws on the relative
@@ -96,6 +114,9 @@ function searchParamsToOffer(sp: PageProps["searchParams"]): OfferData | null {
      shared or search-indexed URL — still carry the wrapped form, so
      the consume side must handle it as well. */
   const rawUrl = toAbsoluteMerchantUrl(single(sp.u).trim());
+  /* Fall back to a URL-derived name when `t=` is absent (pre-fix anchor
+     links + shared URLs) so the page renders instead of 404ing. */
+  const title = titleParam || cleanTitle(deriveTitleFromUrl(rawUrl)).slice(0, 200);
   if (!title || !rawUrl) return null;
 
   /* The merchant URL must be a real http(s) link. This value gets

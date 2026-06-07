@@ -234,7 +234,11 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                         pdpUrlForOffer falls back to /p/live for
                         synthetic offers. */}
                     <a
-                      href={pdpUrlForOffer(country.code, offer)}
+                      /* Synthetic (sniffed) offers have no title of their
+                         own, and /p/live 404s without `t=`. Pass the
+                         anchor's title so the paste-flow store link
+                         resolves instead of dying on notFound(). */
+                      href={pdpUrlForOffer(country.code, { ...offer, title: anchor.title })}
                       onClick={() => trackClick(anchor.key, query, i, "anchor-comparison")}
                       className={`group flex items-center gap-3 p-3 rounded-xl border transition-all ${
                         isBest
