@@ -3,12 +3,12 @@ name: Price alerts (daily scan + email)
 on:
   schedule:
     # Daily at 07:00 UTC (08:00 WAT). The data refresh (scrape-deals.yml)
-    # runs Mon + Thu at 05:00 UTC and settles — scrape + the four ingests
+    # runs Mon, Wed + Fri at 05:00 UTC and settles — scrape + the four ingests
     # + dedup — by ~06:00 UTC, so an 07:00 scan picks up that morning's
-    # fresh price drops on ingest days. On the other five days the scan is
+    # fresh price drops on ingest days. On the other four days the scan is
     # a cheap no-op: pending_price_alerts returns nothing new, the script
     # logs "No alerts to send" and exits. Running daily (rather than only
-    # Mon/Thu) means a manual mid-week ingest or a corrected price still
+    # Mon/Wed/Fri) means a manual mid-week ingest or a corrected price still
     # fires its alerts within 24h instead of waiting for the next cron.
     - cron: "0 7 * * *"
   workflow_dispatch:

@@ -8,9 +8,10 @@
    silent Playwright scrapers for Slot, 3C Hub, Jiji, Spar, Kara,
    Obiwezy.
 
-   Cost: ~60 SerpAPI credits per run (6 merchants × ~10 queries).
-   Mon+Thu cadence = ~480 credits/month, ~10% of the Developer
-   plan budget.
+   Cost: ~72 SerpAPI credits per run (Slot 12 + Kara 10 + Konga 14 =
+   36 queries, each firing engine=google + a google_images companion).
+   Mon/Wed/Fri cadence (~13 runs/mo) = ~940 credits/month, ~19% of the
+   Developer plan budget.
 
    Usage:
      npm run ingest:ng-serpapi                    # all 6 merchants

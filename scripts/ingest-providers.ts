@@ -134,7 +134,7 @@ async function main() {
      Both modes check credits before starting. The difference is the
      BUFFER:
 
-       deals mode (Mon+Thu cron, primary user-facing data):
+       deals mode (Mon/Wed/Fri cron, primary user-facing data):
          Buffer = 0%. If we have enough credits for the full run, go.
          If not, SKIP CLEANLY rather than start and fail halfway —
          a partial run burns credits without filling the catalog, AND

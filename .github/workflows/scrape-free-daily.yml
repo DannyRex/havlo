@@ -2,32 +2,32 @@ name: Refresh free data (daily, non-SerpAPI sources)
 
 on:
   schedule:
-    # The paid workflow (scrape-deals.yml) refreshes EVERYTHING on Mon +
-    # Thu at 05:00 UTC and also sends the newsletter. This companion
-    # workflow fills the OTHER five days with the FREE sources only, so
+    # The paid workflow (scrape-deals.yml) refreshes EVERYTHING on Mon,
+    # Wed + Fri at 05:00 UTC and also sends the newsletter. This companion
+    # workflow fills the OTHER four days with the FREE sources only, so
     # free inventory refreshes every day while SerpAPI spend and the
-    # digest cadence stay exactly twice-weekly.
+    # digest cadence stay at three-a-week.
     #
-    #   Mon, Thu            → scrape-deals.yml   (free + SerpAPI + newsletter)
-    #   Sun,Tue,Wed,Fri,Sat → this file          (free only, no email, no credits)
+    #   Mon, Wed, Fri      → scrape-deals.yml   (free + SerpAPI + newsletter)
+    #   Sun, Tue, Thu, Sat → this file          (free only, no email, no credits)
     #
-    # 0,2,3,5,6 = Sun, Tue, Wed, Fri, Sat (cron's day-of-week: 0=Sun..6=Sat).
-    # Together with scrape-deals.yml's "1,4" the free sources are touched
+    # 0,2,4,6 = Sun, Tue, Thu, Sat (cron's day-of-week: 0=Sun..6=Sat).
+    # Together with scrape-deals.yml's "1,3,5" the free sources are touched
     # all seven days, with no day running both files.
     #
     # Free sources here: the Playwright store scrape (+ deals.ts commit +
     # ingest:scraped), the AliExpress affiliate API, and NG Shopify JSON
     # (3C Hub). There are deliberately NO SerpAPI jobs (Jumia, standard
     # Google Shopping, NG long-tail, UK retailers) and NO send-newsletter
-    # here. Those stay in the Mon/Thu workflow. If you add or remove a
+    # here. Those stay in the Mon/Wed/Fri workflow. If you add or remove a
     # free source, keep this file and scrape-deals.yml's free jobs in sync
     # until they are factored into one reusable workflow.
-    - cron: "0 5 * * 0,2,3,5,6"
+    - cron: "0 5 * * 0,2,4,6"
   workflow_dispatch: {}
 
 # The scrape job commits the refreshed deals.ts back to the repo, so the
 # auto-injected GITHUB_TOKEN needs write access to contents (same as the
-# Mon/Thu workflow).
+# Mon/Wed/Fri workflow).
 permissions:
   contents: write
 
@@ -35,7 +35,7 @@ permissions:
 # push. Scheduled runs never overlap (disjoint days, 60m timeout), so this
 # only guards manual dispatch. cancel-in-progress: false lets an in-flight
 # commit finish cleanly rather than being killed mid-push. A manual overlap
-# with the Mon/Thu workflow is still covered by the scrape job's rebase +
+# with the Mon/Wed/Fri workflow is still covered by the scrape job's rebase +
 # retry push loop below.
 concurrency:
   group: ${{ github.workflow }}
@@ -91,7 +91,7 @@ jobs:
           git add src/lib/data/deals.ts
           git commit -m "chore: refresh deals [$(date '+%Y-%m-%d')]"
           # Scrape can take 15-25 min; main may have moved during the run
-          # (manual commits, the Mon/Thu workflow on an overlapping manual
+          # (manual commits, the Mon/Wed/Fri workflow on an overlapping manual
           # dispatch). Rebase + retry on push rejection so we don't lose
           # the data refresh.
           for attempt in 1 2 3; do
@@ -215,7 +215,7 @@ jobs:
       # Self-host newly-ingested product images into Supabase Storage (#133).
       # Mirrors the step in scrape-deals.yml so products ingested on free-daily
       # days (AliExpress, NG Shopify, scraped) get hosted SAME-DAY instead of
-      # waiting for the next Mon/Thu run. Runs after dedup so it hosts canonical
+      # waiting for the next Mon/Wed/Fri run. Runs after dedup so it hosts canonical
       # post-merge products; idempotent (only stored_image_at IS NULL rows);
       # placeholder images are skipped + nulled. No-ops until migration 0076 +
       # the public "product-images" bucket exist.

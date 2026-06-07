@@ -7,8 +7,8 @@
    Transactional confirmations land best when they read like a
    personal note from the founder.
 
-   Cadence reminder in the body matches the scrape cron: twice a
-   week (Mon + Thu morning). We only email when fresh data lands. */
+   Cadence reminder in the body matches the scrape cron: three
+   mornings a week (Mon/Wed/Fri). We only email when fresh data lands. */
 
 import {
   shellPersonal,
@@ -35,15 +35,15 @@ export function newsletterWelcome({ country }: Args): Email {
   const cc = (country ?? "ng").toLowerCase();
   const dealsUrl = `${SITE_URL}/${cc}/deals`;
 
-  const subject   = "You're in. First Havlo digest lands Monday or Thursday.";
-  const preheader = "Two emails a week, Monday and Thursday morning. Nothing on idle days.";
+  const subject   = "You're in. First Havlo digest lands Monday, Wednesday, or Friday.";
+  const preheader = "Three emails a week, Monday, Wednesday, and Friday morning. Nothing on idle days.";
 
   /* ── HTML body ──────────────────────────────────────────────── */
 
   const body = `
 ${paragraph("Hi,")}
 ${paragraph("Thanks for joining the Havlo deals digest.")}
-${paragraph(`Twice a week (Monday and Thursday morning), you'll get one email from this address with the strongest deals we found that day. We don't email on the other days. If there's nothing new worth opening, we don't send anything.`)}
+${paragraph(`Three mornings a week (Monday, Wednesday, and Friday), you'll get one email from this address with the strongest deals we found that day. We don't email on the other days. If there's nothing new worth opening, we don't send anything.`)}
 ${paragraph(`Until the first one ships, ${textLink({ url: dealsUrl, label: `browse what's hot today` })}.`)}
 ${signature("Danny")}
 ${spacer(8)}
@@ -57,7 +57,7 @@ ${spacer(8)}
     body: [
       `Thanks for joining the Havlo deals digest.`,
       ``,
-      `Twice a week (Monday and Thursday morning), you'll get one email from this address with the strongest deals we found that day. We don't email on the other days. If there's nothing new worth opening, we don't send anything.`,
+      `Three mornings a week (Monday, Wednesday, and Friday), you'll get one email from this address with the strongest deals we found that day. We don't email on the other days. If there's nothing new worth opening, we don't send anything.`,
       ``,
       `Until the first one ships, browse what's hot today: ${dealsUrl}`,
     ],

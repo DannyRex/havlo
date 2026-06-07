@@ -134,7 +134,7 @@ export default function CategorySubscribe({ categorySlug, categoryName, category
           deals in your inbox?
         </p>
         <p className="text-[11px] sm:text-[12px] text-ink-3 mt-0.5">
-          Two emails a week, Monday and Thursday. Unsubscribe in one click.
+          Three emails a week, Monday, Wednesday, and Friday. Unsubscribe in one click.
         </p>
       </div>
 

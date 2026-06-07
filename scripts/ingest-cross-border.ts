@@ -18,13 +18,13 @@
    ~0 -- Temu queries usually return nothing yet still cost 1 credit each.
    SHEIN still surfaces, but mainly in fashion/beauty. The SKU lists below
    are fashion/beauty ONLY (these merchants do not index in electronics).
-   After the first cron run, check the per-merchant kept= counts printed
-   at the end: if Temu stays at 0, drop it from the cron (run with
-   --merchants=shein) to stop paying for empty result sets.
+   Temu was dropped from the cron (--merchants=shein in scrape-deals.yml)
+   after its kept= counts stayed at 0, since it pulled its Google Shopping
+   listings 2025-04-09. Re-add it to --merchants if it indexes again.
 
-   COST: ~10 SKUs x 4 countries x 2 merchants = ~80 SerpAPI calls/run.
-   Twice-weekly cron (Mon/Thu) ~= 8.7 runs/mo ~= 694 credits/month, inside
-   the Developer plan's (5,000/mo) headroom. --merchants=shein halves it.
+   COST: ~10 SKUs x 4 countries x 1 merchant (SHEIN) = ~40 SerpAPI calls/run.
+   Mon/Wed/Fri cron ~= 13 runs/mo ~= 520 credits/month, well inside
+   the Developer plan's (5,000/mo) headroom.
 
    STORE/COUNTRY HANDLING needs NO new code: "shein" and "temu" are
    already in GLOBAL_INTL_STORES (src/lib/country.ts), so ingestion tags

@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
     );
 
     return json({ counts: Object.fromEntries(entries), country: cc },
-      /* Counts move on the Mon/Thu + daily ingest cadence, not minute to
+      /* Counts move on the Mon/Wed/Fri + daily ingest cadence, not minute to
          minute, so a 2-min edge window is plenty and keeps recompute
          cheap; swr serves instantly while a fresh one warms. */
       "s-maxage=120, stale-while-revalidate=600");

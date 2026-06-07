@@ -1,5 +1,5 @@
-/* Twice-weekly deals digest — sent by scripts/cron/send-newsletter.ts
-   right after the Mon + Thurs scrape cron finishes ingesting fresh
+/* Mon/Wed/Fri deals digest, sent by scripts/cron/send-newsletter.ts
+   right after the Mon/Wed/Fri scrape cron finishes ingesting fresh
    inventory.
 
    Visual treatment: marketing-shell (Havlo wordmark header, large

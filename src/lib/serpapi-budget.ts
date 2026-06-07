@@ -23,7 +23,7 @@ import { getSupabaseAdmin } from "@/lib/providers/db-client";
 
 /* Default cap when no row exists in the DB. Override per-environment
    via SERPAPI_MONTHLY_CAP, override per-month by editing the row's
-   cap column directly. 5000 matches the SerpAPI Starter plan
+   cap column directly. 5000 matches the SerpAPI Developer plan
    default; bump if you upgrade. */
 const DEFAULT_CAP = Number(process.env.SERPAPI_MONTHLY_CAP ?? 5000);
 

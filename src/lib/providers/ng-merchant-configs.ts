@@ -222,9 +222,10 @@ export const NG_MERCHANT_CONFIGS_INACTIVE: MerchantConfig[] = [
    Small lists keep SerpAPI credit cost predictable; we can grow
    these as the catalog matures.
 
-   Total per ingest run = sum of (config.queries.length) across all
-   configs. At ~10 queries per merchant × 6 merchants = ~60 credits
-   per run. Twice-weekly cron = ~480 credits/month, well under the
+   Total per ingest run = sum of (config.queries.length) across the
+   active configs, each query firing google + a google_images companion.
+   Slot 12 + Kara 10 + Konga 14 = 36 queries x 2 = ~72 credits per run.
+   Mon/Wed/Fri cron (~13 runs/mo) = ~940 credits/month, well under the
    5,000 Developer plan budget.
 
    Query design: lead with high-velocity SKUs that the merchant

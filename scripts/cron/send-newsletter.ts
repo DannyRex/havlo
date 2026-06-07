@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
-/* Twice-weekly newsletter digest send.
+/* Mon/Wed/Fri newsletter digest send.
 
-   Fires AFTER the Mon + Thurs scrape cron finishes ingesting fresh
+   Fires AFTER the Mon/Wed/Fri scrape cron finishes ingesting fresh
    inventory (.github/workflows/scrape-deals.yml). The cadence is:
 
        scrape  →  ingest-aliexpress / serpapi / uk-retailers

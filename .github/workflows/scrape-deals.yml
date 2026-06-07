@@ -2,23 +2,33 @@ name: Refresh data (scrape + ingest)
 
 on:
   schedule:
-    # Twice-weekly (Mon + Thu). Restored May 2026 after two constraints
-    # that had forced a weekly Thu-only window were both lifted:
+    # 3x / week (Mon, Wed, Fri at 05:00 UTC). The free companion workflow
+    # (scrape-free-daily.yml) covers the other four days (Sun/Tue/Thu/Sat),
+    # so the catalog refreshes daily; these three are the PAID SerpAPI days
+    # and the newsletter ships right after each. GitHub Actions is free
+    # (public repo = unlimited hosted-runner minutes).
     #
-    #   1. GitHub Actions minutes: repo went public, so Actions on
-    #      standard hosted runners is now unlimited (the 2,000 min/mo
-    #      cap is a private-repo constraint only).
-    #   2. SerpAPI: upgraded from Starter (1k credits/mo) to Developer
-    #      (5k credits/mo). Mon+Thu usage is now ~1,384 credits/month,
-    #      well under the new ceiling with plenty of room to grow
-    #      category coverage or add markets without bumping plan again.
+    # SerpAPI cost (Developer plan = 5,000 credits/mo). Per run, after
+    # dropping the dead-yield Temu lane (Temu pulled its Google Shopping
+    # listings Apr 2025):
+    #     standard ingest         60   (12 categories x 5 countries)
+    #     jumia (+img backfill)   ~54   (29 queries + ~25 google_images)
+    #     ng long-tail            72   (Slot 12 + Kara 10 + Konga 14, x2)
+    #     uk retailers            42   (sum of per-retailer FLAGSHIP_SKUS)
+    #     cross-border (SHEIN)    40   (4 markets x 10 SKUs)
+    #     -------------------------------
+    #     ~270 credits/run  x  ~13 runs/mo  =  ~3,500/mo  (~70% of plan)
     #
-    # If we ever want daily ingest, projected cost is ~4,144 credits/mo
-    # (still under Developer), and the Actions side is free. Newsletter
-    # cadence is now decoupled-ready: send-newsletter only needs the
-    # dedup job to succeed, so partial ingest failures don't block the
-    # digest. A faster cadence is just a cron change, no other rewiring.
-    - cron: "0 5 * * 1,4"
+    # Leaves ~1,500/mo for live-search + growth. (Jun 2026 recount: the
+    # earlier "~1,384/mo" here was stale, pre-Konga and pre-cross-border.)
+    # True daily would be ~270 x 30 = ~8,200/mo, OVER the 5k ceiling, so
+    # daily needs a plan bump, not just a cron change. Note a cadence
+    # change touches three places: this cron, the complementary cron in
+    # scrape-free-daily.yml, AND the day-name copy in the newsletter
+    # components + templates. Newsletter is decoupled-ready: send-newsletter
+    # only needs the dedup job to succeed, so partial ingest failures
+    # don't block the digest.
+    - cron: "0 5 * * 1,3,5"
   workflow_dispatch:
     # Manual run from GitHub UI. Inputs let us refresh just the
     # free data sources (Playwright scrapers + AliExpress affiliate
@@ -168,13 +178,13 @@ jobs:
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.ALIEXPRESS_APP_KEY != '' && env.ALIEXPRESS_APP_SECRET != ''
         run: npm run ingest:aliexpress
 
-  # ── Job 3: SerpAPI standard ingest. 6 countries × 10 categories ×
+  # ── Job 3: SerpAPI standard ingest. 5 countries × 12 categories ×
   #          50-result limit = 60 calls per run. Independent of the
   #          Playwright scrape — runs in parallel.
   #          Skipped automatically when SERPAPI_KEY is unset (dev
   #          checkout) OR when the manual run sets skip_serpapi=true.
-  #          Cron always runs it (~480 credits/month against the
-  #          1,000-credit Starter plan). ──
+  #          Cron always runs it (~780 credits/month against the
+  #          5,000-credit Developer plan). ──
   ingest-serpapi:
     runs-on: ubuntu-latest
     # Timeout history:
@@ -225,10 +235,10 @@ jobs:
   # ── Job 4a: Jumia ingest via SerpAPI's dedicated `engine=jumia`.
   #           Replaces the Playwright Jumia scraper which Cloudflare
   #           defeats. Runs in parallel with the other ingest jobs.
-  #           ~17 SerpAPI credits per run (curated NG query list —
-  #           phones, computing, electronics, audio, appliances,
-  #           fashion, beauty, gaming). Twice-weekly cron = ~34/month,
-  #           fits comfortably under the Starter plan budget. ──
+  #           ~29 credits/run for the curated NG query list (phones,
+  #           computing, electronics, audio, appliances, fashion, beauty,
+  #           gaming) + ~20-30 for the post-ingest google_images backfill
+  #           = ~54/run. 3x/week (~13 runs/mo) = ~700/month. ──
   ingest-jumia:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -253,7 +263,7 @@ jobs:
       # May 2026: day-gate removed. The earlier "Thursday only" gate
       # saved ~68 SerpAPI calls/month against the 1k Starter cap, but
       # the upgrade to the 5k Developer plan made that saving noise.
-      # Jumia now refreshes on both Mon + Thu like every other ingest
+      # Jumia now refreshes on Mon, Wed + Fri like every other ingest
       # source, so NG catalog freshness matches the rest of the world.
       - name: Ingest Jumia deals (SerpAPI engine=jumia) → Supabase
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
@@ -269,8 +279,8 @@ jobs:
       # list rides the same google + site:konga.com path as Slot + Kara.
       # Cost: each query fires google + google_images = 2 credits, so
       # ~72 credits per run today (Slot 12 + Kara 10 + Konga 14 queries =
-      # 36 queries x 2). Twice-weekly cron (~8.7 runs/month) = ~626
-      # credits/month, well under the 5,000 Developer plan ceiling.
+      # 36 queries x 2). 3x/week (~13 runs/month) = ~940 credits/month,
+      # comfortably under the 5,000 Developer plan ceiling.
       # Grows linearly with merchants added to the config — each new
       # merchant adds (its query-list count x 2) to the per-run cost.
       - name: Ingest NG long-tail merchants (SerpAPI site-filter) → Supabase
@@ -294,10 +304,10 @@ jobs:
   #          SerpAPI with retailer-prefixed SKUs ("Argos iPhone 17",
   #          "Currys MacBook Pro M4") and filters to keep only on-
   #          target retailer rows.
-  #          ~96 SerpAPI credits per run (8 retailers × 14 SKUs, after
-  #          dedup against the standard ingest). Twice-weekly cron =
-  #          ~192/month, fits under the 1,000-credit Starter plan
-  #          alongside the standard ingest's ~480/month. ──
+  #          ~42 SerpAPI credits per run (sum of each retailer's
+  #          FLAGSHIP_SKUS list; credits are charged per search, before
+  #          the post-fetch dedup). 3x/week (~13 runs/mo) = ~550/month,
+  #          alongside the standard ingest's ~780/month. ──
   ingest-uk-retailers:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -323,18 +333,17 @@ jobs:
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
         run: npm run ingest:uk-retailers
 
-      # Cross-border marketplace ingest (SHEIN + Temu). SerpAPI has no
-      # native SHEIN/Temu engine, so this reuses the google_shopping
-      # provider with retailer-suffixed queries ("<sku> SHEIN") filtered
-      # to on-target rows -- same shape as the UK step above. Fashion/
-      # beauty SKUs only, 4 markets, ~80 credits/run (~694/month) within
-      # the SerpAPI plan headroom. NOTE: Temu pulled its Google Shopping
-      # listings on 2025-04-09 so its yield is ~0; if the run's kept=
-      # counts confirm that after launch, change the command to
-      # `npm run ingest:cross-border -- --merchants=shein`.
+      # Cross-border marketplace ingest (SHEIN). SerpAPI has no native
+      # SHEIN engine, so this reuses the google_shopping provider with
+      # retailer-suffixed queries ("<sku> SHEIN") filtered to on-target
+      # rows -- same shape as the UK step above. Fashion/beauty SKUs only,
+      # 4 markets x 10 SKUs = ~40 credits/run, ~520/month. Temu was
+      # dropped Jun 2026 (--merchants=shein below): it pulled its Google
+      # Shopping listings 2025-04-09, so its yield was ~0 yet it doubled
+      # this lane's cost. Re-add it to the --merchants list if it returns.
       - name: Ingest cross-border (SHEIN + Temu) deals → Supabase
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
-        run: npm run ingest:cross-border
+        run: npm run ingest:cross-border -- --merchants=shein
 
   # ── Job 5: Dedup pass. Re-keys product signatures with the compact
   #          'brand|model[|inches]' form and merges any near-
@@ -383,8 +392,8 @@ jobs:
       # dedup so it seeds the canonical post-merge offers, not duplicates
       # that are about to be collapsed. Mirrors the identical step in
       # scrape-free-daily.yml's dedup job: without it, a product ingested
-      # on the Mon/Thu run rendered an empty price chart until the next
-      # free-daily seed (Tue/Fri) caught it. Idempotent + no API credits;
+      # on the Mon/Wed/Fri run rendered an empty price chart until the next
+      # free-daily seed caught it. Idempotent + no API credits;
       # no-ops until migration 0067 is applied.
       - name: Seed missing price-history points
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''

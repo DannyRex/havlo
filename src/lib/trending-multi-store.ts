@@ -362,7 +362,7 @@ async function fetchMultiStoreTitlesForCountry(countryCode: string): Promise<Mul
        but no longer appears in `product_best_offers`)
      · the Option A orphan-reap trigger or a manual cleanup deletes a
        product the chip was anchored to
-     · ingestion runs (Mon/Thu) age-out an SKU
+     · ingestion runs (Mon/Wed/Fri) age-out an SKU
    Without this layer, the chip clicks into /api/compare with a pid
    that resolves to zero offers, falls through to FTS which (post the
    May 29 search-relevance tightening) is too strict to anchor, and the

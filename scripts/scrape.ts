@@ -217,7 +217,7 @@ async function main() {
     // { name: "Jumia",      probe: "https://www.jumia.com.ng/mlp-flash-sales/",     fn: () => scrapeJumia(page) },
     /* 3C Hub retired from the Playwright orchestrator May 2026 —
        its Shopify catalog is ingested standalone via
-       scripts/ingest-ng-shopify.ts on the same Mon+Thu cron, no
+       scripts/ingest-ng-shopify.ts on the same daily cron, no
        browser launch needed. Standalone path lands the full
        /collections/all bucket (93 in-stock) where this orchestrator
        capped at 73. Saves ~3s per cron run by skipping the redundant

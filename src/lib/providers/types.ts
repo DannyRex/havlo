@@ -72,7 +72,7 @@ export interface SearchQuery {
   /** Ingest mode toggle:
         - "deals" (default): appends 'deals' suffix to generic queries
           to bias Google Shopping toward sale-tagged results. Used by
-          the Mon+Thu deal cron.
+          the Mon/Wed/Fri deal cron.
         - "market": drops the suffix to return a broader catalogue mix
           (deals + full-price + sponsored). Used by the monthly market
           cron to populate the spectrum + 'cheaper alternatives' rail

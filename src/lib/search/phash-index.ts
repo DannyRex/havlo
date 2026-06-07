@@ -33,7 +33,7 @@ interface PhashEntry {
   phash: bigint;
 }
 
-/* 30-minute freshness. New products are hashed by the Mon/Thu
+/* 30-minute freshness. New products are hashed by the daily image-phash
    backfill, so a half-hour-stale index never misses a flagship for
    long, and the homepage/compare upload control isn't worth a tighter
    window's egress. */

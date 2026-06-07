@@ -20,7 +20,7 @@ import type { SearchOutput, ProductGroup, DupeResult, StoreOffer } from "@/lib/s
                                         Vercel Fluid Active CPU hit
                                         100% of the 4h free tier)
    Compare results don't change within an hour — the underlying
-   product catalog refreshes Mon+Thu, and a 1h cache window with
+   product catalog refreshes Mon/Wed/Fri, and a 1h cache window with
    1d SWR means hot queries hit our function ~24× per day instead
    of ~720× per day. Big CPU saving with negligible UX impact. */
 /* Vary: Accept-Encoding so the CDN keeps a single compressed variant

@@ -21,7 +21,7 @@ export default function NewsletterStrip() {
           The best price drops, in your inbox.
         </h2>
         <p className="text-sm sm:text-base text-ink-2 max-w-md mx-auto mb-7 sm:mb-8 leading-relaxed">
-          Two emails a week, Monday and Thursday morning. Just the price
+          Three emails a week, Monday, Wednesday, and Friday morning. Just the price
           drops worth opening. Unsubscribe in one click.
         </p>
         <div className="flex justify-center">

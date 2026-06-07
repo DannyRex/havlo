@@ -25,10 +25,9 @@
      num=30
      api_key=<key>
 
-   Cost: 1 SerpAPI credit per call (no google_images companion call
-   for now — UI gradient/emoji placeholder is the fallback when
-   image_url is null). Per-merchant ingest: ~10 queries × 1 credit
-   = ~10 credits per run.
+   Cost: 2 SerpAPI credits per query (engine=google plus a google_images
+   companion call that backfills image_url; see the per-query fetch
+   below). Per-merchant ingest: ~10-14 queries x 2 = ~20-28 credits.
 
    Used by:
      - scripts/ingest-ng-serpapi.ts (offline ingest into products + offers)

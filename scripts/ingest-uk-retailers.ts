@@ -30,10 +30,10 @@
    source string.
 
    Cost:
-     ~14 retailers, each with ~6-14 SKUs.
-     Total: ~120 SerpAPI calls per run.
-     Twice-weekly cron = ~960/month against a 1,000-credit Starter
-     plan — still within budget. Drop --retailers= to ingest a
+     ~11 active retailers, each 1-8 SKUs from FLAGSHIP_SKUS.
+     Total: ~42 SerpAPI calls per run (1 engine each).
+     Mon/Wed/Fri cron (~13 runs/mo) = ~550/month, well within the
+     5,000-credit Developer plan. Drop --retailers= to ingest a
      subset if approaching cap.
 
    Usage:

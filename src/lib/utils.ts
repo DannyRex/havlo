@@ -813,7 +813,7 @@ export function timeAgo(dateStr: string): string {
    whether verified 1 hour or 2 weeks. The visual tone never
    shifted, so users defaulted to trusting it.
 
-   Tiers chosen against the Mon+Thu scrape cadence:
+   Tiers chosen against the Mon/Wed/Fri scrape cadence:
      - fresh (<3 days)   — within one scrape cycle; price is reliable
      - aging (3-7 days)  — past one cycle; could have drifted but unlikely
      - stale (7-30 days) — multiple cycles missed; explicit warning

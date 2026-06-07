@@ -101,7 +101,7 @@ const PriceHistoryChart    = dynamic(
    15th cross-border listing landed after the PDP last froze at 14).
    Same window on both surfaces ⇒ same refresh cadence ⇒ no drift.
    Tradeoff: ~4× more PDP regens/day (the reason for the 6h bump). PDP
-   content only really changes on the Mon+Thu ingest, so most of that is
+   content only really changes on the Mon/Wed/Fri ingest, so most of that is
    wasted work — if Fluid CPU tightens again, prefer on-demand
    revalidation (revalidatePath) fired FROM the ingest cron over
    re-raising this time window. */
@@ -208,9 +208,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
      that may no longer be buyable.
 
      "Updated multiple times a week" replaces the old "updated daily"
-     (June 2026 honesty pass): SerpAPI-sourced prices refresh Mon/Thu
+     (June 2026 honesty pass): SerpAPI-sourced prices refresh Mon/Wed/Fri
      and the free-source scrape runs daily, so the whole catalog is
-     refreshed at least twice weekly — "daily" overclaimed for the
+     refreshed at least three times a week — "daily" overclaimed for the
      SerpAPI majority. */
   const desc = offer.in_stock
     ? `From ${price} at ${store}. Compare live prices for ${name} across ${country.name} stores and find the cheapest place to buy. Prices updated multiple times a week on Havlo.`
@@ -1072,7 +1072,7 @@ export default async function ProductPage({ params }: PageProps) {
      A freshly-ingested TRACKED product carries a live price but zero
      offer_price_history rows until its price first changes OR the daily
      seed:price-history backfill runs, a 1-2 day window (the backfill
-     runs on the free-daily cron, not on the Mon/Thu scrape that creates
+     runs on the free-daily cron, not on the Mon/Wed/Fri scrape that creates
      most new rows). Left empty, the chart shows a bare "No price activity
      yet" panel, which reads as inconsistent next to every other product's
      flat hold-line (user report, June 2026: "why no activity instead of

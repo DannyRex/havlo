@@ -7,7 +7,7 @@ name: Compute category counts
 # connection-pool incident). The compute is a single GENTLE sequential pass,
 # off the request path, once a day.
 #
-# Cadence: daily 06:30 UTC — after the 05:00 Mon/Thu big scrape + the daily
+# Cadence: daily 06:30 UTC — after the 05:00 Mon/Wed/Fri big scrape + the daily
 # free scrape have run and ingest has settled. The reader treats rows older
 # than 48h as stale and falls back to live pool-derived counts, so one missed
 # run degrades gracefully rather than serving wrong numbers.

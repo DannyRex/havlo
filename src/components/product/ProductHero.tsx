@@ -517,7 +517,7 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
           /* Inline annotation, not a card. The earlier amber-bg +
              amber-border treatment was claiming banner-grade real
              estate for a chip that fires on ~20% of PDPs at any
-             given time (Mon+Thu ingest cadence + 7-day stale
+             given time (Mon/Wed/Fri ingest cadence + 7-day stale
              threshold + 14-day TTL means a healthy slice of the
              catalog sits in the 7–13d-old window). When a "warning"
              reads as default UI chrome it loses urgency — exactly

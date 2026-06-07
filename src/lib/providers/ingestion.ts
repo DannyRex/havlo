@@ -1451,7 +1451,7 @@ async function sweepStaleOffers(
 /* Lowered May 29 2026 from 30 to 14 days after a user trust-break
    report ("Last refreshed 2w ago, merchant price had changed").
 
-   Mon+Thu scrape cadence means ~6 cycles in 14 days; if SIX
+   Mon/Wed/Fri scrape cadence means ~6 cycles in 14 days; if SIX
    consecutive cycles fail to re-verify an offer, the offer is almost
    certainly gone from the merchant feed (Shopify catalog change,
    SerpAPI query no longer running, store removed the listing). A

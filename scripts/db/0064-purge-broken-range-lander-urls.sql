@@ -14,7 +14,7 @@
 -- domain that resolves to a relevant Range search page.
 --
 -- This migration nukes the existing broken rows. The next SerpAPI
--- scrape (Mon/Thu cron) will re-ingest with the rewriter applied,
+-- scrape (Mon/Wed/Fri cron) will re-ingest with the rewriter applied,
 -- so Range offers come back to the catalog with correct URLs
 -- automatically — no backfill needed.
 --
@@ -49,7 +49,7 @@ where store_id = 'the-range'
 --   where store_id = 'the-range'
 --     and url ~* 'therange\.com/lander';
 --
---   -- After the next Mon/Thu SerpAPI scrape, the row count for
+--   -- After the next Mon/Wed/Fri SerpAPI scrape, the row count for
 --   -- the-range should be back near the pre-purge level — but
 --   -- every new URL should now be therange.co.uk/search?q=...
 --   -- instead of therange.com/lander.
