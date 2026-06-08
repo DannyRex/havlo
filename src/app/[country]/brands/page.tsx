@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import JsonLd from "@/components/seo/JsonLd";
+import StoreLogo from "@/components/compare/StoreLogo";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import { getCountry, ACTIVE_COUNTRIES } from "@/lib/country";
 import { categories } from "@/lib/data/categories";
@@ -99,7 +100,22 @@ export default async function BrandsIndexPage({
                   href={`/${country.code}/brand/${b.slug}`}
                   className="flex items-center justify-between gap-2 px-4 py-3 rounded-xl bg-surface-2 border border-border hover:border-border-strong transition-colors group"
                 >
-                  <span className="text-ink font-medium text-sm truncate">{b.brand}</span>
+                  <span className="flex items-center gap-2.5 min-w-0">
+                    {/* Brand mark. No bundled /logos asset for most brands,
+                        so StoreLogo resolves the brand's favicon from its
+                        domain (slug.com) and falls back to a letter badge.
+                        Same primitive the product cards use, for visual
+                        consistency. */}
+                    <StoreLogo
+                      storeId={b.slug}
+                      storeName={b.brand}
+                      storeLogoUrl={`/logos/${b.slug}.png`}
+                      merchantUrl={`https://${b.slug.replace(/[^a-z0-9-]/g, "")}.com`}
+                      size={24}
+                      pad={4}
+                    />
+                    <span className="text-ink font-medium text-sm truncate">{b.brand}</span>
+                  </span>
                   <span className="text-ink-3 text-xs tabular-nums shrink-0">{b.count}</span>
                 </Link>
               </li>
