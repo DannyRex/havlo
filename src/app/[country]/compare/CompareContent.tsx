@@ -38,8 +38,13 @@ function looksLikeUrl(v: string): boolean {
 const MIN_DB_ALTERNATIVES = 3;
 function dbAltCount(out: SearchOutput | null | undefined): number {
   if (!out) return 0;
-  if (out.mode === "similar") return out.dupes.length;
-  if (out.mode === "single")  return Math.max(0, out.group.offers.length - 1);
+  /* Count the store options the user already sees for free: the anchor
+     product's own cross-store offers PLUS any alternative products
+     (dupes). A well-deduped flagship often has 0 dupes but many anchor
+     offers — that's still a real comparison, so it must count or we'd
+     pay SerpAPI for a product the catalog already covers. */
+  if (out.mode === "similar") return (out.anchor?.offers.length ?? 0) + out.dupes.length;
+  if (out.mode === "single")  return out.group.offers.length;
   return 0;
 }
 
