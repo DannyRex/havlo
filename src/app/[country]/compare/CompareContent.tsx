@@ -27,6 +27,22 @@ function looksLikeUrl(v: string): boolean {
   return /^https?:\/\//i.test(t) || /^(www\.|[a-z]+\.(com|ng|co))/i.test(t);
 }
 
+/* Paid-live gate (June 2026). The free AliExpress teaser always runs,
+   but the PAID Google Shopping (SerpAPI) lane only fires when our own
+   catalog couldn't already assemble a useful cross-store comparison.
+   dbAltCount() reports how many alternative offers /api/compare found;
+   at/above this many, the DB answers the query for free and we skip the
+   credit. Below it (long-tail products, or blocked-store pastes the
+   catalog doesn't cover yet) the paid lane runs, and its persist step
+   back-fills the catalog so the NEXT search resolves for free. */
+const MIN_DB_ALTERNATIVES = 3;
+function dbAltCount(out: SearchOutput | null | undefined): number {
+  if (!out) return 0;
+  if (out.mode === "similar") return out.dupes.length;
+  if (out.mode === "single")  return Math.max(0, out.group.offers.length - 1);
+  return 0;
+}
+
 export default function CompareContent({
   initialResult,
 }: {
@@ -74,8 +90,13 @@ export default function CompareContent({
      redundant client refetch. Mirrors DealFeed's hasConsumedInitialRef. */
   const hasInitialResultRef = useRef<boolean>(initialResult != null);
 
-  /* ── Fetch live SerpAPI results in parallel with the internal search ── */
-  const fetchLive = useCallback(async (q: string) => {
+  /* ── Fetch live results alongside the internal (DB) search ──
+     `dbAltsPromise` resolves to the number of cross-store alternatives
+     /api/compare found for this query. The PAID Google Shopping lane is
+     gated on it: when the catalog already answers (>= MIN_DB_ALTERNATIVES),
+     we skip the SerpAPI credit and let the free teaser + DB comparison
+     stand. Omit it (or a thin/failed DB result) to force the paid lane. */
+  const fetchLive = useCallback(async (q: string, dbAltsPromise?: Promise<number>) => {
     const trimmed = q.trim();
     if (!trimmed) return;
     /* Skip a back-to-back identical live query (the double-fire). A
@@ -91,17 +112,9 @@ export default function CompareContent({
     const enc = encodeURIComponent(trimmed);
     const stillCurrent = () => lastLiveQueryRef.current === trimmed;
 
-    /* Two-phase progressive load. The live section's latency is
-       dominated by the paid Google Shopping (SerpAPI) call (~1.5s);
-       AliExpress (free) returns in ~0.5s. Fire BOTH concurrently:
-
-         Phase 1 (tier=free) — AliExpress only, no SerpAPI, no persist.
-           Paints the section fast so it isn't blank during the wait.
-         Phase 2 (full) — the authoritative pipeline (free + SerpAPI
-           fallback + DB write-back). Replaces the teaser when it lands.
-
-       No extra SerpAPI cost: the paid call + persist happen exactly once
-       (in phase 2). The teaser is a free read that the user sees sooner. */
+    /* Phase 1 (tier=free) — AliExpress only, no SerpAPI, no persist.
+       Spends no credit, returns in ~0.5s, paints the section fast.
+       ALWAYS runs. */
     const teaser = fetch(`/api/live-search?q=${enc}&limit=12&tier=free&trusted=1`)
       .then((r) => r.json())
       .then((data) => {
@@ -114,17 +127,31 @@ export default function CompareContent({
       })
       .catch(() => { /* best-effort; phase 2 below is authoritative */ });
 
-    const full = fetch(`/api/live-search?q=${enc}&limit=12&trusted=1`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!stillCurrent()) return;
-        fullDoneRef.current = true;
-        setLiveResults(Array.isArray(data.items) ? (data.items as Deal[]) : []);
-        setLiveProviders(Array.isArray(data.providers) ? (data.providers as string[]) : []);
-      })
-      /* If the full request fails, KEEP whatever the teaser already
-         painted rather than wiping it — graceful degradation. */
-      .catch(() => { /* keep teaser results if any */ });
+    /* Phase 2 (full) — the PAID pipeline (SerpAPI + DB write-back).
+       Only fire it when our own catalog couldn't already answer: a
+       thin/empty DB result (alts < MIN_DB_ALTERNATIVES) or no DB context
+       at all. When the DB already covers the product we never spend the
+       credit — the free teaser + the DB comparison rows are enough. */
+    let runPaid = true;
+    if (dbAltsPromise) {
+      try { runPaid = (await dbAltsPromise) < MIN_DB_ALTERNATIVES; }
+      catch { runPaid = true; }
+    }
+    if (!stillCurrent()) return; // superseded while awaiting the DB count
+
+    const full = runPaid
+      ? fetch(`/api/live-search?q=${enc}&limit=12&trusted=1`)
+          .then((r) => r.json())
+          .then((data) => {
+            if (!stillCurrent()) return;
+            fullDoneRef.current = true;
+            setLiveResults(Array.isArray(data.items) ? (data.items as Deal[]) : []);
+            setLiveProviders(Array.isArray(data.providers) ? (data.providers as string[]) : []);
+          })
+          /* If the full request fails, KEEP whatever the teaser already
+             painted rather than wiping it — graceful degradation. */
+          .catch(() => { /* keep teaser results if any */ })
+      : Promise.resolve();
 
     await Promise.allSettled([teaser, full]);
     if (stillCurrent()) setLiveLoading(false);
@@ -201,14 +228,15 @@ export default function CompareContent({
     const sniffedAnchor = sniff?.ok ? sniffToAnchor(sniff) : null;
 
     if (sniffedAnchor) {
-      // Live search uses the sniffed title — best signal for SerpAPI.
-      fetchLive(sniffedAnchor.title);
-      try {
-        const dupesFor = async (term: string): Promise<DupeResult[]> => {
-          const res = await fetch(`/api/compare/dupes?q=${encodeURIComponent(term)}&maxPriceNgn=${sniffedAnchor.bestPrice}`);
-          const data = await res.json() as { dupes: DupeResult[] };
-          return data.dupes ?? [];
-        };
+      const dupesFor = async (term: string): Promise<DupeResult[]> => {
+        const res = await fetch(`/api/compare/dupes?q=${encodeURIComponent(term)}&maxPriceNgn=${sniffedAnchor.bestPrice}`);
+        const data = await res.json() as { dupes: DupeResult[] };
+        return data.dupes ?? [];
+      };
+      /* Resolve the catalog alternatives (with the broaden-on-miss
+         retry) as a single promise so the live call can gate its paid
+         lane on the FINAL count. */
+      const dupesPromise = (async () => {
         let dupes = await dupesFor(sniffedAnchor.title);
         /* Broaden on a miss: the exact sniffed title ("Air Jordan 1 Low SE
            Craft Men's Shoes") can be too specific to FTS-match our catalog
@@ -223,6 +251,13 @@ export default function CompareContent({
             dupes = await dupesFor(broad);
           }
         }
+        return dupes;
+      })();
+      /* Live search uses the sniffed title — best signal for SerpAPI.
+         Paid lane only if the catalog can't already compare it. */
+      fetchLive(sniffedAnchor.title, dupesPromise.then((d) => d.length).catch(() => 0));
+      try {
+        const dupes = await dupesPromise;
         setResult({ mode: "similar", query: sniffedAnchor.title, anchor: sniffedAnchor, dupes });
       } catch {
         // Dupes call failed — still show the sniffed anchor on its own
@@ -242,10 +277,11 @@ export default function CompareContent({
        the name but no usable price) → a real title-search is still
        worthwhile, so search on the title (never the raw URL). */
     if (sniffedTitle) {
-      fetchLive(sniffedTitle);
+      const comparePromise = fetch(`/api/compare?q=${encodeURIComponent(sniffedTitle)}&mode=similar`)
+        .then((r) => r.json() as Promise<SearchOutput>);
+      fetchLive(sniffedTitle, comparePromise.then(dbAltCount).catch(() => 0));
       try {
-        const res = await fetch(`/api/compare?q=${encodeURIComponent(sniffedTitle)}&mode=similar`);
-        setResult(await res.json() as SearchOutput);
+        setResult(await comparePromise);
       } catch {
         setResult({ mode: "empty", query: sniffedTitle, suggestions: [] });
       } finally {
@@ -278,20 +314,23 @@ export default function CompareContent({
     setLoading(true);
     setResult(null);
 
-    // Fire both calls in parallel
-    fetchLive(q);
+    /* Build the catalog query up front so the live call can gate its
+       paid lane on the DB result — only spend a SerpAPI credit when the
+       catalog comes back thin. pid is the primary backstop (chip clicks,
+       PDP CTA); oid is the ultimate fallback for when pid + FTS both
+       miss — /api/compare synthesises an anchor from the offer-row
+       directly so the user always sees their product. */
+    const apiParams = new URLSearchParams({ q, mode: "similar" });
+    if (pid) apiParams.set("pid", pid);
+    if (oid) apiParams.set("oid", oid);
+    const comparePromise = fetch(`/api/compare?${apiParams.toString()}`)
+      .then((r) => r.json() as Promise<SearchOutput>);
+
+    // Live search gated on the catalog result (paid lane only when thin).
+    fetchLive(q, comparePromise.then(dbAltCount).catch(() => 0));
 
     try {
-      /* Forward pid + oid to the API. pid is the primary backstop
-         (chip clicks, PDP CTA). oid is the ultimate fallback for
-         when pid + FTS both miss — /api/compare synthesises an
-         anchor from the offer-row directly so the user always
-         sees their product, never "Nothing found" from a PDP. */
-      const apiParams = new URLSearchParams({ q, mode: "similar" });
-      if (pid) apiParams.set("pid", pid);
-      if (oid) apiParams.set("oid", oid);
-      const res = await fetch(`/api/compare?${apiParams.toString()}`);
-      const data = await res.json() as SearchOutput;
+      const data = await comparePromise;
       setResult(data);
       /* Log to search_query_log. resultCount is approximate — we
          use anchor.offers.length + dupes.length when similar mode,
@@ -340,7 +379,10 @@ export default function CompareContent({
     if (hasInitialResultRef.current) {
       hasInitialResultRef.current = false;
       if (!initialKey) {
-        fetchLive(initialQuery);
+        /* The DB comparison is already on screen (SSR-seeded), so gate
+           the paid lane on its alternatives count — a well-covered deep
+           link shouldn't spend a SerpAPI credit on mount. */
+        fetchLive(initialQuery, Promise.resolve(dbAltCount(initialResult ?? null)));
         const count = initialResult?.mode === "similar"
           ? (initialResult.anchor?.offers.length ?? 0) + initialResult.dupes.length
           : initialResult?.mode === "single"
