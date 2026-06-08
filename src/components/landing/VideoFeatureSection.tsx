@@ -102,7 +102,7 @@ export default function VideoFeatureSection({
             {cta && (
               <Link
                 href={cta.href}
-                className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-ink-2 hover:text-ink transition-colors group/cta"
+                className="mt-6 flex w-fit mx-auto md:mx-0 items-center gap-1.5 text-sm font-semibold text-ink-2 hover:text-ink transition-colors group/cta"
               >
                 {cta.label}
                 <ArrowRight size={16} className="transition-transform group-hover/cta:translate-x-0.5" aria-hidden="true" />

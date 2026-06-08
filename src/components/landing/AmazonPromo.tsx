@@ -35,7 +35,7 @@ export default function AmazonPromo({ country }: { country: Country }) {
             {/* Filled pill CTA — the clear, clickable action. The whole
                 card is a link; this button-styled span signals where the
                 click goes. */}
-            <span className="shrink-0 inline-flex items-center justify-center gap-2 rounded-full bg-ink text-bg px-6 py-3 text-sm font-semibold shadow-sm group-hover:opacity-90 group-hover:gap-3 transition-all">
+            <span className="shrink-0 self-center sm:self-auto inline-flex items-center justify-center gap-2 rounded-full bg-ink text-bg px-6 py-3 text-sm font-semibold shadow-sm group-hover:opacity-90 group-hover:gap-3 transition-all">
               Browse Amazon deals
               <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">&rarr;</span>
             </span>
