@@ -15,6 +15,19 @@
  */
 import { track } from "@/lib/analytics";
 
+/* True when `id` is a real DB product/offer identifier worth logging to
+ * /api/click — i.e. NOT a synthetic provider key. Synthetic ids look
+ * like `argos:product_key` (colon-namespaced) or
+ * `serp-…/aliex-…/paapi-…/konga-…` (provider-prefixed live-search rows).
+ * Logging those pollutes popular_products with keys that never resolve
+ * to a stable product, so every product-view-intent surface gates
+ * trackClick on this. Single source of truth — keep the call sites
+ * (MasonryCard, Hero autocomplete, SearchBar autocomplete) in sync via
+ * this one helper instead of re-inlining the regex. */
+export function isTrackableProductId(id: string | null | undefined): id is string {
+  return !!id && !id.includes(":") && !/^(serp|aliex|paapi|konga)-/.test(id);
+}
+
 export function trackClick(
   dealId: string,
   query: string,

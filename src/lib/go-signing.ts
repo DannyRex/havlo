@@ -21,12 +21,24 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-function signingKey(): string {
+/* The real server-only key material, or null when neither secret is
+   configured. verifyGoTarget() keys its fail-closed decision off this. */
+function realSecret(): string | null {
   return (
     process.env.GO_SIGNING_SECRET ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    "havlo-go-unsecret"
+    null
   );
+}
+
+function signingKey(): string {
+  /* Constant fallback ONLY so signGoTarget() doesn't crash in a
+     misconfigured env. It can never authorize an outbound redirect:
+     verifyGoTarget() returns false whenever realSecret() is null, so a
+     signature made with this constant is never honored. The constant is
+     visible in the public repo — treating it as valid key material would
+     be fail-OPEN (forgeable open redirect). This is fail-CLOSED. */
+  return realSecret() || "havlo-go-unsecret-fail-closed";
 }
 
 /* HMAC-SHA256 of the redirect target, hex, truncated to 16 chars
@@ -39,6 +51,11 @@ export function signGoTarget(target: string): string {
 /* Constant-time check that `sig` is a valid signature for `target`. */
 export function verifyGoTarget(target: string, sig: string | null | undefined): boolean {
   if (!sig) return false;
+  /* Fail closed: with no real signing secret configured, never honor a
+     signature. Otherwise the public-repo fallback constant would let
+     anyone forge a sig and turn /api/go into an open redirect. Every
+     outbound link then degrades to its internal Havlo page instead. */
+  if (!realSecret()) return false;
   const expected = signGoTarget(target);
   if (sig.length !== expected.length) return false;
   try {

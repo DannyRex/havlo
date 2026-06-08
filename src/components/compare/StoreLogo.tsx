@@ -21,7 +21,7 @@
    nothing (blank/transparent), or every tier fails, the cell still
    shows a visible store indicator instead of an empty box. */
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { storeLogoInvertClass } from "@/lib/store-logo-invert";
 import { resolveStoreDomain } from "@/lib/store-domains";
 import { displayStoreName } from "@/lib/store-display";
@@ -76,6 +76,22 @@ export default function StoreLogo({
     setTier((t) => (t === "primary" && favicon ? "favicon" : "letter"));
   }
 
+  /* SSR onError race (QA Jun 2026): the <img> server-renders with the
+     primary src and can finish loading — and FAILING (a 404'd
+     /logos/<id>.png) — BEFORE React hydrates and attaches onError. The
+     missed error left the tile stuck broken instead of falling through
+     to the favicon (most visible on /brands, where most slugs have no
+     bundled logo). After mount and after each tier change, re-check the
+     live <img>: if it already errored (complete with zero natural size),
+     step the tier down manually. Terminates at the letter tier (no img
+     rendered), so no loop. */
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth === 0) handleError();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tier, src]);
+
   /* Outer cell uses page-matching bg + visible border so the cell is
      delimited in BOTH light and dark modes. */
   const cellClass =
@@ -114,6 +130,7 @@ export default function StoreLogo({
            PNGs / favicons). Absolutely centered over the letter base. */
         // eslint-disable-next-line @next/next/no-img-element
         <img
+          ref={imgRef}
           src={src}
           alt={altName}
           width={inner}

@@ -118,6 +118,24 @@ async function main() {
     process.exit(1);
   }
   console.log(`✓ Flipped ${candidates.length} offers to in_stock=false.`);
+
+  /* Refresh the cheapest-offer matview (QA Jun 2026 BLOCKER fix).
+     product_best_offers reads from mv_cheapest_offer, which only
+     recomputed on the post-dedup cron — never after THIS TTL sweep.
+     So an offer flipped OOS here stayed the "cheapest in-stock" row in
+     the matview until the next dedup run, surfacing sold-out best-
+     prices on /deals and PDPs (11.1% of best-prices measured stale).
+     Refreshing here recomputes the cheapest STILL-in-stock offer per
+     product (or drops the product when none remain), so the flip takes
+     effect immediately. Non-concurrent refresh briefly AccessExclusive-
+     locks the matview, but this sweep runs Sunday 04:00 UTC (off-peak),
+     matching the lock-timing rationale of the ingest crons. */
+  const { error: refreshErr } = await supa.rpc("refresh_cheapest_offers");
+  if (refreshErr) {
+    console.error("✗ matview refresh failed:", refreshErr.message);
+    process.exit(1);
+  }
+  console.log("✓ Refreshed mv_cheapest_offer (cheapest-offer matview).");
 }
 
 main().catch((err) => {

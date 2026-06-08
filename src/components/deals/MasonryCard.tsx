@@ -32,7 +32,7 @@ import { getCashbackForStore } from "@/lib/cashback";
 import InfoTip from "@/components/ui/InfoTip";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import { track } from "@/lib/analytics";
-import { trackClick } from "@/lib/trackClick";
+import { trackClick, isTrackableProductId } from "@/lib/trackClick";
 import { pdpUrlForDeal } from "@/lib/pdp-url";
 import { landedTotal } from "@/lib/landed-price";
 import type { Deal } from "@/types";
@@ -332,7 +332,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
            (outbound_clicks), the same signal the compare rows feed.
            Skip synthetic live-search ids that don't resolve to a
            catalog product so we don't log unattributable rows. */
-        if (deal.id && !deal.id.includes(":") && !/^(serp|aliex|paapi|konga)-/.test(deal.id)) {
+        if (isTrackableProductId(deal.id)) {
           trackClick(deal.id, "", 0, "card");
         }
       }}

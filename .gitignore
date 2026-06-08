@@ -52,7 +52,11 @@ scripts/data-cache/
 # Re-generate with scripts/generate-price-gap-cards.ts.
 scripts/output/
 
-# Remotion render output (large MP4s; re-render from remotion/src
-# compositions). The composition SOURCE is committed; the rendered
-# videos that ship live in public/videos/ (added deliberately, kept small).
+# Remotion render output (large, regenerable MP4s; re-render any time
+# from the remotion/src compositions). The composition SOURCE is the
+# committed artifact. The rendered videos that ship now live in Supabase
+# Storage (site-media bucket, served via CDN) — NOT in the repo. Both the
+# scratch output dir and the final renders dir stay untracked so 80 MB+
+# of regenerable binaries don't bloat the repo.
 remotion/out/
+remotion/renders/

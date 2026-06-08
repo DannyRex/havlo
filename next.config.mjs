@@ -3,6 +3,10 @@ const nextConfig = {
      ship to prod silently. Cheap insurance. */
   reactStrictMode: true,
 
+  /* Don't advertise the framework/version in the x-powered-by header
+     (minor fingerprinting reduction). QA Jun 2026. */
+  poweredByHeader: false,
+
   /* Strip console.* in production except errors/warns — keeps the prod
      bundle leaner without losing the signal you actually want at 3am. */
   compiler: {
@@ -86,6 +90,19 @@ const nextConfig = {
       {
         source: "/_next/static/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+      /* Baseline security headers on every response (QA Jun 2026).
+         HSTS is already applied at the edge. A full Content-Security-
+         Policy is intentionally NOT set here: the site loads GA,
+         Skimlinks, Supabase, and many third-party image CDNs, so a CSP
+         needs its own tested allowlist pass to avoid breaking them. */
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy",        value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options",        value: "SAMEORIGIN" },
+        ],
       },
     ];
   },
