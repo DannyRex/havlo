@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, Tag, Search, Info, Coins, BookOpen, Menu, X, ShoppingBag } from "lucide-react";
+import { Home, Tag, Tags, Search, Info, Coins, BookOpen, Menu, X, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import Logo from "@/components/ui/Logo";
@@ -42,6 +42,7 @@ function countryHref(href: string, countryCode: string): string {
 const navLinks = [
   { href: "/",         label: "Home",          Icon: Home     },
   { href: "/deals",    label: "Deals",         Icon: Tag      },
+  { href: "/brands",   label: "Shop by brand", Icon: Tags     },
   { href: "/compare",  label: "Find for less", Icon: Search   },
   { href: "/cashback", label: "Cashback",      Icon: Coins    },
   { href: "/amazon",   label: "Save with Amazon", Icon: ShoppingBag },
