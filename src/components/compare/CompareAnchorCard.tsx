@@ -152,6 +152,22 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
               </div>
             )}
 
+            {/* Sniffed-but-no-price (blocked store): the anchor read a title
+                from the pasted URL but the store blocks automated price reads
+                (BackMarket, OnBuy, Currys/Argos and other Akamai/DataDome
+                sites). bestPrice===0 + a synthetic offer (empty offerId) is
+                the signal. Without this line the card just silently omits the
+                price and reads as broken; instead, say so honestly and point
+                at the real value (alternatives below + the store clickthrough). */}
+            {anchor.offers.length > 0 && anchor.bestPrice === 0 && anchor.offers[0]?.offerId === "" && (
+              <p className="mt-2 text-xs text-ink-3 leading-relaxed">
+                Price unavailable from {displayStoreName(anchor.offers[0].storeName)}.{" "}
+                {hasDupes
+                  ? "Compare with the options below."
+                  : "Open it on the store below, or search by name to compare prices."}
+              </p>
+            )}
+
             {hasDupes && dupes[0].savingsPercent > 0 && (
               <p className="mt-2 text-xs text-success font-medium">
                 Alternatives from {formatPriceForUser(cheapestDupeBest, country)}
