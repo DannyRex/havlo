@@ -438,15 +438,17 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
               elsewhere on the page (StoreLogos section) so the
               hero stays compact.
 
-              "across {storeCount} stores" names the scope and right-sizes
-              the "any product" promise: you can search anything, and we
-              compare it across the stores we actually track in this
-              country, not the entire web. The count is the same dynamic
-              storeCount the marquee + trust pill use (never a hardcoded
-              guess), so the number can't drift from what we really cover.
-              When the search lands outside that set, EmptySearchState's
-              paste-a-link recovery is the graceful next step. */}
-          Search any product or paste a link. Havlo finds it cheaper across {formatCount(storeCount)} stores in {countryPhrase(countryCode, countryName)}.
+              The subhead carries the NATURE of the search; the trust pill
+              above carries the COUNT ("scanning prices across N stores"), so
+              we don't repeat the number here (that duplication was the first
+              cut's mistake). "compares its price across the stores we track"
+              resolves the ambiguity a first-time user has (am I searching the
+              whole web, only Havlo, or just deals?): it is a price comparison
+              across the curated set of stores we cover in this country, not a
+              web search and not deals-only. When a search lands outside that
+              set, EmptySearchState's paste-a-link recovery is the graceful
+              next step. */}
+          Search any product or paste a link. Havlo compares its price across the stores we track in {countryPhrase(countryCode, countryName)}, so you buy it cheaper.
         </p>
 
         {/* Composer — mobile-optimised.
