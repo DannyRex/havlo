@@ -162,14 +162,14 @@ export default function CompareAnchorCard({ anchor, dupes, country, query, canCo
                 URL but couldn't read a price (BackMarket, OnBuy, Currys/Argos
                 and other Akamai/DataDome sites block automated price reads).
                 bestPrice===0 + a synthetic offer (empty offerId) is the signal.
-                Keep the framing neutral ("Price unavailable from {store}")
-                rather than calling out the store's scraping defenses, and point
-                at the real value (alternatives below + the store clickthrough). */}
+                When there ARE alternatives, say nothing about the missing
+                price and just point at the comparison; only the
+                no-alternatives branch explains the gap (neutrally, no
+                scraping-defense talk). */}
             {anchor.offers.length > 0 && anchor.bestPrice === 0 && anchor.offers[0]?.offerId === "" && (
               <p className="mt-2 text-xs text-ink-3 leading-relaxed">
                 {canCompare ? (
                   <>
-                    Price unavailable from {displayStoreName(anchor.offers[0].storeName)} right now.
                     Compare the options below to find it cheaper.
                   </>
                 ) : (
