@@ -7,6 +7,19 @@ const nextConfig = {
      (minor fingerprinting reduction). QA Jun 2026. */
   poweredByHeader: false,
 
+  /* ESLint is now wired up (eslint + eslint-config-next + @typescript-
+     eslint) and `npm run lint` is clean — 0 errors, 7 known warnings
+     (exhaustive-deps + one no-img-element, all intentional). We do NOT
+     let lint GATE the production build: ignoreDuringBuilds keeps a future
+     lint slip from breaking a Vercel deploy on a live site. Run
+     `npm run lint` in dev / a dedicated CI step instead. The baseline is
+     already clean, so flip this to false anytime to enforce lint in the
+     build. (QA Jun 2026 — previously `next lint` was a silent no-op
+     because neither eslint nor eslint-config-next was installed.) */
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
   /* Strip console.* in production except errors/warns — keeps the prod
      bundle leaner without losing the signal you actually want at 3am. */
   compiler: {

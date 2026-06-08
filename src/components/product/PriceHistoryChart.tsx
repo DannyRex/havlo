@@ -245,6 +245,21 @@ export default function PriceHistoryChart({
                    these — the empty state should explain that
                    tracking just doesn't apply to this product
                    type instead of implying it's about to start. */
+  /* Date formatters for the tooltip + lowest-tile dates. Declared HERE,
+     above the empty-state early return below, because React hooks must
+     run in the same order on every render (react-hooks/rules-of-hooks):
+     leaving them after the early return made them conditional. They
+     depend on nothing ([] deps), so computing them unconditionally is
+     free. */
+  const dateFmt = useMemo(
+    () => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }),
+    [],
+  );
+  const dateFmtYear = useMemo(
+    () => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }),
+    [],
+  );
+
   if (sliced.length < 1) {
     const isCurated = dataSource === "curated";
     return (
@@ -272,16 +287,6 @@ export default function PriceHistoryChart({
   /* ── Verdict + change indicators ──────────────────────────── */
   const verdict       = computeVerdict(currentNgn, geom.lowestNgn, geom.meanNgn, range.days, sliced.length);
   const weekChange    = computeRecentChange(sliced, 7);
-
-  /* Date format string used for tooltip + lowest tile dates. */
-  const dateFmt = useMemo(
-    () => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }),
-    [],
-  );
-  const dateFmtYear = useMemo(
-    () => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }),
-    [],
-  );
 
   /* Lowest-date callout — shown both in the header pill (verdict
      when applicable) and in the lowest tile. When the live price has
