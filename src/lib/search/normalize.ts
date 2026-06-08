@@ -247,25 +247,80 @@ const BRANDS_BY_LENGTH = ALL_BRANDS.slice().sort((a, b) => b.length - a.length);
    ambiguous match still produces the right answer. */
 const AMBIGUOUS_BRANDS = new Set<string>(["google", "mango"]);
 
+/* Compatibility cues — "Case FOR iPhone", "Compatible WITH Dyson",
+   "FITS Samsung" mark a fits-for accessory reference, not the product's
+   own brand. Ordered longest-phrase-first so "compatible with" matches
+   as a unit before bare "compatible", and "for use with" before bare
+   "for". Bare "for" is last so it only wins when nothing more specific
+   does. */
+const COMPAT_CUE_RE =
+  /\b(for use with|compatible with|compatible for|replacement for|spare for|suitable for|designed for|works with|fit for|to fit|compatible|fits|for)\s+/gi;
+
+/* Common-word brands — tokens that are also ordinary English words and
+   over-match generic titles ("Surface mount diode" → microsoft, "Instant
+   coffee" → instant, "Network switch" → switch, "Honor guard" → honor).
+   Each only counts when the title corroborates it: the parent brand name
+   is present, or a real product line of that brand appears. Extend this
+   map when an audit surfaces another common-word false positive. */
+const CONTEXT_REQUIRED: Record<string, RegExp> = {
+  surface: /\b(microsoft|surface\s+(pro|laptop|go|book|studio|duo|hub|rt|neo))\b/i,
+  instant: /\binstant\s*(pot|vortex|omni|duo|pro|zest|ace|brands)\b/i,
+  switch:  /\b(nintendo|joy[-\s]?con|switch\s+(oled|lite|sports))\b/i,
+  honor:   /\bhonor\s*(\d|magic|pad|band|play|view|x\d|note|pro\b|plus\b|lite\b)/i,
+};
+
+/* Index where the compatibility-governed region begins, or Infinity if
+   the title has none. A cue only opens the region when the token right
+   after it is itself a brand — so "... for MEN adidas" (audience word
+   after the cue) does NOT govern adidas, but "... compatible with
+   SAMSUNG galaxy" (brand right after the cue) governs both samsung and
+   the trailing galaxy. The region runs to end-of-title, so every brand
+   token in the fits-for phrase is suppressed while a brand LEADING the
+   title (before any cue) is kept ("Anker Charger for iPhone" → anker). */
+function compatGovernedStart(norm: string): number {
+  COMPAT_CUE_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = COMPAT_CUE_RE.exec(norm)) !== null) {
+    const afterCue = m.index + m[0].length;
+    const tail = norm.slice(afterCue);
+    for (const b of BRANDS_BY_LENGTH) {
+      if (new RegExp(`^${b.replace(/&/g, "\\&")}\\b`, "i").test(tail)) {
+        return afterCue;
+      }
+    }
+  }
+  return Infinity;
+}
+
 function findBrand(norm: string): string | null {
   let ambiguousFallback: string | null = null;
+  const governedStart = compatGovernedStart(norm);
   for (const b of BRANDS_BY_LENGTH) {
     const re = new RegExp(`\\b${b.replace(/&/g, "\\&")}\\b`, "i");
-    if (re.test(norm)) {
-      const canonical = BRAND_ALIAS[b.toLowerCase()] ?? b.toLowerCase();
-      /* Normalise multi-word brands to a no-space token so the
-         signature key stays a stable single-segment slug — i.e.
-         "fashion nova" → "fashionnova". This keeps the brand|model
-         signature parseable downstream without ambiguity. */
-      const slug = canonical.replace(/\s+/g, "");
-      if (AMBIGUOUS_BRANDS.has(slug)) {
-        /* Hold the ambiguous match; keep iterating to see if a more
-           specific hardware brand also matches. */
-        if (!ambiguousFallback) ambiguousFallback = slug;
-        continue;
-      }
-      return slug;
+    const m = re.exec(norm);
+    if (!m) continue;
+
+    /* Compatibility guard: a brand inside the fits-for region is a
+       compatibility reference, not the product's brand. */
+    if (m.index >= governedStart) continue;
+
+    /* Context-required common-word brands must be corroborated. */
+    const ctx = CONTEXT_REQUIRED[b.toLowerCase()];
+    if (ctx && !ctx.test(norm)) continue;
+
+    const canonical = BRAND_ALIAS[b.toLowerCase()] ?? b.toLowerCase();
+    /* Normalise multi-word brands to a no-space token so the
+       signature key stays a stable single-segment slug — i.e.
+       "fashion nova" → "fashionnova". This keeps the brand|model
+       signature parseable downstream without ambiguity. */
+    const slug = canonical.replace(/\s+/g, "");
+    if (AMBIGUOUS_BRANDS.has(slug)) {
+      /* Hold the ambiguous match; keep iterating to see if a more
+         specific hardware brand also matches. */
+      if (!ambiguousFallback) ambiguousFallback = slug;
+      continue;
     }
+    return slug;
   }
   /* No non-ambiguous match found — fall back to the ambiguous one
      (genuine Google Pixel / Nest titles land here). */
