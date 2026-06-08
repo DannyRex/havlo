@@ -158,24 +158,24 @@ export default function CompareAnchorCard({ anchor, dupes, country, query, canCo
               </div>
             )}
 
-            {/* Sniffed-but-no-price (blocked store): the anchor read a title
-                from the pasted URL but the store blocks automated price reads
-                (BackMarket, OnBuy, Currys/Argos and other Akamai/DataDome
-                sites). bestPrice===0 + a synthetic offer (empty offerId) is
-                the signal. Without this line the card just silently omits the
-                price and reads as broken; instead, say so honestly and point
+            {/* Sniffed-but-no-price: the anchor read a title from the pasted
+                URL but couldn't read a price (BackMarket, OnBuy, Currys/Argos
+                and other Akamai/DataDome sites block automated price reads).
+                bestPrice===0 + a synthetic offer (empty offerId) is the signal.
+                Keep the framing neutral ("Price unavailable from {store}")
+                rather than calling out the store's scraping defenses, and point
                 at the real value (alternatives below + the store clickthrough). */}
             {anchor.offers.length > 0 && anchor.bestPrice === 0 && anchor.offers[0]?.offerId === "" && (
               <p className="mt-2 text-xs text-ink-3 leading-relaxed">
                 {canCompare ? (
                   <>
-                    {displayStoreName(anchor.offers[0].storeName)} blocks us from reading its price, so we
-                    can&apos;t show it here. Compare the options below to find it cheaper.
+                    Price unavailable from {displayStoreName(anchor.offers[0].storeName)} right now.
+                    Compare the options below to find it cheaper.
                   </>
                 ) : (
                   <>
-                    We read the product but couldn&apos;t price it ({displayStoreName(anchor.offers[0].storeName)}{" "}
-                    blocks us) or find it in our stores yet, so there is nothing to compare against. Try a
+                    Price unavailable from {displayStoreName(anchor.offers[0].storeName)}, and we couldn&apos;t
+                    match it in our stores yet, so there is nothing to compare against. Try a
                     broader search by name
                     {anchor.offers[0].url ? (
                       <>

@@ -473,7 +473,7 @@ export default function CompareContent({
                 )}
               </>
             ) : (
-              <p className="text-sm text-amber-300/80">
+              <p className="text-sm text-amber-700 dark:text-amber-300">
                 We couldn&apos;t read this page. Try searching by product name instead.
               </p>
             )}
