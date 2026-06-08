@@ -44,9 +44,15 @@ interface Props {
   dupes:  DupeResult[];
   country: Country;
   query:  string;
+  /** True when there is (or may be) something to compare against: catalog
+      dupes present, OR live results present/loading. Drives the no-price
+      paste message ("compare below" vs an honest "couldn't compare yet"), so
+      a no-price paste never just pushes the user back to the store they came
+      from. */
+  canCompare?: boolean;
 }
 
-export default function CompareAnchorCard({ anchor, dupes, country, query }: Props) {
+export default function CompareAnchorCard({ anchor, dupes, country, query, canCompare = false }: Props) {
   /* Price summary line — cheapest store's price as headline, spread vs
      the most-expensive store ("save up to X across stores"). Sort + show
      the RAW merchant price (#16) so this matches the PDP hero / chart /
@@ -161,22 +167,32 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
                 at the real value (alternatives below + the store clickthrough). */}
             {anchor.offers.length > 0 && anchor.bestPrice === 0 && anchor.offers[0]?.offerId === "" && (
               <p className="mt-2 text-xs text-ink-3 leading-relaxed">
-                Price unavailable from {displayStoreName(anchor.offers[0].storeName)}.{" "}
-                {anchor.offers[0].url ? (
+                {canCompare ? (
                   <>
-                    <a
-                      href={anchor.offers[0].url}
-                      target="_blank"
-                      rel="noopener noreferrer nofollow"
-                      onClick={() => trackClick(anchor.key, query, 0, "anchor-noprice-outbound")}
-                      className="font-medium text-ink underline underline-offset-2 hover:text-brand"
-                    >
-                      Open it on {displayStoreName(anchor.offers[0].storeName)}
-                    </a>
-                    {hasDupes ? ", or compare the options below." : ", or search by name to compare prices."}
+                    {displayStoreName(anchor.offers[0].storeName)} blocks us from reading its price, so we
+                    can&apos;t show it here. Compare the options below to find it cheaper.
                   </>
                 ) : (
-                  hasDupes ? "Compare with the options below." : "Search by name to compare prices."
+                  <>
+                    We read the product but couldn&apos;t price it ({displayStoreName(anchor.offers[0].storeName)}{" "}
+                    blocks us) or find it in our stores yet, so there is nothing to compare against. Try a
+                    broader search by name
+                    {anchor.offers[0].url ? (
+                      <>
+                        {" "}or{" "}
+                        <a
+                          href={anchor.offers[0].url}
+                          target="_blank"
+                          rel="noopener noreferrer nofollow"
+                          onClick={() => trackClick(anchor.key, query, 0, "anchor-noprice-outbound")}
+                          className="underline underline-offset-2 hover:text-ink"
+                        >
+                          reopen the page you pasted
+                        </a>
+                      </>
+                    ) : null}
+                    .
+                  </>
                 )}
               </p>
             )}

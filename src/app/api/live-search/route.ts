@@ -181,8 +181,17 @@ export async function GET(req: NextRequest) {
      classifies into PAID_SEARCH_CATEGORIES, drop the serpapi providers and
      keep only the free trailing lanes (pg-fts catalog) so we never bill
      SerpAPI for a query we can't match well. */
+  /* `trusted=1` is set by the paste/sniff flow (/compare URL paste), where
+     the query is a specific sniffed product title (brand + model), not a
+     vague freetext. That precision lets us safely run the paid lane even for
+     fashion/beauty (the categories the gate normally blocks) so a pasted Nike
+     shoe actually gets compared instead of bouncing the user back to the
+     store. A precise title won't over-pool the way "vanilla" did (the Fenty
+     -> Matalan-dress bug) and the stricter multi-token relevance below keeps
+     it safe. */
+  const trusted = req.nextUrl.searchParams.get("trusted") === "1";
   const cat = inferCategoryFromTitle(q);
-  const allowPaidSearch = cat !== null && PAID_SEARCH_CATEGORIES.has(cat);
+  const allowPaidSearch = trusted || (cat !== null && PAID_SEARCH_CATEGORIES.has(cat));
   const rest2 = allowPaidSearch ? rest : rest.filter((p) => !p.id.includes("serpapi"));
   if (!allowPaidSearch && rest2.length !== rest.length) {
     console.log(`[live-search] paid lane gated off (category=${cat ?? "unclassified"}) for q="${q.slice(0, 60)}"`);
@@ -259,11 +268,21 @@ export async function GET(req: NextRequest) {
     .split(/\s+/)
     .filter((w) => w.length >= 3 && !STOP.has(w));
 
+  /* Trusted (paste) queries run the paid lane even in fashion/beauty, so they
+     get a STRICTER relevance bar to keep garbage out: the result must share a
+     MAJORITY of the query's significant tokens, not just one. A pasted "Fenty
+     Skin Jumbo Butta Drop Vanilla Dream" won't match a "Blue Vanilla" dress
+     (1 shared token), but a real Fenty/Nike listing will. Normal (typed)
+     queries keep the looser >=1-token bar. */
+  const minTokenMatches = trusted
+    ? Math.min(queryTokens.length, Math.max(2, Math.ceil(queryTokens.length * 0.5)))
+    : 1;
   const tokenRelevant = queryTokens.length === 0
     ? deduped  // can't filter without tokens
     : deduped.filter((it) => {
         const title = it.title.toLowerCase();
-        return queryTokens.some((t) => title.includes(t));
+        const hits = queryTokens.reduce((n, t) => (title.includes(t) ? n + 1 : n), 0);
+        return hits >= minTokenMatches;
       });
 
   /* PERSIST SET — every token-relevant live result, country- and

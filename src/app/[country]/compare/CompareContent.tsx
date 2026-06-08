@@ -102,7 +102,7 @@ export default function CompareContent({
 
        No extra SerpAPI cost: the paid call + persist happen exactly once
        (in phase 2). The teaser is a free read that the user sees sooner. */
-    const teaser = fetch(`/api/live-search?q=${enc}&limit=12&tier=free`)
+    const teaser = fetch(`/api/live-search?q=${enc}&limit=12&tier=free&trusted=1`)
       .then((r) => r.json())
       .then((data) => {
         /* Apply the teaser only if it's still the active query AND the
@@ -114,7 +114,7 @@ export default function CompareContent({
       })
       .catch(() => { /* best-effort; phase 2 below is authoritative */ });
 
-    const full = fetch(`/api/live-search?q=${enc}&limit=12`)
+    const full = fetch(`/api/live-search?q=${enc}&limit=12&trusted=1`)
       .then((r) => r.json())
       .then((data) => {
         if (!stillCurrent()) return;
@@ -204,15 +204,26 @@ export default function CompareContent({
       // Live search uses the sniffed title — best signal for SerpAPI.
       fetchLive(sniffedAnchor.title);
       try {
-        const url = `/api/compare/dupes?q=${encodeURIComponent(sniffedAnchor.title)}&maxPriceNgn=${sniffedAnchor.bestPrice}`;
-        const res = await fetch(url);
-        const data = await res.json() as { dupes: DupeResult[] };
-        setResult({
-          mode:   "similar",
-          query:  sniffedAnchor.title,
-          anchor: sniffedAnchor,
-          dupes:  data.dupes ?? [],
-        });
+        const dupesFor = async (term: string): Promise<DupeResult[]> => {
+          const res = await fetch(`/api/compare/dupes?q=${encodeURIComponent(term)}&maxPriceNgn=${sniffedAnchor.bestPrice}`);
+          const data = await res.json() as { dupes: DupeResult[] };
+          return data.dupes ?? [];
+        };
+        let dupes = await dupesFor(sniffedAnchor.title);
+        /* Broaden on a miss: the exact sniffed title ("Air Jordan 1 Low SE
+           Craft Men's Shoes") can be too specific to FTS-match our catalog
+           even when we carry the model ("Air Jordan 1 Low"). Retry once with
+           the first few significant words so a near-match still surfaces
+           instead of leaving the paste with nothing to compare. */
+        if (dupes.length === 0) {
+          const DROP = new Set(["the","and","for","with","mens","men's","womens","women's","unisex","shoes","shoe","sneakers","trainers","size"]);
+          const broad = sniffedAnchor.title.toLowerCase().replace(/[^a-z0-9\s]/g, " ")
+            .split(/\s+/).filter((w) => w && !DROP.has(w)).slice(0, 4).join(" ");
+          if (broad && broad !== sniffedAnchor.title.toLowerCase()) {
+            dupes = await dupesFor(broad);
+          }
+        }
+        setResult({ mode: "similar", query: sniffedAnchor.title, anchor: sniffedAnchor, dupes });
       } catch {
         // Dupes call failed — still show the sniffed anchor on its own
         setResult({
@@ -606,6 +617,7 @@ export default function CompareContent({
             dupes={result.dupes}
             country={country}
             query={query}
+            canCompare={result.dupes.length > 0 || liveResults.length > 0 || liveLoading}
           />
 
           {/* Dupes grid */}
