@@ -49,12 +49,11 @@ const footerSections = [
   {
     title: "Legal",
     links: [
-      /* "Your Privacy Choices" satisfies CCPA + CPRA + parallel state
-         laws (VA / CT / CO / UT) requirement for a clearly-labeled
-         opt-out link in the footer. Labeled to match Global Privacy
-         Control conventions (vs the harsher literal "Do Not Sell My
-         Info" which over-claims since we don't actually sell data). */
-      { label: "Your Privacy Choices", href: "/privacy-choices" },
+      /* Privacy Policy + the CCPA/CPRA "your privacy choices" opt-out
+         combined into one footer link (per design). The opt-out still
+         lives at /privacy-choices and is linked from a dedicated section
+         inside the policy, so the clearly-labeled choice stays reachable
+         without a second footer row. */
       { label: "Privacy Policy",       href: "/privacy-policy"  },
       { label: "Terms of Use",         href: "/terms-of-use"    },
       /* Accessibility statement — required by the EU Accessibility Act

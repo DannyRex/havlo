@@ -97,6 +97,13 @@ const sections = [
     ],
   },
   {
+    title: "Your privacy choices",
+    paragraphs: [
+      "Depending on where you live (for example California, Colorado, Virginia, or Connecticut), you can opt out of any sharing of your personal information for targeted advertising. We do not sell your personal information.",
+      "You can review and manage these choices any time at havlo.io/privacy-choices.",
+    ],
+  },
+  {
     title: "Changes to this policy",
     paragraphs: [
       "We update this policy as the product changes. The last-updated date at the top reflects the most recent change. Material changes (new third parties, new categories of data) will be flagged at the top.",
