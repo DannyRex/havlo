@@ -278,18 +278,42 @@ function extractTitleFromSlug(url: URL): string | null {
 
   // Amazon: /dp/ASIN or /product-name/dp/ASIN — grab the name segment before /dp/
   const dpIdx = segments.indexOf("dp");
-  let slug = "";
-  if (dpIdx > 0) {
-    slug = segments[dpIdx - 1];
-  } else {
-    slug = segments[segments.length - 1] ?? "";
-  }
-  slug = slug.replace(/\.[a-z]{2,4}$/, "");
+  let candidate = dpIdx > 0 ? segments[dpIdx - 1] : "";
 
-  // Bail on opaque product IDs (all-caps/digits, or looks like a hash)
-  if (!slug || /^[A-Z0-9]{6,}$/.test(slug) || slug.length < 8) return null;
+  /* General case: pick the MOST product-name-like path segment, not just
+     the last one. "Last segment" breaks on URL shapes like BackMarket's
+     /en-gb/p/<product-slug>/<uuid>, where the trailing segment is an opaque
+     UUID — de-slugifying it yields a garbage "title" (e.g. "Bc189cd2 Fca4
+     4021 …"). Score each segment by how many hyphen-separated letter-bearing
+     words it carries (a real product slug has the most) and never pick a
+     UUID. */
+  if (!candidate) {
+    const isUuidLike = (s: string) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+    const wordScore = (s: string) => {
+      const stripped = s.replace(/\.[a-z]{2,4}$/, "");
+      if (isUuidLike(stripped)) return -1;
+      return stripped.split("-").filter((w) => /[a-z]/i.test(w)).length;
+    };
+    candidate = segments.reduce(
+      (best, seg) => (wordScore(seg) > wordScore(best) ? seg : best),
+      "",
+    );
+  }
+
+  let slug = candidate.replace(/\.[a-z]{2,4}$/, "");
+
+  // Bail on opaque product IDs (all-caps/digits, UUIDs, or too short)
+  if (
+    !slug ||
+    /^[A-Z0-9]{6,}$/.test(slug) ||
+    /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(slug) ||
+    slug.length < 8
+  )
+    return null;
 
   const cleaned = slug
+    .replace(/~[a-z0-9]+$/i, "")        // OnBuy trailing product id e.g. ~p154088435
     .replace(/-\d{5,}$/, "")           // Jumia trailing deal ID e.g. -356834
     .replace(/-[a-zA-Z0-9]{15,}$/, "") // Jiji listing hash e.g. -7p6S0VhfxMKI9qFxqhP6BVXX
     .replace(/-/g, " ")
