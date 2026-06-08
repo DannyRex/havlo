@@ -22,12 +22,14 @@ jobs:
     env:
       SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      # NGN policy: the API reports the OFFICIAL naira rate, which runs
-      # below the parallel/street rate used for USD goods (likely why 1650
-      # was hardcoded). Leave this UNSET to keep the manually-set NGN row
-      # untouched (the other 5 currencies still refresh live). Set it to
-      # manage NGN live as official x premium, e.g. "1.2" for a ~20% spread.
-      # NGN_PARALLEL_PREMIUM: "1.2"
+      # NGN policy (Jun 2026): NGN now tracks the LIVE market rate daily, the
+      # same as every other currency -- there is no longer a hand-set naira
+      # value to remember to review. Post-float the official/interbank and
+      # parallel/street rates have largely converged, and the old static 1650
+      # seed had drifted ~20% above the live market. Leave NGN_PARALLEL_PREMIUM
+      # UNSET for the pure live market rate (premium 1.0). Set it (e.g. "1.08")
+      # ONLY if you later decide to layer a parallel/street cushion on top.
+      # NGN_PARALLEL_PREMIUM: "1.08"
     steps:
       - name: Checkout repo
         uses: actions/checkout@v5

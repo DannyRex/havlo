@@ -2,21 +2,31 @@ import { createClient } from "@supabase/supabase-js";
 import { writeFileSync } from "node:fs";
 
 /* Daily FX refresh. Populates the fx_rates table (migration 0072) that the
-   SQL RPCs read via fx_rate() and TS reads via src/lib/fx.ts, replacing the
-   hardcoded USD->NGN rate.
+   SQL RPCs read via fx_rate() and that TS reads via
+   src/lib/fx-rates.generated.ts, replacing the old hardcoded USD->NGN rate.
 
-   Source: open.er-api.com -- keyless, free, daily, and crucially carries
-   NGN (the ECB-based feeds like Frankfurter do not, which is fatal since
-   NGN is the canonical currency). Run by .github/workflows/fx-rates.yml.
+   Sources (keyless, free, daily, both carry NGN):
+     primary  = open.er-api.com
+     fallback = fawazahmed0 currency-api (jsdelivr CDN)
+   ECB-based feeds (Frankfurter) are unusable here because they omit NGN, the
+   canonical currency. If the primary source hiccups we transparently fall
+   back to the secondary so a single-source outage can't freeze the rates.
 
-   NGN policy: the naira's OFFICIAL rate (what this API reports) diverges
-   from the PARALLEL/street rate Nigerians actually transact at for USD
-   goods -- which is most likely why someone hardcoded 1650. To avoid
-   silently re-pricing the entire NG catalogue at the official rate, NGN is
-   only updated when NGN_PARALLEL_PREMIUM is set (effective = official x
-   premium); otherwise the seeded/manually-set NGN row is left untouched.
-   The other five currencies have a negligible official/parallel gap, so
-   they always refresh live. */
+   NGN policy (Jun 2026): NGN now tracks the LIVE market rate daily, exactly
+   like every other currency -- it is no longer pinned to a hand-set value
+   that someone has to remember to review. Post-float the naira's official /
+   interbank rate and the parallel/street rate have largely converged, and the
+   old static 1650 seed had drifted ~20% ABOVE the live market (it was set
+   during the early-2024 naira weakness and never updated, so the NG catalogue
+   was silently over-priced). The entire point of this change is that nobody
+   has to touch the rate by hand again. NGN_PARALLEL_PREMIUM stays as an
+   OPTIONAL multiplier (default 1.0 = pure live market, the chosen policy) in
+   case a parallel-rate cushion is ever wanted; it is not required.
+
+   Every rate is sanity-bounded: a value outside a wide per-currency band is
+   treated as a glitched payload (decimal shift, zero, wrong base) and that
+   currency is skipped for the run -- its last good DB row is left intact
+   rather than re-pricing the whole catalogue off a bad number. */
 
 try { (process as any).loadEnvFile?.(".env.local"); } catch {}
 
@@ -27,6 +37,72 @@ const SUPABASE_KEY =
 
 const QUOTES = ["NGN", "GBP", "EUR", "AED", "INR", "ZAR"];
 
+/* Wide per-currency plausibility bands (1 USD = X). Tight enough to catch a
+   glitched feed (decimal shift / 0 / wrong-base response), loose enough never
+   to reject a genuine market move. */
+const SANITY: Record<string, [number, number]> = {
+  NGN: [600, 4000],
+  GBP: [0.4, 1.5],
+  EUR: [0.4, 1.5],
+  AED: [2.5, 5.0],
+  INR: [40, 160],
+  ZAR: [8, 35],
+};
+
+/* Optional parallel-rate cushion for NGN. Default 1.0 = track the pure live
+   market rate (the chosen policy). Set NGN_PARALLEL_PREMIUM to e.g. "1.08" to
+   layer an 8% street-rate spread on top, with zero code changes. */
+const ngnPremium = (() => {
+  const raw = process.env.NGN_PARALLEL_PREMIUM;
+  const n = raw ? Number(raw) : 1.0;
+  return isFinite(n) && n > 0 ? n : 1.0;
+})();
+
+type RateMap = Record<string, number>;
+
+/* Primary: open.er-api.com -> { result, rates: { NGN: 1360.4, GBP: 0.74 } }. */
+async function fetchPrimary(): Promise<RateMap | null> {
+  try {
+    const res = await fetch("https://open.er-api.com/v6/latest/USD");
+    if (!res.ok) { console.warn("primary FX http", res.status); return null; }
+    const data: any = await res.json();
+    if (data?.result !== "success" || !data?.rates) {
+      console.warn("primary FX bad payload:", data?.result ?? "(no result)");
+      return null;
+    }
+    return data.rates as RateMap;
+  } catch (e: any) {
+    console.warn("primary FX error:", e?.message ?? e);
+    return null;
+  }
+}
+
+/* Fallback: fawazahmed0 currency-api via jsdelivr ->
+   { date, usd: { ngn: 1360.1, gbp: 0.74 } } with lowercase keys. */
+async function fetchFallback(): Promise<RateMap | null> {
+  try {
+    const res = await fetch(
+      "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json",
+    );
+    if (!res.ok) { console.warn("fallback FX http", res.status); return null; }
+    const data: any = await res.json();
+    const usd = data?.usd;
+    if (!usd || typeof usd !== "object") {
+      console.warn("fallback FX bad payload");
+      return null;
+    }
+    const out: RateMap = {};
+    for (const q of QUOTES) {
+      const v = Number(usd[q.toLowerCase()]);
+      if (isFinite(v) && v > 0) out[q] = v;
+    }
+    return Object.keys(out).length ? out : null;
+  } catch (e: any) {
+    console.warn("fallback FX error:", e?.message ?? e);
+    return null;
+  }
+}
+
 async function main() {
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     console.error("Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY");
@@ -34,19 +110,17 @@ async function main() {
   }
   const supa = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  const res = await fetch("https://open.er-api.com/v6/latest/USD");
-  if (!res.ok) {
-    console.error("FX fetch failed:", res.status);
+  let rates = await fetchPrimary();
+  let sourceName = "open.er-api.com";
+  if (!rates) {
+    console.warn("primary FX source unavailable -> trying fallback");
+    rates = await fetchFallback();
+    sourceName = "fawazahmed0/currency-api";
+  }
+  if (!rates) {
+    console.error("Both FX sources failed -- leaving fx_rates untouched.");
     process.exit(1);
   }
-  const data: any = await res.json();
-  if (data?.result !== "success" || !data?.rates) {
-    console.error("FX bad payload:", data?.result ?? "(no result)");
-    process.exit(1);
-  }
-
-  const premiumRaw = process.env.NGN_PARALLEL_PREMIUM;
-  const ngnPremium = premiumRaw ? Number(premiumRaw) : null;
 
   const nowIso = new Date().toISOString();
   const rows: {
@@ -58,33 +132,32 @@ async function main() {
   }[] = [];
 
   for (const q of QUOTES) {
-    const official = Number(data.rates[q]);
-    if (!official || !isFinite(official) || official <= 0) {
-      console.warn(`skip ${q}: no usable rate from API`);
+    let v = Number(rates[q]);
+    if (!v || !isFinite(v) || v <= 0) {
+      console.warn(`skip ${q}: no usable rate from ${sourceName}`);
       continue;
     }
-    if (q === "NGN") {
-      if (ngnPremium && isFinite(ngnPremium) && ngnPremium > 0) {
-        rows.push({
-          base: "USD",
-          quote: "NGN",
-          rate: Math.round(official * ngnPremium * 100) / 100,
-          source: `open.er-api.com x${ngnPremium}`,
-          updated_at: nowIso,
-        });
-      } else {
-        console.log(
-          `NGN left untouched (set NGN_PARALLEL_PREMIUM to manage it; ` +
-            `official today = ${official})`,
-        );
-      }
+    let source = sourceName;
+    /* NGN tracks the live market by default (premium 1.0). Only label/scale
+       when an explicit parallel cushion is configured. */
+    if (q === "NGN" && ngnPremium !== 1.0) {
+      v = v * ngnPremium;
+      source = `${sourceName} x${ngnPremium}`;
+    }
+    const band = SANITY[q];
+    if (band && (v < band[0] || v > band[1])) {
+      console.warn(
+        `skip ${q}: ${v} outside sanity band [${band[0]}, ${band[1]}] ` +
+          `-- treating as a bad feed, keeping the last good row`,
+      );
       continue;
     }
     rows.push({
       base: "USD",
       quote: q,
-      rate: Math.round(official * 1e6) / 1e6,
-      source: "open.er-api.com",
+      /* NGN to 2dp (whole-naira display anyway); others to 6dp. */
+      rate: q === "NGN" ? Math.round(v * 100) / 100 : Math.round(v * 1e6) / 1e6,
+      source,
       updated_at: nowIso,
     });
   }
@@ -115,15 +188,14 @@ async function main() {
     process.exit(1);
   }
   console.log(
-    `fx_rates updated (${nowIso}): ` +
+    `fx_rates updated (${nowIso}, ${sourceName}): ` +
       rows.map((r) => `${r.quote}=${r.rate}`).join(", "),
   );
 
   // Mirror the table into the build-time generated file so country.ts's
   // client-safe USD_FX reads the live DISPLAY rates without a DB import.
-  // The workflow commits this file when it changes (rates move slowly, so
-  // it rarely does). USD->NGN follows the table (managed by the NGN policy
-  // above), the rest are live.
+  // The workflow commits this file when it changes. NGN now follows the live
+  // market like the rest, so this updates whenever the naira moves.
   const { data: allRows } = await supa
     .from("fx_rates")
     .select("quote, rate")
