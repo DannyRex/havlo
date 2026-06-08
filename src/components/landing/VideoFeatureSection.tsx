@@ -77,18 +77,24 @@ export default function VideoFeatureSection({
 
   return (
     <section className={surface ? "py-14 sm:py-24 bg-surface border-y border-border" : "py-14 sm:py-24 bg-bg"}>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid items-center gap-8 sm:gap-12 lg:gap-16 md:grid-cols-2">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Asymmetric columns so the video frame is the dominant element
+            (~57% width) on either side. The wider fraction always lands
+            where the video sits, so it stays big as the sections
+            alternate L/R. */}
+        <div className={`grid items-center gap-8 sm:gap-12 lg:gap-16 ${reverse ? "md:grid-cols-[1.3fr_1fr]" : "md:grid-cols-[1fr_1.3fr]"}`}>
           {/* Copy */}
           <div className={reverse ? "md:order-2" : ""}>
             {eyebrow && (
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand mb-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-3 mb-3">
                 {eyebrow}
               </p>
             )}
+            {/* Title stays a single ink colour (no accent tint) to match
+                the other homepage section headings. */}
             <h2 className="text-[26px] sm:text-4xl font-bold text-ink tracking-[-0.025em] leading-[1.1] mb-4">
               {title}
-              {titleAccent ? <> <span className="text-brand">{titleAccent}</span></> : null}
+              {titleAccent ? <> {titleAccent}</> : null}
             </h2>
             <p className="text-[15px] sm:text-base text-ink-2 leading-relaxed max-w-md">
               {body}
@@ -96,7 +102,7 @@ export default function VideoFeatureSection({
             {cta && (
               <Link
                 href={cta.href}
-                className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-ink hover:text-brand transition-colors group/cta"
+                className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-ink-2 hover:text-ink transition-colors group/cta"
               >
                 {cta.label}
                 <ArrowRight size={16} className="transition-transform group-hover/cta:translate-x-0.5" aria-hidden="true" />
