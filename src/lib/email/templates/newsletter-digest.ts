@@ -127,7 +127,7 @@ ${spacer(8)}
 ${unsubFootnote}
 `;
 
-  const html = shellMarketing({ preheader, body });
+  const html = shellMarketing({ preheader, body, bodyHasUnsubscribe: Boolean(unsubscribeUrl) });
 
   /* ── Plain text body ────────────────────────────────────────── */
 
@@ -151,6 +151,7 @@ ${unsubFootnote}
         ? [``, `Unsubscribe in one click: ${unsubscribeUrl}`]
         : []),
     ],
+    bodyHasUnsubscribe: Boolean(unsubscribeUrl),
   });
 
   return { subject, text, html };

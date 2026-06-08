@@ -91,13 +91,20 @@ interface ShellOptions {
   preheader: string;
   /** Main body HTML — composed from the helpers below. */
   body:      string;
+  /** Set when the BODY already renders its own unsubscribe line (the
+      digest's signed one-click link). The shared footer then omits its
+      default "reply remove" line so the email shows ONE unsubscribe
+      mechanism, not two. The one-click link is the automated/reliable
+      path; "reply remove" has no inbound handler, so when the body offers
+      the link we drop the reply line rather than double up. */
+  bodyHasUnsubscribe?: boolean;
 }
 
 /* The standard email-client-safe document shell. DOCTYPE + meta
    tags + dark-mode color-scheme hint + mobile media queries +
    Outlook conditional table fallback. */
 /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
-function shellDocument({ preheader, body, kind: _kind }: ShellOptions & { kind: "marketing" | "personal" }): string {
+function shellDocument({ preheader, body, bodyHasUnsubscribe, kind: _kind }: ShellOptions & { kind: "marketing" | "personal" }): string {
   return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
@@ -204,9 +211,9 @@ ${escapeHtml(preheader)}
             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-top:1px solid ${tokens.border};" class="border-top">
               <tr>
                 <td style="padding:24px 0 8px 0;">
-                  <p class="text-ink-3" style="margin:0 0 6px 0;font-family:${tokens.fontFamily};font-size:13px;line-height:1.55;color:${tokens.ink3};">
+                  ${bodyHasUnsubscribe ? "" : `<p class="text-ink-3" style="margin:0 0 6px 0;font-family:${tokens.fontFamily};font-size:13px;line-height:1.55;color:${tokens.ink3};">
                     You're getting this because you signed up at <a href="${SITE_URL}" class="text-ink-3" style="color:${tokens.ink3};text-decoration:underline;">havlo.io</a>. Reply <strong style="color:${tokens.ink3};">remove</strong> and we'll take you off the list. Same day, no follow-up.
-                  </p>
+                  </p>`}
                   <p class="text-ink-3" style="margin:0;font-family:${tokens.fontFamily};font-size:12px;line-height:1.5;color:${tokens.ink3};">
                     Havlo · havlo.io · Independent price comparison
                   </p>
@@ -457,7 +464,7 @@ export function textLink(opts: { url: string; label: string }): string {
 /* Wraps a body in the standard plain-text footer (signature +
    unsubscribe note) so every plain-text alternative reads the same
    sign-off. */
-export function plainTextShell(opts: { body: string[]; signoff?: string }): string {
+export function plainTextShell(opts: { body: string[]; signoff?: string; bodyHasUnsubscribe?: boolean }): string {
   const sig = opts.signoff ?? "Danny";
   return [
     `Hi,`,
@@ -469,6 +476,8 @@ export function plainTextShell(opts: { body: string[]; signoff?: string }): stri
     ``,
     `--`,
     `You're getting this because you signed up at havlo.io.`,
-    `Reply "remove" to unsubscribe.`,
+    /* Omit the reply-remove line when the body already carries its own
+       one-click unsubscribe link (digest). One mechanism, not two. */
+    ...(opts.bodyHasUnsubscribe ? [] : [`Reply "remove" to unsubscribe.`]),
   ].join("\n");
 }
