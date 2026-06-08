@@ -65,10 +65,10 @@ export default function HubSkeleton({
             ))}
           </div>
         ) : (
-          /* Mirrors the brand index: cols 2/3/4 of short link tiles. */
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+          /* Mirrors the brand index: cols 2/3/4 of brand-link tiles. */
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {Array.from({ length: 16 }).map((_, i) => (
-              <div key={i} className="skeleton h-[50px] rounded-xl" />
+              <div key={i} className="skeleton h-[68px] rounded-xl" />
             ))}
           </div>
         )}

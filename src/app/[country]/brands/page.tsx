@@ -93,14 +93,14 @@ export default async function BrandsIndexPage({
         </header>
 
         {brands.length > 0 ? (
-          <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+          <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {brands.map((b) => (
               <li key={b.slug}>
                 <Link
                   href={`/${country.code}/brand/${b.slug}`}
-                  className="flex items-center justify-between gap-2 px-4 py-3 rounded-xl bg-surface-2 border border-border hover:border-border-strong transition-colors group"
+                  className="flex items-center justify-between gap-3 px-4 py-4 rounded-xl bg-surface-2 border border-border hover:border-border-strong transition-colors group"
                 >
-                  <span className="flex items-center gap-2.5 min-w-0">
+                  <span className="flex items-center gap-3 min-w-0">
                     {/* Brand mark. No bundled /logos asset for most brands,
                         so StoreLogo resolves the brand's favicon from its
                         domain (slug.com) and falls back to a letter badge.
@@ -111,12 +111,12 @@ export default async function BrandsIndexPage({
                       storeName={b.brand}
                       storeLogoUrl={`/logos/${b.slug}.png`}
                       merchantUrl={`https://${b.slug.replace(/[^a-z0-9-]/g, "")}.com`}
-                      size={24}
-                      pad={4}
+                      size={36}
+                      pad={6}
                     />
-                    <span className="text-ink font-medium text-sm truncate">{b.brand}</span>
+                    <span className="text-ink font-medium text-[15px] truncate">{b.brand}</span>
                   </span>
-                  <span className="text-ink-3 text-xs tabular-nums shrink-0">{b.count}</span>
+                  <span className="text-ink-3 text-[13px] tabular-nums shrink-0">{b.count}</span>
                 </Link>
               </li>
             ))}
