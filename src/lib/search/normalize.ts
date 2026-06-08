@@ -176,8 +176,10 @@ const FASHION_BEAUTY_BRANDS: string[] = [
   /* Beauty */
   "fenty beauty", "fenty skin",
   "soap glory", "soap and glory",
-  /* Single-word adds */
-  "dkny", "akkriti", "ecru", "pantaloons", "lume",
+  /* Single-word adds. "ecru" removed Jun 2026: it's a fabric COLOUR
+     ("jeans in ecru", "navy and ecru") far more often than the niche
+     label, so it false-tagged colour mentions as a brand. */
+  "dkny", "akkriti", "pantaloons", "lume",
   "bedoyecta", "clarins", "nivea", "remy",
 
   /* ── Expanded fashion/beauty dictionary (launch QA, Jun 2026).
