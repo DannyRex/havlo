@@ -162,9 +162,22 @@ export default function CompareAnchorCard({ anchor, dupes, country, query }: Pro
             {anchor.offers.length > 0 && anchor.bestPrice === 0 && anchor.offers[0]?.offerId === "" && (
               <p className="mt-2 text-xs text-ink-3 leading-relaxed">
                 Price unavailable from {displayStoreName(anchor.offers[0].storeName)}.{" "}
-                {hasDupes
-                  ? "Compare with the options below."
-                  : "Open it on the store below, or search by name to compare prices."}
+                {anchor.offers[0].url ? (
+                  <>
+                    <a
+                      href={anchor.offers[0].url}
+                      target="_blank"
+                      rel="noopener noreferrer nofollow"
+                      onClick={() => trackClick(anchor.key, query, 0, "anchor-noprice-outbound")}
+                      className="font-medium text-ink underline underline-offset-2 hover:text-brand"
+                    >
+                      Open it on {displayStoreName(anchor.offers[0].storeName)}
+                    </a>
+                    {hasDupes ? ", or compare the options below." : ", or search by name to compare prices."}
+                  </>
+                ) : (
+                  hasDupes ? "Compare with the options below." : "Search by name to compare prices."
+                )}
               </p>
             )}
 

@@ -239,7 +239,23 @@ export const fetchBrandHubOffers = cache(async (
     console.warn(`[hubs] brand "${brandLabel}" (${countryCode}) error:`, error.message);
     return [];
   }
-  return dealsFromRows((data ?? []) as HubRow[]);
+  /* Defensive brand-hub guard. products.brand is derived from the product
+     TITLE at ingest (buildSignature), which over-tags third-party "made for
+     X" accessories (e.g. "Roller Brush for Dyson", "Battery For Apple
+     macbook", "Controller for PS4") and the odd false token. The exact-brand
+     query above is correct; the underlying DATA is over-broad. Until the
+     extractor is tightened + the catalog re-ingested, drop the clearest
+     third-party items at display time so a brand page shows genuine brand
+     products, not accessories made for the brand. High precision: only
+     removes titles that explicitly say "compatible with / replacement / for
+     <brand>", which a first-party product never does, so genuine brand-led
+     titles ("Apple Watch …", "Nike Air Max …") are never touched. */
+  const escaped = brandLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const thirdParty = new RegExp(
+    `\\b(compatible with|replacement|spare part|for use with|fits|for\\s+(the\\s+)?${escaped})\\b`,
+    "i",
+  );
+  return dealsFromRows((data ?? []) as HubRow[]).filter((d) => !thirdParty.test(d.title));
 });
 
 /* ── Amazon offers, every marketplace ─────────────────────────────

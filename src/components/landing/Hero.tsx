@@ -436,19 +436,11 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
               country. The longer "stores you already know"
               variant is now the brand-consistency framing surfaced
               elsewhere on the page (StoreLogos section) so the
-              hero stays compact.
-
-              The subhead carries the NATURE of the search; the trust pill
-              above carries the COUNT ("scanning prices across N stores"), so
-              we don't repeat the number here (that duplication was the first
-              cut's mistake). "compares its price across the stores we track"
-              resolves the ambiguity a first-time user has (am I searching the
-              whole web, only Havlo, or just deals?): it is a price comparison
-              across the curated set of stores we cover in this country, not a
-              web search and not deals-only. When a search lands outside that
-              set, EmptySearchState's paste-a-link recovery is the graceful
-              next step. */}
-          Search any product or paste a link. Havlo compares its price across the stores we track in {countryPhrase(countryCode, countryName)}, so you buy it cheaper.
+              hero stays compact. (Jun 2026: reverted to the original
+              concise line per founder direction; the store-count and
+              "stores we track" framings read as redundant with the trust
+              pill above, "scanning prices across N stores".) */}
+          Paste a link or search any product. Havlo finds it cheaper in {countryPhrase(countryCode, countryName)}.
         </p>
 
         {/* Composer — mobile-optimised.
