@@ -11,6 +11,7 @@ import {
 import { useCountry } from "@/components/providers/CountryProvider";
 import { formatCount } from "@/lib/utils";
 import { logSearchEvent } from "@/lib/search/log-search";
+import { trackClick } from "@/lib/trackClick";
 import ImageSearchButton from "@/components/search/ImageSearchButton";
 import type { ComponentType } from "react";
 
@@ -223,6 +224,9 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
       mode: "text",
       resultCount: Math.max(1, s.storeCount),
     });
+    /* Picked a specific product = intent to view it → popularity/
+       trending count, the same signal the compare rows feed. */
+    trackClick(s.key, query.trim(), 0, "autocomplete");
     const params = new URLSearchParams({
       q:    s.title,
       pid:  s.key,

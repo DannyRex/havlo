@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Search, X, TrendingDown, Link2, ArrowUp } from "lucide-react";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { track, extractDomain } from "@/lib/analytics";
+import { trackClick } from "@/lib/trackClick";
 import { formatCount } from "@/lib/utils";
 
 interface Suggestion { title: string; key: string; storeCount: number }
@@ -248,6 +249,9 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
       });
     }
     onSearch(trimmed, pid);
+    /* Autocomplete pick on a specific product = intent to view it →
+       feeds the same popularity/trending count as the compare rows. */
+    if (pid) trackClick(pid, trimmed, 0, "autocomplete");
   };
 
   const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
