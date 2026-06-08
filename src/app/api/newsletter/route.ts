@@ -18,6 +18,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
+import { unsubscribeLink } from "@/lib/email/unsubscribe-token";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { sendEmail } from "@/lib/email/send";
 import { newsletterWelcome } from "@/lib/email/templates/newsletter-welcome";
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
 
   /* Welcome email — fire-and-forget via waitUntil so the user
      response isn't gated on Resend latency. */
-  const tmpl = newsletterWelcome({ country });
+  const tmpl = newsletterWelcome({ country, unsubscribeUrl: unsubscribeLink(email) });
   waitUntil(
     sendEmail({
       to:      email,

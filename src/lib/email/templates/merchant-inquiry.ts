@@ -37,9 +37,10 @@ ${signature("Danny")}
 ${spacer(8)}
 `;
 
-  const html = shellPersonal({ preheader, body });
+  const html = shellPersonal({ preheader, body, transactional: true });
 
   const text = plainTextShell({
+    transactional: true,
     body: [
       `Thanks for applying to list "${storeName}" on Havlo.`,
       ``,

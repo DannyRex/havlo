@@ -47,11 +47,12 @@ ${signature("Danny")}
 ${spacer(8)}
 `;
 
-  const html = shellPersonal({ preheader, body });
+  const html = shellPersonal({ preheader, body, transactional: true });
 
   /* ── Plain text body ────────────────────────────────────────── */
 
   const text = plainTextShell({
+    transactional: true,
     body: [
       `We're watching for "${query}". When something matching surfaces at a real discount, I'll email you the offers, cheapest first.`,
       ``,

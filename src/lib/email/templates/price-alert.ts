@@ -61,9 +61,10 @@ ${spacer(8)}
 ${paragraph(`<span style="font-size:12px;color:#9ca3af;">No longer want this alert? ${textLink({ url: unsubUrl, label: "Cancel it here" })}.</span>`)}
 `;
 
-  const html = shellPersonal({ preheader, body });
+  const html = shellPersonal({ preheader, body, bodyHasUnsubscribe: true });
 
   const text = plainTextShell({
+    bodyHasUnsubscribe: true,
     body: [
       `We're watching "${productTitle}". When the price drops to ${targetPriceFmt} or below at any store you can buy from, I'll email you with the link.`,
       ``,
@@ -117,9 +118,10 @@ ${spacer(8)}
 ${paragraph(`<span style="font-size:12px;color:#9ca3af;">${textLink({ url: unsubUrl, label: "Stop tracking this product" })}.</span>`)}
 `;
 
-  const html = shellPersonal({ preheader, body });
+  const html = shellPersonal({ preheader, body, bodyHasUnsubscribe: true });
 
   const text = plainTextShell({
+    bodyHasUnsubscribe: true,
     body: [
       `Quick heads-up.`,
       ``,

@@ -77,7 +77,7 @@ ${signature("Danny")}
 ${spacer(8)}
 `;
 
-  const html = shellPersonal({ preheader, body });
+  const html = shellPersonal({ preheader, body, transactional: true });
 
   /* ── Plain text body ────────────────────────────────────────── */
 
@@ -86,6 +86,7 @@ ${spacer(8)}
   ).join("\n\n");
 
   const text = plainTextShell({
+    transactional: true,
     body: [
       `Quick update on "${query}". Here's what's surfaced on Havlo at meaningful discounts, cheapest first:`,
       ``,

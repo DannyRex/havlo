@@ -45,11 +45,12 @@ ${signature("Danny")}
 ${spacer(8)}
 `;
 
-  const html = shellPersonal({ preheader, body });
+  const html = shellPersonal({ preheader, body, transactional: true });
 
   /* ── Plain text body ────────────────────────────────────────── */
 
   const text = plainTextShell({
+    transactional: true,
     body: [
       `You're in. Cashback (real money back on what you'd buy anyway) is still in build. When it's ready, I'll email you here with how it works, which stores qualify, and how withdrawals happen.`,
       ``,
