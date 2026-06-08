@@ -23,6 +23,7 @@ import {
   timeAgo,
 } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
+import StoreLogo from "@/components/compare/StoreLogo";
 import { useCountry } from "@/components/providers/CountryProvider";
 import {
   USD_FX, formatLocal, resolveStoreCountry, isGlobalIntlStore, type Country,
@@ -181,6 +182,12 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
      ("Amazon.de - Amazon.de-Seller" → "Amazon Germany") that escaped
      ingest-time canonicalisation on older DB rows. */
   const displayStore = displayStoreName(deal.storeName);
+  /* Logo file path. eBay (and a few marketplaces) fragment into
+     per-seller store ids (ebay-characteruk) whose per-seller logo files
+     don't exist — collapse those to the marketplace slug so the real
+     /logos/ebay.png renders. StoreLogo still falls through to a favicon
+     then a letter badge for any store without a bundled asset. */
+  const logoStoreId = /^ebay[-_]/i.test(deal.storeId) ? "ebay" : deal.storeId;
 
   /* Amazon search-URL deals (curated catalog rows that link to
      /s?k=... rather than a /dp/ASIN page). The displayed price is
@@ -422,6 +429,16 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
 
       <div className="pt-2 sm:pt-2.5 px-0.5">
         <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-ink-3 mb-0.5 sm:mb-1 leading-none min-w-0">
+          {/* Store logo — small mark before the store name, so a card
+              reads as "from {merchant}" at a glance. Resolves bundled
+              /logos asset → favicon → letter badge (StoreLogo). */}
+          <StoreLogo
+            storeId={deal.storeId}
+            storeName={deal.storeName}
+            storeLogoUrl={`/logos/${logoStoreId}.png`}
+            size={18}
+            pad={3}
+          />
           <span className="font-medium text-ink-2 truncate">{displayStore}</span>
           <span aria-hidden="true" className="shrink-0 hidden sm:inline">·</span>
           {/* Last-verified time. Was `hidden sm:inline` — desktop only —
