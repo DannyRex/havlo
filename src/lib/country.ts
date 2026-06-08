@@ -618,12 +618,19 @@ export const COUNTRY_STORES: Record<string, string[]> = {
   ],
   us: [
     "amazon.com", "amazon-us", "amazon-com", "amazon us", "walmart", "best buy", "bestbuy", "target", "newegg",
-    /* Bare "ebay" is intentionally ambiguous — eBay is a global
-       marketplace. The UK roster has explicit "ebay.co.uk" /
-       "ebay uk" / "ebay-uk" variants that match BEFORE this
-       fallback under first-match-wins iteration. So a UK listing
-       still resolves to UK; everything else lands here. */
-    "ebay", "home depot", "homedepot", "macy", "kohl", "costco", "bjs",
+    /* eBay is a PER-MARKETPLACE store, not a US store: ebay.co.uk
+       prices in GBP (UK-local), ebay.com in USD (US-local), ebay.de
+       in EUR, etc. Bare "ebay" was REMOVED from this roster (Jun 2026
+       eBay-locality fix) because it forced inferStoreCountry to pin
+       every eBay seller — including UK ones SerpAPI returns under a
+       bare "eBay" storeName — to US, which short-circuited the
+       currency-based locality below. Locality now follows currency:
+       the read side (isDealLocalToCountry) falls through to the
+       `currency === country.currency` check, and the ingest write side
+       anchors eBay by currency (EBAY_MARKET_BY_CURRENCY in
+       ingestion.ts). The explicit US-domain variants below still
+       resolve a literally-ebay.com listing to US. */
+    "ebay.com", "ebay-us", "ebay us", "home depot", "homedepot", "macy", "kohl", "costco", "bjs",
     "nordstrom", "sephora", "ulta", "wayfair", "etsy", "lowes", "lowe's",
     "staples", "gap", "old navy", "oldnavy", "nike", "adidas",
     /* v3 additions: GameStop primarily ships US (occasionally

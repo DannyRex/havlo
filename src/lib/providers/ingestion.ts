@@ -67,6 +67,21 @@ interface StoreRow {
   trusted: boolean;
 }
 
+/* eBay's native marketplaces among Havlo's launch countries, keyed by
+   the currency each one prices in. eBay anchors by CURRENCY because
+   SerpAPI returns a bare "eBay" storeName for every market — the seller
+   handle (ebay-characteruk, ebay-focuscamera…) carries no reliable
+   country signal, but the price currency always reveals the
+   marketplace. AE/ZA/NG have no native eBay site, so an eBay offer
+   priced in AED/ZAR/NGN is a cross-border listing and stays unanchored
+   (null) → the read-side currency fallback keeps it cross-border. */
+const EBAY_MARKET_BY_CURRENCY: Record<string, string> = {
+  USD: "US", GBP: "UK", EUR: "DE", INR: "IN",
+};
+function isEbayStore(storeId: string, storeName: string): boolean {
+  return /(^|[-_. ])ebay([-_. ]|$)/i.test(storeId) || /(^|\W)ebay(\W|$)/i.test(storeName);
+}
+
 function dealToStoreRow(d: Deal, sourceQuery: string): StoreRow {
   /* `is_international` retains its original currency-based heuristic
      (USD = international price tag) since downstream filters lean on
@@ -106,7 +121,16 @@ function dealToStoreRow(d: Deal, sourceQuery: string): StoreRow {
      Layer 3 closes that gap for any future ingest. */
   const isIntl = d.currency === "USD";
   let country = inferStoreCountry(d.storeId, d.storeName);
-  if (!country && !isGlobalIntlStore(d.storeId, d.storeName)) {
+  if (isEbayStore(d.storeId, d.storeName)) {
+    /* eBay is a per-marketplace store: locality follows CURRENCY, not
+       the query market. A UK ingest routinely surfaces USD ebay.com
+       sellers that are genuinely cross-border, so the source_query
+       (query-market) fallback below would wrongly anchor them to UK.
+       ebay.co.uk→GBP→UK, ebay.com→USD→US, ebay.de→EUR→DE,
+       ebay.in→INR→IN. Overrides inferStoreCountry so the bare-"eBay"
+       seller rows can no longer be force-pinned to one market. */
+    country = EBAY_MARKET_BY_CURRENCY[d.currency] ?? null;
+  } else if (!country && !isGlobalIntlStore(d.storeId, d.storeName)) {
     /* Country-tag fallback. SKIP for known multi-market stores
        (AliExpress / Shein / Temu / DHgate / etc.) — those legitimately
        appear in queries from MANY countries and shouldn't be anchored
