@@ -11,6 +11,7 @@ import AmazonPromo from "@/components/landing/AmazonPromo";
 import StoreLogos, { getStoreCountForCountry } from "@/components/landing/StoreLogos";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import CTA from "@/components/landing/CTA";
+import HomeVideoShowcase from "@/components/landing/HomeVideoShowcase";
 import RefreshOnInterval from "@/components/ui/RefreshOnInterval";
 import JsonLd from "@/components/seo/JsonLd";
 import DealUnavailableBanner from "@/components/feedback/DealUnavailableBanner";
@@ -249,6 +250,13 @@ export default async function HomePage({ params }: { params: { country: string }
       {trendingBuckets && (
         <TrendingDeals buckets={trendingBuckets} countryCode={country.code} />
       )}
+      {/* "See how it works" — two alternating autoplay-video feature
+          sections (spoken.io pattern) using our own CursorFlow +
+          price-drop demo clips. Placed AFTER TrendingDeals so the tuned
+          LCP (the first trending card image) is untouched; the videos
+          are lazy-loaded (preload=none + IntersectionObserver) so they
+          cost nothing above the fold. */}
+      <HomeVideoShowcase countryCode={country.code} />
       {/* Amazon affiliate promo — placed right after the trending grid so
           it rides the deal-discovery momentum (reads as another way to
           find deals, not an injected ad) while still sitting below the
