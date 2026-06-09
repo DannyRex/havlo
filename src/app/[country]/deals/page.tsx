@@ -75,17 +75,15 @@ async function fetchInitialDeals(
     const proto = h.get("x-forwarded-proto") ?? "https";
     const qs = new URLSearchParams();
     qs.set("country", params.country);
-    /* SSR limit bumped May 2026 re-audit from 24 → 60. Bots, audit
-       tools, and headless renderers see only the SSR-emitted HTML;
-       the client-side IntersectionObserver pagination doesn't fire
-       for them. 60 cards in initial HTML give SEO crawlers a
-       meaningful crawl depth and let any HTML-based audit see the
-       full first-screen + several scrolls' worth of inventory.
-       Wire-size impact: ~30 KB → ~75 KB per /deals HTML response
-       (with the per-item payload trim in /api/deals keeping the
-       per-card cost around 500 bytes). Trade is worth it for
-       discoverability + audit signal. */
-    qs.set("limit",   "60");
+    /* SSR limit history:
+         May 2026: 24 → 60 (SEO crawl depth + audit visibility).
+         Jun 2026: 60 → 40 — /deals is dynamic (no-store, MISS) and
+         currently 378 KB / request, the dominant driver of Vercel
+         Fast Origin Transfer. Going to 40 cards lands ~250 KB per
+         request (~33% cut) while keeping a strong first-paint +
+         multi-scroll crawl-depth signal; real users keep getting
+         infinite scroll. Triggered by the launch egress audit. */
+    qs.set("limit",   "40");
     qs.set("offset",  "0");
     if (params.category) qs.set("category",    params.category);
     if (params.tier)     qs.set("minDiscount", params.tier);
