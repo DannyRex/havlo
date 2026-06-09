@@ -8,6 +8,7 @@ import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ScrollToTopButton from "@/components/ui/ScrollToTopButton";
 import { getCountry, ACTIVE_COUNTRIES } from "@/lib/country";
 import { fetchAllAmazonOffers } from "@/lib/hubs";
+import { getCashbackForStore } from "@/lib/cashback";
 import {
   SITE_URL,
   buildHreflangAlternates,
@@ -118,10 +119,13 @@ export default async function AmazonDealsPage({
             once here (not per card). */}
         <AmazonCashbackBanner country={country} />
 
-        {/* Search ALL of Amazon (not just our tracked markdowns) so cashback
-            isn't restricted to the catalogue below. Routes through
-            /api/amazon-search, which tags the marketplace search URL. */}
-        <AmazonSearchBar countryCode={country.code} />
+        {/* Bring ANY Amazon product to Havlo (paste a link, or search) so
+            cashback isn't restricted to the catalogue below. Pasted links go
+            to the compare/sniff flow; typed queries search Amazon (tagged). */}
+        <AmazonSearchBar
+          countryCode={country.code}
+          cashbackPercent={getCashbackForStore("amazon")?.percent ?? 2}
+        />
 
         {/* Browser — client-side filter (country + category) + sort. */}
         {offers.length > 0 ? (

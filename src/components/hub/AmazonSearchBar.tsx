@@ -1,32 +1,72 @@
-import { Search } from "lucide-react";
-import { getCashbackForStore } from "@/lib/cashback";
+"use client";
 
-/* AmazonSearchBar — search the FULL Amazon catalogue, not just the
-   markdowns Havlo tracks. The native form GETs /api/amazon-search, which
-   builds the right marketplace search URL with our Associates tag and
-   302s to it, so the click qualifies for cashback. Opens in a new tab so
-   Havlo stays put. No client JS needed — works as a plain HTML form. */
-export default function AmazonSearchBar({ countryCode }: { countryCode: string }) {
-  const percent = getCashbackForStore("amazon")?.percent ?? 2;
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Search } from "lucide-react";
+
+/* AmazonSearchBar — bring ANY Amazon product to Havlo so you can shop it
+   through us and earn cashback, even when it's not one of the markdowns
+   we track.
+
+   Two inputs, one box:
+     • Paste an Amazon product link -> hand to the compare/sniff flow
+       (/[country]/compare?q=<url>&mode=similar). It finds the product,
+       surfaces cheaper matches, and its outbound Amazon click goes through
+       /api/go (tagged) so the purchase qualifies for cashback.
+     • Type a product name -> search Amazon's full catalogue (tagged) via
+       /api/amazon-search, opened in a new tab. */
+
+function looksLikeUrl(v: string): boolean {
+  const t = v.trim();
+  return (
+    /^https?:\/\//i.test(t) ||
+    /^www\./i.test(t) ||
+    /\b[a-z0-9-]+\.(com|co\.uk|de|ae|in|co\.za|ng|net|io)\b/i.test(t)
+  );
+}
+
+export default function AmazonSearchBar({
+  countryCode,
+  cashbackPercent,
+}: {
+  countryCode: string;
+  cashbackPercent: number;
+}) {
+  const router = useRouter();
+  const [value, setValue] = useState("");
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const v = value.trim();
+    if (!v) return;
+
+    if (looksLikeUrl(v)) {
+      const url = /^https?:\/\//i.test(v) ? v : `https://${v}`;
+      router.push(
+        `/${countryCode}/compare?q=${encodeURIComponent(url)}&mode=similar`,
+      );
+    } else {
+      window.open(
+        `/api/amazon-search?q=${encodeURIComponent(v)}&country=${encodeURIComponent(countryCode)}`,
+        "_blank",
+        "noopener",
+      );
+    }
+  }
 
   return (
     <section className="mb-8 rounded-2xl border border-border bg-surface-2 p-5 sm:p-6">
       <h2 className="text-[18px] sm:text-xl font-bold text-ink tracking-[-0.02em] leading-tight">
-        Search all of Amazon
+        Shop any Amazon product through Havlo
       </h2>
       <p className="mt-1 text-[13px] sm:text-sm text-ink-2 max-w-xl leading-relaxed">
-        Cashback is not limited to the price drops below. Search Amazon&apos;s
-        full catalogue, and you will earn {percent}% back on whatever you buy
-        too once cashback goes live.
+        Paste an Amazon link and we will find the product for you, surface any
+        cheaper match, and route you through Havlo so you earn {cashbackPercent}%
+        cashback (coming soon). No link? Type a product to search Amazon&apos;s
+        full catalogue.
       </p>
 
-      <form
-        action="/api/amazon-search"
-        method="GET"
-        target="_blank"
-        className="mt-4 flex gap-2"
-      >
-        <input type="hidden" name="country" value={countryCode} />
+      <form onSubmit={onSubmit} className="mt-4 flex gap-2">
         <div className="relative flex-1">
           <Search
             size={18}
@@ -35,14 +75,15 @@ export default function AmazonSearchBar({ countryCode }: { countryCode: string }
             className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-3"
           />
           <input
-            type="search"
-            name="q"
-            required
-            maxLength={150}
-            enterKeyHint="search"
+            type="text"
+            inputMode="url"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            maxLength={2048}
+            enterKeyHint="go"
             autoComplete="off"
-            placeholder="Search Amazon for anything..."
-            aria-label="Search all of Amazon"
+            placeholder="Paste an Amazon link, or search Amazon..."
+            aria-label="Paste an Amazon link or search Amazon"
             className="w-full rounded-full border border-border bg-bg pl-11 pr-4 py-3 text-[15px] text-ink placeholder:text-ink-3 outline-none focus:border-brand transition-colors"
           />
         </div>
@@ -50,9 +91,7 @@ export default function AmazonSearchBar({ countryCode }: { countryCode: string }
           type="submit"
           className="shrink-0 inline-flex items-center justify-center gap-2 rounded-full bg-ink text-bg font-semibold text-sm px-5 sm:px-6 py-3 hover:opacity-90 transition-opacity"
         >
-          <Search size={16} strokeWidth={2.25} aria-hidden="true" className="sm:hidden" />
-          <span className="hidden sm:inline">Search Amazon</span>
-          <span className="sm:hidden sr-only">Search Amazon</span>
+          Find it
         </button>
       </form>
     </section>
