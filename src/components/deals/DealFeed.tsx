@@ -92,6 +92,10 @@ const VALID_ORIGINS = new Set<OriginFilter>(["all", "local", "intl"]);
    immediately; the skeleton only flashes on subsequent client-side
    filter changes. Big wall-clock UX win on poor networks. */
 interface DealFeedProps {
+  /* Stable rotation seed from the SSR page, reused for every load-more so
+     the relevance order stays fixed for the whole scroll session and
+     offsets never re-serve already-seen products (recycling fix). */
+  initialSeed?:         string;
   initialItems?:        Deal[];
   initialTotal?:        number;
   initialHasMore?:      boolean;
@@ -118,6 +122,7 @@ interface DealFeedProps {
 }
 
 export default function DealFeed({
+  initialSeed,
   initialItems,
   initialTotal,
   initialHasMore,
@@ -455,8 +460,11 @@ export default function DealFeed({
     p.set("country", country.code);
     p.set("limit",  String(PAGE_SIZE));
     p.set("offset", String(offset));
+    /* Pin the relevance rotation to the SSR-captured seed so every page
+       of this session shares one order — no recycling across offsets. */
+    if (initialSeed) p.set("seed", initialSeed);
     return p.toString();
-  }, [category, tier, sort, searchDebounced, origin, selectedStores, country.code]);
+  }, [category, tier, sort, searchDebounced, origin, selectedStores, country.code, initialSeed]);
 
   /* Sparse-search live fallback — fired from the main fetch effect
      when a text search returns a thin catalog (< LIVE_SEARCH_THRESHOLD
@@ -657,7 +665,16 @@ export default function DealFeed({
       .then((r) => r.json())
       .then(({ items: more, total: nextTotal, hasMore: hm, originCounts: nextOriginCounts, stores: nextStores, error }) => {
         if (error) return;
-        setItems((prev) => [...prev, ...more]);
+        /* Dedup appended items against what's already shown — belt-and-
+           suspenders so the feed can NEVER visibly recycle even if the pool
+           order ever shifts under us (e.g. a stale edge-cache entry built
+           with a different seed). The stable session seed is the real fix;
+           this guarantees the user never sees a card twice. */
+        setItems((prev) => {
+          const seen = new Set(prev.map((d) => d.id));
+          const fresh = (more as Deal[] | undefined ?? []).filter((d) => !seen.has(d.id));
+          return fresh.length ? [...prev, ...fresh] : prev;
+        });
         setHasMore(hm);
         /* Refresh the metadata from every paginated response too.
            Without this, the user can land on /uk/deals with initial

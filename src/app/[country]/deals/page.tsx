@@ -67,7 +67,7 @@ interface InitialDealsBundle {
   degraded:     boolean;
 }
 async function fetchInitialDeals(
-  params: { country: string; category?: string; tier?: string; sort?: string; search?: string; origin?: string; stores?: string },
+  params: { country: string; category?: string; tier?: string; sort?: string; search?: string; origin?: string; stores?: string; seed?: string },
 ): Promise<InitialDealsBundle | null> {
   try {
     const h = headers();
@@ -91,6 +91,10 @@ async function fetchInitialDeals(
     if (params.search)   qs.set("search",      params.search);
     if (params.origin)   qs.set("origin",      params.origin);
     if (params.stores)   qs.set("stores",      params.stores);
+    /* Stable rotation seed captured once at SSR and reused by DealFeed for
+       every load-more, so the relevance order is fixed for the session and
+       offsets never re-serve already-seen products (recycling fix). */
+    if (params.seed)     qs.set("seed",        params.seed);
     /* 60s SSR fetch cache (May 2026 paint-speed pass).
      *
      * History: was `cache: "no-store"` because the cache-poisoning
@@ -275,6 +279,14 @@ export default async function DealsPage({
      URL has no ?origin=, we fetch the local pool server-side so
      SSR + client first-paint agree. */
   const searchParam = pickFirst("search");
+  /* One rotation seed for this page load, threaded into the SSR fetch AND
+     handed to DealFeed for every load-more. Pinning it for the session is
+     what stops the feed recycling: the old code re-derived a live 60s
+     wall-clock bucket per request, so a scroll crossing a minute boundary
+     got a re-shuffled order and re-served seen products. The minute bucket
+     still varies the order across visits (and keeps the edge cache keyed
+     to a shared value within the minute). */
+  const rotationSeed = String(Math.floor(Date.now() / 60000));
   /* Resolve the feed AND (only for a freeform text search) a possible
      cross-store best-price header in parallel, so the comparison probe
      adds no serial latency to the page. fetchComparisonForSearch is
@@ -290,6 +302,7 @@ export default async function DealsPage({
       search:   searchParam,
       origin:   pickFirst("origin") ?? "local",
       stores:   pickFirst("stores"),
+      seed:     rotationSeed,
     }),
     searchParam ? fetchComparisonForSearch(searchParam, country.code) : Promise.resolve(null),
   ]);
@@ -343,6 +356,7 @@ export default async function DealsPage({
             correct state semantics. */}
         <DealFeed
           key={country.code}
+          initialSeed={rotationSeed}
           initialItems={initial?.items}
           initialTotal={initial?.total}
           initialHasMore={initial?.hasMore}

@@ -570,8 +570,25 @@ export async function GET(req: NextRequest) {
        "cant relevance rotate on every call or more frequently?"
        Tightened to 60s. */
     if (sort === "relevance" && qualifyingByOrigin.length > 12) {
-      const ROTATION_BUCKET_MS = 60 * 1000;            // new shuffle every 60 seconds
-      const bucket = Math.floor(Date.now() / ROTATION_BUCKET_MS);
+      const ROTATION_BUCKET_MS = 60 * 1000;            // wall-clock fallback bucket
+      /* Rotation seed: a STABLE per-session value the client threads
+         through every page request (?seed=) so the relevance order stays
+         FIXED for the whole scroll session and offsets never overlap.
+
+         Recycling bug (Jun 2026): the seed used to be a LIVE wall-clock
+         60s bucket evaluated per request. A scroll session that crossed a
+         minute boundary got a re-shuffled order, so deeper offsets
+         re-served products already shown on earlier pages (the feed
+         "recycled"). The bumped JITTER (320 -> 2600) made it worse, not
+         better -- bigger jitter = more cross-page movement = more repeats.
+         Now DealFeed captures ONE seed at page load and reuses it for
+         every load-more, so a session pages through the pool exactly once.
+         Seed-less callers (direct API hits) fall back to the wall-clock
+         bucket, where rotation-over-time is still the right behaviour. */
+      const seedParam = searchParams.get("seed");
+      const bucket = seedParam && /^\d{1,15}$/.test(seedParam)
+        ? Number(seedParam)
+        : Math.floor(Date.now() / ROTATION_BUCKET_MS);
       /* Per-country seed component so /uk and /ng don't share a
          shuffle (two markets, two separate orderings — preserves
          the perception that each market has its own editorial
