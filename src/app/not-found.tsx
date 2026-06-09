@@ -30,6 +30,16 @@ export const metadata: Metadata = {
   robots: { index: false, follow: true },
 };
 
+/* Render per-request rather than as a static prerender. The shared chrome
+   (Navbar via CountryProvider) resolves the visitor's country from
+   usePathname(); on a STATIC 404 prerender usePathname() is "/" (there is
+   no request URL), so the server picks the default country while the
+   client picks the real one from /uk/scan etc. — tearing hydration
+   (#418 / #425 / #423). A dynamic render gives usePathname() the real path
+   on both sides, so the country agrees and hydration is clean. 404s are
+   rare, so the lost static cache is negligible. (QA Jun 2026.) */
+export const dynamic = "force-dynamic";
+
 /* A short, high-intent slice of the category set — enough to give a
    stuck visitor (and a crawler) an obvious way back in without
    dumping the whole nav. */

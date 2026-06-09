@@ -25,6 +25,7 @@ import { useState, useRef, useEffect } from "react";
 import { storeLogoInvertClass } from "@/lib/store-logo-invert";
 import { resolveStoreDomain } from "@/lib/store-domains";
 import { displayStoreName } from "@/lib/store-display";
+import { BUNDLED_LOGOS } from "@/lib/bundled-logos";
 
 interface Props {
   storeId:      string;
@@ -60,9 +61,18 @@ export default function StoreLogo({
     ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
     : null;
 
+  /* Only use the /logos/<slug>.png primary tier when that file is
+     actually bundled (BUNDLED_LOGOS) — otherwise the <img> fires a
+     guaranteed 404 before falling through to the favicon, which spammed
+     the console + wasted a request per long-tail store. Non-/logos
+     storeLogoUrls (rare) are always honoured. Deterministic, so SSR +
+     client agree (no hydration churn). (QA Jun 2026.) */
+  const logoSlug = /\/logos\/([^/]+)\.png$/.exec(storeLogoUrl || "")?.[1];
+  const primaryUsable = !!storeLogoUrl && (logoSlug ? BUNDLED_LOGOS.has(logoSlug) : true);
+
   type Tier = "primary" | "favicon" | "letter";
   const [tier, setTier] = useState<Tier>(
-    storeLogoUrl ? "primary" : favicon ? "favicon" : "letter",
+    primaryUsable ? "primary" : favicon ? "favicon" : "letter",
   );
 
   const src =
