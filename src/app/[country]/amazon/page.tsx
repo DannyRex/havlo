@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import JsonLd from "@/components/seo/JsonLd";
 import AmazonDealsBrowser from "@/components/hub/AmazonDealsBrowser";
-import AmazonSearchBar from "@/components/hub/AmazonSearchBar";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ScrollToTopButton from "@/components/ui/ScrollToTopButton";
 import { getCountry, ACTIVE_COUNTRIES } from "@/lib/country";
@@ -60,6 +59,7 @@ export default async function AmazonDealsPage({
 }) {
   const country = getCountry(params.country);
   const offers = await fetchAllAmazonOffers();
+  const cashbackPct = getCashbackForStore("amazon")?.percent ?? 2;
 
   const breadcrumb = buildBreadcrumbList([
     { name: "Havlo",      url: `${SITE_URL}/${country.code}` },
@@ -103,24 +103,23 @@ export default async function AmazonDealsPage({
               <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 motion-safe:animate-ping" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
             </span>
-            Amazon deals
+            Cashback · coming soon
           </span>
           <h1 className="text-2xl sm:text-4xl font-bold text-ink tracking-[-0.025em] leading-[1.08] mb-3">
-            Don&apos;t overpay on Amazon
+            Earn {cashbackPct}% back on Amazon
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-base leading-relaxed">
-            Amazon prices bounce around. We show the history, so you can spot a
-            real markdown from a dressed-up one.
+            Shop Amazon the way you already do, just start from Havlo, and
+            we&apos;ll put {cashbackPct}% of every order back in your pocket.
+            It&apos;s almost here.{" "}
+            <Link
+              href={`/${country.code}/cashback`}
+              className="font-semibold text-success hover:underline underline-offset-2"
+            >
+              Join the waitlist
+            </Link>
           </p>
         </header>
-
-        {/* Cashback (coming soon) + paste-a-link, in one block. Paste an
-            Amazon product link and we route to it through our Associates tag
-            (/api/amazon-search) so the purchase qualifies for cashback. */}
-        <AmazonSearchBar
-          countryCode={country.code}
-          cashbackPercent={getCashbackForStore("amazon")?.percent ?? 2}
-        />
 
         {/* Browser — client-side filter (country + category) + sort. */}
         {offers.length > 0 ? (
