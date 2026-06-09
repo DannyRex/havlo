@@ -143,7 +143,7 @@ export default function PriceAlertButton({ productId, productTitle, currentPrice
        above. Previously capped at max-w-sm which stranded the form
        at a child width on desktop and looked inconsistent next to
        the bar. */
-    <div className="w-full mt-2 p-4 rounded-xl border border-border bg-surface-2/60">
+    <div className="w-full mt-2 p-4 rounded-xl bg-surface-2/60">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <BellRing size={16} className="text-ink" />

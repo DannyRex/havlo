@@ -33,7 +33,7 @@ export default function MerchantVerifiedChip({
   if (variant === "pill") {
     return (
       <span
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 border border-border text-[12px] text-ink-2"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 text-[12px] text-ink-2"
         title={VERIFIED_TITLE}
       >
         <BadgeCheck size={12} className="text-success" aria-hidden="true" />

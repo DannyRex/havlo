@@ -55,7 +55,7 @@ export default function PriceResults({
   return (
     <div>
       {/* Product header */}
-      <div className="flex items-start gap-4 sm:gap-5 p-4 sm:p-5 rounded-2xl bg-surface-2 border border-border mb-6">
+      <div className="flex items-start gap-4 sm:gap-5 p-4 sm:p-5 rounded-2xl bg-surface-2 mb-6">
         {imageUrl ? (
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden flex-shrink-0 bg-white">
             {/* Proxied so Amazon / ASOS / AliExpress hotlink-block CDNs

@@ -73,7 +73,7 @@ export default function OtherConfigurations({ configs, country }: Props) {
 
   return (
     <section className="mt-12 sm:mt-16">
-      <details className="group rounded-2xl border border-border bg-surface-2/50">
+      <details className="group rounded-2xl bg-surface-2/50">
         <summary className="flex items-center gap-2.5 px-4 sm:px-5 py-3.5 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
           <Layers size={16} className="shrink-0 text-ink-3" aria-hidden="true" />
           <span className="text-sm font-semibold text-ink">

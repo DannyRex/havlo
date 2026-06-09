@@ -765,7 +765,7 @@ export default function DealFeed({
           Browse deals & new arrivals
         </h1>
         <p className="text-sm sm:text-base text-ink-2 mt-2 max-w-2xl">
-          Fresh drops first, then everything else worth a look.
+          The newest deals up top, then the rest of the catalogue to dig through.
         </p>
         {activeCounts?.deals !== undefined && activeCounts.total > 0 && (
           /* Deal-count summary on its own line — separate paragraph
@@ -900,7 +900,7 @@ export default function DealFeed({
       {invalidCategory && (
         <div
           role="status"
-          className="mb-4 flex items-start gap-2 rounded-xl border border-border bg-surface-2 px-3.5 py-2.5"
+          className="mb-4 flex items-start gap-2 rounded-xl bg-surface-2 px-3.5 py-2.5"
         >
           <span className="text-[11px] sm:text-xs text-ink-2 leading-relaxed flex-1">
             We don&apos;t have a &ldquo;{invalidCategory}&rdquo; category. Showing all deals instead.
@@ -1051,7 +1051,7 @@ export default function DealFeed({
                 value={sort}
                 onChange={(e) => setSort(e.target.value as SortOption)}
                 aria-label="Sort deals"
-                className="appearance-none bg-surface-2 border border-border rounded-full pl-3.5 pr-8 py-1.5 text-[13px] text-ink hover:border-border-strong outline-none cursor-pointer transition-colors"
+                className="appearance-none bg-surface-2 rounded-full pl-3.5 pr-8 py-1.5 text-[13px] text-ink hover:border-border-strong outline-none cursor-pointer transition-colors"
               >
                 {SORTS.map(({ value, label }) => (
                   <option key={value} value={value}>{label}</option>
@@ -1071,7 +1071,7 @@ export default function DealFeed({
           <div
             role="group"
             aria-label="View mode"
-            className="flex items-center gap-0.5 rounded-full bg-surface-2 border border-border p-0.5"
+            className="flex items-center gap-0.5 rounded-full bg-surface-2 p-0.5"
           >
             <button
               type="button"
@@ -1106,7 +1106,7 @@ export default function DealFeed({
               value={sort}
               onChange={(e) => setSort(e.target.value as SortOption)}
               aria-label="Sort deals"
-              className="appearance-none bg-surface-2 border border-border rounded-full pl-3.5 pr-8 py-1.5 text-xs text-ink hover:border-border-strong outline-none cursor-pointer transition-colors"
+              className="appearance-none bg-surface-2 rounded-full pl-3.5 pr-8 py-1.5 text-xs text-ink hover:border-border-strong outline-none cursor-pointer transition-colors"
             >
               {SORTS.map(({ value, label }) => (
                 <option key={value} value={value}>{label}</option>

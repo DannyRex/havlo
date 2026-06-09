@@ -265,7 +265,7 @@ export default function PriceHistoryChart({
     return (
       <section
         ref={containerRef}
-        className="rounded-2xl border border-border bg-surface-2/40 px-5 py-8 text-center"
+        className="rounded-2xl bg-surface-2/40 px-5 py-8 text-center"
         aria-label={isCurated
           ? "Price history. Not tracked for this listing"
           : "Price history. No data yet"
@@ -325,7 +325,7 @@ export default function PriceHistoryChart({
   return (
     <section
       ref={containerRef}
-      className="rounded-2xl border border-border bg-surface-2/40 p-4 sm:p-5"
+      className="rounded-2xl bg-surface-2/40 p-4 sm:p-5"
       aria-label="Price history"
     >
       {/* ── Header: verdict + range toggle ─────────────────── */}

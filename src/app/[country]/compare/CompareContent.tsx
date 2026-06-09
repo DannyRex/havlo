@@ -478,7 +478,7 @@ export default function CompareContent({
       {/* ── Sniff loading ── */}
       {sniffLoading && (
         <div className="mt-8 max-w-lg mx-auto flex items-center gap-3 px-5 py-4 rounded-2xl
-                        border border-border bg-surface-2">
+                         bg-surface-2">
           <span className="w-4 h-4 rounded-full border-2 border-border border-t-brand animate-spin shrink-0" />
           <p className="text-sm text-ink-2">Analysing link…</p>
         </div>

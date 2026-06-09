@@ -159,7 +159,7 @@ export default function ForMerchantsPage() {
               const Icon = step.icon;
               return (
                 <li key={step.title} className="flex gap-4">
-                  <div className="shrink-0 w-9 h-9 rounded-full bg-surface-2 border border-border flex items-center justify-center">
+                  <div className="shrink-0 w-9 h-9 rounded-full bg-surface-2 flex items-center justify-center">
                     <Icon size={16} className="text-ink-2" />
                   </div>
                   <div>

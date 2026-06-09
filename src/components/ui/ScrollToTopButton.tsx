@@ -32,7 +32,7 @@ export default function ScrollToTopButton({ threshold = 600 }: { threshold?: num
       type="button"
       onClick={toTop}
       aria-label="Scroll back to top"
-      className={`fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-surface-2/90 text-ink shadow-lg backdrop-blur transition-all duration-200 hover:border-border-strong hover:bg-surface motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40 ${
+      className={`fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-surface-2/90 text-ink shadow-lg backdrop-blur transition-all duration-200 hover:border-border-strong hover:bg-surface motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40 ${
         visible
           ? "translate-y-0 opacity-100"
           : "pointer-events-none translate-y-2 opacity-0"

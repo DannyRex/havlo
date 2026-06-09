@@ -367,7 +367,7 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
             the search box below the fold. Short form on mobile keeps
             the credibility signal but doesn't eat vertical space. */}
         <div
-          className="inline-flex items-center gap-2 mb-5 sm:mb-8 px-3 py-1.5 rounded-full bg-surface-2 border border-border text-xs sm:text-sm text-ink-2"
+          className="inline-flex items-center gap-2 mb-5 sm:mb-8 px-3 py-1.5 rounded-full bg-surface-2 text-xs sm:text-sm text-ink-2"
         >
           <span className="relative flex h-2 w-2" aria-hidden="true">
             <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 animate-ping" />

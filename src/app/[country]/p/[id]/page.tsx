@@ -1448,7 +1448,7 @@ export default async function ProductPage({ params }: PageProps) {
             {offer.category_slug && fallbackCategoryName ? (
               <Link
                 href={`/${country.code}/deals/${offer.category_slug}`}
-                className="px-3.5 py-2 rounded-full bg-surface-2 border border-border text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
+                className="px-3.5 py-2 rounded-full bg-surface-2 text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
               >
                 More {fallbackCategoryName} deals
               </Link>
@@ -1456,20 +1456,20 @@ export default async function ProductPage({ params }: PageProps) {
             {brandHubSlug ? (
               <Link
                 href={`/${country.code}/brand/${brandHubSlug}`}
-                className="px-3.5 py-2 rounded-full bg-surface-2 border border-border text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
+                className="px-3.5 py-2 rounded-full bg-surface-2 text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
               >
                 All {offer.brand} prices
               </Link>
             ) : null}
             <Link
               href={`/${country.code}/deals`}
-              className="px-3.5 py-2 rounded-full bg-surface-2 border border-border text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
+              className="px-3.5 py-2 rounded-full bg-surface-2 text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
             >
               All {country.name} deals
             </Link>
             <Link
               href={`/${country.code}/brands`}
-              className="px-3.5 py-2 rounded-full bg-surface-2 border border-border text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
+              className="px-3.5 py-2 rounded-full bg-surface-2 text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
             >
               Shop by brand
             </Link>

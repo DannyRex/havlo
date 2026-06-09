@@ -98,7 +98,7 @@ export default async function BrandsIndexPage({
               <li key={b.slug}>
                 <Link
                   href={`/${country.code}/brand/${b.slug}`}
-                  className="flex items-center justify-between gap-3 px-4 py-4 rounded-xl bg-surface-2 border border-border hover:border-border-strong transition-colors group"
+                  className="flex items-center justify-between gap-3 px-4 py-4 rounded-xl bg-surface-2 hover:border-border-strong transition-colors group"
                 >
                   <span className="flex items-center gap-3 min-w-0">
                     {/* Brand mark. No bundled /logos asset for most brands,
@@ -123,7 +123,7 @@ export default async function BrandsIndexPage({
             ))}
           </ul>
         ) : (
-          <div className="rounded-2xl border border-border bg-surface-2 px-6 py-12 text-center">
+          <div className="rounded-2xl bg-surface-2 px-6 py-12 text-center">
             <p className="text-ink-2 text-[15px] leading-relaxed">
               We are still building out brand pages for {country.name}. In
               the meantime, browse the full deal feed.
@@ -150,7 +150,7 @@ export default async function BrandsIndexPage({
                 <Link
                   key={c.slug}
                   href={`/${country.code}/deals/${c.slug}`}
-                  className="px-3.5 py-2 rounded-full bg-surface-2 border border-border text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
+                  className="px-3.5 py-2 rounded-full bg-surface-2 text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
                 >
                   {c.name}
                 </Link>

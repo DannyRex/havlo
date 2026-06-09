@@ -174,7 +174,7 @@ export default async function BrandHubPage({
                 <Link
                   key={c.slug}
                   href={`/${country.code}/deals/${c.slug}`}
-                  className="px-3.5 py-2 rounded-full bg-surface-2 border border-border text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
+                  className="px-3.5 py-2 rounded-full bg-surface-2 text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
                 >
                   {c.name}
                 </Link>
