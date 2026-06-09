@@ -513,6 +513,23 @@ export function isDealLocalToCountry(
   d: { storeId: string; storeName: string; storeCountry?: string | null; currency: string },
   country: Country,
 ): boolean {
+  /* eBay is per-marketplace. SerpAPI labels UK eBay listings generically
+     as "eBay" and normalises their price to USD, so neither the
+     "ebay.co.uk" roster entry nor the GBP currency check matches and they
+     fall through to INTL. A UK-scoped ingest sourced them from ebay.co.uk,
+     so for UK shoppers a bare "eBay" listing is LOCAL; explicit ebay.com /
+     ebay-us stays anchored to the US. Runs before the store_country check
+     so it also overrides a USD->US mis-tag from EBAY_MARKET_BY_CURRENCY.
+     (Jun 2026.) */
+  if (country.code.toLowerCase() === "uk") {
+    const eid = d.storeId.toLowerCase();
+    const enm = d.storeName.toLowerCase();
+    const isEbay = eid === "ebay" || eid.startsWith("ebay-") || enm === "ebay" || enm.startsWith("ebay ") || enm.startsWith("ebay-");
+    if (isEbay) {
+      const isUsEbay = eid.includes("ebay-us") || eid.includes("ebay-com") || enm.includes("ebay.com") || enm.includes("ebay us");
+      return !isUsEbay;
+    }
+  }
   if (d.storeCountry) {
     return d.storeCountry.toLowerCase() === country.code.toLowerCase();
   }

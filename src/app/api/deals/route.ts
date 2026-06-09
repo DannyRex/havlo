@@ -96,6 +96,13 @@ async function fetchPoolCached(params: {
   sort:          SortOption;
   search?:       string;
   country?:      string;
+  /* User's discount tier (10/20/50%). Pushed into the SQL fetch so the
+     pool row-cap lands AFTER the discount filter, not before. With the
+     old broad-pool-then-JS-filter, a sort like "newest" capped the pool
+     to recent (mostly full-price) rows BEFORE the tier filter, so "Best
+     deals" collapsed to 49 of its real 511 under Latest. Omitted / 0
+     keeps the broad default-browse pool and its shared cache key. */
+  minDiscount?:  number;
   /* REAL store_ids (already resolved from URL canonical via
      resolveCanonicalStoreFilter). When set, the underlying RPC
      filters to these stores so even niche stores with only one
@@ -122,9 +129,9 @@ async function fetchPoolCached(params: {
   const provider = await getActiveBrowseProvider();
   const data = await provider.fetchDeals({
     categorySlug: params.categorySlug,
-    /* Intentionally NOT passing the user's minDiscount — see route
-       body for the broad/qualifying split rationale. */
-    minDiscount:  0,
+    /* Tier pushed into SQL so the row-cap lands AFTER the discount
+       filter, keeping qualifying counts stable across sorts. */
+    minDiscount:  params.minDiscount ?? 0,
     sort:         params.sort,
     search:       params.search,
     origin:       "all",
@@ -351,8 +358,15 @@ export async function GET(req: NextRequest) {
        pull origin='all', country-filter, bucket by currency in-
        memory, then apply the user's chosen origin to the items
        returned. Counts and items are now guaranteed consistent. */
-    /* Fetch the BROAD pool — no minDiscount filter passed to the
-       provider. The user's tier choice (20%+, 50%+) is applied
+    /* June 2026: the discount tier is now pushed INTO the pool fetch
+       (fetchPoolCached minDiscount), so the row-cap lands after the
+       filter and qualifying counts stay stable across sorts. The notes
+       below describe the prior broad-pool-then-JS-filter design; the
+       Stores dropdown they reference is now a separate cap-free RPC
+       (countryCorrectDropdownRows), so 0%-discount stores still list at
+       higher tiers without needing an unfiltered pool here:
+
+       (historical) The user's tier choice (20%+, 50%+) is applied
        below in JS so we can keep TWO pools:
 
          broadPool      — un-discount-filtered. Powers the Stores
@@ -416,6 +430,10 @@ export async function GET(req: NextRequest) {
         search,
         country: country.code,
         stores: realStoreIds,
+        /* Push the tier into the fetch so the qualifying count is
+           sort-stable. `|| undefined` for tier=all keeps the broad
+           pool's shared cache key (no cold-bust, no per-default egress). */
+        minDiscount: userMinDiscount || undefined,
       }),
       countryCorrectDropdownRows({
         countryCode: country.code,
@@ -466,6 +484,23 @@ export async function GET(req: NextRequest) {
        → INTL for everyone. Falls back to the currency check when
        the store can't be inferred (rare, niche scrapers). */
     const isLocalToUser = (d: typeof broadCountryFiltered[0]): boolean => {
+      /* eBay is per-marketplace. SerpAPI labels UK eBay listings
+         generically as "eBay" and normalises their price to USD, so
+         neither the "ebay.co.uk" roster entry nor the GBP currency check
+         matches and they fall through to INTL. A UK-scoped ingest sourced
+         them from ebay.co.uk, so for UK shoppers a bare "eBay" listing is
+         LOCAL; explicit ebay.com / ebay-us stays anchored to the US. Runs
+         before store_country so it also overrides a USD->US mis-tag.
+         Kept in sync with isDealLocalToCountry (lib/country.ts). (Jun 2026.) */
+      if (country.code.toLowerCase() === "uk") {
+        const eid = d.storeId.toLowerCase();
+        const enm = d.storeName.toLowerCase();
+        const isEbay = eid === "ebay" || eid.startsWith("ebay-") || enm === "ebay" || enm.startsWith("ebay ") || enm.startsWith("ebay-");
+        if (isEbay) {
+          const isUsEbay = eid.includes("ebay-us") || eid.includes("ebay-com") || enm.includes("ebay.com") || enm.includes("ebay us");
+          return !isUsEbay;
+        }
+      }
       /* Primary signal: DB-tagged store_country (Deal.storeCountry).
          Restored on the RPC return in migration 0038 + threaded
          through rowToDeal. Authoritative because it covers stores
