@@ -110,8 +110,8 @@ export default async function AmazonDealsPage({
             Don&apos;t overpay on Amazon
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-base leading-relaxed">
-            Every Amazon price drop we track comes with its price history, so
-            you can tell if it&apos;s really a deal.
+            Every price drop comes with its history, so you know it&apos;s
+            really a deal.
           </p>
         </header>
 

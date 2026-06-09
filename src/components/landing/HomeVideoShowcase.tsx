@@ -34,7 +34,7 @@ export default function HomeVideoShowcase({ countryCode }: { countryCode: string
         eyebrow="Compare prices"
         title="See what you"
         titleAccent="should actually pay."
-        body="Search a product or paste a link from any store. We check the price across local and overseas shops, so you can see who's cheapest before you buy."
+        body="Search a product or paste any store link. We check local and overseas shops, so you see who's cheapest before you buy."
         srcLight={flow.light}
         srcDark={flow.dark}
         cta={{ label: "Find it cheaper", href: `/${countryCode}/compare` }}
@@ -44,7 +44,7 @@ export default function HomeVideoShowcase({ countryCode }: { countryCode: string
         eyebrow="Price alerts"
         title="Get told the moment it"
         titleAccent="drops."
-        body="Add anything to your watchlist and we'll email you when the price falls. Set it once, then leave the checking to us."
+        body="Add anything to your watchlist; we'll email you the moment it drops. Set it and forget it."
         srcLight={`${VIDEO_BASE}/pricedrop-light.mp4`}
         srcDark={`${VIDEO_BASE}/pricedrop-dark.mp4`}
         cta={{ label: "Browse live deals", href: `/${countryCode}/deals` }}

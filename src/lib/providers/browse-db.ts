@@ -210,6 +210,10 @@ async function searchDealsViaFts(
   const fromDb = merged
     .filter((r) => isUsableMerchantUrl(r.url))
     .filter((r) => !looksCounterfeit(r.title))
+    /* Drop image-less products — a card with no picture reads as broken,
+       and these can't be reliably back-filled (source pages mostly expose
+       a site-icon og:image). ~17 of 16k; returns once an image lands. */
+    .filter((r) => !!r.image_url && r.image_url.trim() !== "")
     .map((r) => rowToDeal(r, popularity));
 
   /* Popularity-aware re-rank. RPC already returned rows in relevance

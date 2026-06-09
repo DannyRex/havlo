@@ -60,10 +60,9 @@ export default function AmazonSearchBar({
         Shop any Amazon product through Havlo
       </h2>
       <p className="mt-1 text-[13px] sm:text-sm text-ink-2 max-w-xl leading-relaxed">
-        Paste an Amazon link and we will find the product for you, surface any
-        cheaper match, and route you through Havlo so you earn {cashbackPercent}%
-        cashback (coming soon). No link? Type a product to search Amazon&apos;s
-        full catalogue.
+        Paste an Amazon link and we&apos;ll find it, flag anything cheaper, and
+        route you through Havlo for {cashbackPercent}% cashback. No link? Search
+        Amazon&apos;s full catalogue.
       </p>
 
       <form onSubmit={onSubmit} className="mt-4 flex gap-2">

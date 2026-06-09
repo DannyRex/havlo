@@ -138,6 +138,11 @@ function dealsFromRows(rows: HubRow[]): Deal[] {
   const out: Deal[] = [];
   for (const r of rows) {
     if (isSyntheticId(r.offer_id)) continue;
+    /* Skip products with no image — a card/PDP with no picture reads as
+       broken, and these can't be reliably back-filled (most source pages
+       expose only a site-icon og:image). Tiny slice of the catalogue
+       (~17 of 16k), reappears automatically once an image is captured. */
+    if (!r.image_url || r.image_url.trim() === "") continue;
     if (seenProduct.has(r.product_id)) continue;
     seenProduct.add(r.product_id);
     out.push(rowToDeal(r));
