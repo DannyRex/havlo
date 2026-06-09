@@ -247,29 +247,8 @@ async function countryCorrectDropdownRows(opts: {
 }): Promise<DropdownStoreRow[]> {
   const { countryCode, category, minDiscount, search, origin } = opts;
   const base = { country: countryCode, category, minDiscount, search };
-
-  /* UK eBay is local (ebay.co.uk) but its DB store_country reads US,
-     because SerpAPI prices ebay.co.uk in USD and the ingest anchors eBay
-     by currency. The country-aware read layer (isLocalToUser /
-     isDealLocalToCountry) already counts eBay as local for UK shoppers;
-     mirror that here so the Local store-filter tab lists eBay too. Only
-     bare "eBay" flips; explicit ebay.com / ebay-us stays cross-border.
-     A DB re-tag can't fix this cleanly: store_country is per-store and the
-     aggregate "ebay" store is sourced from every market's searches at
-     once, so no single country tag is correct. */
-  const isLocalEbay = (r: DropdownStoreRow): boolean => {
-    if (countryCode.toLowerCase() !== "uk") return false;
-    const id = r.store_id.toLowerCase();
-    const nm = r.store_name.toLowerCase();
-    const isEbay = id === "ebay" || id.startsWith("ebay-") || nm === "ebay" || nm.startsWith("ebay ") || nm.startsWith("ebay-");
-    if (!isEbay) return false;
-    const isUsEbay = id.includes("ebay-us") || id.includes("ebay-com") || nm.includes("ebay.com") || nm.includes("ebay us");
-    return !isUsEbay;
-  };
-
   const onlyCrossBorder = (rows: DropdownStoreRow[]) =>
     rows.filter((r) =>
-      !isLocalEbay(r) &&
       isCrossBorderStore(
         { storeId: r.store_id, storeName: r.store_name, currency: "", tags: [] },
         countryCode,
@@ -277,15 +256,7 @@ async function countryCorrectDropdownRows(opts: {
     );
 
   if (origin === "local") {
-    const local = await listCountryStoresWithCounts({ ...base, origin: "local" });
-    if (countryCode.toLowerCase() !== "uk") return local;
-    /* Lift the eBay row (local for UK) out of the country-blind global
-       roster into the local slice — the RPC's local slice misses it
-       because the DB store_country says US. */
-    const global = await listCountryStoresWithCounts({ ...base, origin: "all" });
-    const have = new Set(local.map((r) => r.store_id));
-    const ebayLocal = global.filter((r) => isLocalEbay(r) && !have.has(r.store_id));
-    return [...local, ...ebayLocal];
+    return listCountryStoresWithCounts({ ...base, origin: "local" });
   }
 
   if (origin === "intl") {
@@ -293,16 +264,16 @@ async function countryCorrectDropdownRows(opts: {
     return onlyCrossBorder(await listCountryStoresWithCounts({ ...base, origin: "all" }));
   }
 
-  // origin === "all": local ∪ eBay-local ∪ cross-border, deduped by store_id.
-  // Both RPC slices fire in parallel (the global slice is country-blind, the
-  // local slice is country-scoped + untruncated).
+  // origin === "all": local ∪ cross-border, deduped by store_id. Both RPC
+  // slices fire in parallel (the global slice is country-blind, the local
+  // slice is country-scoped + untruncated).
   const [global, local] = await Promise.all([
     listCountryStoresWithCounts({ ...base, origin: "all" }),
     listCountryStoresWithCounts({ ...base, origin: "local" }),
   ]);
   const seen = new Set<string>();
   const out: DropdownStoreRow[] = [];
-  for (const r of [...local, ...global.filter(isLocalEbay), ...onlyCrossBorder(global)]) {
+  for (const r of [...local, ...onlyCrossBorder(global)]) {
     if (seen.has(r.store_id)) continue;
     seen.add(r.store_id);
     out.push(r);
@@ -513,23 +484,6 @@ export async function GET(req: NextRequest) {
        → INTL for everyone. Falls back to the currency check when
        the store can't be inferred (rare, niche scrapers). */
     const isLocalToUser = (d: typeof broadCountryFiltered[0]): boolean => {
-      /* eBay is per-marketplace. SerpAPI labels UK eBay listings
-         generically as "eBay" and normalises their price to USD, so
-         neither the "ebay.co.uk" roster entry nor the GBP currency check
-         matches and they fall through to INTL. A UK-scoped ingest sourced
-         them from ebay.co.uk, so for UK shoppers a bare "eBay" listing is
-         LOCAL; explicit ebay.com / ebay-us stays anchored to the US. Runs
-         before store_country so it also overrides a USD->US mis-tag.
-         Kept in sync with isDealLocalToCountry (lib/country.ts). (Jun 2026.) */
-      if (country.code.toLowerCase() === "uk") {
-        const eid = d.storeId.toLowerCase();
-        const enm = d.storeName.toLowerCase();
-        const isEbay = eid === "ebay" || eid.startsWith("ebay-") || enm === "ebay" || enm.startsWith("ebay ") || enm.startsWith("ebay-");
-        if (isEbay) {
-          const isUsEbay = eid.includes("ebay-us") || eid.includes("ebay-com") || enm.includes("ebay.com") || enm.includes("ebay us");
-          return !isUsEbay;
-        }
-      }
       /* Primary signal: DB-tagged store_country (Deal.storeCountry).
          Restored on the RPC return in migration 0038 + threaded
          through rowToDeal. Authoritative because it covers stores

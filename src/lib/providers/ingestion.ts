@@ -67,17 +67,26 @@ interface StoreRow {
   trusted: boolean;
 }
 
-/* eBay's native marketplaces among Havlo's launch countries, keyed by
-   the currency each one prices in. eBay anchors by CURRENCY because
-   SerpAPI returns a bare "eBay" storeName for every market — the seller
-   handle (ebay-characteruk, ebay-focuscamera…) carries no reliable
-   country signal, but the price currency always reveals the
-   marketplace. AE/ZA/NG have no native eBay site, so an eBay offer
-   priced in AED/ZAR/NGN is a cross-border listing and stays unanchored
-   (null) → the read-side currency fallback keeps it cross-border. */
-const EBAY_MARKET_BY_CURRENCY: Record<string, string> = {
-  USD: "US", GBP: "UK", EUR: "DE", INR: "IN",
+/* eBay is per-marketplace; anchor it by the listing's actual DOMAIN.
+   Currency can't be used: SerpAPI normalises every eBay price to USD, so
+   ebay.co.uk and ebay.com both arrive as USD (the old currency heuristic
+   wrongly pinned every UK eBay listing to US). ebay.co.uk -> UK,
+   ebay.com -> US, ebay.de -> DE, etc. Links that carry NO eBay domain
+   (Google Shopping redirects, which dominate the eBay feed) default to
+   US: the catalog's eBay inventory is overwhelmingly ebay.com sellers and
+   US is the safe cross-border bucket for every non-US market. */
+const EBAY_TLD_TO_COUNTRY: Record<string, string> = {
+  "co.uk": "UK", "com": "US", "de": "DE", "in": "IN",
+  "com.au": "AU", "ca": "CA", "ie": "IE", "fr": "FR", "it": "IT", "es": "ES",
 };
+function ebayMarketFromUrl(rawUrl: string | null | undefined): string {
+  if (!rawUrl) return "US";
+  let host: string;
+  try { host = new URL(rawUrl).hostname.toLowerCase().replace(/^www\./, ""); }
+  catch { return "US"; }
+  const m = host.match(/(?:^|\.)ebay\.([a-z.]+)$/);
+  return m ? (EBAY_TLD_TO_COUNTRY[m[1]] ?? "US") : "US";
+}
 function isEbayStore(storeId: string, storeName: string): boolean {
   return /(^|[-_. ])ebay([-_. ]|$)/i.test(storeId) || /(^|\W)ebay(\W|$)/i.test(storeName);
 }
@@ -122,14 +131,11 @@ function dealToStoreRow(d: Deal, sourceQuery: string): StoreRow {
   const isIntl = d.currency === "USD";
   let country = inferStoreCountry(d.storeId, d.storeName);
   if (isEbayStore(d.storeId, d.storeName)) {
-    /* eBay is a per-marketplace store: locality follows CURRENCY, not
-       the query market. A UK ingest routinely surfaces USD ebay.com
-       sellers that are genuinely cross-border, so the source_query
-       (query-market) fallback below would wrongly anchor them to UK.
-       ebay.co.uk→GBP→UK, ebay.com→USD→US, ebay.de→EUR→DE,
-       ebay.in→INR→IN. Overrides inferStoreCountry so the bare-"eBay"
-       seller rows can no longer be force-pinned to one market. */
-    country = EBAY_MARKET_BY_CURRENCY[d.currency] ?? null;
+    /* Anchor eBay by the listing's domain (see ebayMarketFromUrl): a
+       .co.uk listing is UK-local, a .com listing is US/cross-border.
+       Replaces the old currency heuristic that pinned everything to US
+       because SerpAPI prices all eBay in USD. */
+    country = ebayMarketFromUrl(d.url);
   } else if (!country && !isGlobalIntlStore(d.storeId, d.storeName)) {
     /* Country-tag fallback. SKIP for known multi-market stores
        (AliExpress / Shein / Temu / DHgate / etc.) — those legitimately

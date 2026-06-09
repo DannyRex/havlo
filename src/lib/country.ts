@@ -513,23 +513,6 @@ export function isDealLocalToCountry(
   d: { storeId: string; storeName: string; storeCountry?: string | null; currency: string },
   country: Country,
 ): boolean {
-  /* eBay is per-marketplace. SerpAPI labels UK eBay listings generically
-     as "eBay" and normalises their price to USD, so neither the
-     "ebay.co.uk" roster entry nor the GBP currency check matches and they
-     fall through to INTL. A UK-scoped ingest sourced them from ebay.co.uk,
-     so for UK shoppers a bare "eBay" listing is LOCAL; explicit ebay.com /
-     ebay-us stays anchored to the US. Runs before the store_country check
-     so it also overrides a USD->US mis-tag from EBAY_MARKET_BY_CURRENCY.
-     (Jun 2026.) */
-  if (country.code.toLowerCase() === "uk") {
-    const eid = d.storeId.toLowerCase();
-    const enm = d.storeName.toLowerCase();
-    const isEbay = eid === "ebay" || eid.startsWith("ebay-") || enm === "ebay" || enm.startsWith("ebay ") || enm.startsWith("ebay-");
-    if (isEbay) {
-      const isUsEbay = eid.includes("ebay-us") || eid.includes("ebay-com") || enm.includes("ebay.com") || enm.includes("ebay us");
-      return !isUsEbay;
-    }
-  }
   if (d.storeCountry) {
     return d.storeCountry.toLowerCase() === country.code.toLowerCase();
   }
@@ -635,18 +618,15 @@ export const COUNTRY_STORES: Record<string, string[]> = {
   ],
   us: [
     "amazon.com", "amazon-us", "amazon-com", "amazon us", "walmart", "best buy", "bestbuy", "target", "newegg",
-    /* eBay is a PER-MARKETPLACE store, not a US store: ebay.co.uk
-       prices in GBP (UK-local), ebay.com in USD (US-local), ebay.de
-       in EUR, etc. Bare "ebay" was REMOVED from this roster (Jun 2026
-       eBay-locality fix) because it forced inferStoreCountry to pin
-       every eBay seller — including UK ones SerpAPI returns under a
-       bare "eBay" storeName — to US, which short-circuited the
-       currency-based locality below. Locality now follows currency:
-       the read side (isDealLocalToCountry) falls through to the
-       `currency === country.currency` check, and the ingest write side
-       anchors eBay by currency (EBAY_MARKET_BY_CURRENCY in
-       ingestion.ts). The explicit US-domain variants below still
-       resolve a literally-ebay.com listing to US. */
+    /* eBay is a PER-MARKETPLACE store, not a US store: ebay.co.uk is
+       UK-local, ebay.com is US/cross-border, ebay.de is DE, etc. Bare
+       "ebay" is kept OUT of this roster so inferStoreCountry doesn't pin
+       every eBay seller to US. Locality is anchored at INGEST by the
+       listing's DOMAIN (ebayMarketFromUrl in ingestion.ts sets
+       store_country), since SerpAPI normalises every eBay price to USD and
+       currency can't tell the marketplaces apart. The explicit ebay.com /
+       ebay-us entries below still resolve a literally-ebay.com listing to
+       US. */
     "ebay.com", "ebay-us", "ebay us", "home depot", "homedepot", "macy", "kohl", "costco", "bjs",
     "nordstrom", "sephora", "ulta", "wayfair", "etsy", "lowes", "lowe's",
     "staples", "gap", "old navy", "oldnavy", "nike", "adidas",
