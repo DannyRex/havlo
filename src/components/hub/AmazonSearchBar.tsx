@@ -1,30 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
+import Link from "next/link";
+import { BadgePercent, ArrowRight } from "lucide-react";
 
-/* AmazonSearchBar — bring ANY Amazon product to Havlo so you can shop it
-   through us and earn cashback, even when it's not one of the markdowns
-   we track.
+/* Cashback + paste-a-link, in one block (merged from the old standalone
+   cashback banner to kill the repetition). Cashback is Phase 1 (waitlist),
+   so the framing is "coming soon".
 
-   Two inputs, one box:
-     • Paste an Amazon product link -> hand to the compare/sniff flow
-       (/[country]/compare?q=<url>&mode=similar). It finds the product,
-       surfaces cheaper matches, and its outbound Amazon click goes through
-       /api/go (tagged) so the purchase qualifies for cashback.
-     • Type a product name -> search Amazon's full catalogue (tagged) via
-       /api/amazon-search, opened in a new tab. */
-
-function looksLikeUrl(v: string): boolean {
-  const t = v.trim();
-  return (
-    /^https?:\/\//i.test(t) ||
-    /^www\./i.test(t) ||
-    /\b[a-z0-9-]+\.(com|co\.uk|de|ae|in|co\.za|ng|net|io)\b/i.test(t)
-  );
-}
-
+   The single action: paste an Amazon product link and we route you to that
+   product on Amazon through our Associates tag (via /api/amazon-search,
+   which validates the host and 302s) so the purchase qualifies for cashback.
+   No keyword search, no Havlo compare detour. */
 export default function AmazonSearchBar({
   countryCode,
   cashbackPercent,
@@ -32,67 +19,93 @@ export default function AmazonSearchBar({
   countryCode: string;
   cashbackPercent: number;
 }) {
-  const router = useRouter();
   const [value, setValue] = useState("");
+  const [error, setError] = useState(false);
+
+  function isAmazonLink(v: string): boolean {
+    const t = v.trim().toLowerCase();
+    return (
+      /(^|\/\/|\.)amazon\.[a-z.]{2,}(\/|$)/.test(t) ||
+      t.includes("amzn.to/") ||
+      t.includes("a.co/")
+    );
+  }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const v = value.trim();
-    if (!v) return;
-
-    if (looksLikeUrl(v)) {
-      const url = /^https?:\/\//i.test(v) ? v : `https://${v}`;
-      router.push(
-        `/${countryCode}/compare?q=${encodeURIComponent(url)}&mode=similar`,
-      );
-    } else {
-      window.open(
-        `/api/amazon-search?q=${encodeURIComponent(v)}&country=${encodeURIComponent(countryCode)}`,
-        "_blank",
-        "noopener",
-      );
+    if (!isAmazonLink(v)) {
+      setError(true);
+      return;
     }
+    setError(false);
+    window.open(
+      `/api/amazon-search?url=${encodeURIComponent(v)}&country=${encodeURIComponent(countryCode)}`,
+      "_blank",
+      "noopener",
+    );
   }
 
   return (
-    <section className="mb-8 rounded-2xl border border-border bg-surface-2 p-5 sm:p-6">
-      <h2 className="text-[18px] sm:text-xl font-bold text-ink tracking-[-0.02em] leading-tight">
-        Shop any Amazon product through Havlo
-      </h2>
-      <p className="mt-1 text-[13px] sm:text-sm text-ink-2 max-w-xl leading-relaxed">
-        Paste an Amazon link and we&apos;ll find it, flag anything cheaper, and
-        route you through Havlo for {cashbackPercent}% cashback. No link? Search
-        Amazon&apos;s full catalogue.
-      </p>
+    <section className="mb-8 rounded-2xl border border-success/30 bg-success/5 p-5 sm:p-6">
+      <div className="flex items-start gap-4 sm:gap-5">
+        <span className="shrink-0 grid place-items-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-success/15 text-success">
+          <BadgePercent size={26} strokeWidth={2} aria-hidden="true" />
+        </span>
 
-      <form onSubmit={onSubmit} className="mt-4 flex gap-2">
-        <div className="relative flex-1">
-          <Search
-            size={18}
-            strokeWidth={2}
-            aria-hidden="true"
-            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-3"
-          />
-          <input
-            type="text"
-            inputMode="url"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            maxLength={2048}
-            enterKeyHint="go"
-            autoComplete="off"
-            placeholder="Paste an Amazon link, or search Amazon..."
-            aria-label="Paste an Amazon link or search Amazon"
-            className="w-full rounded-full border border-border bg-bg pl-11 pr-4 py-3 text-[15px] text-ink placeholder:text-ink-3 outline-none focus:border-brand transition-colors"
-          />
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-success mb-1">
+            Cashback &middot; coming soon
+          </p>
+          <h2 className="text-[18px] sm:text-xl font-bold text-ink tracking-[-0.02em] leading-tight">
+            Earn <span className="text-success">{cashbackPercent}% back</span> on
+            anything you buy on Amazon
+          </h2>
+          <p className="mt-1 text-[13px] sm:text-sm text-ink-2 max-w-xl leading-relaxed">
+            Paste any Amazon product link to shop it through Havlo. Join the
+            waitlist and we&apos;ll email you the moment it goes live.
+          </p>
+
+          <form onSubmit={onSubmit} className="mt-4 flex gap-2">
+            <input
+              type="url"
+              inputMode="url"
+              value={value}
+              onChange={(e) => {
+                setValue(e.target.value);
+                if (error) setError(false);
+              }}
+              maxLength={2048}
+              enterKeyHint="go"
+              autoComplete="off"
+              placeholder="Paste an Amazon product link..."
+              aria-label="Paste an Amazon product link"
+              aria-invalid={error}
+              className="flex-1 min-w-0 rounded-full border border-border bg-bg px-4 py-3 text-[15px] text-ink placeholder:text-ink-3 outline-none focus:border-success transition-colors"
+            />
+            <button
+              type="submit"
+              className="shrink-0 inline-flex items-center justify-center rounded-full bg-success text-white font-semibold text-sm px-5 sm:px-6 py-3 hover:opacity-90 transition-opacity"
+            >
+              Shop it
+            </button>
+          </form>
+          {error && (
+            <p className="mt-1.5 text-[12px] text-error">
+              That doesn&apos;t look like an Amazon link. Paste a full product
+              URL, e.g. amazon.com/...
+            </p>
+          )}
+
+          <Link
+            href={`/${countryCode}/cashback`}
+            className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-success hover:gap-2.5 transition-all"
+          >
+            Join the waitlist
+            <ArrowRight size={15} aria-hidden="true" />
+          </Link>
         </div>
-        <button
-          type="submit"
-          className="shrink-0 inline-flex items-center justify-center gap-2 rounded-full bg-ink text-bg font-semibold text-sm px-5 sm:px-6 py-3 hover:opacity-90 transition-opacity"
-        >
-          Find it
-        </button>
-      </form>
+      </div>
     </section>
   );
 }

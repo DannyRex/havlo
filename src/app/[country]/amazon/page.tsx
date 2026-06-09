@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import JsonLd from "@/components/seo/JsonLd";
 import AmazonDealsBrowser from "@/components/hub/AmazonDealsBrowser";
-import AmazonCashbackBanner from "@/components/hub/AmazonCashbackBanner";
 import AmazonSearchBar from "@/components/hub/AmazonSearchBar";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ScrollToTopButton from "@/components/ui/ScrollToTopButton";
@@ -115,13 +114,9 @@ export default async function AmazonDealsPage({
           </p>
         </header>
 
-        {/* 2% cashback applies to every Amazon order, so it's advertised
-            once here (not per card). */}
-        <AmazonCashbackBanner country={country} />
-
-        {/* Bring ANY Amazon product to Havlo (paste a link, or search) so
-            cashback isn't restricted to the catalogue below. Pasted links go
-            to the compare/sniff flow; typed queries search Amazon (tagged). */}
+        {/* Cashback (coming soon) + paste-a-link, in one block. Paste an
+            Amazon product link and we route to it through our Associates tag
+            (/api/amazon-search) so the purchase qualifies for cashback. */}
         <AmazonSearchBar
           countryCode={country.code}
           cashbackPercent={getCashbackForStore("amazon")?.percent ?? 2}
