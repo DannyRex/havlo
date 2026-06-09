@@ -413,7 +413,7 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
       <div className="flex flex-col">
         {/* Eyebrow: store badge + cross-border tag */}
         <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 text-[12px] text-ink-2">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border bg-surface-2 text-[12px] text-ink-2">
             <StoreIcon size={12} aria-hidden="true" />
             <span className="font-medium text-ink">{displayStore}</span>
           </div>
@@ -430,13 +430,13 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
                keeping all three pills visually identical reads as a
                consistent metadata row, not "one of these is a problem."
                May 29 2026 trust-signal refinement. */
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 text-[12px] text-ink-2">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border bg-surface-2 text-[12px] text-ink-2">
               <Globe size={12} className="text-amber-600 dark:text-amber-400" aria-hidden="true" />
               <span>International</span>
             </div>
           )}
           {offer.brand && (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 text-[12px] text-ink-2">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border bg-surface-2 text-[12px] text-ink-2">
               <Tag size={12} aria-hidden="true" />
               {/* brandDisplay handles the casing — DB stores brand
                   lowercase ("apple"), display wants "Apple" / "LG" /

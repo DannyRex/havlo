@@ -33,7 +33,7 @@ export default function HubProductGrid({
 }: HubProductGridProps) {
   if (deals.length === 0) {
     return (
-      <div className="rounded-2xl bg-surface-2 px-6 py-12 text-center">
+      <div className="rounded-2xl border border-border bg-surface-2 px-6 py-12 text-center">
         <p className="text-ink-2 text-[15px] leading-relaxed">
           No products to show here right now. Prices and stock refresh
           throughout the day, so check back soon.

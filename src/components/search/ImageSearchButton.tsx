@@ -120,7 +120,7 @@ export default function ImageSearchButton({ countryCode, variant = "hero", class
           type="button"
           onClick={openPicker}
           disabled={uploading}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface-2 text-sm font-medium text-ink-2 hover:border-border-strong hover:text-ink transition-colors disabled:opacity-70"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border bg-surface-2 text-sm font-medium text-ink-2 hover:border-border-strong hover:text-ink transition-colors disabled:opacity-70"
         >
           {uploading ? (
             <Loader2 size={16} className="animate-spin" aria-hidden="true" />

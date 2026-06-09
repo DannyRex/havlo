@@ -183,7 +183,7 @@ export default function EmptySearchState({ query, source, browseHref, suggestion
               <Link
                 key={s.key}
                 href={`/${country.code}/compare?q=${encodeURIComponent(s.title)}`}
-                className="px-3 py-1.5 rounded-full bg-surface-2 hover:bg-border text-[13px] text-ink hover:text-ink transition-colors"
+                className="px-3 py-1.5 rounded-full border border-border bg-surface-2 hover:bg-border text-[13px] text-ink hover:text-ink transition-colors"
               >
                 {s.title.length > 50 ? `${s.title.slice(0, 47)}…` : s.title}
               </Link>

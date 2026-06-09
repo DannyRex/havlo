@@ -44,7 +44,7 @@ export default function NotFound() {
     <section className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 text-center">
       {/* Eyebrow — small, calm status pill rather than a giant "404"
           that would shout louder than the actual message. */}
-      <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-2 text-ink-3 text-xs font-semibold uppercase tracking-[0.12em]">
+      <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-surface-2 text-ink-3 text-xs font-semibold uppercase tracking-[0.12em]">
         <span
           aria-hidden
           className="w-1.5 h-1.5 rounded-full"
@@ -86,7 +86,7 @@ export default function NotFound() {
             <Link
               key={c.slug}
               href={`/deals/${c.slug}`}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-surface-2 text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-border bg-surface-2 text-ink-2 text-sm hover:border-border-strong hover:text-ink transition-colors"
             >
               {c.name}
               <ArrowRight size={14} className="opacity-60" />

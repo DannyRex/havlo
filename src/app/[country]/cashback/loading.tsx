@@ -102,7 +102,7 @@ export default function CashbackLoading() {
         </section>
 
         {/* ── Email capture card ──────────────────────────────── */}
-        <section className="mb-12 p-6 sm:p-8 rounded-2xl bg-surface-2">
+        <section className="mb-12 p-6 sm:p-8 rounded-2xl border border-border bg-surface-2">
           {/* H2 */}
           <div className="skeleton h-7 sm:h-8 w-2/3 max-w-md rounded-lg mb-2" />
           {/* Supporting copy — 2 lines */}

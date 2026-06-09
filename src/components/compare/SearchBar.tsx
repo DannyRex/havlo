@@ -458,7 +458,7 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
                  entries which are hand-curated and match popular
                  catalog products by construction. */
               onClick={() => { setValue(c.title); submit(c.title, c.key); }}
-              className="px-3 py-1.5 rounded-full text-xs text-ink-2 hover:text-ink bg-surface-2 hover:bg-surface hover:border-border-strong transition-colors animate-fade-in"
+              className="px-3 py-1.5 rounded-full text-xs text-ink-2 hover:text-ink border border-border bg-surface-2 hover:bg-surface hover:border-border-strong transition-colors animate-fade-in"
             >
               {c.title}
             </button>

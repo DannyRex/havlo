@@ -207,7 +207,7 @@ export default function AboutPage() {
             {COVERAGE.map((c) => (
               <div
                 key={c.name}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-2"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-surface-2"
               >
                 <CountryFlag code={c.code} size={18} />
                 <span className="text-ink-2">{c.name}</span>

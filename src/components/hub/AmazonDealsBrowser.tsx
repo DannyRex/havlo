@@ -310,7 +310,7 @@ function FilterSelect<T extends string>({
         aria-label={ariaLabel}
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
-        className="appearance-none rounded-full bg-surface-2 text-ink-2 hover:text-ink text-xs font-medium pl-7 pr-7 py-1.5 outline-none focus:border-brand cursor-pointer transition-colors"
+        className="appearance-none rounded-full border border-border bg-surface-2 text-ink-2 hover:text-ink text-xs font-medium pl-7 pr-7 py-1.5 outline-none focus:border-brand cursor-pointer transition-colors"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

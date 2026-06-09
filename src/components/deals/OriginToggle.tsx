@@ -24,7 +24,7 @@ export default function OriginToggle({ active, onChange, counts }: Props) {
     <div
       role="tablist"
       aria-label="Deal origin"
-      className="flex items-stretch w-full rounded-full bg-surface-2 p-0.5"
+      className="flex items-stretch w-full rounded-full border border-border bg-surface-2 p-0.5"
     >
       {OPTIONS.map(({ value, label, short, icon: Icon }) => {
         const isActive = active === value;

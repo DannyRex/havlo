@@ -802,7 +802,7 @@ export default function PriceComparisonBar({
         const cheapestUsed = usedOffers[0];
         const moreCount    = usedOffers.length - 1;
         return (
-          <div className="mb-3 px-3.5 py-2.5 rounded-xl bg-surface-2">
+          <div className="mb-3 px-3.5 py-2.5 rounded-xl border border-border bg-surface-2">
             <div className="flex items-start gap-2.5">
               <RotateCcw size={14} className="text-ink-3 shrink-0 mt-0.5" aria-hidden="true" />
               <div className="min-w-0">
@@ -832,7 +832,7 @@ export default function PriceComparisonBar({
 
       {/* ── Historical signal ──────────────────────────────────── */}
       {priceHistory && !isHistoricalLow && (
-        <div className="mb-3 px-3.5 py-2 rounded-xl bg-surface-2">
+        <div className="mb-3 px-3.5 py-2 rounded-xl border border-border bg-surface-2">
           <p className="text-[11px] text-ink-2 leading-relaxed">
             <History size={11} className="inline-block mr-1 -mt-0.5 text-ink-3" aria-hidden="true" />
             Lowest tracked: <span className="font-semibold text-ink tabular-nums">

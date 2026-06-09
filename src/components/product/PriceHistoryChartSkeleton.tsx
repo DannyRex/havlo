@@ -23,7 +23,7 @@
 export default function PriceHistoryChartSkeleton() {
   return (
     <section
-      className="rounded-2xl bg-surface-2/40 p-4 sm:p-5"
+      className="rounded-2xl border border-border bg-surface-2/40 p-4 sm:p-5"
       aria-busy="true"
       aria-live="polite"
       aria-label="Loading price history"

@@ -106,7 +106,7 @@ export default function CountryBlogIndex({
                           {post.countries.map((c) => (
                             <span
                               key={c}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-2 text-[10px] uppercase tracking-[0.06em] text-ink-3"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-border bg-surface-2 text-[10px] uppercase tracking-[0.06em] text-ink-3"
                             >
                               {c === "all"
                                 ? <Globe size={11} className="text-ink-3" aria-hidden="true" />
