@@ -15,8 +15,11 @@
   --bg-rgb:            255 255 255;
   --surface-rgb:       255 255 255;
   --surface-2-rgb:     248 250 255;     /* brighter + faint cool undertone */
-  --border-rgb:        222 226 234;     /* crisper edges */
-  --border-strong-rgb: 190 196 207;
+  /* June 2026 (Danny): all neutral borders are one subtle light-grey in
+     light mode. 1px #efefef gives cards/dividers definition (surfaces are
+     all near-white) without a heavy edge. */
+  --border-rgb:        239 239 239;
+  --border-strong-rgb: 239 239 239;
   /* Skeleton fill — surface-2 (248/250/255) was only ~7 units off white and
      read as invisible. This sits clearly darker than the border so loading
      placeholders are legible, while keeping the cool undertone. Stays visible
@@ -60,6 +63,18 @@
   /* Status — brighter green (green-400) so it stays vibrant on dark. */
   --success-rgb: 74 222 128;
 }
+
+/* ── Border policy by mode (June 2026, Danny) ───────────────────────
+   Light mode keeps a subtle 1px #efefef border on cards/dividers: the
+   surfaces are all near-white, so the border is what defines them.
+   Dark mode drops those borders app-wide because bg < surface < surface-2
+   are visibly distinct there, so the elevation defines the surface and a
+   border just adds noise. The borders that SURVIVE in dark are the
+   border-strong ones, used by elements whose fill matches their parent
+   (inputs like the newsletter field, outline buttons) which would
+   otherwise vanish. Unlayered so it beats Tailwind's @layer utilities
+   without !important. */
+.dark .border-border { border-color: transparent; }
 
 * { box-sizing: border-box; }
 

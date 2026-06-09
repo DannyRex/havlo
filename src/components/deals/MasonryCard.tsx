@@ -337,7 +337,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
         }
       }}
     >
-      <div className={`relative overflow-hidden rounded-xl sm:rounded-2xl bg-surface-2 ${aspect}`}>
+      <div className={`relative overflow-hidden rounded-xl sm:rounded-2xl bg-surface-2 border border-border ${aspect}`}>
         <ResilientImage deal={deal} priority={priority} />
         {/* When the image fails to load (CDN block, deleted file, network),
             we swap to the gradient + emoji at runtime via state in

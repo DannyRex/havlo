@@ -765,7 +765,7 @@ export default function DealFeed({
           Browse deals & new arrivals
         </h1>
         <p className="text-sm sm:text-base text-ink-2 mt-2 max-w-2xl">
-          The newest deals up top, then the rest of the catalogue to dig through.
+          The newest deals first, then everything else.
         </p>
         {activeCounts?.deals !== undefined && activeCounts.total > 0 && (
           /* Deal-count summary on its own line — separate paragraph
