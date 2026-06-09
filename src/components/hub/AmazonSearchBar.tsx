@@ -48,7 +48,7 @@ export default function AmazonSearchBar({
   }
 
   return (
-    <section className="mb-8 rounded-2xl border border-success/25 bg-success/[0.06] p-4 sm:p-6">
+    <section className="mb-8 rounded-2xl border border-border-strong bg-surface-2 p-4 sm:p-6">
       {/* Headline + coming-soon tag */}
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[16px] sm:text-lg font-bold text-ink tracking-[-0.01em]">
@@ -80,7 +80,7 @@ export default function AmazonSearchBar({
         <button
           type="submit"
           aria-label="Shop this Amazon link through Havlo"
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 grid place-items-center w-10 h-10 rounded-full bg-success text-white hover:opacity-90 active:scale-95 transition-all"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 grid place-items-center w-10 h-10 rounded-full bg-ink text-bg hover:opacity-90 active:scale-95 transition-all"
         >
           <ArrowRight size={18} strokeWidth={2.25} aria-hidden="true" />
         </button>
