@@ -109,8 +109,8 @@ export default async function AmazonDealsPage({
             Don&apos;t overpay on Amazon
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-base leading-relaxed">
-            Every price drop comes with its history, so you know it&apos;s
-            really a deal.
+            Amazon prices bounce around. We show the history, so you can spot a
+            real markdown from a dressed-up one.
           </p>
         </header>
 

@@ -459,7 +459,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
           <span className="shrink-0 ml-auto sm:ml-0" suppressHydrationWarning>found {timeAgo(deal.postedAt).toLowerCase()}</span>
         </div>
 
-        <p className="text-[12px] sm:text-[13px] font-medium text-ink leading-snug line-clamp-2 mb-1 sm:mb-1.5 tracking-[-0.005em]">
+        <p className="text-[12px] sm:text-[13px] font-medium text-ink leading-snug line-clamp-1 mb-1 sm:mb-1.5 tracking-[-0.005em]">
           {cleanedTitle}
         </p>
 

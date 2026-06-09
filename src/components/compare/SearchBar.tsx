@@ -283,7 +283,7 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
           Find similar products for less
         </h1>
         <p className="text-[13px] sm:text-sm text-ink-2">
-          Search a product or paste a link. We&apos;ll find cheaper alternatives.
+          One product, every store that sells it, lowest price first.
         </p>
       </div>
 

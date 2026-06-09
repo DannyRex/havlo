@@ -28,8 +28,8 @@ export default function AmazonPromo({ country }: { country: Country }) {
                 Don&apos;t overpay on Amazon
               </h2>
               <p className="text-sm sm:text-base text-ink-2 mt-2 max-w-2xl">
-                Every Amazon price drop we track comes with its price history,
-                so you can tell if it&apos;s really a deal.
+                Every Amazon &apos;deal&apos; comes with its price history, so
+                the fake ones have nowhere to hide.
               </p>
             </div>
             {/* Filled pill CTA — the clear, clickable action. The whole

@@ -232,7 +232,7 @@ export default async function CTA({ country }: { country: import("@/lib/country"
                 </h2>
 
                 <p className="text-white/70 text-[15px] sm:text-lg leading-relaxed max-w-md mb-8">
-                  Paste a link or search any product. We find the same item, or a cheaper alternative, at the stores you already shop.
+                  Found something you love? We&apos;ll find the same item for less, or a close match that costs even less.
                 </p>
 
                 {/* Country-prefixed hrefs. A bare /compare or /deals

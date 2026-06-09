@@ -77,12 +77,12 @@ export default function VideoFeatureSection({
 
   return (
     <section className={surface ? "py-14 sm:py-24 bg-surface border-y border-border" : "py-14 sm:py-24 bg-bg"}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
         {/* Asymmetric columns so the video frame is the dominant element
             (~57% width) on either side. The wider fraction always lands
             where the video sits, so it stays big as the sections
             alternate L/R. */}
-        <div className={`grid items-center gap-8 sm:gap-12 lg:gap-16 ${reverse ? "md:grid-cols-[1.3fr_1fr]" : "md:grid-cols-[1fr_1.3fr]"}`}>
+        <div className={`grid items-center gap-8 sm:gap-12 lg:gap-16 ${reverse ? "md:grid-cols-[1.75fr_1fr]" : "md:grid-cols-[1fr_1.75fr]"}`}>
           {/* Copy */}
           <div className={reverse ? "md:order-2" : ""}>
             {eyebrow && (

@@ -88,8 +88,7 @@ export default async function BrandsIndexPage({
             Shop by brand in {country.name}
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-base leading-relaxed max-w-2xl">
-            Jump straight to a brand to compare its prices across local and
-            cross-border stores that ship to {country.name}.
+            Pick a brand, see who sells it for less.
           </p>
         </header>
 

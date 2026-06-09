@@ -90,14 +90,16 @@ export default function AmazonSearchBar({
       <p className="mt-2.5 text-[12.5px] text-ink-3 leading-relaxed">
         {error ? (
           <span className="text-error">
-            That doesn&apos;t look like an Amazon link — paste a full product URL.
+            That doesn&apos;t look like an Amazon link. Paste a full product URL.
           </span>
         ) : (
           <>Shop any Amazon product through Havlo. </>
         )}
+        {/* block on mobile so 'Join the waitlist' drops to its own line
+            under the helper sentence; inline from sm up. */}
         <Link
           href={`/${countryCode}/cashback`}
-          className="font-semibold text-success hover:underline underline-offset-2"
+          className="block sm:inline font-semibold text-success hover:underline underline-offset-2"
         >
           Join the waitlist
         </Link>

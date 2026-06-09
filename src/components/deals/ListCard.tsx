@@ -195,7 +195,7 @@ export default function ListCard({ deal, linkHref }: Props) {
           <span className="shrink-0" suppressHydrationWarning>found {timeAgo(deal.postedAt).toLowerCase()}</span>
         </div>
 
-        <p className="mt-1.5 text-[13px] font-medium text-ink leading-snug line-clamp-2 tracking-[-0.005em]">
+        <p className="mt-1.5 text-[13px] font-medium text-ink leading-snug line-clamp-1 tracking-[-0.005em]">
           {cleanedTitle}
         </p>
 

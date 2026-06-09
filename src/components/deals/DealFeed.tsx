@@ -765,7 +765,7 @@ export default function DealFeed({
           Browse deals & new arrivals
         </h1>
         <p className="text-sm sm:text-base text-ink-2 mt-2 max-w-2xl">
-          Fresh deals first, then everything else worth seeing from the stores {country.name === "Nigeria" ? "Nigerians" : `${country.name} shoppers`} already shop.
+          Fresh drops first, then everything else worth a look.
         </p>
         {activeCounts?.deals !== undefined && activeCounts.total > 0 && (
           /* Deal-count summary on its own line — separate paragraph
@@ -814,7 +814,7 @@ export default function DealFeed({
           the visitor's market roster, not the launch-market Currys
           that didn't exist in NG/US/DE. Kept short (under ~30 chars)
           so it doesn't get clipped on iPhone-mini-class viewports. */}
-      <div className="relative mb-1.5">
+      <div className="relative mb-4">
         <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-3 pointer-events-none" aria-hidden="true" />
         <label htmlFor="deals-search" className="sr-only">
           Search deals
@@ -868,14 +868,8 @@ export default function DealFeed({
           </button>
         )}
       </div>
-      {/* Microcopy reflects the new Enter behaviour shipped in
-          89e1d5d — Enter commits the filter + dismisses keyboard
-          rather than teleporting to /compare. Previous copy ("Press
-          Enter to search across every store for a fresh comparison")
-          was stale and contradicted the new keyboard model. */}
-      <p className="text-[11px] text-ink-3 mb-4 px-4">
-        Filter the deals shown below by typing. Use the Stores button to narrow by retailer.
-      </p>
+      {/* Filter microcopy removed June 2026: redundant noise; the input
+          placeholder + behaviour are self-evident. */}
 
       {/* Best-price-across-stores header. Appears when the visitor
           arrived from a Hero freeform search that the server resolved

@@ -97,7 +97,7 @@ export default function Footer() {
                 sentence on what Havlo IS so the footer reads like a
                 brand block, not a sales caption. */}
             <p className="text-sm text-ink-2 leading-relaxed max-w-xs">
-              Independent price comparison across the stores you already shop.
+              Because the first price you see is rarely the best one.
             </p>
             <a
               href="https://instagram.com/havlo.io"
