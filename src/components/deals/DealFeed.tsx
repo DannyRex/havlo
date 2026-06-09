@@ -77,6 +77,48 @@ const VALID_TIERS = new Set<DiscountTier>(["all", "10", "20", "30", "50"]);
 const VALID_SORTS = new Set<SortOption>(["relevance", "newest", "discount", "popular", "price_asc", "price_desc"]);
 const VALID_ORIGINS = new Set<OriginFilter>(["all", "local", "intl"]);
 
+/* Confidence gate for the best-price comparison header.
+
+   A search lands on /deals?search=… (Hero freeform search or in-page
+   typing); we only want the "Best price across stores" card when the
+   query clearly denotes ONE product, not a bare category or brand
+   ("sneakers", "laptops", "adidas"). Two cheap, deterministic signals:
+     1. >= 2 meaningful tokens. Single-token queries at this surface are
+        overwhelmingly categories/brands — too broad for a single-product
+        price claim. This is also the cheap pre-gate that skips the
+        /api/compare call entirely for those (the common case).
+     2. The anchor title contains a strong majority of the query tokens,
+        i.e. the FTS top hit actually IS what they searched — guards
+        against FTS latching onto a tangential product via one shared
+        word.
+
+   Moved client-side (was deals/page.tsx) when /deals became static — the
+   header is now fetched on demand from /api/compare inside DealFeed. */
+const COMPARE_STOPWORDS = new Set([
+  "the", "a", "an", "for", "with", "and", "of", "in", "on", "new",
+  "best", "cheap", "cheapest", "price", "prices", "deal", "deals", "buy", "sale",
+]);
+function tokenizeQuery(s: string): string[] {
+  return s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+}
+function meaningfulQueryTokens(s: string): string[] {
+  return tokenizeQuery(s).filter((t) => !COMPARE_STOPWORDS.has(t));
+}
+function isConfidentProductQuery(search: string, anchorTitle: string, distinctStores: number): boolean {
+  const qTokens = meaningfulQueryTokens(search);
+  if (qTokens.length < 2) return false;
+  const titleTokens = new Set(tokenizeQuery(anchorTitle));
+  const hits = qTokens.filter((t) => titleTokens.has(t)).length;
+  /* Tier the overlap requirement by corroboration. 2+ distinct stores
+     carrying the SAME matched product is itself evidence the anchor is
+     correct, so 60% token overlap is enough. A SINGLE-store anchor has
+     no such corroboration, so require EVERY meaningful query token in the
+     title — otherwise a generic-category match would headline a DIFFERENT
+     brand as "best price we found". */
+  const need = distinctStores >= 2 ? Math.ceil(qTokens.length * 0.6) : qTokens.length;
+  return hits >= need;
+}
+
 /* "iPhone" as the product-name example in the search-input
    placeholder. The placeholder used to suggest a country-local
    store name (Konga / Currys / MediaMarkt) but the search field is
@@ -106,14 +148,6 @@ interface DealFeedProps {
      parses the URL ?stores=… into a Set<string> for the selected-
      stores state below. */
   initialStoreOptions?: Array<{ id: string; name: string; count: number }>;
-  /* Server-computed best-price comparison for the landing search
-     query (Hero freeform search → /deals?search=). Present only when
-     the FTS top hit is a confident single product with >=2 store
-     offers — the gate lives in deals/page.tsx so the cost is paid
-     once, server-side, with the /api/compare edge cache. Rendered as
-     a CompareAnchorCard header above the grid while the on-page search
-     still matches this query. null/absent → grid only. */
-  initialComparison?: { anchor: ProductGroup; query: string } | null;
   /* True when the SSR /api/deals prefetch returned the degraded
      curated-Amazon fallback (a transient pool failure). Forces a client
      refetch on mount instead of seeding the bogus pool — see
@@ -128,7 +162,6 @@ export default function DealFeed({
   initialHasMore,
   initialOriginCounts,
   initialStoreOptions,
-  initialComparison,
   initialDegraded,
 }: DealFeedProps = {}) {
   /* Read initial filter state from URL params so /deals?category=phones
@@ -200,48 +233,58 @@ export default function DealFeed({
       ? (initialOriginRaw as OriginFilter)
       : "local";
 
-  /* Initial state seeded from props (when page.tsx pre-fetched on the
-     server) so first paint shows real cards, not the skeleton. When
-     props are absent (legacy callers, dev paths) we fall back to the
-     old empty-array + loading=true behaviour. */
-  /* Is the SSR seed trustworthy enough to keep + skip the first client
-     refetch (the no-flicker optimisation)?
-
-     Trustworthy when the prefetch actually responded, it ISN'T the
-     degraded curated-Amazon fallback, AND it's either real content OR a
-     legitimately-empty SEARCH result (an empty search is a real "no
-     matches" state with its own live-search recovery below).
-
-     NOT trustworthy — so seed empty + loading + let the mount fetch
-     recover — when:
-       • the prefetch failed entirely (initialItems undefined), or
-       • a non-search BROWSE view came back EMPTY (the catalog holds
-         thousands of local deals, so an empty default view is a
-         transient pool blip, not reality), or
-       • the response was the degraded curated-Amazon fallback.
-     This is what stops a momentary pool failure from stranding the page
-     on "No deals match those filters" until the user toggles a filter
-     and back (June 2026 bug). */
+  /* Initial state seeded from props. The page is now STATIC/ISR and
+     always prefetches the DEFAULT deals view (origin=local, no
+     category/tier/sort/search/stores) — searchParams don't exist at
+     prerender time. So the seed is the DEFAULT view, baked into the
+     statically-SSR'd fallback grid, and:
+       • when the URL is ALSO the default view, the seed is authoritative
+         for this URL → keep it + skip the mount fetch (no flicker), and
+       • when the URL is filtered/searched (a deep link like
+         /uk/deals?category=phones, or a Hero "?search=" landing), the
+         seed is the wrong set for this URL → start in the skeleton and
+         run the mount fetch to load the filtered set (skeleton → results).
+     Legacy callers with no props fall back to empty + loading=true. */
   const seedProvided   = Array.isArray(initialItems);
   const seedItems      = initialItems ?? [];
   const seedHasContent = seedItems.length > 0;
-  const isSearchView   = initialSearch.trim().length > 0;
-  const seedIsTrustworthy =
-    seedProvided && !initialDegraded && (seedHasContent || isSearchView);
+  /* The default seed is usable when the prefetch responded with real
+     content and wasn't the degraded curated-Amazon fallback. A degraded
+     or empty seed forces the mount fetch (client-side recovery) so a
+     transient pool blip never strands the page on an empty grid. */
+  const seedIsTrustworthy = seedProvided && !initialDegraded && seedHasContent;
+  /* True when the URL carries NO filters — the same default view the
+     server prefetched. Only then is the seed authoritative for this URL. */
+  const isDefaultView =
+    initialCategory === "all" &&
+    initialTier === "all" &&
+    initialSort === "relevance" &&
+    initialSearch.trim() === "" &&
+    initialStores.size === 0 &&
+    initialOrigin === "local";
+  const skipMountFetch = isDefaultView && seedIsTrustworthy;
 
-  const [items, setItems]       = useState<Deal[]>(seedIsTrustworthy ? seedItems : []);
-  const [total, setTotal]       = useState(seedIsTrustworthy ? (initialTotal ?? 0) : 0);
-  const [hasMore, setHasMore]   = useState(seedIsTrustworthy ? (initialHasMore ?? false) : false);
-  /* loading=false on first render IF the seed is trustworthy. Otherwise
-     show the skeleton and let the mount fetch repopulate. */
-  const [loading, setLoading]   = useState(!seedIsTrustworthy);
+  /* Seed items/total/hasMore from the server seed ALWAYS, so the client's
+     first render equals the SSR fallback HTML — no flash on the default
+     view, and no hydration mismatch if the page is ever served
+     dynamically. On a filtered/searched URL the mount fetch runs
+     immediately and `loading` starts true, so the skeleton (not the
+     default seed) is what the user actually sees before the filtered set
+     lands. */
+  const [items, setItems]       = useState<Deal[]>(seedItems);
+  const [total, setTotal]       = useState(initialTotal ?? 0);
+  const [hasMore, setHasMore]   = useState(initialHasMore ?? false);
+  /* loading=false only when we keep the default seed (default URL + good
+     seed). Filtered/searched URLs and a bad seed start in the skeleton
+     and let the mount fetch repopulate. */
+  const [loading, setLoading]   = useState(!skipMountFetch);
   const [loadingMore, setLoadingMore] = useState(false);
   /* Track whether we've consumed the SSR'd initial fetch yet. The
-     filter-change effect below skips its first run when this is
-     unset AND a trustworthy seed was provided — so the user doesn't see
-     a content → skeleton → content flicker on first paint. An
-     untrustworthy seed leaves this true, so the mount fetch runs. */
-  const hasConsumedInitialRef = useRef(!seedIsTrustworthy);
+     filter-change effect below skips its first run only when
+     skipMountFetch is set (default URL + trustworthy seed) — so the user
+     doesn't see a content → skeleton → content flicker on the default
+     view. Any other URL leaves this true, so the mount fetch runs. */
+  const hasConsumedInitialRef = useRef(!skipMountFetch);
 
   const [category, setCategory] = useState(initialCategory);
   const [tier, setTier]         = useState<DiscountTier>(initialTier);
@@ -262,7 +305,7 @@ export default function DealFeed({
     useState<{
       all: number; local: number; intl: number;
       allDeals?: number; localDeals?: number; intlDeals?: number;
-    } | undefined>(seedIsTrustworthy ? initialOriginCounts : undefined);
+    } | undefined>(skipMountFetch ? initialOriginCounts : undefined);
   /* Did-you-mean suggestions returned by /api/deals when the result
      list is empty AND a search query is present. Populates the
      pills on EmptySearchState. Empty array = no pills, falls back
@@ -276,6 +319,17 @@ export default function DealFeed({
   const [liveItems, setLiveItems]         = useState<Deal[]>([]);
   const [liveLoading, setLiveLoading]     = useState(false);
   const [liveProviders, setLiveProviders] = useState<string[]>([]);
+  /* Best-price comparison header, fetched client-side from /api/compare
+     for the active search (was an SSR prop before /deals went static).
+     null = no header. The fetch is gated by isConfidentProductQuery so a
+     bare category/brand search never headlines a single-product price
+     card; the >=2-token pre-check also skips the network call entirely
+     for single-word searches (the common case). */
+  const [comparison, setComparison] =
+    useState<{ anchor: ProductGroup; query: string } | null>(null);
+  /* Race guard for the comparison fetch — a newer search bumps this so
+     stale responses bail instead of clobbering a fresher result. */
+  const compareSeqRef = useRef(0);
   /* Selected store IDs from the StoreFilter popover. Persists to URL
      via buildParams (?stores=argos,currys). */
   const [selectedStores, setSelectedStores] = useState<Set<string>>(initialStores);
@@ -335,7 +389,7 @@ export default function DealFeed({
   /* All stores currently available in the filtered pool. Comes back
      in the /api/deals response alongside items + counts. Empty until
      the first fetch lands. */
-  const [storeOptions, setStoreOptions] = useState<StoreOption[]>(seedIsTrustworthy ? (initialStoreOptions ?? []) : []);
+  const [storeOptions, setStoreOptions] = useState<StoreOption[]>(skipMountFetch ? (initialStoreOptions ?? []) : []);
 
   /* Mobile-only view-mode toggle (grid masonry vs list rows). Tablet +
      desktop always show masonry — toggle UI is hidden via sm:hidden.
@@ -368,6 +422,44 @@ export default function DealFeed({
     const t = setTimeout(() => setSearchDebounced(searchInput), 300);
     return () => clearTimeout(t);
   }, [searchInput]);
+
+  /* Resolve the best-price comparison header for the active search. Fires
+     on the DEBOUNCED search so it tracks both a Hero "?search=" deep-link
+     (initialSearch seeds searchDebounced) and in-page typing. Cheap
+     pre-gate: skip the /api/compare call unless the query has >=2
+     meaningful tokens (single-word searches are categories/brands the
+     confidence gate would reject anyway). The seq guard drops stale
+     responses when the search moves on, and the call reuses /api/compare's
+     1h edge cache. */
+  useEffect(() => {
+    const q = searchDebounced.trim();
+    if (!q || meaningfulQueryTokens(q).length < 2) {
+      setComparison(null);
+      return;
+    }
+    const seq = ++compareSeqRef.current;
+    fetch(`/api/compare?q=${encodeURIComponent(q)}&country=${country.code}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (seq !== compareSeqRef.current) return;
+        if (!data || data.mode !== "similar" || !data.anchor) {
+          setComparison(null);
+          return;
+        }
+        const anchor = data.anchor as ProductGroup;
+        const distinctStores = new Set((anchor.offers ?? []).map((o) => o.storeId)).size;
+        /* single-store OK (the header reads "Best price we found"); the
+           confidence gate stops a tangential FTS match from headlining. */
+        if (distinctStores < 1 || !isConfidentProductQuery(q, anchor.title, distinctStores)) {
+          setComparison(null);
+          return;
+        }
+        setComparison({ anchor, query: q });
+      })
+      .catch(() => {
+        if (seq === compareSeqRef.current) setComparison(null);
+      });
+  }, [searchDebounced, country.code]);
 
   const offsetRef = useRef(0);
   /* Sequence counter for fetch-race defence. Every fetch effect run
@@ -735,22 +827,22 @@ export default function DealFeed({
           ? { total: originCounts.intl, deals: originCounts.intlDeals }
           : { total: originCounts.all, deals: originCounts.allDeals };
 
-  /* Show the best-price comparison header only while the on-page
-     search box still holds the landing query the server resolved the
-     comparison from. Editing the search (or clearing it) drops the
-     now-stale card and hands filtering back to the grid. Trimmed +
-     lower-cased so trivial differences don't flicker the card. */
+  /* Show the comparison header only while the on-page search box still
+     holds the query the fetched comparison resolved from. Editing or
+     clearing the search drops the now-stale card (the effect above
+     clears or replaces `comparison` as searchDebounced changes). Trimmed
+     + lower-cased so trivial differences don't flicker the card. */
   const showComparisonHeader =
-    !!initialComparison &&
-    searchDebounced.trim().toLowerCase() === initialComparison.query.trim().toLowerCase();
+    !!comparison &&
+    searchDebounced.trim().toLowerCase() === comparison.query.trim().toLowerCase();
 
   /* Distinct stores behind the comparison anchor. Drives the header
      copy: a single-store anchor reads "Best price we found" rather than
      falsely implying a cross-store comparison. (The card's own rows
      already say "Available at" vs "Across N stores", and hide the
      "Save up to X" spread when there's only one store.) */
-  const comparisonStoreCount = initialComparison
-    ? new Set((initialComparison.anchor.offers ?? []).map((o) => o.storeId)).size
+  const comparisonStoreCount = comparison
+    ? new Set((comparison.anchor.offers ?? []).map((o) => o.storeId)).size
     : 0;
 
   return (
@@ -871,24 +963,24 @@ export default function DealFeed({
       {/* Filter microcopy removed June 2026: redundant noise; the input
           placeholder + behaviour are self-evident. */}
 
-      {/* Best-price-across-stores header. Appears when the visitor
-          arrived from a Hero freeform search that the server resolved
-          to a confident single product (gate in deals/page.tsx) and
-          the filter box still holds that landing query. Reuses the
+      {/* Best-price-across-stores header. Appears when the active search
+          (a Hero freeform "?search=" landing or in-page typing) resolves
+          to a confident single product via the client /api/compare fetch
+          above, and the filter box still holds that query. Reuses the
           /compare anchor card; dupes are [] here because the grid below
           already IS the "more matches" surface, so the card stays a
           pure price-comparison header rather than sprouting its own
           alternatives connector. */}
-      {showComparisonHeader && initialComparison && (
+      {showComparisonHeader && comparison && (
         <div className="mb-2">
           <p className="max-w-3xl mx-auto text-[11px] font-bold uppercase tracking-[0.12em] text-ink-3 mb-3 px-1">
             {comparisonStoreCount >= 2 ? "Best price across stores" : "Best price we found"}
           </p>
           <CompareAnchorCard
-            anchor={initialComparison.anchor}
+            anchor={comparison.anchor}
             dupes={[]}
             country={country}
-            query={initialComparison.query}
+            query={comparison.query}
           />
         </div>
       )}

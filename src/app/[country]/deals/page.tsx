@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import Link from "next/link";
 import DealFeed from "@/components/deals/DealFeed";
+import MasonryCard from "@/components/deals/MasonryCard";
 import JsonLd from "@/components/seo/JsonLd";
 import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import ScrollToTopButton from "@/components/ui/ScrollToTopButton";
@@ -12,7 +12,38 @@ import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList, buildItemListJs
 import type { SeoDeal } from "@/lib/seo";
 import { isSyntheticId } from "@/lib/pdp-url";
 import type { Deal } from "@/types";
-import type { ProductGroup } from "@/lib/search";
+
+/* ISR — /[country]/deals is now STATICALLY prerendered + revalidated
+   every 10 minutes instead of re-rendering on the origin for every
+   request.
+
+   History: the page was dynamic by design — it read `searchParams` to
+   SSR the filtered/searched view and `headers()` to build an absolute
+   self-fetch URL. Both reads opt the route out of static generation, so
+   Vercel served it `x-vercel-cache: MISS` + `private, no-store` and
+   re-rendered ~373 KB on the origin every hit — the dominant driver of
+   Vercel "Fast Origin Transfer" (every other page is already
+   PRERENDER/ISR). The June 2026 egress audit flagged it.
+
+   The fix splits the surface in two:
+     • A statically-SSR'd DEFAULT deals grid (the <Suspense> fallback
+       below) — real product cards baked into the prerendered HTML so
+       crawlers keep their crawl depth and the page paints instantly
+       from the edge.
+     • The interactive <DealFeed> (filters, search, infinite scroll) is
+       a client component that reads `useSearchParams`, which forces a
+       static page dynamic unless wrapped in <Suspense>. On the client
+       it reads the URL and fetches /api/deals itself for any
+       filtered/searched view — it already did this for every filter
+       change. Deep links like /uk/deals?category=phones resolve
+       correctly: the client reads the param on mount and fetches the
+       filtered set (skeleton → results).
+
+   The `?search=` best-price comparison header moved to a client fetch
+   inside DealFeed (its /api/compare effect), so it works for both
+   client navigation and direct deep-links without re-introducing a
+   server read here. */
+export const revalidate = 600;
 
 export async function generateMetadata({
   params,
@@ -45,16 +76,20 @@ export async function generateMetadata({
   };
 }
 
-/* Server-side fetch helper. Calls our own /api/deals so the SSR
-   path uses identical logic + cache as the client refetch — no
-   risk of drift between "what server thought" vs "what client sees
-   after first filter change". The fetch URL is absolute (built
-   from incoming request host) because Node fetch on the server
-   can't resolve relative URLs.
+/* Server-side fetch of the DEFAULT deals view. Calls our own /api/deals
+   so the SSR seed uses identical logic + cache as DealFeed's client
+   refetch — no drift between "what the server SSR'd" and "what the
+   client sees after its first filter change".
 
-   Errors swallowed → empty initial state → DealFeed renders the
-   skeleton + falls through to client-side fetch on mount. Belt-
-   and-braces: server-fetch failure shouldn't break the page. */
+   The absolute URL is built from SITE_URL (not `headers()`) so the page
+   stays statically renderable. We deliberately fetch ONLY the default
+   view (origin=local, no category/tier/sort/search/stores): the page is
+   static now, so searchParams don't exist at prerender time. The default
+   seed is both the SEO grid (fallback) and the seed passed to DealFeed;
+   any filtered/searched view is resolved client-side.
+
+   Errors swallowed → null → the fallback renders an empty grid and
+   DealFeed recovers via its client-side mount fetch. */
 interface InitialDealsBundle {
   items:        Deal[];
   total:        number;
@@ -66,95 +101,40 @@ interface InitialDealsBundle {
      seeding a bogus empty/Amazon-only first paint. */
   degraded:     boolean;
 }
-async function fetchInitialDeals(
-  params: { country: string; category?: string; tier?: string; sort?: string; search?: string; origin?: string; stores?: string; seed?: string },
-): Promise<InitialDealsBundle | null> {
+async function fetchDefaultDeals(countryCode: string, seed: string): Promise<InitialDealsBundle | null> {
   try {
-    const h = headers();
-    const host = h.get("x-forwarded-host") ?? h.get("host") ?? "havlo.io";
-    const proto = h.get("x-forwarded-proto") ?? "https";
     const qs = new URLSearchParams();
-    qs.set("country", params.country);
-    /* SSR limit history:
-         May 2026: 24 → 60 (SEO crawl depth + audit visibility).
-         Jun 2026: 60 → 40 — /deals is dynamic (no-store, MISS) and
-         currently 378 KB / request, the dominant driver of Vercel
-         Fast Origin Transfer. Going to 40 cards lands ~250 KB per
-         request (~33% cut) while keeping a strong first-paint +
-         multi-scroll crawl-depth signal; real users keep getting
-         infinite scroll. Triggered by the launch egress audit. */
-    qs.set("limit",   "40");
-    qs.set("offset",  "0");
-    if (params.category) qs.set("category",    params.category);
-    if (params.tier)     qs.set("minDiscount", params.tier);
-    if (params.sort)     qs.set("sort",        params.sort);
-    if (params.search)   qs.set("search",      params.search);
-    if (params.origin)   qs.set("origin",      params.origin);
-    if (params.stores)   qs.set("stores",      params.stores);
-    /* Stable rotation seed captured once at SSR and reused by DealFeed for
-       every load-more, so the relevance order is fixed for the session and
-       offsets never re-serve already-seen products (recycling fix). */
-    if (params.seed)     qs.set("seed",        params.seed);
-    /* 60s SSR fetch cache (May 2026 paint-speed pass).
-     *
-     * History: was `cache: "no-store"` because the cache-poisoning
-     * fallback bug (UK Amazon-only HTML cached for 10 min) made
-     * any persistent cache catastrophic. That class is now mitigated
-     * at TWO layers:
-     *   1. /api/deals detects `looksLikeCuratedFallback` and sets
-     *      `Cache-Control: no-store, no-cache` on degraded responses,
-     *      plus the `X-Havlo-Degraded: curated-fallback` header.
-     *   2. The route's own POOL_CACHE versioning (`v3-3pass` prefix)
-     *      means old function instances can't write under the same
-     *      key as new ones.
-     *
-     * With those guards in place, a 60s SSR fetch cache is safe AND
-     * trims ~1-2s off every cold-cache page load (~95% of visits to
-     * a low-traffic /[country]/deals route). If the RPC ever does
-     * fail and produces a curated-fallback response, the worst case
-     * is 60s of stale Amazon-only HTML before the cache expires and
-     * the next SSR refreshes from a recovered API.
-     *
-     * User report May 2026: "/deals takes long to paint content".
-     * Wall-time before this fix: ~1.5-2s cold (Vercel SSR fn cold
-     * start + 3-pass RPC + 200KB JSON parse). After: ~50ms for
-     * cache-hit visits, ~1.5s for the 1-in-60s cache-miss visitor.
-     */
-    const url = `${proto}://${host}/api/deals?${qs.toString()}`;
-    /* Sort-aware cache window. The relevance sort uses seeded jitter
-       inside /api/deals (its own s-maxage is 60s for relevance) so a
-       visitor's first-page rotates as the jitter re-rolls — drop the
-       SSR fetch cache to 60s for relevance so the SSR'd first page
-       cycles in lockstep with that. The previous 600s window meant
-       every visit inside a 10-minute span saw the identical first 60
-       cards regardless of jitter, which read as "the pool didn't
-       increase". Non-rotating sorts (newest, price_*) stay on the
-       600s window — they don't benefit from faster cycling and the
-       longer window keeps Fluid CPU + Supabase egress in check. */
-    const isRotatingSort = !params.sort || params.sort === "relevance";
-    /* On-demand invalidation hook. /api/live-search calls
-       revalidateTag(`deals:{country}`) right after a compare-page live
-       search persists fresh SerpAPI offers into the catalog. Tagging
-       this SSR fetch lets that bust purge the cached browse response for
-       the affected country on demand — so newly-ingested deals reflect
-       on the very next /deals load (any category) instead of waiting out
-       the 60/600s window below. The time-based revalidate stays as the
-       egress-friendly fallback for everything else; the tag only fires
-       when a live search actually wrote new rows. Coarse per-country tag
-       (not per-category) because an ingested deal can land in any
-       category, so the whole country's browse must refresh. */
+    qs.set("country", countryCode);
+    /* 40 cards — strong first-paint + multi-scroll crawl-depth signal
+       (May 2026 bumped 24→60 for SEO; June 2026 trimmed 60→40 in the
+       egress audit). Real users keep getting infinite scroll client-side. */
+    qs.set("limit",  "40");
+    qs.set("offset", "0");
+    /* origin=local matches DealFeed's client-side default ("local"
+       everywhere — founder direction May 2026) so the SSR seed and the
+       client's first render agree on the default view. */
+    qs.set("origin", "local");
+    /* Pin the relevance rotation to one seed for this prerender, the
+       SAME seed handed to DealFeed (initialSeed) so its client load-more
+       continues the identical order — no recycling across offsets. On a
+       static page the seed is frozen per revalidation window, which is
+       the intended trade for edge-caching the surface. */
+    qs.set("seed", seed);
+
+    const url = `${SITE_URL}/api/deals?${qs.toString()}`;
+    /* 600s cache, aligned with this page's `revalidate`. Tagged so the
+       on-demand bust in /api/live-search (revalidateTag(`deals:{cc}`),
+       fired after a compare-page live search persists fresh offers)
+       refreshes the prerendered seed on the next load instead of waiting
+       out the window. */
     const res = await fetch(url, {
       next: {
-        revalidate: isRotatingSort ? 60 : 600,
-        tags: ["deals", `deals:${params.country.toLowerCase()}`],
+        revalidate: 600,
+        tags: ["deals", `deals:${countryCode.toLowerCase()}`],
       },
     });
     if (!res.ok) {
-      /* Log the status so Vercel captures the SSR-time failure.
-         Previously `if (!res.ok) return null` silently degraded to
-         the skeleton + client-side fetch path, indistinguishable
-         from a healthy first paint — no signal to investigate. */
-      console.error(`[fetchInitialDeals] /api/deals returned ${res.status}`, { url });
+      console.error(`[fetchDefaultDeals] /api/deals returned ${res.status}`, { url });
       return null;
     }
     const j = await res.json();
@@ -167,95 +147,56 @@ async function fetchInitialDeals(
       degraded:     j.degraded === true,
     };
   } catch (err) {
-    /* Same rationale — surface the underlying error to Vercel
-       logs so a persistent SSR failure doesn't masquerade as a
-       successful skeleton render. */
-    console.error("[fetchInitialDeals] threw", (err as Error).message);
+    console.error("[fetchDefaultDeals] threw", (err as Error).message);
     return null;
   }
 }
 
-/* Confidence gate for the best-price header.
+/* Static SEO grid — the default deals rendered server-side into the
+   prerendered HTML (this is the <Suspense> fallback for DealFeed). Keeps
+   real product cards + crawlable PDP links in the document crawlers see,
+   and paints instantly from the edge while the interactive DealFeed
+   hydrates and swaps in (seeded with the SAME deals, so the swap is
+   seamless on the default view).
 
-   A Hero freeform search lands on /deals?search=…; we only want the
-   "Best price across stores" comparison card when the query clearly
-   denotes ONE product, not when it's a bare category or brand
-   ("sneakers", "laptops", "adidas"). Two cheap, deterministic signals:
-     1. >= 2 meaningful tokens. Single-token queries at this surface
-        are overwhelmingly categories/brands — too broad for a single-
-        product price claim.
-     2. The anchor title contains a strong majority of the query
-        tokens, i.e. the FTS top hit actually IS what they searched —
-        guards against FTS latching onto a tangential product via one
-        shared word. */
-function isConfidentProductQuery(search: string, anchorTitle: string, distinctStores: number): boolean {
-  const STOP = new Set([
-    "the", "a", "an", "for", "with", "and", "of", "in", "on", "new",
-    "best", "cheap", "cheapest", "price", "prices", "deal", "deals", "buy", "sale",
-  ]);
-  const tokenize = (s: string) =>
-    s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
-  const qTokens = tokenize(search).filter((t) => !STOP.has(t));
-  if (qTokens.length < 2) return false;
-  const titleTokens = new Set(tokenize(anchorTitle));
-  const hits = qTokens.filter((t) => titleTokens.has(t)).length;
-  /* Tier the overlap requirement by corroboration. 2+ distinct stores
-     carrying the SAME matched product is itself evidence the anchor is
-     correct, so 60% token overlap is enough. A SINGLE-store anchor has
-     no such corroboration, so require EVERY meaningful query token in
-     the title — otherwise a generic-category match ("scanfrost chest
-     freezer" -> "snowsea chest deep freezer", sharing only chest +
-     freezer) would headline a DIFFERENT brand as "best price we found".
-     This is what makes the single-store loosening (June 2026) safe. */
-  const need = distinctStores >= 2 ? Math.ceil(qTokens.length * 0.6) : qTokens.length;
-  return hits >= need;
-}
+   Mirrors DealFeed's header + grid markup so the fallback→DealFeed swap
+   doesn't reshape the cards. NO AnimateIn wrapper here: AnimateIn starts
+   at opacity:0 until its mount effect runs, which would hide the SEO
+   grid before JS — these cards must be visible in the static HTML. */
+function DefaultDealsGrid({ deals }: { deals: Deal[] }) {
+  return (
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-8 sm:py-12">
+      <div className="mb-6 sm:mb-8 px-1 sm:px-0">
+        <h1 className="text-[28px] sm:text-4xl font-bold text-ink tracking-[-0.03em] leading-tight">
+          Browse deals & new arrivals
+        </h1>
+        <p className="text-sm sm:text-base text-ink-2 mt-2 max-w-2xl">
+          The newest deals first, then everything else.
+        </p>
+      </div>
 
-/* Resolve the landing search to a confident cross-store comparison
-   anchor, or null. Calls our own /api/compare on its FTS q-path —
-   which does NOT fan out to live-search (that's a separate client-side
-   /api/live-search call) and does NOT invoke the LLM judge (that lives
-   only on the pid path, pgFtsFindByProductId). So this stays cheap and
-   reuses /api/compare's 1h edge cache. The anchor is returned for any
-   confident product query with >= 1 in-stock offer. The header copy
-   adapts to the store count ("Best price across stores" for 2+ stores,
-   "Best price we found" for a single store) and CompareAnchorCard hides
-   its spread + says "Available at" when there's one store, so a
-   one-store anchor never implies a cross-store comparison that isn't
-   there. (Founder direction June 2026: the strict 2-store gate stayed
-   silent on most real queries given thin cross-store catalog overlap.) */
-async function fetchComparisonForSearch(
-  search: string,
-  countryCode: string,
-): Promise<{ anchor: ProductGroup; query: string } | null> {
-  const q = search.trim();
-  if (!q) return null;
-  try {
-    const h = headers();
-    const host  = h.get("x-forwarded-host") ?? h.get("host") ?? "havlo.io";
-    const proto = h.get("x-forwarded-proto") ?? "https";
-    const url = `${proto}://${host}/api/compare?q=${encodeURIComponent(q)}&country=${encodeURIComponent(countryCode)}`;
-    const res = await fetch(url, { next: { revalidate: 3600 } });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data?.mode !== "similar" || !data.anchor) return null;
-    const anchor = data.anchor as ProductGroup;
-    const distinctStores = new Set((anchor.offers ?? []).map((o) => o.storeId)).size;
-    if (distinctStores < 1) return null;   // single-store OK; header reads "Best price we found"
-    if (!isConfidentProductQuery(q, anchor.title, distinctStores)) return null;
-    return { anchor, query: q };
-  } catch (err) {
-    console.error("[fetchComparisonForSearch] threw", (err as Error).message);
-    return null;
-  }
+      {deals.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
+          {deals.map((d, i) => (
+            <div key={d.id}>
+              <MasonryCard
+                deal={d}
+                aspect="aspect-[4/5]"
+                /* First 4 are the LCP candidates across viewports. */
+                priority={i < 4}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default async function DealsPage({
   params,
-  searchParams,
 }: {
-  params:       { country: string };
-  searchParams: { [k: string]: string | string[] | undefined };
+  params: { country: string };
 }) {
   const country = getCountry(params.country);
   const breadcrumb = buildBreadcrumbList([
@@ -264,48 +205,21 @@ export default async function DealsPage({
     { name: "Deals",      url: `${SITE_URL}/${country.code}/deals` },
   ]);
 
-  /* Pre-fetch the FIRST page server-side. Eliminates the skeleton
-     flash on first paint — the initial HTML carries real cards.
-     Filters from URL search params are forwarded so a deep link like
-     /uk/deals?category=phones&minDiscount=20 SSRs the filtered view
-     directly, not the default + then a client refetch. */
-  const pickFirst = (k: string) => {
-    const v = searchParams[k];
-    return Array.isArray(v) ? v[0] : v;
-  };
-  /* origin default must match DealFeed's client-side default
-     ("local" — see comment in DealFeed.tsx for the full history;
-     founder direction May 2026 to revert to local-first). When the
-     URL has no ?origin=, we fetch the local pool server-side so
-     SSR + client first-paint agree. */
-  const searchParam = pickFirst("search");
-  /* One rotation seed for this page load, threaded into the SSR fetch AND
-     handed to DealFeed for every load-more. Pinning it for the session is
-     what stops the feed recycling: the old code re-derived a live 60s
-     wall-clock bucket per request, so a scroll crossing a minute boundary
-     got a re-shuffled order and re-served seen products. The minute bucket
-     still varies the order across visits (and keeps the edge cache keyed
-     to a shared value within the minute). */
+  /* One rotation seed for this prerender, threaded into the SSR fetch AND
+     handed to DealFeed (initialSeed) for every load-more, so the
+     relevance order stays fixed for the whole scroll session and offsets
+     never re-serve already-seen products. On a static page Date.now() is
+     the prerender timestamp (frozen per 600s revalidation), which is the
+     accepted cost of edge-caching this surface; /api/deals validates the
+     `seed` param as a numeric bucket. */
   const rotationSeed = String(Math.floor(Date.now() / 60000));
-  /* Resolve the feed AND (only for a freeform text search) a possible
-     cross-store best-price header in parallel, so the comparison probe
-     adds no serial latency to the page. fetchComparisonForSearch is
-     self-gating: it returns null for ambiguous/category queries and
-     anything with no in-stock offer, so we always attempt it when
-     a search is present and let it decide. */
-  const [initial, comparison] = await Promise.all([
-    fetchInitialDeals({
-      country:  country.code,
-      category: pickFirst("category"),
-      tier:     pickFirst("minDiscount"),
-      sort:     pickFirst("sort"),
-      search:   searchParam,
-      origin:   pickFirst("origin") ?? "local",
-      stores:   pickFirst("stores"),
-      seed:     rotationSeed,
-    }),
-    searchParam ? fetchComparisonForSearch(searchParam, country.code) : Promise.resolve(null),
-  ]);
+
+  /* Pre-fetch the DEFAULT first page server-side. It seeds both the SEO
+     grid (the Suspense fallback) and DealFeed's initial state, so the
+     prerendered HTML carries real cards and the default view paints with
+     zero skeleton flash. */
+  const initial = await fetchDefaultDeals(country.code, rotationSeed);
+  const defaultDeals = initial?.items ?? [];
 
   /* ItemList JSON-LD over the SSR'd first page, so the structured
      product list matches the cards actually present in the initial
@@ -315,7 +229,7 @@ export default async function DealsPage({
      is left null — the builder omits it rather than misrepresenting the
      store as the brand. Emitted only when the page actually rendered
      deals, so a degraded SSR fetch doesn't ship an empty ItemList. */
-  const seoDeals: SeoDeal[] = (initial?.items ?? [])
+  const seoDeals: SeoDeal[] = defaultDeals
     .filter((d) => !isSyntheticId(d.id))
     .slice(0, 24)
     .map((d) => ({
@@ -336,24 +250,20 @@ export default async function DealsPage({
   return (
     <>
       <JsonLd data={itemList ? [breadcrumb, itemList] : breadcrumb} />
-      <Suspense>
-        {/* `key={country.code}` forces React to UN-mount + RE-mount
-            DealFeed when the visitor switches countries. Without
-            this, DealFeed's filter state (initialised from URL via
-            useState on first render) survives the navigation and
-            silently keeps the old country's category / origin /
-            store-filter selections. The audit May 2026 caught the
-            visible symptom: switching from /uk/deals?category=
-            phones to NG landed on /ng/deals?origin=local with
-            ?category=phones silently stripped because state
-            survived the country swap, then wrote back the old
-            origin via the URL-sync useEffect.
 
-            Re-mount cost: a brief skeleton flicker during the
-            country swap (the new country's SSR'd initial fetch
-            still seeds the freshly-mounted DealFeed, so it's
-            faster than a full client cold-start). Worth it for
-            correct state semantics. */}
+      {/* The interactive feed reads `useSearchParams`, which forces a
+          static page dynamic unless wrapped in <Suspense>. The fallback
+          is the statically-SSR'd default grid (real cards in the
+          prerendered HTML for SEO); DealFeed hydrates and swaps in,
+          seeded with the same default deals so the default view doesn't
+          flicker. A filtered/searched deep link is resolved by DealFeed
+          client-side (skeleton → results).
+
+          `key={country.code}` forces a clean re-mount on country switch
+          so filter state never survives the navigation (audit May 2026:
+          switching /uk/deals?category=phones → NG silently kept the old
+          category). */}
+      <Suspense fallback={<DefaultDealsGrid deals={defaultDeals} />}>
         <DealFeed
           key={country.code}
           initialSeed={rotationSeed}
@@ -362,7 +272,6 @@ export default async function DealsPage({
           initialHasMore={initial?.hasMore}
           initialOriginCounts={initial?.originCounts}
           initialStoreOptions={initial?.storeOptions}
-          initialComparison={comparison}
           initialDegraded={initial?.degraded}
         />
       </Suspense>
