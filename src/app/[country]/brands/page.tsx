@@ -7,6 +7,7 @@ import NewsletterStrip from "@/components/landing/NewsletterStrip";
 import { getCountry, ACTIVE_COUNTRIES } from "@/lib/country";
 import { categories } from "@/lib/data/categories";
 import { listIndexableBrands } from "@/lib/hubs";
+import { resolveBrandDomain } from "@/lib/brand-domains";
 import { SITE_URL, buildHreflangAlternates, buildBreadcrumbList } from "@/lib/seo";
 
 /* Brand index — /[country]/brands.
@@ -103,14 +104,15 @@ export default async function BrandsIndexPage({
                   <span className="flex items-center gap-3 min-w-0">
                     {/* Brand mark. No bundled /logos asset for most brands,
                         so StoreLogo resolves the brand's favicon from its
-                        domain (slug.com) and falls back to a letter badge.
-                        Same primitive the product cards use, for visual
-                        consistency. */}
+                        canonical domain (resolveBrandDomain: corrects the
+                        ~12 brands whose slug.com points at the wrong company,
+                        e.g. mac -> maccosmetics.com) and falls back to a
+                        letter badge. Same primitive the product cards use. */}
                     <StoreLogo
                       storeId={b.slug}
                       storeName={b.brand}
                       storeLogoUrl={`/logos/${b.slug}.png`}
-                      merchantUrl={`https://${b.slug.replace(/[^a-z0-9-]/g, "")}.com`}
+                      merchantUrl={`https://${resolveBrandDomain(b.slug)}`}
                       size={36}
                       pad={6}
                     />
