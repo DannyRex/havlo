@@ -247,8 +247,29 @@ async function countryCorrectDropdownRows(opts: {
 }): Promise<DropdownStoreRow[]> {
   const { countryCode, category, minDiscount, search, origin } = opts;
   const base = { country: countryCode, category, minDiscount, search };
+
+  /* UK eBay is local (ebay.co.uk) but its DB store_country reads US,
+     because SerpAPI prices ebay.co.uk in USD and the ingest anchors eBay
+     by currency. The country-aware read layer (isLocalToUser /
+     isDealLocalToCountry) already counts eBay as local for UK shoppers;
+     mirror that here so the Local store-filter tab lists eBay too. Only
+     bare "eBay" flips; explicit ebay.com / ebay-us stays cross-border.
+     A DB re-tag can't fix this cleanly: store_country is per-store and the
+     aggregate "ebay" store is sourced from every market's searches at
+     once, so no single country tag is correct. */
+  const isLocalEbay = (r: DropdownStoreRow): boolean => {
+    if (countryCode.toLowerCase() !== "uk") return false;
+    const id = r.store_id.toLowerCase();
+    const nm = r.store_name.toLowerCase();
+    const isEbay = id === "ebay" || id.startsWith("ebay-") || nm === "ebay" || nm.startsWith("ebay ") || nm.startsWith("ebay-");
+    if (!isEbay) return false;
+    const isUsEbay = id.includes("ebay-us") || id.includes("ebay-com") || nm.includes("ebay.com") || nm.includes("ebay us");
+    return !isUsEbay;
+  };
+
   const onlyCrossBorder = (rows: DropdownStoreRow[]) =>
     rows.filter((r) =>
+      !isLocalEbay(r) &&
       isCrossBorderStore(
         { storeId: r.store_id, storeName: r.store_name, currency: "", tags: [] },
         countryCode,
@@ -256,7 +277,15 @@ async function countryCorrectDropdownRows(opts: {
     );
 
   if (origin === "local") {
-    return listCountryStoresWithCounts({ ...base, origin: "local" });
+    const local = await listCountryStoresWithCounts({ ...base, origin: "local" });
+    if (countryCode.toLowerCase() !== "uk") return local;
+    /* Lift the eBay row (local for UK) out of the country-blind global
+       roster into the local slice — the RPC's local slice misses it
+       because the DB store_country says US. */
+    const global = await listCountryStoresWithCounts({ ...base, origin: "all" });
+    const have = new Set(local.map((r) => r.store_id));
+    const ebayLocal = global.filter((r) => isLocalEbay(r) && !have.has(r.store_id));
+    return [...local, ...ebayLocal];
   }
 
   if (origin === "intl") {
@@ -264,16 +293,16 @@ async function countryCorrectDropdownRows(opts: {
     return onlyCrossBorder(await listCountryStoresWithCounts({ ...base, origin: "all" }));
   }
 
-  // origin === "all": local ∪ cross-border, deduped by store_id. Both RPC
-  // slices fire in parallel (the global slice is country-blind, the local
-  // slice is country-scoped + untruncated).
+  // origin === "all": local ∪ eBay-local ∪ cross-border, deduped by store_id.
+  // Both RPC slices fire in parallel (the global slice is country-blind, the
+  // local slice is country-scoped + untruncated).
   const [global, local] = await Promise.all([
     listCountryStoresWithCounts({ ...base, origin: "all" }),
     listCountryStoresWithCounts({ ...base, origin: "local" }),
   ]);
   const seen = new Set<string>();
   const out: DropdownStoreRow[] = [];
-  for (const r of [...local, ...onlyCrossBorder(global)]) {
+  for (const r of [...local, ...global.filter(isLocalEbay), ...onlyCrossBorder(global)]) {
     if (seen.has(r.store_id)) continue;
     seen.add(r.store_id);
     out.push(r);
