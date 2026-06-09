@@ -48,7 +48,7 @@ export default function AmazonSearchBar({
   }
 
   return (
-    <section className="mb-8 rounded-2xl border border-border-strong bg-surface-2 p-4 sm:p-6">
+    <section className="mb-8 rounded-2xl bg-surface-2 shadow-card-lg p-4 sm:p-6">
       {/* Headline + coming-soon tag */}
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[16px] sm:text-lg font-bold text-ink tracking-[-0.01em]">

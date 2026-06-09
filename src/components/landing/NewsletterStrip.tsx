@@ -12,7 +12,7 @@ import EmailCapture from "@/components/email/EmailCapture";
 
 export default function NewsletterStrip() {
   return (
-    <section className="py-12 sm:py-20 bg-surface border-y border-border">
+    <section className="py-12 sm:py-20 bg-surface">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <p className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-3">
           Stay in the loop

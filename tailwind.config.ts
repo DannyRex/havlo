@@ -43,6 +43,11 @@ const config: Config = {
       boxShadow: {
         card:        "0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06)",
         "card-hover":"0 4px 14px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04)",
+        /* Soft, wide float for the borderless feature/CTA cards (Amazon
+           promo, cashback waitlist, Amazon search). Cool slate-tinted to
+           match the palette; surface-2's lightness carries dark mode. */
+        "card-lg":       "0 1px 3px rgba(15, 23, 42, 0.05), 0 12px 28px -10px rgba(15, 23, 42, 0.13)",
+        "card-lg-hover": "0 2px 6px rgba(15, 23, 42, 0.06), 0 20px 40px -12px rgba(15, 23, 42, 0.18)",
         "brand":     "0 6px 20px rgba(22, 163, 74, 0.20)",
         "input":     "0 0 0 4px rgba(22, 163, 74, 0.10)",
       },

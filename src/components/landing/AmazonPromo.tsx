@@ -13,7 +13,7 @@ export default function AmazonPromo({ country }: { country: Country }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <Link
           href={`/${country.code}/amazon`}
-          className="group block rounded-2xl border border-border bg-surface-2 shadow-sm hover:shadow-md hover:border-ink/30 transition-all duration-300 p-7 sm:p-10"
+          className="group block rounded-2xl bg-surface-2 shadow-card-lg hover:shadow-card-lg-hover hover:-translate-y-0.5 transition-all duration-300 p-7 sm:p-10"
         >
           <div className="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-8">
             <div className="flex-1 min-w-0">

@@ -76,7 +76,7 @@ export default function VideoFeatureSection({
   }, [inView, src]);
 
   return (
-    <section className={surface ? "py-14 sm:py-24 bg-surface border-y border-border" : "py-14 sm:py-24 bg-bg"}>
+    <section className={surface ? "py-14 sm:py-24 bg-surface" : "py-14 sm:py-24 bg-bg"}>
       <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
         {/* Asymmetric columns so the video frame is the dominant element
             (~57% width) on either side. The wider fraction always lands
@@ -115,7 +115,11 @@ export default function VideoFeatureSection({
               surface-2 backing rather than cropping it. */}
           <div
             ref={boxRef}
-            className={`relative aspect-video rounded-2xl overflow-hidden border border-border bg-surface-2 shadow-sm ${reverse ? "md:order-1" : ""}`}
+            /* Bare frame: no grey backing, no border, just the clip. Any
+               letterbox falls on the section bg, not a grey box. Full-bleed
+               on mobile (-mx-4 cancels the section's px-4) so the in-clip UI
+               is large enough to read; inset + rounded from sm up. */
+            className={`relative aspect-video overflow-hidden -mx-4 sm:mx-0 rounded-none sm:rounded-2xl ${reverse ? "md:order-1" : ""}`}
           >
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
             <video

@@ -325,7 +325,7 @@ export default function CashbackPage({
         </section>
 
         {/* ── Email capture ────────────────────────────────────── */}
-        <section className="mb-12 p-6 sm:p-8 rounded-2xl border border-border-strong bg-surface-2">
+        <section className="mb-12 p-6 sm:p-8 rounded-2xl bg-surface-2 shadow-card-lg">
           <h2 className="text-xl sm:text-2xl font-bold text-ink tracking-[-0.02em] mb-2">
             Get your account on day one.
           </h2>
