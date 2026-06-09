@@ -60,10 +60,11 @@ const footerSections = [
          (in force 28 June 2025) for e-commerce-related services. Also
          signals good faith on US ADA Title III + UK Equality Act. */
       { label: "Accessibility",        href: "/accessibility"   },
-      /* DSA contact — required by EU Digital Services Act (Articles
-         11 + 12) for any platform accessible to EU users. Visible
-         single point of contact for users + EU authorities. */
-      { label: "DSA Contact",          href: "/dsa-contact"     },
+      /* DSA Contact link hidden until the EU/Germany launch — Havlo doesn't
+         yet operate in the EU (DE deferred from ACTIVE_COUNTRIES), so the
+         Digital Services Act point of contact isn't required. The
+         /dsa-contact page is kept (noindexed) for a one-line restore when
+         the EU market goes live. */
     ],
   },
 ] as const;

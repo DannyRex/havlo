@@ -103,6 +103,12 @@ const sections = [
 export const metadata: Metadata = {
   title:       "DSA Contact · Havlo",
   description: "Havlo's EU Digital Services Act point of contact and how to report illegal content surfaced on the platform.",
+  /* Hidden until the EU/Germany launch. Havlo doesn't yet operate in the
+     EU (DE is deferred from ACTIVE_COUNTRIES), so the DSA point of contact
+     isn't required and is de-linked from the footer + privacy policy. The
+     page is kept reachable but out of the index; remove this robots block
+     and restore the footer/privacy links when the EU market goes live. */
+  robots: { index: false, follow: false },
 };
 
 export default function DSAContactPage() {
