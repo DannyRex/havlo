@@ -109,9 +109,7 @@ export default async function AmazonDealsPage({
             Earn {cashbackPct}% back on Amazon
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-base leading-relaxed">
-            Shop Amazon the way you already do, just start from Havlo, and
-            we&apos;ll put {cashbackPct}% of every order back in your pocket.
-            It&apos;s almost here.{" "}
+            Cashback on every order you place through Havlo. Coming soon.{" "}
             <Link
               href={`/${country.code}/cashback`}
               className="font-semibold text-success hover:underline underline-offset-2"
