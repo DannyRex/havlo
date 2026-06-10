@@ -131,6 +131,14 @@ interface Props {
       visitor's country. Only relevant when localAlternative is
       surfaced — drives the banner's wording. */
   isLocallyShoppable?: boolean;
+  /** True while the comparison data (perStoreOffers / priceHistory /
+      totalStores / localAlternative) is still being fetched client-side
+      by PdpInteractive. The hero CORE (image, title, price, CTAs) renders
+      immediately from the server-passed `offer`; only the
+      PriceComparisonBar shows a skeleton in its place until the data
+      arrives, so a cold ISR navigation paints instantly instead of
+      freezing on the previous page. */
+  loading?: boolean;
 }
 
 /* Convert any price (NGN or USD) to the user's preferred currency.
@@ -150,7 +158,7 @@ function convertToUserCurrency(
   return country.currency === "USD" ? Math.round(out * 100) / 100 : Math.round(out);
 }
 
-export default function ProductHero({ offer, countryCode, totalStores, perStoreOffers, priceHistory, signedOutboundUrl, localAlternative, isLocallyShoppable }: Props) {
+export default function ProductHero({ offer, countryCode, totalStores, perStoreOffers, priceHistory, signedOutboundUrl, localAlternative, isLocallyShoppable, loading }: Props) {
   const country = getCountry(countryCode);
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -675,21 +683,44 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             country tiles. Last Checked is not intuitive — is it
             the last time I or havlo checked it?" — fixed via
             "Verified by Havlo" labelling inside the bar. */}
-        <PriceComparisonBar
-          thisPriceNgn={anchorPriceNgn}
-          thisStoreId={offer.storeId}
-          thisStoreName={displayStore}
-          thisIsCrossBorder={isCrossBorder}
-          country={country}
-          perStoreOffers={perStoreOffers ?? []}
-          priceHistory={priceHistory}
-          lastCheckedAt={offer.scrapedAt}
-          storeCountry={dealStoreCountry}
-          outOfStock={offer.inStock === false}
-          countryCode={countryCode}
-          productId={offer.productId}
-          productSearchTitle={offer.title}
-        />
+        {loading ? (
+          /* Comparison-bar skeleton — same dimensions as the real bar
+             (headline row, gradient track, range labels, footer fact
+             strip) so the swap-in is invisible. Mirrors the bar block in
+             src/app/[country]/p/[id]/loading.tsx. Shown while
+             PdpInteractive fetches the cross-store spectrum. */
+          <div className="rounded-2xl bg-surface border border-border p-4 sm:p-5" aria-hidden="true">
+            <div className="flex items-baseline justify-between gap-3 mb-3">
+              <div className="skeleton h-4 w-28 rounded" />
+              <div className="skeleton h-3 w-20 rounded" />
+            </div>
+            <div className="skeleton h-2 w-full rounded-full mb-2" />
+            <div className="flex items-center justify-between mb-3">
+              <div className="skeleton h-3 w-16 rounded" />
+              <div className="skeleton h-3 w-16 rounded" />
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-3 border-t border-border">
+              <div className="skeleton h-3 w-32 rounded" />
+              <div className="skeleton h-3 w-24 rounded" />
+            </div>
+          </div>
+        ) : (
+          <PriceComparisonBar
+            thisPriceNgn={anchorPriceNgn}
+            thisStoreId={offer.storeId}
+            thisStoreName={displayStore}
+            thisIsCrossBorder={isCrossBorder}
+            country={country}
+            perStoreOffers={perStoreOffers ?? []}
+            priceHistory={priceHistory}
+            lastCheckedAt={offer.scrapedAt}
+            storeCountry={dealStoreCountry}
+            outOfStock={offer.inStock === false}
+            countryCode={countryCode}
+            productId={offer.productId}
+            productSearchTitle={offer.title}
+          />
+        )}
       </div>
     </section>
     </>

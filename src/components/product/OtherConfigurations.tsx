@@ -1,3 +1,5 @@
+"use client";
+
 /* "Other configurations" disclosure for the PDP.
 
    Why this exists: a product like "MacBook Air 15 M3 256GB Starlight"
@@ -20,7 +22,10 @@
         OWN cheapest price + store count. No number here feeds the
         anchor's comparison, so nothing can contradict it.
 
-   Server component — pure helpers only, no client state. (#15) */
+   Client component (was server): the PDP now streams its comparison
+   data client-side via PdpInteractive, which renders this with the
+   client-fetched `configs`. Still pure presentational — no client
+   state of its own beyond the native <details> toggle. (#15) */
 
 import Link from "next/link";
 import { ChevronRight, Layers } from "lucide-react";
