@@ -458,6 +458,58 @@ export function isLooseCategoryModel(model: string | null | undefined): boolean 
   return LOOSE_CATEGORY_TYPES.has(model.toLowerCase().trim());
 }
 
+/* AMBIGUOUS_HARDWARE_TYPES — electronics / appliance category words where a
+   single brand sells MANY genuinely-distinct models (Logitech sells dozens of
+   headsets; Samsung dozens of monitors; HP hundreds of laptops). Unlike the
+   Fashion / Beauty fallback — where brand|<type> is a deliberately-coarse but
+   harmless "you may also like" cluster — using the bare hardware type as a
+   signature MODEL is actively wrong: it collapses different products under one
+   product_id at INGEST, so a $19 AliExpress knockoff "Logitech … Headset" gets
+   merged into the real "Logitech PRO X 2" product and shown as one of its
+   stores (June 2026 user report: ca652f59 pooled a PRO X 2, a G435, and two
+   Astro A50s as "the same product"; catalog audit found 13+ such pools —
+   hyperx|headset spanned $5.30–$149.99 across 14 offers).
+
+   When findModel can only resolve one of these bare types (no real model code
+   from MODEL_HINTS / SKU fallback), it must return null instead — the title
+   then gets a NULL signature (honest opt-out; dedups only via the exact
+   title_key path, which never wrong-merges). DELIBERATELY EXCLUDES the genuine
+   single-line anchors where the type word IS the model line and grouping its
+   variants is correct: nintendo `switch`, apple `watch` / `airpods` /
+   `homepod` / `airtag` / `magsafe` / `ipad`. Those keep their brand|type
+   signature. */
+const AMBIGUOUS_HARDWARE_TYPES = new Set<string>([
+  /* display + audio */
+  "television", "tv", "monitor", "projector", "display",
+  "earbuds", "earphones", "earphone", "headphones", "headphone",
+  "headset", "speaker", "soundbar", "amplifier",
+  /* computing + peripherals */
+  "laptop", "notebook", "desktop", "tablet", "chromebook",
+  "smartphone", "phone", "powerbank", "keyboard", "mouse", "mousepad", "webcam",
+  /* networking + photography + storage */
+  "router", "modem", "hub", "camera", "camcorder", "drone", "gimbal",
+  "tripod", "ssd", "harddrive", "flashdrive", "memorycard",
+  /* gaming peripherals (the consoles themselves anchor via MODEL_HINTS) */
+  "console", "controller", "joystick",
+  /* appliances — kitchen */
+  "fridge", "refrigerator", "freezer", "microwave", "oven", "stove", "cooker",
+  "blender", "mixer", "grinder", "toaster", "kettle", "coffeemaker", "fryer",
+  "airfryer", "dishwasher",
+  /* appliances — laundry + comfort + climate */
+  "washingmachine", "washer", "dryer", "iron", "steamer", "vacuum",
+  "vacuumcleaner", "fan", "heater", "humidifier", "dehumidifier", "purifier",
+  "airconditioner", "split",
+  /* health hardware */
+  "thermometer", "scale",
+]);
+
+/* True when a category word is one of the ambiguous hardware types above —
+   exported so the re-signature backfill recomputes identically to ingest. */
+export function isAmbiguousHardwareType(type: string | null | undefined): boolean {
+  if (!type) return false;
+  return AMBIGUOUS_HARDWARE_TYPES.has(type.toLowerCase().trim());
+}
+
 function findProductType(norm: string): string | null {
   /* Some titles concatenate words ("mini skirt" → "miniskirt"). The
      normalised string has spaces preserved, so we match on word
@@ -870,7 +922,18 @@ function findModel(brand: string | null, norm: string): string | null {
      produce a useful brand|type signature for the long tail of
      descriptive Fashion / Beauty titles that don't follow a
      model-code grammar. See PRODUCT_TYPES + findProductType above. */
-  return findProductType(norm);
+  const type = findProductType(norm);
+  /* …but NEVER for ambiguous hardware types (June 2026). A brand sells
+     dozens of distinct headsets / monitors / laptops, so brand|<type>
+     here is not a coarse-but-harmless cluster (as for Fashion) — it
+     MERGES different products under one product_id at ingest and pools a
+     $19 knockoff into the real product's offer list. Return null so the
+     title gets a NULL signature and dedups only via the exact title_key
+     path, which never wrong-merges. Genuine single-line anchors
+     (nintendo|switch, apple|watch/airpods/…) are excluded from the set,
+     so they still resolve here. */
+  if (isAmbiguousHardwareType(type)) return null;
+  return type;
 }
 
 function findStorage(norm: string): number | null {
