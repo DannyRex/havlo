@@ -297,8 +297,16 @@ export async function GET(req: NextRequest) {
     const search      = searchParams.get("search")      ?? undefined;
     const originParam = searchParams.get("origin") as OriginFilter | null;
     const origin      = originParam === "local" || originParam === "intl" ? originParam : "all";
-    const limit       = searchParams.get("limit")  ? parseInt(searchParams.get("limit")!,  10) : 24;
-    const offset      = searchParams.get("offset") ? parseInt(searchParams.get("offset")!, 10) : 0;
+    /* Clamp limit/offset (June 2026 QA): limit=-1 hit
+       slice(offset, offset - 1), whose negative end index made it return
+       the ENTIRE pool minus one row (1,893 items, megabytes per hit) — a
+       free heaviest-possible-query button for any caller; limit=9999
+       returned the full pool. Clamp to [1, 100] (UI pages request <=48)
+       and offset to >=0; NaN falls back to the defaults. */
+    const rawLimit    = searchParams.get("limit")  ? parseInt(searchParams.get("limit")!,  10) : 24;
+    const rawOffset   = searchParams.get("offset") ? parseInt(searchParams.get("offset")!, 10) : 0;
+    const limit       = Number.isFinite(rawLimit)  ? Math.min(Math.max(rawLimit, 1), 100) : 24;
+    const offset      = Number.isFinite(rawOffset) ? Math.max(rawOffset, 0) : 0;
 
     /* Multi-store filter: comma-separated list of store IDs the user
        has ticked in the Stores filter panel (e.g. ?stores=argos,currys).

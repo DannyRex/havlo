@@ -812,6 +812,31 @@ export async function loadPdpData(offerId: string, countryCode: string): Promise
   const spectrumLowNgn = perStoreOffers.length > 0
     ? Math.min(...perStoreOffers.map((o) => o.effectiveNgn))
     : anchorPriceNgn;
+
+  /* ── Live-price clamp on "Lowest tracked" (June 2026 QA) ──────────
+     The no-history fallback below already encodes the invariant — the
+     chart "can never claim an all-time low above a price a store is
+     selling at right now" — but it only applied when history was EMPTY.
+     With sparse/sanitised history the rollup low can sit ABOVE today's
+     live cheapest (QA repro: "£47 listed here" beside "Lowest tracked:
+     £211" — the £47 had no surviving history row). A price on sale right
+     now IS a tracked price, so clamp the summary low to the live
+     spectrum floor; store attribution is dropped the same way the
+     chart-floor reconciliation above drops it. */
+  if (
+    priceHistorySummary &&
+    spectrumLowNgn > 0 &&
+    priceHistorySummary.allTimeLowNgn > spectrumLowNgn
+  ) {
+    priceHistorySummary = {
+      ...priceHistorySummary,
+      allTimeLowNgn:     spectrumLowNgn,
+      allTimeLowAt:      new Date().toISOString(),
+      allTimeLowStoreId: "",
+      thisStoreLowNgn:   undefined,
+    };
+  }
+
   const chartPoints: PriceHistoryPoint[] =
     priceTimeseriesSane && priceTimeseriesSane.length > 0
       ? priceTimeseriesSane

@@ -275,7 +275,14 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
      Why does the price show USD?" */
   let secondaryStr: string | null = null;
   if (isCrossBorderForUser && !sameCcy) {
-    if (dealCcy === "NGN") secondaryStr = `≈ ${formatCompact(deal.salePrice)}`;
+    /* Stored NGN is only the store's REAL currency for NG-anchored
+       stores (Jumia, Konga). A global-intl marketplace row ingested via
+       the NG cron (DHgate, AliExpress) carries NGN as an ingestion
+       artifact — surfacing "≈ ₦21K" to a UK shopper on a DHgate card
+       implies DHgate prices in naira (June 2026 QA: ₦ leak on /uk PDP
+       rail). Same gate the USD branch below applies via usdIsNative. */
+    const ngnIsNative = dealStoreCountry?.toLowerCase() === "ng";
+    if (dealCcy === "NGN" && ngnIsNative) secondaryStr = `≈ ${formatCompact(deal.salePrice)}`;
     else if (dealCcy === "USD") {
       /* The stored "USD" is only the store's REAL currency for
          genuinely dollar-native sources: global-intl marketplaces
