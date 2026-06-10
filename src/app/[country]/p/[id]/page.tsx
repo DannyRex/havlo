@@ -157,10 +157,28 @@ function offerRowToHero(row: OfferRow): OfferData {
 
 /* ── Static params ───────────────────────────────────────────────── */
 
-/* Skipped: offers churn every ingest cycle, so pre-rendering would
-   waste build minutes on URLs that go stale within hours. ISR's
-   on-demand caching is the right shape — each unique URL warms its
-   own cache entry the first time a visitor lands on it. */
+/* Return an EMPTY set: we deliberately pre-render ZERO offer URLs at
+   build time (offers churn every ingest cycle, so build-time snapshots
+   would go stale within hours and waste build minutes). But the
+   function MUST be present — a dynamic segment with NO
+   generateStaticParams at all is classified `ƒ` (Dynamic), never enters
+   the prerender/ISR manifest, and `export const revalidate` above then
+   silently has NO effect: every request renders dynamically
+   (x-vercel-cache: MISS, private/no-store) on the highest-traffic page
+   on the site. Exporting generateStaticParams (even returning []) opts
+   the route into static generation with fallback: blocking, so each
+   unique offer URL is server-rendered on its FIRST hit and then served
+   from the ISR cache (x-vercel-cache: HIT/PRERENDER) until the
+   revalidate window — the on-demand caching this page always intended.
+   dynamicParams keeps its default (true) so any offer id still renders
+   on demand; we just don't seed the cache at build time.
+
+   Verified via `next build`: without this the route is `ƒ` and absent
+   from prerender-manifest.dynamicRoutes; with it the route is `●` with
+   fallback: null (blocking ISR) and zero prewarmed paths. */
+export function generateStaticParams(): { country: string; id: string }[] {
+  return [];
+}
 
 /* ── Metadata ────────────────────────────────────────────────────── */
 
