@@ -21,6 +21,7 @@ try {
 
 import { fetchEbayUkDealsViaSerpapi, UK_EBAY_QUERIES } from "../src/lib/providers/search-ebay-serpapi";
 import { ingestDeals } from "../src/lib/providers/ingestion";
+import { getSupabaseAdmin } from "../src/lib/providers/db-client";
 import type { Deal } from "../src/types";
 
 function parseArgs(): { dryRun: boolean; limit: number | null } {
@@ -92,6 +93,16 @@ async function main() {
     const result = await ingestDeals("serpapi-ebay-uk", "ebay-uk:uk", unique);
     upserted = result.upserted;
     for (const er of result.errors) console.log(`    ! ${er}`);
+
+    /* Refresh the cheapest-offer matview the deals feed reads — without
+       this, freshly-upserted eBay UK offers sit in `offers` but never
+       surface in /uk/deals until the next cron refresh. (The regular cron
+       refreshes it; this standalone script must do it itself.) */
+    const supa = getSupabaseAdmin();
+    if (supa) {
+      const { error } = await supa.rpc("refresh_cheapest_offers");
+      console.log(error ? `    ! matview refresh failed: ${error.message}` : "  ✓ cheapest-offer matview refreshed");
+    }
   }
 
   console.log(`\n✓ Done — upserted ${upserted} / ${unique.length} listings`);

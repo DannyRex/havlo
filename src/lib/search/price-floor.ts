@@ -214,7 +214,7 @@ const ACCESSORY_HARD: RegExp[] = [
    standalone "Anker PowerCore Battery" / "Anker USB-C Cable" product is
    NOT caught, but "Battery for Astro A50" / "Charger for Sony WH-1000XM5"
    (parts AliExpress returns for branded searches) is. */
-const ACCESSORY_SOFT_NOUN = /\b(?:case|cover|sleeve|strap|holder|stand|mount|grip|bumper|shell|guard|dock|cushion|protector|batter(?:y|ies)|charger|cable|cord|adapter|antenna)\b/;
+const ACCESSORY_SOFT_NOUN = /\b(?:case|cover|sleeve|strap|holder|stand|mount|grip|bumper|shell|guard|dock|cushion|protector|batter(?:y|ies)|charger|cable|cord|adapter|antenna|remote)\b/;
 /* Fitment connector across the marketplaces we ingest: English "for",
    German "für"/"fuer", French "pour", Spanish/Portuguese "para". Only
    consulted AFTER ACCESSORY_SOFT_NOUN matches, so the non-English words

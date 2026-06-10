@@ -247,6 +247,30 @@ export function normaliseTitleKey(title: string): string {
     .slice(0, 120);
 }
 
+/* Split URLs into chunks whose cumulative length stays under a byte budget,
+   so a PostgREST `.in("url", chunk)` query string never exceeds the ~8KB
+   cap. A fixed-count chunk silently 400s once URLs get long enough (eBay's
+   /itm/<id>?_skw=<query>); budgeting by bytes is length-agnostic. A single
+   URL longer than the budget still ships alone (better a big query than a
+   dropped probe). */
+function chunkUrlsByBytes(urls: string[], budgetBytes = 6000): string[][] {
+  const chunks: string[][] = [];
+  let cur: string[] = [];
+  let len = 0;
+  for (const u of urls) {
+    const cost = encodeURIComponent(u).length + 4; // ~comma + quoting overhead
+    if (cur.length > 0 && len + cost > budgetBytes) {
+      chunks.push(cur);
+      cur = [];
+      len = 0;
+    }
+    cur.push(u);
+    len += cost;
+  }
+  if (cur.length > 0) chunks.push(cur);
+  return chunks;
+}
+
 function dealToProductRow(d: Deal, signature: string | null) {
   /* Strip merchant-side brand placeholders ("Generic", "Unbranded",
      "No Brand") before any other title work — every downstream
@@ -715,19 +739,21 @@ export async function ingestDeals(
      largely uniform anyway. */
   const urls = Array.from(new Set(offerUrls.map((o) => o.url).filter(Boolean)));
   const offerHits = new Map<string, string>(); // key = `${storeId}:${url}` → product_id
-  /* Chunked lookup — PostgREST URL cap is ~8KB. PayPorte's 1,480-URL
-     daily ingest blew past that limit silently here (no error check
-     on the original query — `rows` came back null, the loop ran over
-     nothing, dedup missed every entry). Chunk by 100 URLs. */
-  const OFFER_URL_CHUNK_SIZE = 100;
-  for (let i = 0; i < urls.length; i += OFFER_URL_CHUNK_SIZE) {
-    const chunk = urls.slice(i, i + OFFER_URL_CHUNK_SIZE);
+  /* Chunk by cumulative BYTE length, not a fixed count — PostgREST's
+     `.in()` goes in the query string, capped at ~8KB. A flat 100-URL chunk
+     was safe for short URLs but overflowed for long marketplace URLs
+     (eBay's /itm/<id>?_skw=<query> at ~100 chars × 100 = 10KB → every probe
+     returned `Bad Request`, silently disabling URL dedup — June 2026 eBay
+     UK ingest). Budget 6KB leaves headroom under the cap regardless of URL
+     length. */
+  const urlChunks = chunkUrlsByBytes(urls, 6000);
+  for (let i = 0; i < urlChunks.length; i++) {
     const { data: rows, error: rowsErr } = await supa
       .from("offers")
       .select("store_id, url, product_id")
-      .in("url", chunk);
+      .in("url", urlChunks[i]);
     if (rowsErr) {
-      result.errors.push(`Offers-by-url probe (chunk ${Math.floor(i / OFFER_URL_CHUNK_SIZE) + 1}): ${rowsErr.message}`);
+      result.errors.push(`Offers-by-url probe (chunk ${i + 1}): ${rowsErr.message}`);
       continue;
     }
     for (const r of (rows ?? []) as Array<{ store_id: string; url: string; product_id: string }>) {
@@ -1159,7 +1185,7 @@ export async function ingestDeals(
      no real product's pool). The accessory-title gate in the AliExpress
      provider catches the part/battery titles; this catches clean-titled
      clones by price. */
-  const MARKETPLACE_CLONE_STORES = new Set(["aliexpress"]);
+  const MARKETPLACE_CLONE_STORES = new Set(["aliexpress", "ebay-uk"]);
   const RELATIVE_FLOOR = 0.35;
   const usdOf = (price: number, cur: string): number => {
     if (!price || price <= 0) return 0;
@@ -1239,18 +1265,17 @@ export async function ingestDeals(
        the previous single-shot version had a NULL-byte typo in the
        Map key template ("${o.store_id}\0${o.url}"), so even when the
        query succeeded the displaced lookup never matched anything. */
-    const DISPLACED_URL_CHUNK_SIZE = 100;
     const existingMap = new Map<string, string>();
     let probeFailed = false;
-    for (let i = 0; i < urls.length; i += DISPLACED_URL_CHUNK_SIZE) {
-      const chunk = urls.slice(i, i + DISPLACED_URL_CHUNK_SIZE);
+    const displacedChunks = chunkUrlsByBytes(urls, 6000); // byte-budgeted — long eBay URLs 400'd a fixed 100-chunk
+    for (let i = 0; i < displacedChunks.length; i++) {
       const { data: existing, error: existingErr } = await supa
         .from("offers")
         .select("product_id, store_id, url")
         .in("store_id", storeIds)
-        .in("url", chunk);
+        .in("url", displacedChunks[i]);
       if (existingErr) {
-        result.errors.push(`Displaced-offer probe (chunk ${Math.floor(i / DISPLACED_URL_CHUNK_SIZE) + 1}): ${existingErr.message}`);
+        result.errors.push(`Displaced-offer probe (chunk ${i + 1}): ${existingErr.message}`);
         probeFailed = true;
         break;
       }

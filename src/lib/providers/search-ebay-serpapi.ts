@@ -20,8 +20,18 @@
 
 import type { Deal } from "@/types";
 import { USD_FX } from "@/lib/country";
+import { isAccessoryListing } from "@/lib/search/price-floor";
 
 const SERPAPI_ENDPOINT = "https://serpapi.com/search.json";
+
+/* Floor for eBay UK results. Every UK_EBAY_QUERIES entry is a specific
+   flagship product (iPhone, MacBook, PS5, Dyson, GHD, …) whose cheapest
+   legit listing — even used — clears ~$25. eBay's keyword search also
+   returns CASES / CABLES / SCREEN PROTECTORS that match the keywords; the
+   cheapest-offer logic then surfaces a $5 "iPhone" that's really a case
+   (user report, June 2026). So drop sub-$25 results outright (the
+   isAccessoryListing gate below catches the higher-priced fitment parts). */
+const EBAY_UK_MIN_USD = 25;
 
 /* eBay engine `organic_results[]` shape (the subset we read). `price` is
    either a single {raw, extracted} or a {from,to} range for multi-variant
@@ -86,6 +96,12 @@ export async function fetchEbayUkDealsViaSerpapi(query: EbayQuery, apiKey: strin
     const link = r.link?.trim();
     if (!title || !link) continue;
 
+    /* Accessory / spare-part gate — eBay's keyword search returns fitment
+       parts (cases, chargers, screen protectors, replacement batteries)
+       SEO-matched to the flagship query. Drop them so a $9 "case for
+       iPhone 15 Pro Max" never surfaces as an iPhone deal. */
+    if (isAccessoryListing(title)) continue;
+
     /* Hard-require a real ebay.co.uk product listing. The engine should
        only ever return these, but guard so a stray result can't slip in
        and get mis-tagged. /itm/ is eBay's item-page marker. */
@@ -97,7 +113,7 @@ export async function fetchEbayUkDealsViaSerpapi(query: EbayQuery, apiKey: strin
     const gbp = priceGbp(r.price);
     if (gbp === null) continue;
     const usd = gbpToUsd(gbp);
-    if (usd < 1) continue;
+    if (usd < EBAY_UK_MIN_USD) continue;
 
     const condition = r.condition?.trim();
     const isUsed = condition ? !/new/i.test(condition) : false;
