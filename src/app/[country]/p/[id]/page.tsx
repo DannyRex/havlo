@@ -146,7 +146,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
        full why), but noindex keeps these out of the index regardless. */
     return {
       title: "Product no longer available",
-      robots: { index: false, follow: false },
+      /* index:false drops the dead URL; follow:true (was nofollow — June
+         2026 GSC audit) lets crawlers flow through the dead-end's links
+         (categories, /deals) so equity into a churned PDP isn't stranded. */
+      robots: { index: false, follow: true },
     };
   }
 

@@ -53,6 +53,12 @@ async function fetchProductSitemapRows(): Promise<Array<{ offerId: string; updat
     const { data, error } = await supa
       .from("product_best_offers")
       .select("offer_id, scraped_at")
+      /* Image required (June 2026 GSC audit): imageless UUID PDPs are the
+         thinnest pages we emit and feed "Crawled - currently not indexed"
+         (503 URLs). Keep them OUT of the sitemap so Google's crawl budget
+         goes to pages that can actually rank (image + price + offers);
+         they stay reachable through internal links regardless. */
+      .not("image_url", "is", null)
       .order("scraped_at", { ascending: false })
       .range(from, from + SITEMAP_PAGE - 1);
     if (error || !data) break;

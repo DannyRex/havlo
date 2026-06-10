@@ -13,8 +13,14 @@ export default function robots(): MetadataRoute.Robots {
         disallow: [
           "/api/",
           "/_next/",
-          "/*?*country=*",       // dedupe — country lives in URL path, not query
-          "/*?*utm_*",           // dedupe — utm-tagged URLs map to canonicals
+          /* The `?country=` / `?utm_` Disallow patterns are GONE (June 2026
+             GSC audit). Robots-blocking parameter URLs is the WRONG dedupe
+             tool: Google can't crawl a blocked URL, so it can't see the
+             canonical on it — the URLs pile up forever as "Blocked by
+             robots.txt" (357 and rising) and any link equity into them is
+             stranded. Every page already declares a clean self-canonical,
+             which is the correct consolidation mechanism. Google also
+             handles utm_ params natively. */
         ],
       },
       /* Answer engines (ChatGPT, Claude, Perplexity, Gemini-via-GPTBot)
