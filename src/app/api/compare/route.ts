@@ -287,9 +287,21 @@ export async function GET(req: NextRequest) {
        param only when it's a supported country code; otherwise fall
        through to the cookie/geo chain. */
     const countryParam = req.nextUrl.searchParams.get("country")?.toLowerCase().trim();
-    const country = countryParam && COUNTRIES.some((c) => c.code === countryParam)
-      ? getCountry(countryParam)
+    const hasExplicitCountry = !!countryParam && COUNTRIES.some((c) => c.code === countryParam);
+    const country = hasExplicitCountry
+      ? getCountry(countryParam!)
       : getServerCountry();
+
+    /* CDN-cache safety (June 2026 pills bug): responses are cached
+       s-maxage=3600 keyed on the URL ONLY — but without ?country= the
+       result is shaped by the visitor's cookie/geo, so the first
+       visitor's country got cached and served to every other country
+       (an NG visitor clicking a pill received a US-geo-filtered payload
+       → "Nothing found" for products with 2 NG stores). CompareContent
+       now always pins ?country=, putting it in the cache key; any
+       remaining param-less caller gets an UNCACHEABLE response so its
+       cookie-shaped payload can never poison the shared cache. */
+    const okHeaders = hasExplicitCountry ? headers : emptyHeaders;
 
     /* Resolution priority — pid first when present.
 
@@ -416,7 +428,7 @@ export async function GET(req: NextRequest) {
         if (synthFiltered.mode === "similar") {
           return NextResponse.json(
             { ...synthFiltered, displayCurrency: country.currency, displayCountry: country.code },
-            { headers },
+            { headers: okHeaders },
           );
         }
       }
@@ -429,7 +441,7 @@ export async function GET(req: NextRequest) {
        currency. See /api/deals for matching doc. */
     return NextResponse.json(
       { ...filtered, displayCurrency: country.currency, displayCountry: country.code },
-      { headers: filtered.mode === "empty" ? emptyHeaders : headers },
+      { headers: filtered.mode === "empty" ? emptyHeaders : okHeaders },
     );
   } catch (err) {
     console.error("[/api/compare]", err);

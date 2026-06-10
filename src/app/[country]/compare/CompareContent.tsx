@@ -169,14 +169,18 @@ export default function CompareContent({
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch(`/api/compare?key=${encodeURIComponent(key)}`);
+      /* country pinned to the PAGE country — the API otherwise falls back
+         to the geo cookie, which can disagree with the page (an NG pill
+         clicked by a US-geo visitor got country-filtered to empty even
+         though the product has 2 NG stores — June 2026 pills bug). */
+      const res = await fetch(`/api/compare?key=${encodeURIComponent(key)}&country=${country.code}`);
       setResult(await res.json() as SearchOutput);
     } catch {
       setResult({ mode: "empty", query: displayQ, suggestions: [] });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [country.code]);
 
   /* ── URL path: sniff → use sniffed product as the literal anchor ─────
      Old flow: sniffed title → /api/compare → pg-fts picks a *similar*
@@ -282,7 +286,7 @@ export default function CompareContent({
        the name but no usable price) → a real title-search is still
        worthwhile, so search on the title (never the raw URL). */
     if (sniffedTitle) {
-      const comparePromise = fetch(`/api/compare?q=${encodeURIComponent(sniffedTitle)}&mode=similar`)
+      const comparePromise = fetch(`/api/compare?q=${encodeURIComponent(sniffedTitle)}&mode=similar&country=${country.code}`)
         .then((r) => r.json() as Promise<SearchOutput>);
       fetchLive(sniffedTitle, comparePromise.then(dbAltCount).catch(() => 0));
       try {
@@ -303,7 +307,7 @@ export default function CompareContent({
        credit on a query that can never resolve. */
     setResult({ mode: "empty", query: rawUrl, suggestions: [] });
     setLoading(false);
-  }, [router, fetchLive]);
+  }, [router, fetchLive, country.code]);
 
   /* ── Text search ────────────────────────────────────────────────────── */
   const handleSearch = useCallback(async (q: string, pid?: string, oid?: string) => {
@@ -325,7 +329,7 @@ export default function CompareContent({
        PDP CTA); oid is the ultimate fallback for when pid + FTS both
        miss — /api/compare synthesises an anchor from the offer-row
        directly so the user always sees their product. */
-    const apiParams = new URLSearchParams({ q, mode: "similar" });
+    const apiParams = new URLSearchParams({ q, mode: "similar", country: country.code });
     if (pid) apiParams.set("pid", pid);
     if (oid) apiParams.set("oid", oid);
     const comparePromise = fetch(`/api/compare?${apiParams.toString()}`)
@@ -353,7 +357,7 @@ export default function CompareContent({
     } finally {
       setLoading(false);
     }
-  }, [router, handleUrlSearch, fetchLive]);
+  }, [router, handleUrlSearch, fetchLive, country.code]);
 
   /* ── SearchBar submit handler ─────────────────────────────────────────
      Every search from the /compare bar resolves ON /compare: a pasted
