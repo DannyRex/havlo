@@ -146,6 +146,12 @@ export default function ListCard({ deal, linkHref }: Props) {
          live-search persist path is paused, so those IDs never
          resolve in the offers table. linkHref override still wins
          where callers need a custom destination. */
+      /* prefetch={false}: PDP is static/ISR, so a default prefetch pulls
+         the full heavy PDP payload per card AND suppresses the
+         p/loading.tsx skeleton on click. Opting out restores the instant
+         skeleton (ISR still serves fast on click). Same rationale as
+         MasonryCard's PDP <Link>. */
+      prefetch={false}
       href={linkHref ?? pdpUrlForDeal(country.code, deal)}
       aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${displayStore}. Open details.`}
       className="group flex gap-3 items-start p-2.5 rounded-2xl border border-border bg-surface hover:border-border-strong hover:shadow-card transition-all"

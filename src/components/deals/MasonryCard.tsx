@@ -310,6 +310,16 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
          live-search persist path is paused, so those IDs never
          resolve in the offers table. linkHref override still wins
          where callers need a custom destination (rare). */
+      /* prefetch={false}: the PDP is statically generated (ISR) — it has
+         generateStaticParams. A default <Link> therefore prefetches the
+         FULL PDP RSC payload for every card in the viewport (a cold-render
+         storm on the deals/rail feeds) AND suppresses the p/loading.tsx
+         skeleton on click: the router waits on the in-flight full prefetch
+         instead of showing the loading boundary, so the current page just
+         freezes for the render duration. Opting out restores the instant
+         skeleton on navigation; the ISR cache still serves the page fast on
+         the actual click. Mirrors ProductHero's compare-CTA prefetch={false}. */
+      prefetch={false}
       href={linkHref ?? pdpUrlForDeal(country.code, deal)}
       aria-label={`${cleanedTitle}, ${isPriceFromOnly ? "from " : ""}${priceFmt} at ${displayStore}. Open details.`}
       className="group block"

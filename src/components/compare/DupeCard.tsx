@@ -243,6 +243,11 @@ export default function DupeCard({
 
       {cardHref ? (
         <Link
+          /* prefetch={false}: PDP is static/ISR, so a default prefetch
+             pulls the full heavy PDP payload AND suppresses the
+             p/loading.tsx skeleton on click. Opting out restores the
+             skeleton. Same rationale as MasonryCard's PDP <Link>. */
+          prefetch={false}
           href={cardHref}
           onClick={() => trackClick(dupe.key, query, rank, mode)}
           className="block"
