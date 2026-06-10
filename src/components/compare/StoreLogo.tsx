@@ -51,14 +51,25 @@ export default function StoreLogo({
   size = 40,
   pad = 6,
 }: Props) {
-  /* Favicon source for the fallback tier. resolveStoreDomain prefers
+  /* Favicon sources for the fallback tiers. resolveStoreDomain prefers
      the store's curated canonical domain (reliable brand icon) and only
      falls back to the offer's own merchant host, returning null for
      relay / Google / ad-redirect hosts so we degrade to the letter
-     badge rather than a wrong logo. Finding #7. */
+     badge rather than a wrong logo. Finding #7.
+
+     TWO providers because neither is reliably high-res on its own:
+     Google s2 (sz=128) returns up to 128px where a site declares a large
+     icon (nike, jumia 64-128) but only 16x16 for many (clarins, infinix,
+     converse); DuckDuckGo often has a far bigger icon for exactly those
+     (clarins 256, infinix 48). So try Google first, then step to
+     DuckDuckGo on error OR when Google hands back a tiny <=16px icon —
+     the blurry-dot symptom the brands page showed. (June 2026.) */
   const domain = resolveStoreDomain(storeId, storeName, merchantUrl);
   const favicon = domain
-    ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+    ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+    : null;
+  const favicon2 = domain
+    ? `https://icons.duckduckgo.com/ip3/${domain}.ico`
     : null;
 
   /* Only use the /logos/<slug>.png primary tier when that file is
@@ -70,7 +81,7 @@ export default function StoreLogo({
   const logoSlug = /\/logos\/([^/]+)\.png$/.exec(storeLogoUrl || "")?.[1];
   const primaryUsable = !!storeLogoUrl && (logoSlug ? BUNDLED_LOGOS.has(logoSlug) : true);
 
-  type Tier = "primary" | "favicon" | "letter";
+  type Tier = "primary" | "favicon" | "favicon2" | "letter";
   const [tier, setTier] = useState<Tier>(
     primaryUsable ? "primary" : favicon ? "favicon" : "letter",
   );
@@ -78,27 +89,36 @@ export default function StoreLogo({
   const src =
     tier === "primary" ? storeLogoUrl
     : tier === "favicon" ? favicon
+    : tier === "favicon2" ? favicon2
     : null;
 
-  /* Step down a tier on each image error: primary -> favicon (if we
-     have one) -> letter. */
+  /* Step down a tier on each image error:
+     primary -> favicon (Google) -> favicon2 (DuckDuckGo) -> letter. */
   function handleError() {
-    setTier((t) => (t === "primary" && favicon ? "favicon" : "letter"));
+    setTier((t) =>
+      t === "primary" && favicon ? "favicon"
+      : (t === "primary" || t === "favicon") && favicon2 ? "favicon2"
+      : "letter",
+    );
   }
 
-  /* SSR onError race (QA Jun 2026): the <img> server-renders with the
-     primary src and can finish loading — and FAILING (a 404'd
-     /logos/<id>.png) — BEFORE React hydrates and attaches onError. The
-     missed error left the tile stuck broken instead of falling through
-     to the favicon (most visible on /brands, where most slugs have no
-     bundled logo). After mount and after each tier change, re-check the
-     live <img>: if it already errored (complete with zero natural size),
-     step the tier down manually. Terminates at the letter tier (no img
-     rendered), so no loop. */
+  /* Post-load corrections (QA Jun 2026):
+     (a) SSR onError race — the <img> server-renders with the primary src
+         and can finish loading AND FAILING (a 404'd /logos/<id>.png)
+         BEFORE React hydrates + attaches onError, leaving the tile stuck
+         broken. Re-check after mount: complete with zero natural size =>
+         step the tier down.
+     (b) Tiny-favicon upgrade — Google s2 sometimes returns a usable but
+         16x16 icon (loads fine, never errors) that renders as a blurry
+         dot. When that happens and a DuckDuckGo fallback exists, step to
+         it (often a much larger icon). Only fires from the google
+         `favicon` tier and favicon2 is terminal, so no loop. */
   const imgRef = useRef<HTMLImageElement | null>(null);
   useEffect(() => {
     const img = imgRef.current;
-    if (img && img.complete && img.naturalWidth === 0) handleError();
+    if (!img || !img.complete) return;
+    if (img.naturalWidth === 0) { handleError(); return; }
+    if (tier === "favicon" && favicon2 && img.naturalWidth <= 16) setTier("favicon2");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tier, src]);
 

@@ -22,6 +22,7 @@
    so the favicon tier is never reached for them. */
 
 import { toAbsoluteMerchantUrl } from "@/lib/pdp-url";
+import { marketplaceBaseSlug } from "@/lib/store-logo";
 
 /** Normalise a store id or display name to a comparable slug:
     lowercase, alphanumerics only. "JD Sports" and "jd-sports" both
@@ -68,6 +69,11 @@ const STORE_DOMAINS: Record<string, string> = {
   // ── NG ──
   jumia: "jumia.com.ng",
   konga: "konga.com",
+  // eBay: bundled /logos/ebay.png is a 16x16 placeholder, so it's
+  // de-bundled (June 2026) and resolves a crisp ebay.com favicon instead.
+  // resolveStoreDomain() collapses ebay-<seller> variants via
+  // marketplaceBaseSlug, so every per-seller card resolves here too.
+  ebay: "ebay.com",
   jiji: "jiji.ng",
   slot: "slot.ng",
   kara: "kara.com.ng",
@@ -117,6 +123,80 @@ const STORE_DOMAINS: Record<string, string> = {
   shein: "shein.com",
   temu: "temu.com",
   dhgate: "dhgate.com",
+
+  /* ── Expanded coverage (June 2026 logo audit) ──
+     The store-logo audit found 939 in-stock stores falling to a bare
+     letter badge — many of them recognisable retailers simply absent
+     from this map. Keys are canonicalStoreSlug form (lowercase, alnum
+     only) so they match whatever storeId/storeName variant the DB holds.
+     Domains verified by eye against the retailer's live site. */
+  // UK
+  hsamuel: "hsamuel.co.uk",
+  ernestjones: "ernestjones.co.uk",
+  moss: "moss.co.uk",
+  superdrug: "superdrug.com",
+  hollandbarrett: "hollandandbarrett.com",
+  matalan: "matalan.co.uk",
+  officeshoes: "office.co.uk",
+  theperfumeshop: "theperfumeshop.com",
+  boohoo: "boohoo.com",
+  prettylittlething: "prettylittlething.com",
+  gymshark: "gymshark.com",
+  footasylum: "footasylum.com",
+  frasers: "frasers.com",
+  flannels: "flannels.com",
+  ocado: "ocado.com",
+  appliancesdirect: "appliancesdirect.co.uk",
+  homeoutletdirect: "homeoutletdirect.co.uk",
+  hughes: "hughes.co.uk",
+  dorothyperkinsuk: "dorothyperkins.com",
+  coast: "coastfashion.com",
+  accessorize: "accessorize.com",
+  hobbycraft: "hobbycraft.co.uk",
+  endclothing: "endclothing.com",
+  justmylook: "justmylook.com",
+  decathlonuk: "decathlon.co.uk",
+  hm: "hm.com",
+  // US
+  academysportsoutdoors: "academy.com",
+  belk: "belk.com",
+  footlocker: "footlocker.com",
+  champssports: "champssports.com",
+  gamestop: "gamestop.com",
+  abercrombiefitch: "abercrombie.com",
+  fragrancenet: "fragrancenet.com",
+  stockx: "stockx.com",
+  goat: "goat.com",
+  mercari: "mercari.com",
+  brandsmartusa: "brandsmartusa.com",
+  lodgecastiron: "lodgecastiron.com",
+  wilsonsportinggoods: "wilson.com",
+  ultabeauty: "ulta.com",
+  charlottetilbury: "charlottetilbury.com",
+  drunkelephantskincare: "drunkelephant.com",
+  levis: "levi.com",
+  puma: "puma.com",
+  lenovo: "lenovo.com",
+  etsyseller: "etsy.com",
+  shopsimon: "shopsimon.com",
+  // IN
+  bigbasket: "bigbasket.com",
+  pantaloons: "pantaloons.com",
+  tatacliqfashion: "tatacliq.com",
+  mamaearth: "mamaearth.in",
+  hyugalife: "hyugalife.com",
+  perniaspopupshop: "perniaspopupshop.com",
+  superkicks: "superkicks.in",
+  boat: "boat-lifestyle.com",
+  // DE
+  refurbedde: "refurbed.com",
+  booztde: "boozt.com",
+  // misc cross-border
+  techinn: "tradeinn.com",
+  kitlocker: "kitlocker.com",
+  mcgrocer: "mcgrocer.com",
+  doverstreetmarket: "doverstreetmarket.com",
+  georgeatasda: "george.com",
 };
 
 /* Hosts that are never a real merchant storefront — Google properties
@@ -159,6 +239,10 @@ export function resolveStoreDomain(
   merchantUrl?: string,
 ): string | null {
   const curated =
+    /* Collapse marketplace seller/regional variants first
+       (ebay-<seller> → ebay) so the favicon resolves for every variant,
+       not just the bare base id. */
+    STORE_DOMAINS[canonicalStoreSlug(marketplaceBaseSlug(storeId))] ??
     STORE_DOMAINS[canonicalStoreSlug(storeId)] ??
     STORE_DOMAINS[canonicalStoreSlug(storeName)];
   if (curated) return curated;

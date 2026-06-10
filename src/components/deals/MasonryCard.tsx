@@ -24,6 +24,7 @@ import {
 } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import StoreLogo from "@/components/compare/StoreLogo";
+import { resolveStoreLogoUrl } from "@/lib/store-logo";
 import { useCountry } from "@/components/providers/CountryProvider";
 import {
   USD_FX, formatLocal, resolveStoreCountry, isGlobalIntlStore, type Country,
@@ -183,12 +184,13 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
      ("Amazon.de - Amazon.de-Seller" → "Amazon Germany") that escaped
      ingest-time canonicalisation on older DB rows. */
   const displayStore = displayStoreName(deal.storeName);
-  /* Logo file path. eBay (and a few marketplaces) fragment into
-     per-seller store ids (ebay-characteruk) whose per-seller logo files
-     don't exist — collapse those to the marketplace slug so the real
-     /logos/ebay.png renders. StoreLogo still falls through to a favicon
-     then a letter badge for any store without a bundled asset. */
-  const logoStoreId = /^ebay[-_]/i.test(deal.storeId) ? "ebay" : deal.storeId;
+  /* Logo file path via the shared resolver — collapses EVERY marketplace
+     that fragments into per-seller / per-region store ids (amazon-uk,
+     ebay-<seller>, walmart-<seller>, currys-business, dell-uk, qvc-uk)
+     to its single bundled asset. Was an inline ebay-only collapse, which
+     left amazon-uk/in/de/ae (the bulk of Amazon offers) pointing at a
+     non-existent /logos/amazon-uk.png → no logo. (June 2026.) */
+  const storeLogoSrc = resolveStoreLogoUrl(deal.storeId);
 
   /* Amazon search-URL deals (curated catalog rows that link to
      /s?k=... rather than a /dp/ASIN page). The displayed price is
@@ -453,7 +455,7 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
           <StoreLogo
             storeId={deal.storeId}
             storeName={deal.storeName}
-            storeLogoUrl={`/logos/${logoStoreId}.png`}
+            storeLogoUrl={storeLogoSrc}
             size={18}
             pad={3}
           />

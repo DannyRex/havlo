@@ -26,11 +26,13 @@ export const BUNDLED_LOGOS: ReadonlySet<string> = new Set([
   "desertcart-in",
   "dhgate",
   "dick-s-sporting-goods",
-  "ebay",
+  // "ebay" + "healthplus" de-bundled (June 2026): their /logos PNGs are
+  // 16x16 placeholders that render as a blurry dot. Removed here so
+  // StoreLogo skips the bundled tier and resolves a crisp favicon
+  // (ebay.com / healthplusnigeria.com) instead.
   "electronic-express",
   "fashion-nova",
   "flipkart",
-  "healthplus",
   "incredible",
   "jd-williams",
   "jiji",

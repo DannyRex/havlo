@@ -6,14 +6,18 @@
    most stores just round-trip the DB value.
 
    Collapsing rules (applied AFTER the DB lookup):
-     • Amazon marketplace variants (amazon-co-uk-amazon-co-uk-seller,
-       amazon-de-amazon-de-seller, amazon-ae-seller, amazon-in,
-       amazon-uk, amazon-us, …) all reuse /logos/amazon.png — the
-       Amazon arrow logo is brand-consistent across every marketplace,
-       so shipping individual files for each is wasteful.
+     • Marketplace variants (amazon-uk / amazon-de-seller / walmart-jsg2,
+       ebay-<seller>, currys-business, dell-uk, qvc-uk, …) all reuse the
+       parent's single bundled asset — the wordmark is brand-consistent
+       across every regional/seller storefront, so shipping per-variant
+       files is wasteful. marketplaceBaseSlug() is the shared collapse,
+       also consulted by resolveStoreDomain() so the FAVICON tier resolves
+       for seller variants too (June 2026: ebay-<seller> cards fell to a
+       letter badge because the favicon lookup never collapsed the seller
+       suffix).
 
    Adding a new collapse rule:
-     1. Add the prefix/match here
+     1. Add the base to MARKETPLACE_BASES
      2. The DB row's logo_url column doesn't need updating — this
         helper runs after the DB fetch in every consumer
 
@@ -21,39 +25,28 @@
    user-facing storeName from a URL sniff, not a DB storeId); kept
    separate because their input shapes don't overlap. */
 
+/* Marketplaces whose storeIds fragment into regional / per-seller
+   variants but share ONE wordmark. */
+const MARKETPLACE_BASES = ["amazon", "walmart", "currys", "ebay", "dell", "qvc"] as const;
+
+/** Collapse a marketplace's regional/seller storeId variant to its base
+    slug (amazon-uk → amazon, ebay-modanet2008 → ebay). Returns the input
+    lowercased unchanged for non-marketplace stores. */
+export function marketplaceBaseSlug(storeId: string): string {
+  const s = (storeId || "").toLowerCase();
+  for (const base of MARKETPLACE_BASES) {
+    if (s === base || s.startsWith(`${base}-`) || s.startsWith(`${base}_`)) return base;
+  }
+  return s;
+}
+
 export function resolveStoreLogoUrl(
   storeId: string,
   dbLogoUrl?: string | null,
 ): string {
-  /* Amazon family — every marketplace variant uses the same arrow. */
-  if (storeId.startsWith("amazon-") || storeId === "amazon") {
-    return "/logos/amazon.png";
-  }
-  /* Walmart marketplace seller variants (walmart-techmate-intl,
-     walmart-dac-enterprises, walmart-jsg2dak1, etc.) — all sell
-     under the same Walmart storefront, so reuse /logos/walmart.png. */
-  if (storeId.startsWith("walmart-") || storeId === "walmart") {
-    return "/logos/walmart.png";
-  }
-  /* Currys variants — "currys-business" surfaces alongside the
-     regular consumer "currys" in SerpAPI results. Same brand,
-     same logo. */
-  if (storeId.startsWith("currys-") || storeId === "currys") {
-    return "/logos/currys.png";
-  }
-  /* eBay regional variants — ebay-us, ebay-co-uk, ebay-de, etc.
-     all share the same wordmark. */
-  if (storeId.startsWith("ebay-") || storeId === "ebay") {
-    return "/logos/ebay.png";
-  }
-  /* Dell regional + business variants — dell-uk, dell-de,
-     dell-small-business, etc. */
-  if (storeId.startsWith("dell-") || storeId === "dell") {
-    return "/logos/dell.png";
-  }
-  /* QVC US + UK channels share the same wordmark. */
-  if (storeId.startsWith("qvc-") || storeId === "qvc") {
-    return "/logos/qvc.png";
+  const base = marketplaceBaseSlug(storeId);
+  if ((MARKETPLACE_BASES as readonly string[]).includes(base)) {
+    return `/logos/${base}.png`;
   }
   return dbLogoUrl ?? `/logos/${storeId}.png`;
 }
