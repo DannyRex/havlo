@@ -33,7 +33,7 @@ const LIVE_SEARCH_THRESHOLD = 5;
 
 const TIERS: { value: DiscountTier; label: string }[] = [
   { value: "all", label: "All" },
-  { value: "10",  label: "Best deals" },
+  { value: "10",  label: "Deals only" },
   { value: "20",  label: "20%+" },
   { value: "50",  label: "50%+" },
 ];
