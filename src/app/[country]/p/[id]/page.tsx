@@ -118,49 +118,6 @@ interface PageProps {
    that anything visible on this PDP is also resolvable from the
    compare flow. */
 
-/* ISR-CRITICAL: cross-request cache for the offer existence + hero
-   fetch. (June 2026 soft-404 fix.)
-
-   fetchOfferById on its own is wrapped only in React.cache, which
-   dedupes within a single request but is NOT a Next data-cache
-   boundary. From static generation's point of view its Supabase read
-   is an UNCACHED data source, so every PDP render that awaited it (here
-   AND in generateMetadata) deopted the whole route to dynamic
-   (revalidate=0) — silently defeating `export const revalidate = 3600`
-   above even though every OTHER read on the page was already behind
-   unstable_cache. The route was the last-uncached-read twin of the
-   partition regression documented downpage. Two symptoms it caused:
-
-     1. Perf: every PDP paid a full dynamic Supabase fan-out per hit
-        (x-vercel-cache: MISS, private/no-store) instead of being
-        ISR-cheap — the matview + revalidate this page is built around
-        never engaged.
-     2. Soft-404: a missing offer's notFound() was served from the
-        DYNAMIC render path, which App Router streams at HTTP 200. A
-        STATIC notFound() returns a real 404 (cf. /[cc]/deals/[slug],
-        /[cc]/compare), so restoring static generation is what flips the
-        dead-PDP status 200 -> 404 — not force-dynamic, which would make
-        it worse.
-
-   Wrapping the fetch in unstable_cache gives static generation a cache
-   boundary instead of a live read, so the route prerenders again: real
-   offers become ISR PAGE entries (200, x-vercel-cache HIT/PRERENDER)
-   and missing offers take the static notFound path -> a real 404 that
-   crawlers can deindex. TTL matches the page's 1h ISR so the offer
-   snapshot can't drift further than the page that frames it; a missing
-   id therefore caches as `null` for at most that window (a re-ingested
-   offer recovers on the next revalidate). The `pdp-offer` tag lets an
-   ingest run bust it on demand. fetchOfferById keeps its React.cache so
-   generateMetadata + the body still share one in-request value;
-   unstable_cache adds the cross-request layer the page already assumed
-   it had. Used by BOTH call sites below — leaving generateMetadata on
-   the raw read would re-deopt the route on its own. */
-const fetchOfferByIdCached = unstable_cache(
-  (offerId: string) => fetchOfferById(offerId),
-  ["pdp-offer-by-id"],
-  { revalidate: 3600, tags: ["pdp-offer"] },
-);
-
 function offerRowToHero(row: OfferRow): OfferData {
   return {
     offerId:         row.offer_id,
@@ -209,7 +166,7 @@ function offerRowToHero(row: OfferRow): OfferData {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const country = getCountry(params.country);
-  const offer = await fetchOfferByIdCached(params.id);
+  const offer = await fetchOfferById(params.id);
   if (!offer) {
     return {
       title: "Product not found",
@@ -340,13 +297,13 @@ export default async function ProductPage({ params }: PageProps) {
     /* Try the stripped id as an offer_id lookup. fetchOfferById
        already tries product_id → offer_id → curated, so we just
        hand it the bare id. */
-    const fallbackOffer = await fetchOfferByIdCached(stripped);
+    const fallbackOffer = await fetchOfferById(stripped);
     if (!fallbackOffer) redirect(`/${country.code}/deals`);
     /* Replace params for the rest of the function. */
     params.id = stripped;
   }
 
-  const offer = await fetchOfferByIdCached(params.id);
+  const offer = await fetchOfferById(params.id);
   if (!offer) notFound();
 
   /* Two independent Supabase reads — fired in parallel:
