@@ -57,19 +57,25 @@ export default function StoreLogo({
      relay / Google / ad-redirect hosts so we degrade to the letter
      badge rather than a wrong logo. Finding #7.
 
-     TWO providers because neither is reliably high-res on its own:
-     Google s2 (sz=128) returns up to 128px where a site declares a large
-     icon (nike, jumia 64-128) but only 16x16 for many (clarins, infinix,
-     converse); DuckDuckGo often has a far bigger icon for exactly those
-     (clarins 256, infinix 48). So try Google first, then step to
-     DuckDuckGo on error OR when Google hands back a tiny <=16px icon —
-     the blurry-dot symptom the brands page showed. (June 2026.) */
+     TWO providers, in this order, because their FAILURE modes differ:
+     Google s2 (sz=128) returns a real logo at up to 128px for sites that
+     declare a large icon (nike, jumia, healthplus 96) but a generic 16x16
+     GLOBE for many brands (clarins, infinix, topshop, smeg) — the "globe
+     on the brands page" report. icon.horse is the opposite: it returns a
+     real, full-size brand logo when it has one (clarins, topshop, puma,
+     H&M, …) and a clean 404 when it doesn't — NEVER a globe or grey
+     placeholder. So: try Google first (fast, real where present), and
+     step to icon.horse on error OR when Google hands back a <=16px icon
+     (its globe). icon.horse then yields a real logo or 404s to the letter
+     badge — so a brand is a real mark or a clean initial, never a globe.
+     (June 2026; replaced DuckDuckGo, which returned grey-arrow
+     placeholders for the brands it lacked instead of failing cleanly.) */
   const domain = resolveStoreDomain(storeId, storeName, merchantUrl);
   const favicon = domain
     ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
     : null;
   const favicon2 = domain
-    ? `https://icons.duckduckgo.com/ip3/${domain}.ico`
+    ? `https://icon.horse/icon/${domain}`
     : null;
 
   /* Only use the /logos/<slug>.png primary tier when that file is
