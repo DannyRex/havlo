@@ -27,6 +27,21 @@ interface Params {
   slug:    string;
 }
 
+/* The set of valid blog posts is FINITE and build-time-known: `posts`
+   is a static array (src/lib/blog/posts.tsx) and generateStaticParams
+   below emits every valid (country × slug) pair. dynamicParams=false
+   makes any pair outside that set 404 at the ROUTING layer (a genuine
+   HTTP 404 → /_not-found) — the same mechanism the category hub uses
+   (/[country]/deals/[category]). Without it, an unknown slug fell
+   through to the page body's notFound(), which under a MATCHED
+   dynamic-param route on this stack (Next 14.2.5 on Vercel) returned a
+   soft-404 (HTTP 200 with the not-found UI) — bad for crawl signals.
+   This also subsumes the country-relevance guard below: an off-country
+   URL (/uk/blog/<ng-only-post>) isn't in the param set, so it 404s up
+   front. The body's `!post` / `isRelevant` notFound() calls remain as
+   defensive fallbacks. */
+export const dynamicParams = false;
+
 /* Generate (country × slug) pairs for every valid combination. A
    post with countries: ["ng"] only emits /ng/blog/[slug]. A post
    with countries: ["all"] emits a page for every country. A post
