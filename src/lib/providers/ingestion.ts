@@ -1145,16 +1145,72 @@ export async function ingestDeals(
      map tuning issue we want to surface. */
   const USD_TO_NGN = FX_GENERATED.NGN ?? 1_650;  // ingest plausibility floor; shared FX mirror so it tracks the same USD->NGN as engine/display
   const refusedAsBogus: Array<{ title: string; storeId: string; ngn: number }> = [];
+
+  /* Relative price-plausibility for clone-heavy marketplaces (June 2026).
+     AliExpress's affiliate search is keyword-matched, so a branded query
+     returns clones / parts priced at a fraction of the genuine product
+     ($5 "HyperX Cloud III" vs a $63 median; $25 "Sony WH-1000XM6" vs $418;
+     a $47 "Astro A50" that was actually a battery). The ABSOLUTE category
+     floor above passes them; this rejects a marketplace offer priced below
+     RELATIVE_FLOOR of the matched product's established REAL-retailer
+     median. Only fires when the product already has non-marketplace
+     in-stock offers to anchor the band — a lone marketplace product has
+     nothing to compare against and is left alone (lower harm: it pollutes
+     no real product's pool). The accessory-title gate in the AliExpress
+     provider catches the part/battery titles; this catches clean-titled
+     clones by price. */
+  const MARKETPLACE_CLONE_STORES = new Set(["aliexpress"]);
+  const RELATIVE_FLOOR = 0.35;
+  const usdOf = (price: number, cur: string): number => {
+    if (!price || price <= 0) return 0;
+    if (cur === "USD") return price;
+    const rate = (FX_GENERATED as Record<string, number>)[cur];
+    return rate && rate > 0 ? price / rate : price;
+  };
+  const realBand = new Map<string, number>(); // productId -> median USD of non-marketplace in-stock offers
+  const mktProductIds = Array.from(new Set(
+    offerWrites.filter((w) => MARKETPLACE_CLONE_STORES.has(w.deal.storeId)).map((w) => w.productId),
+  ));
+  for (let i = 0; i < mktProductIds.length; i += 200) {
+    const batch = mktProductIds.slice(i, i + 200);
+    const { data: bandRows } = await supa
+      .from("offers")
+      .select("product_id, current_price, currency, store_id")
+      .in("product_id", batch)
+      .eq("in_stock", true);
+    const byProd = new Map<string, number[]>();
+    for (const o of (bandRows ?? []) as Array<{ product_id: string; current_price: number; currency: string; store_id: string }>) {
+      if (MARKETPLACE_CLONE_STORES.has(o.store_id)) continue; // band from REAL retailers only
+      const usd = usdOf(Number(o.current_price), o.currency);
+      if (usd > 0) {
+        if (!byProd.has(o.product_id)) byProd.set(o.product_id, []);
+        byProd.get(o.product_id)!.push(usd);
+      }
+    }
+    byProd.forEach((arr: number[], pid: string) => {
+      arr.sort((a: number, b: number) => a - b);
+      realBand.set(pid, arr[Math.floor(arr.length / 2)]);
+    });
+  }
+
   const offerWritesPlausible: typeof offerWrites = [];
   for (const w of offerWrites) {
     const ngn = w.deal.currency === "USD"
       ? Math.round(w.deal.salePrice * USD_TO_NGN)
       : w.deal.salePrice;
-    if (priceLooksPlausible(ngn, w.deal.categorySlug ?? null, w.deal.title)) {
-      offerWritesPlausible.push(w);
-    } else {
+    if (!priceLooksPlausible(ngn, w.deal.categorySlug ?? null, w.deal.title)) {
       refusedAsBogus.push({ title: w.deal.title, storeId: w.deal.storeId, ngn });
+      continue;
     }
+    /* Relative clone gate — only for marketplace stores against a real band. */
+    if (MARKETPLACE_CLONE_STORES.has(w.deal.storeId)) {
+      const band = realBand.get(w.productId);
+      if (band && usdOf(w.deal.salePrice, w.deal.currency) < band * RELATIVE_FLOOR) {
+        refusedAsBogus.push({ title: w.deal.title, storeId: w.deal.storeId, ngn });
+        continue;
+      }
+    }
+    offerWritesPlausible.push(w);
   }
   if (refusedAsBogus.length > 0) {
     /* Capped log — avoid flooding the cron output when a misbehaving

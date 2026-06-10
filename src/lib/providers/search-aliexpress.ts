@@ -43,6 +43,7 @@
 import crypto from "crypto";
 import type { SearchProvider, SearchQuery } from "./types";
 import { ProviderError } from "./types";
+import { isAccessoryListing } from "@/lib/search/price-floor";
 import type { Deal } from "@/types";
 
 const API_BASE     = "https://api-sg.aliexpress.com/sync";
@@ -198,6 +199,19 @@ function mapToDeal(p: AliexProduct, i: number, country: string): Deal | null {
      in our pool) survive this gate easily — only the no-brand
      keyword-stuffed listings get dropped. */
   if (looksLikeJunkAliExpressTitle(title)) return null;
+
+  /* Accessory / spare-part gate (June 2026). AliExpress's affiliate
+     search is keyword-matched, so a query for a branded product
+     ("Astro A50 Wireless Gaming Headset") returns fitment parts that
+     are merely SEO-tagged with those words — "Battery for Astro A50",
+     "Ear Pads for HyperX Cloud", "Charger for Sony WH-1000XM5". The
+     junk gate above only catches wholesale SEO-spam; these read as
+     normal titles but are PARTS, not the product, and were being
+     ingested as the product itself at implausible prices (user report:
+     a $47 "Astro A50" that was actually a battery). isAccessoryListing
+     is fitment-gated, so a standalone product ("Anker PowerCore
+     Battery") still passes. */
+  if (isAccessoryListing(title)) return null;
 
   const sale     = parseNumeric(p.target_sale_price);
   const original = parseNumeric(p.target_original_price) || sale;

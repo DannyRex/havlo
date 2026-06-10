@@ -193,18 +193,28 @@ export function priceLooksPlausibleForLiveDeal(
    own, regardless of surrounding context. */
 const ACCESSORY_HARD: RegExp[] = [
   /\bear\s?pads?\b/, /\bear\s?cushions?\b/, /\bear\s?cups?\b/,
+  /\bear\s?tips?\b/, /\bsilicone\s?tips?\b/,
   /\bheadband\b/, /\bhead\s?beam\b/,
   /\breplacement\b/, /\bspare\s?parts?\b/,
   /\bscreen\s?protectors?\b/, /\btempered\s?glass\b/,
   /\bpouch\b/, /\blanyard\b/, /\bdecals?\b/, /\bskin\s?stickers?\b/,
   /\baccessor(?:y|ies)\s?kit\b/, /\bkit\s+for\b/,
+  /* Repair / spare parts — marketplace listings (esp. AliExpress) flood
+     branded searches with these. June 2026: a "Battery for Astro A50"
+     was ingested as the headset itself. */
+  /\bflex\s?cable\b/, /\bcharging\s?port\b/, /\bmotherboard\b/, /\blogic\s?board\b/,
+  /\brepair\s?(?:part|kit)/, /\blcd\s?(?:screen|assembly|digitizer)\b/, /\bdigitizer\b/,
 ];
 /* Softer accessory nouns — classify ONLY when the title also carries a
    "for <something>" fitment phrase (the "<accessory> for <Product>"
    shape that marks a fitment item, not the product). Keeps "iPhone 15
    ... Cover Screen" and "Charging Case" (parts of the actual product)
-   out of the net while catching "Case for iPhone 15". */
-const ACCESSORY_SOFT_NOUN = /\b(?:case|cover|sleeve|strap|holder|stand|mount|grip|bumper|shell|guard|dock|cushion|protector)\b/;
+   out of the net while catching "Case for iPhone 15". battery / charger
+   / cable / adapter / cord / antenna added June 2026 — fitment-gated so a
+   standalone "Anker PowerCore Battery" / "Anker USB-C Cable" product is
+   NOT caught, but "Battery for Astro A50" / "Charger for Sony WH-1000XM5"
+   (parts AliExpress returns for branded searches) is. */
+const ACCESSORY_SOFT_NOUN = /\b(?:case|cover|sleeve|strap|holder|stand|mount|grip|bumper|shell|guard|dock|cushion|protector|batter(?:y|ies)|charger|cable|cord|adapter|antenna)\b/;
 /* Fitment connector across the marketplaces we ingest: English "for",
    German "für"/"fuer", French "pour", Spanish/Portuguese "para". Only
    consulted AFTER ACCESSORY_SOFT_NOUN matches, so the non-English words
