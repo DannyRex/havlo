@@ -168,8 +168,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const country = getCountry(params.country);
   const offer = await fetchOfferById(params.id);
   if (!offer) {
+    /* Missing/dead offer: noindex so crawlers drop the URL, and a title
+       that matches the not-found.tsx boundary's "no longer available"
+       copy. The response is still HTTP 200 (a matched dynamic-param route
+       can't emit a real 404 on this stack — see not-found.tsx for the
+       full why), but noindex keeps these out of the index regardless. */
     return {
-      title: "Product not found",
+      title: "Product no longer available",
       robots: { index: false, follow: false },
     };
   }
