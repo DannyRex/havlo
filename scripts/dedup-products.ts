@@ -203,6 +203,11 @@ async function main() {
         } else {
           /* Re-point the offer onto the canonical product_id. */
           await supa.from("offers").update({ product_id: canonical }).eq("id", oo.id);
+          /* Migrate the offer's price history too — history rows are
+             stamped with product_id at snapshot time AND cascade on
+             products delete, so without this the duplicate-product
+             delete below ERASES the moved offer's chart history. */
+          await supa.from("offer_price_history").update({ product_id: canonical }).eq("offer_id", oo.id);
           movedOffers++;
         }
       }

@@ -1265,13 +1265,13 @@ export async function ingestDeals(
        the previous single-shot version had a NULL-byte typo in the
        Map key template ("${o.store_id}\0${o.url}"), so even when the
        query succeeded the displaced lookup never matched anything. */
-    const existingMap = new Map<string, string>();
+    const existingMap = new Map<string, { id: string; productId: string }>();
     let probeFailed = false;
     const displacedChunks = chunkUrlsByBytes(urls, 6000); // byte-budgeted — long eBay URLs 400'd a fixed 100-chunk
     for (let i = 0; i < displacedChunks.length; i++) {
       const { data: existing, error: existingErr } = await supa
         .from("offers")
-        .select("product_id, store_id, url")
+        .select("id, product_id, store_id, url")
         .in("store_id", storeIds)
         .in("url", displacedChunks[i]);
       if (existingErr) {
@@ -1279,15 +1279,24 @@ export async function ingestDeals(
         probeFailed = true;
         break;
       }
-      for (const o of (existing ?? []) as Array<{ product_id: string; store_id: string; url: string }>) {
-        existingMap.set(`${o.store_id} ${o.url}`, o.product_id);
+      for (const o of (existing ?? []) as Array<{ id: string; product_id: string; store_id: string; url: string }>) {
+        existingMap.set(`${o.store_id} ${o.url}`, { id: o.id, productId: o.product_id });
       }
     }
+    /* Offers about to be re-pointed by the upsert: their price-history
+       rows still carry the OLD product_id, and offer_price_history
+       cascades on products delete — so once Step 5b reaps the displaced
+       old product, the moved offer's history would be ERASED with it.
+       Collect offer id → new product_id here; migrated after the upsert. */
+    const historyMigrations = new Map<string, string[]>(); // newProductId -> offerIds
     if (!probeFailed) {
       for (const row of offerRows) {
-        const prevPid = existingMap.get(`${row.store_id} ${row.url}`);
-        if (prevPid && prevPid !== row.product_id) {
-          displacedProductIds.add(prevPid);
+        const prev = existingMap.get(`${row.store_id} ${row.url}`);
+        if (prev && prev.productId !== row.product_id) {
+          displacedProductIds.add(prev.productId);
+          const list = historyMigrations.get(row.product_id) ?? [];
+          list.push(prev.id);
+          historyMigrations.set(row.product_id, list);
         }
       }
     }
@@ -1299,6 +1308,22 @@ export async function ingestDeals(
       result.errors.push(`Bulk upsert ${offerWrites.length} offers: ${offerErr.message}`);
     } else {
       result.upserted = offerWrites.length;
+      /* Migrate displaced offers' price history onto their new product
+         BEFORE the orphan pass below deletes the old product (which
+         would cascade-delete the history). Small batches: displaced
+         sets are a handful of offers per run. */
+      for (const [newPid, offerIds] of Array.from(historyMigrations.entries())) {
+        for (let i = 0; i < offerIds.length; i += 100) {
+          const { error: histErr } = await supa
+            .from("offer_price_history")
+            .update({ product_id: newPid })
+            .in("offer_id", offerIds.slice(i, i + 100));
+          if (histErr) {
+            result.errors.push(`History migration → ${newPid}: ${histErr.message}`);
+            break;
+          }
+        }
+      }
     }
   }
 
