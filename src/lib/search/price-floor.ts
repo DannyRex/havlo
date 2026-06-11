@@ -27,6 +27,10 @@ const CATEGORY_PRICE_FLOOR_NGN: Record<string, number> = {
   beauty:       1_500,
   home:         3_000,
   sports:       2_500,
+  /* Supermarket (June 2026): groceries + drinks are legitimately cheap
+     — a single beer is ~₦800-1,200, seasoning cubes less. The default
+     ₦1,000 unknown-category floor would refuse real inventory. */
+  supermarket:    300,
 };
 
 /* Per-flagship-line price floors. Catches counterfeit listings that

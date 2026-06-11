@@ -67,6 +67,26 @@ const WOO_CONFIGS: WooConfig[] = [
     ],
     maxPages: 12, // 510 SKUs today; 1,200-product ceiling leaves growth room
   },
+
+  /* ── Booze.ng — NG online liquor store (June 2026, supermarket cat) ── */
+  {
+    name:       "Booze.ng",
+    storeId:    "booze",
+    baseUrl:    "https://booze.ng",
+    defaultCat: "supermarket",
+    categoryMap: [], // whole catalog is drinks → supermarket
+    maxPages:   20,
+  },
+
+  /* ── My Liquor Hub — NG online liquor store ── */
+  {
+    name:       "My Liquor Hub",
+    storeId:    "myliquorhub",
+    baseUrl:    "https://myliquorhub.com",
+    defaultCat: "supermarket",
+    categoryMap: [],
+    maxPages:   20,
+  },
 ];
 
 /* ── Woo Store API product shape (the subset we read) ──────────── */

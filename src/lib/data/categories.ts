@@ -15,6 +15,15 @@ export const categories: Category[] = [
   { id: "gaming",      name: "Gaming",           slug: "gaming",      icon: "Gamepad2",     color: "#EF4444", dealCount: 18  },
   { id: "fashion",     name: "Fashion",          slug: "fashion",     icon: "Shirt",        color: "#EC4899", dealCount: 24  },
   { id: "home",        name: "Home & Kitchen",   slug: "home",        icon: "Home",         color: "#10B981", dealCount: 16  },
+  /* Supermarket (June 2026) — groceries, drinks + household
+     consumables. NG-anchored: Supermart, SPAR, FoodCo, Booze.ng and
+     My Liquor Hub carry commodity SKUs (the same Coke 50cl / Peak
+     milk / Hennessy VS everywhere), which is the best-case shape for
+     price comparison and the highest-frequency repeat-visit
+     category. Takes the homepage grid to 11 tiles — judged worth it
+     over the "clean 10" (see Health note below) because supermarket
+     inventory is branded and directly comparable. */
+  { id: "supermarket", name: "Supermarket",      slug: "supermarket", icon: "ShoppingCart", color: "#84CC16", dealCount: 0   },
   { id: "beauty",      name: "Beauty",           slug: "beauty",      icon: "Sparkles",     color: "#F59E0B", dealCount: 12  },
   { id: "sports",      name: "Sports",           slug: "sports",      icon: "Dumbbell",     color: "#22C55E", dealCount: 10  },
   { id: "computing",   name: "Computing",        slug: "computing",   icon: "Laptop",       color: "#06B6D4", dealCount: 20  },

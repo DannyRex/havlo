@@ -217,6 +217,16 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   { pattern: /\b(vacuum|dyson\s*v\d|robot\s*vacuum|roomba)\b/i, slug: "appliances", reason: "vacuum" },
   { pattern: /\b(air\s*conditioner|air\s*conditioning|split\s*ac\b|window\s*ac\b|\bac\s*(?:inverter|split|unit)\b|standing\s*fan|ceiling\s*fan|rechargeable\s*fan|industrial\s*fan|water\s*heater|water\s*dispenser|electric\s*iron|steam\s*iron|clothes\s*iron|deep\s*freezer|chest\s*freezer|(?:petrol|diesel|power|inverter|portable|standby)\s*generator|generator\s*\d)\b/i, slug: "appliances", reason: "home appliance (AC/generator/fan/iron)" },
 
+  // ── Supermarket — groceries, drinks, household consumables ──
+  //    (June 2026, new category.) AFTER the appliances rules so
+  //    "rice cooker" / "blender" keep their appliance routing; the
+  //    grocery rice rule below requires a weight/food qualifier for
+  //    the same reason. "wine" is deliberately NOT matched bare —
+  //    it's a fashion colour (COLOR_GROUPS maps wine→red) — and only
+  //    counts with a drink-context word.
+  { pattern: /\b(whisky|whiskey|vodka|tequila|cognac|brandy|liqueur|\brum\b|hennessy|mo[eë]t|champagne|prosecco|baileys|smirnoff|jameson|jack\s*daniel|johnnie\s*walker|red\s*label|black\s*label|glenfiddich|martell|remy\s*martin|campari|absolut|olmeca|don\s*julio|(?:red|white|ros[eé]|sweet|dry|sparkling)\s*wine|wine\s*(?:75cl|70cl|gift|carton|bottle)|\blager\b|\bstout\b|guinness|heineken|budweiser|smirnoff\s*ice|bitter\s*lemon|energy\s*drink|malt\s*drink|\bmalta\b)\b/i, slug: "supermarket", reason: "drinks (alcohol / beverages)" },
+  { pattern: /\b(indomie|noodles|spaghetti|golden\s*morn|cornflakes|corn\s*flakes|\bcereal\b|\bmilo\b|bournvita|ovaltine|peak\s*milk|dano\s*milk|cowbell|milk\s*powder|(?:cooking|vegetable|groundnut|palm|sunflower)\s*oil|tomato\s*paste|seasoning\s*(?:cube|powder)?|maggi|knorr\s*(?:cube|seasoning|chicken|beef)|(?:basmati|long\s*grain|parboiled|jollof)\s*rice|rice\s*(?:5kg|10kg|25kg|50kg)|semovita|garri|table\s*water|bottled\s*water|soft\s*drink|pringles|toilet\s*(?:paper|roll|tissue)|detergent|washing\s*powder|bar\s*soap|air\s*freshener|insecticide)\b/i, slug: "supermarket", reason: "groceries / household consumables" },
+
   // ── Wearables / Fitness ──
   { pattern: /\b(apple\s*watch|smart\s*watch|smartwatch|garmin|fitbit|whoop|fossil\s*smart)\b/i, slug: "electronics", reason: "smartwatch" },
 
