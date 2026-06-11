@@ -75,6 +75,14 @@ const AMAZON_HOST_TO_ENV: Array<[RegExp, string]> = [
   [/(^|\.)amazon\.sg$/i,        "AMAZON_ASSOC_TAG_SG"],
 ];
 
+/* eBay EPN rotation ids are PER MARKETPLACE (publicly visible in every
+   EPN link; not secrets). Only marketplaces we're enrolled for are
+   listed — others pass through untagged. */
+const EBAY_MARKETPLACES: Array<[RegExp, { mkrid: string; siteid: string }]> = [
+  [/(^|\.)ebay\.com$/i,    { mkrid: "711-53200-19255-0", siteid: "0" }],
+  [/(^|\.)ebay\.co\.uk$/i, { mkrid: "710-53481-19255-0", siteid: "3" }],
+];
+
 const RULES: AffiliateRule[] = [
   /* ── Amazon Associates (per marketplace) ── */
   {
@@ -133,20 +141,29 @@ const RULES: AffiliateRule[] = [
     },
   },
 
-  /* ── eBay Partner Network ──
-     eBay uses `?campid=` (the campaign ID inside your account) and
-     `?customid=` (optional sub-tracking). Setting campid is enough
-     for attribution. */
+  /* ── eBay Partner Network (approved June 2026, campaign 5339156340) ──
+     Marketplace-keyed: each eBay domain has its OWN rotation id (mkrid)
+     and siteid — using the US pair on a .co.uk link misattributes the
+     click. Full param set per EPN's link spec: mkcid=1 (affiliate
+     channel), mkrid + siteid (marketplace), campid (our campaign),
+     toolid=10001 (link generator), mkevt=1 (click event). URLs that
+     already carry a query string (eBay item/search URLs always do) are
+     joined with `&` automatically by URL.searchParams. Marketplaces we
+     have no rotation id for (.de, .com.au, …) pass through UNTAGGED
+     rather than guessing — a wrong mkrid is worse than no tag. */
   {
     name: "ebay",
-    match: (host) => /(^|\.)ebay\.(com|co\.uk|de|com\.au|ca)$/i.test(host),
+    match: (host) => EBAY_MARKETPLACES.some(([re]) => re.test(host)),
     wrap: (u) => {
-      const id = envOrNull("EBAY_PARTNER_CAMPAIGN_ID");
-      if (!id) return null;
-      setParam(u, "mkrid", "711-53200-19255-0"); // Standard EPN tracking ring ID
-      setParam(u, "siteid", "0");
-      setParam(u, "campid", id);
-      return setParam(u, "toolid", "10001");
+      const entry = EBAY_MARKETPLACES.find(([re]) => re.test(u.host));
+      if (!entry) return null;
+      const campid = envOrNull("EBAY_PARTNER_CAMPAIGN_ID") ?? "5339156340";
+      setParam(u, "mkcid", "1");
+      setParam(u, "mkrid", entry[1].mkrid);
+      setParam(u, "siteid", entry[1].siteid);
+      setParam(u, "campid", campid);
+      setParam(u, "toolid", "10001");
+      return setParam(u, "mkevt", "1");
     },
   },
 
@@ -215,6 +232,6 @@ export function activeAffiliateRules(): string[] {
   if (envOrNull("KONGA_AFFILIATE_KEY")) active.push("konga");
   if (envOrNull("JUMIA_AFFILIATE_KEY")) active.push("jumia");
   if (envOrNull("ALIEXPRESS_AFFILIATE_KEY")) active.push("aliexpress");
-  if (envOrNull("EBAY_PARTNER_CAMPAIGN_ID")) active.push("ebay");
+  active.push("ebay"); // campid 5339156340 baked in; env overrides
   return active;
 }
