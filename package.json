@@ -45,7 +45,8 @@
     "backfill:images": "tsx --tsconfig tsconfig.scripts.json scripts/backfill-product-images.ts",
     "backfill:self-host-images": "tsx --tsconfig tsconfig.scripts.json scripts/backfill-self-host-images.ts",
     "backfill:image-phash": "tsx --tsconfig tsconfig.scripts.json scripts/backfill-image-phash.ts",
-    "cleanup:placeholder-images": "tsx --tsconfig tsconfig.scripts.json scripts/cleanup-placeholder-images.ts"
+    "cleanup:placeholder-images": "tsx --tsconfig tsconfig.scripts.json scripts/cleanup-placeholder-images.ts",
+    "ingest:ng-woo": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-ng-woo.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.0",

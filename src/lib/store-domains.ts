@@ -83,6 +83,7 @@ const STORE_DOMAINS: Record<string, string> = {
   healthplus: "healthplusnigeria.com",
   medplus: "medplusnig.com",
   supermart: "supermart.ng",
+  pointek: "pointekonline.com",
   essenza: "essenza.ng",
   ajebomarket: "ajebomarket.com",
   // ── DE ──
