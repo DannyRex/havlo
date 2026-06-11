@@ -52,6 +52,7 @@
     "@anthropic-ai/sdk": "^0.91.0",
     "@supabase/supabase-js": "^2.104.1",
     "@vercel/functions": "^3.5.0",
+    "@vercel/speed-insights": "^2.0.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.400.0",
     "next": "14.2.5",

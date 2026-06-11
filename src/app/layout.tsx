@@ -9,6 +9,7 @@ import { CountryProvider } from "@/components/providers/CountryProvider";
 import JsonLd from "@/components/seo/JsonLd";
 import DeferredConsentStack from "@/components/seo/DeferredConsentStack";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/seo";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -218,6 +219,7 @@ export default function RootLayout({
             cookie banner only renders on first visit. See
             DeferredConsentStack for the dynamic-import details. */}
         <DeferredConsentStack />
+        <SpeedInsights />
       </body>
     </html>
   );
