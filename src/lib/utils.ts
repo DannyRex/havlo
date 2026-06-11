@@ -500,10 +500,15 @@ export function currencyToNgn(amount: number, currency: string | null | undefine
   return Math.round(amount * (ngnPerUsd / rate));
 }
 
+/* Compact NGN: one decimal of real precision in BOTH tiers, with a
+   trailing ".0" stripped (₦53.5K, ₦53K — never ₦54K for ₦53,500;
+   user rule June 2026: don't round away the half-thousand). 999,950+
+   rolls into the M tier so we never print "₦1000.0K". */
 export function formatCompact(amount: number): string {
-  if (amount >= 1_000_000) return `₦${(amount / 1_000_000).toFixed(1)}M`;
-  if (amount >= 1_000) return `₦${(amount / 1_000).toFixed(0)}K`;
-  return `₦${amount}`;
+  const strip = (s: string) => s.replace(/\.0$/, "");
+  if (amount >= 999_950) return `₦${strip((amount / 1_000_000).toFixed(1))}M`;
+  if (amount >= 1_000)   return `₦${strip((amount / 1_000).toFixed(1))}K`;
+  return `₦${Math.round(amount)}`;
 }
 
 /* Deterministic integer grouping ("3257" → "3,257").

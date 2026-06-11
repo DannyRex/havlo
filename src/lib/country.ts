@@ -165,10 +165,11 @@ export function formatLocal(amount: number, country: Country): string {
   if (Math.abs(amount) >= 1_000_000) {
     const sign     = amount < 0 ? "-" : "";
     const millions = Math.abs(amount) / 1_000_000;
-    /* One decimal for 1.0M-9.9M (where the digit carries real
-       information); integer for 10M+ (where the .X reads as
-       noise relative to magnitude). */
-    const body = millions >= 10 ? millions.toFixed(0) : millions.toFixed(1);
+    /* One decimal at EVERY magnitude, with a trailing ".0" stripped
+       (₦10.5M, ₦12M — never ₦11M for ₦10,530,000). June 2026 user
+       rule: compact display must not round away real precision —
+       same rule as formatCompact's K tier. */
+    const body = millions.toFixed(1).replace(/\.0$/, "");
     return `${sign}${country.symbol}${body}M`;
   }
   return formatLocalExact(amount, country);
