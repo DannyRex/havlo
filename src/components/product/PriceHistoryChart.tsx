@@ -28,9 +28,8 @@
      • Per-store lines. The cross-store min line + a labeled
        reference for the visitor's offer is enough decision
        support; per-store would clutter and needs a new RPC.
-     • Y-axis ticks. The tile strip below shows lowest/highest
-       as exact numbers — labelled axis ticks would duplicate
-       and crowd the chart.
+     • (June 2026: Y-axis price ticks ARE now in scope — compact
+       labels in a left gutter; see axisPriceLabel + padYDomain.)
      • Single-store-day dimming. Polish item; ignored for v2.
 
    Currency contract: every *Ngn input is NGN. formatPriceForUser
@@ -42,7 +41,7 @@ import {
   useMemo, useRef, useState,
 } from "react";
 import { convertForUser, formatPriceForUser, formatPriceForUserExact, timeAgo } from "@/lib/utils";
-import { formatLocal, type Country } from "@/lib/country";
+import type { Country } from "@/lib/country";
 import type { PriceHistoryPoint } from "@/lib/search/price-history";
 import {
   TrendingDown, TrendingUp, Minus, Calendar,
@@ -141,25 +140,43 @@ export default function PriceHistoryChart({
      currentNgn) change. The math doesn't depend on hover state.
      currentNgn flows through because the reference-line Y position
      depends on it. */
-  const geom = useMemo(
-    () => computeGeometryFull(sliced, width, currentNgn, range.days),
-    [sliced, width, currentNgn, range.days],
-  );
-
   /* Y-axis price gridlines, snapped to "nice" steps in the USER's
-     display currency (June 2026). Conversion is linear, so building
-     ticks in display units lands them on exactly the same pixels as
-     the NGN-domain drawing math. */
-  const yTicks = useMemo(() => {
-    if (geom.yMaxNgn <= geom.yMinNgn) return [];
-    const minDisp = convertForUser(geom.yMinNgn, country, "NGN");
-    const maxDisp = convertForUser(geom.yMaxNgn, country, "NGN");
+     display currency (June 2026). Computed BEFORE geometry because the
+     labels live in a dedicated LEFT GUTTER outside the plot (user
+     report: in-plot labels overlapped the line/area) — the gutter
+     width depends on the longest label, and the plot's x math shifts
+     right by that gutter. padYDomain is the same domain formula the
+     geometry uses, so ticks land on exactly the drawn pixels. */
+  const { yTicks, axisGutter } = useMemo(() => {
+    if (sliced.length === 0) {
+      return { yTicks: [] as Array<{ y: number; label: string }>, axisGutter: PAD_LEFT };
+    }
+    let lo = sliced[0].minPriceNgn;
+    let hi = lo;
+    for (const p of sliced) {
+      if (p.minPriceNgn < lo) lo = p.minPriceNgn;
+      if (p.minPriceNgn > hi) hi = p.minPriceNgn;
+    }
+    const { yMin, yMax } = padYDomain(lo, hi);
+    const minDisp = convertForUser(yMin, country, "NGN");
+    const maxDisp = convertForUser(yMax, country, "NGN");
     const chartH  = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
-    return buildYTicks(minDisp, maxDisp, chartH).map((t) => ({
+    const ticks = buildYTicks(minDisp, maxDisp, chartH).map((t) => ({
       y:     t.y,
-      label: formatLocal(t.value, country),
+      label: axisPriceLabel(t.value, country),
     }));
-  }, [geom.yMinNgn, geom.yMaxNgn, country]);
+    const longest = ticks.reduce((m, t) => Math.max(m, t.label.length), 0);
+    /* ~6px per character at the 10px label font + breathing room,
+       clamped so naira labels can't eat the plot and an empty tick
+       set keeps the original layout. */
+    const gutter = ticks.length > 0 ? Math.min(64, Math.max(36, longest * 6 + 12)) : PAD_LEFT;
+    return { yTicks: ticks, axisGutter: gutter };
+  }, [sliced, country]);
+
+  const geom = useMemo(
+    () => computeGeometryFull(sliced, width, currentNgn, range.days, axisGutter),
+    [sliced, width, currentNgn, range.days, axisGutter],
+  );
 
   /* Store-count provenance for the footer strip. Swept over the
      FULL points array — deliberately NOT the range-sliced window
@@ -439,15 +456,20 @@ export default function PriceHistoryChart({
           {yTicks.map((t, i) => (
             <g key={`ygrid-${i}`}>
               <line
-                x1={PAD_LEFT} x2={width - PAD_RIGHT}
+                x1={axisGutter} x2={width - PAD_RIGHT}
                 y1={t.y} y2={t.y}
                 stroke={GRID_HEX_ALPHA}
                 strokeWidth={1}
               />
+              {/* Label OUTSIDE the plot, right-aligned against the
+                  gutter edge and vertically centred on its gridline
+                  (June 2026 follow-up: in-plot labels overlapped the
+                  line/area). */}
               <text
-                x={PAD_LEFT}
-                y={t.y - 4}
+                x={axisGutter - 6}
+                y={t.y + 3}
                 fontSize={10}
+                textAnchor="end"
                 className="fill-ink-3 tabular-nums select-none"
               >
                 {t.label}
@@ -462,7 +484,7 @@ export default function PriceHistoryChart({
               clamped to the chart band so an out-of-range price
               still appears at the top/bottom edge. */}
           <line
-            x1={PAD_LEFT}
+            x1={axisGutter}
             x2={width - PAD_RIGHT}
             y1={geom.currentRefY}
             y2={geom.currentRefY}
@@ -851,12 +873,6 @@ interface Geometry {
   meanNgn:    number;
   currentRefY: number;
   axisTicks:  { x: number; label: string }[];
-  /** Drawn Y domain (NGN, incl. the 12% padding band). Exposed so the
-      component can build price gridlines snapped to "nice" steps in
-      the USER's display currency — snapping in NGN then converting
-      produced ugly labels (£302, £247) on non-NGN markets. */
-  yMinNgn:    number;
-  yMaxNgn:    number;
 }
 
 /* Monotone cubic Hermite spline → cubic Bezier path.
@@ -948,13 +964,13 @@ function todayMidnightUtcMs(): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
-function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: number): Geometry {
+function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: number, leftPad: number = PAD_LEFT): Geometry {
   if (points.length === 0) {
     return {
       pathD: "", areaD: "", xs: [], ys: [],
       lowestIdx: 0, lowestNgn: 0, lowestX: 0, lowestY: 0,
       highestNgn: 0, meanNgn: 0,
-      currentRefY: PAD_TOP, axisTicks: [], yMinNgn: 0, yMaxNgn: 0,
+      currentRefY: PAD_TOP, axisTicks: [],
     };
   }
 
@@ -977,12 +993,9 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
   /* Y-axis range with 12% padding so the line never touches the
      chart edges. Flat-price (lowest === highest) gets fake-padded
      so the line sits in the middle of the band. */
-  const rangeRaw    = highestNgn - lowestNgn;
-  const range       = rangeRaw === 0 ? Math.max(highestNgn * 0.1, 100) : rangeRaw;
-  const yMin        = lowestNgn  - range * 0.12;
-  const yMax        = highestNgn + range * 0.12;
+  const { yMin, yMax } = padYDomain(lowestNgn, highestNgn);
   const chartH      = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
-  const usableW     = width - PAD_LEFT - PAD_RIGHT;
+  const usableW     = width - leftPad - PAD_RIGHT;
 
   /* X axis is DATE-based, not point-index-based (May 2026 fix).
      Previous index projection made the rightmost dot whatever the
@@ -1014,7 +1027,7 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
   const dateSpanMs   = Math.max(1, xDomainEnd - xDomainStart);
   const xForDay = (dayStr: string) => {
     const dayMs = new Date(dayStr).getTime();
-    return PAD_LEFT + ((dayMs - xDomainStart) / dateSpanMs) * usableW;
+    return leftPad + ((dayMs - xDomainStart) / dateSpanMs) * usableW;
   };
   const yForP = (p: number) =>
     PAD_TOP + ((yMax - p) / (yMax - yMin)) * chartH;
@@ -1026,7 +1039,7 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
     xs.push(xForDay(points[i].day));
     ys.push(yForP(points[i].minPriceNgn));
   }
-  const todayX = PAD_LEFT + usableW;
+  const todayX = leftPad + usableW;
 
   /* Monotone cubic Hermite spline (the "curveMonotoneX" curve from
      D3, attributable to Fritsch–Carlson 1980).
@@ -1070,7 +1083,7 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
     : "";
 
   const pathD = points.length === 1
-    ? `M ${PAD_LEFT.toFixed(2)} ${ys[0].toFixed(2)} L ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}${todayExtension}`
+    ? `M ${leftPad.toFixed(2)} ${ys[0].toFixed(2)} L ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}${todayExtension}`
     : buildMonotonePath(xs, ys) + todayExtension;
 
   const areaBottom = CHART_HEIGHT - PAD_BOTTOM;
@@ -1078,7 +1091,7 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
   /* Single-point area: rectangle from the left edge across to the
      today extension's right edge, dropped to the baseline. */
   const areaD = points.length === 1
-    ? `M ${PAD_LEFT.toFixed(2)} ${ys[0].toFixed(2)} L ${areaRightX.toFixed(2)} ${ys[0].toFixed(2)} L ${areaRightX.toFixed(2)} ${areaBottom} L ${PAD_LEFT.toFixed(2)} ${areaBottom} Z`
+    ? `M ${leftPad.toFixed(2)} ${ys[0].toFixed(2)} L ${areaRightX.toFixed(2)} ${ys[0].toFixed(2)} L ${areaRightX.toFixed(2)} ${areaBottom} L ${leftPad.toFixed(2)} ${areaBottom} Z`
     : `${pathD} L ${areaRightX.toFixed(2)} ${areaBottom} L ${xs[0].toFixed(2)} ${areaBottom} Z`;
 
   /* Axis ticks — up to 4 dates evenly spaced across the X DOMAIN
@@ -1097,7 +1110,7 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
     const fraction = t / denom;
     const dayMs = xDomainStart + fraction * dateSpanMs;
     axisTicks.push({
-      x:     PAD_LEFT + fraction * usableW,
+      x:     leftPad + fraction * usableW,
       label: fmt.format(new Date(dayMs)),
     });
   }
@@ -1116,9 +1129,29 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
        prices still appear at the top/bottom edge. */
     currentRefY: PAD_TOP, // placeholder; caller sets via buildHoverState's external use
     axisTicks,
-    yMinNgn: yMin,
-    yMaxNgn: yMax,
   };
+}
+
+/* Y-domain padding — single source of truth shared by computeGeometry
+   (drawing) and the component's axis-tick memo, so ticks always land on
+   the same pixels as the plotted line. 12% breathing band; flat-price
+   series get a fake band so the line sits mid-chart. */
+function padYDomain(lowestNgn: number, highestNgn: number): { yMin: number; yMax: number } {
+  const rangeRaw = highestNgn - lowestNgn;
+  const range    = rangeRaw === 0 ? Math.max(highestNgn * 0.1, 100) : rangeRaw;
+  return { yMin: lowestNgn - range * 0.12, yMax: highestNgn + range * 0.12 };
+}
+
+/* Axis price label — compact (₦450K / £250 / ₦1.5M) so the left gutter
+   stays narrow. One decimal of real precision with ".0" stripped, same
+   June 2026 rule as formatCompact/formatLocal. Exact values live in the
+   tooltip + stat tiles. */
+function axisPriceLabel(displayValue: number, country: Country): string {
+  const strip = (s: string) => s.replace(/\.0$/, "");
+  const v = Math.abs(displayValue);
+  if (v >= 999_950) return `${country.symbol}${strip((displayValue / 1_000_000).toFixed(1))}M`;
+  if (v >= 1_000)   return `${country.symbol}${strip((displayValue / 1_000).toFixed(1))}K`;
+  return `${country.symbol}${Math.round(displayValue)}`;
 }
 
 /* "Nice" horizontal price gridlines for the Y axis (June 2026 user
@@ -1156,13 +1189,11 @@ function computeGeometryFull(
   width: number,
   currentNgn: number,
   rangeDays: number,
+  leftPad: number = PAD_LEFT,
 ): Geometry {
-  const g = computeGeometry(points, width, rangeDays);
+  const g = computeGeometry(points, width, rangeDays, leftPad);
   if (points.length === 0) return g;
-  const rangeRaw = g.highestNgn - g.lowestNgn;
-  const range    = rangeRaw === 0 ? Math.max(g.highestNgn * 0.1, 100) : rangeRaw;
-  const yMin     = g.lowestNgn  - range * 0.12;
-  const yMax     = g.highestNgn + range * 0.12;
+  const { yMin, yMax } = padYDomain(g.lowestNgn, g.highestNgn);
   const chartH   = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
   const refRaw   = PAD_TOP + ((yMax - currentNgn) / (yMax - yMin)) * chartH;
   return {
