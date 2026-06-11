@@ -171,3 +171,16 @@ export function HealthIcon({ size, className }: IconProps) {
     </svg>
   );
 }
+
+export function SupermarketIcon({ size, className }: IconProps) {
+  /* Shopping cart/trolley — reads as supermarket / groceries.
+     Matches the lucide "ShoppingCart" silhouette referenced by the
+     supermarket category in categories.ts. */
+  return (
+    <svg {...baseProps(size)} className={className}>
+      <path d="M2.5 3h2l1.2 2m0 0 2 9.5h9.4l2-7.5H5.7Z" />
+      <circle cx="9" cy="19.5" r="1.3" />
+      <circle cx="17" cy="19.5" r="1.3" />
+    </svg>
+  );
+}

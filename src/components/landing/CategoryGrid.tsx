@@ -8,7 +8,7 @@ import { SITE_URL } from "@/lib/seo";
 import {
   PhoneIcon, LaptopIcon, GamingIcon, FashionIcon, HomeIcon,
   BeautyIcon, SportsIcon, EarbudsIcon, ElectronicsIcon, HealthIcon,
-  AppliancesIcon,
+  AppliancesIcon, SupermarketIcon,
 } from "@/components/ui/CategoryIcons";
 import type { ComponentType } from "react";
 
@@ -26,20 +26,29 @@ const ICON_FOR: Record<string, IconComp> = {
   computing:   LaptopIcon,
   audio:       EarbudsIcon,
   health:      HealthIcon,
+  supermarket: SupermarketIcon,
 };
+
+/* Homepage grid is capped at HOMEPAGE_TILE_CAP browsable tiles, kept
+   even for the 2- and 5-col breakpoints (an 11th orphans a tile). We
+   now carry 11 browsable categories (supermarket joined June 2026), so
+   the grid shows the TOP 10 BY DEAL COUNT and the lowest-inventory
+   category for the visitor's market drops off — e.g. supermarket
+   (NG-only drinks/grocery stores) earns a tile in NG but falls off in
+   UK/US where it has no reachable inventory. The /deals CategoryNav
+   still lists every category, so nothing is unreachable. */
+const HOMEPAGE_TILE_CAP = 10;
 
 /* Browsable on the homepage = everything except "all" AND anything
    marked `hidden: true`. The hidden flag lets us add taxonomies to
    the data layer + /deals CategoryNav chips without disturbing the
    homepage grid's count/layout.
 
-   Grid balance: 10 browsable tiles keep the 2- and 5-col breakpoints
-   even (an 11th orphans a tile). June 2026 split Appliances back OUT of
-   Electronics (it had grown well past the thin inventory that drove the
-   May merge), so Appliances retakes a tile and Health goes back to
-   `hidden` — restoring the clean 10-tile grid. Health stays a /deals
-   CategoryNav chip + hub (CategoryNav doesn't honour `hidden`), so it
-   loses only its homepage tile. */
+   Health is `hidden` so it never takes a homepage tile (stays a /deals
+   CategoryNav chip + hub — CategoryNav doesn't honour `hidden`). The
+   remaining browsable set is then capped to the top HOMEPAGE_TILE_CAP
+   by deal count below, so the grid stays even regardless of how many
+   browsable categories exist. */
 const browsable = categories.filter((c) => c.slug !== "all" && !c.hidden);
 
 /* Per-category counts, cached by country.
@@ -163,6 +172,7 @@ export default async function CategoryGrid({ country }: { country: Country }) {
         >
           {[...browsable]
             .sort((a, b) => (counts[b.slug] ?? 0) - (counts[a.slug] ?? 0))
+            .slice(0, HOMEPAGE_TILE_CAP)
             .map((cat, idx) => {
             const Icon = ICON_FOR[cat.slug];
             /* Real count from country-filtered fetch above. No fallback
