@@ -41,8 +41,8 @@ import {
   useCallback, useEffect, useId, useLayoutEffect,
   useMemo, useRef, useState,
 } from "react";
-import { formatPriceForUser, formatPriceForUserExact, timeAgo } from "@/lib/utils";
-import type { Country } from "@/lib/country";
+import { convertForUser, formatPriceForUser, formatPriceForUserExact, timeAgo } from "@/lib/utils";
+import { formatLocal, type Country } from "@/lib/country";
 import type { PriceHistoryPoint } from "@/lib/search/price-history";
 import {
   TrendingDown, TrendingUp, Minus, Calendar,
@@ -145,6 +145,21 @@ export default function PriceHistoryChart({
     () => computeGeometryFull(sliced, width, currentNgn, range.days),
     [sliced, width, currentNgn, range.days],
   );
+
+  /* Y-axis price gridlines, snapped to "nice" steps in the USER's
+     display currency (June 2026). Conversion is linear, so building
+     ticks in display units lands them on exactly the same pixels as
+     the NGN-domain drawing math. */
+  const yTicks = useMemo(() => {
+    if (geom.yMaxNgn <= geom.yMinNgn) return [];
+    const minDisp = convertForUser(geom.yMinNgn, country, "NGN");
+    const maxDisp = convertForUser(geom.yMaxNgn, country, "NGN");
+    const chartH  = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+    return buildYTicks(minDisp, maxDisp, chartH).map((t) => ({
+      y:     t.y,
+      label: formatLocal(t.value, country),
+    }));
+  }, [geom.yMinNgn, geom.yMaxNgn, country]);
 
   /* Store-count provenance for the footer strip. Swept over the
      FULL points array — deliberately NOT the range-sliced window
@@ -414,6 +429,30 @@ export default function PriceHistoryChart({
               stroke={GRID_HEX_ALPHA}
               strokeWidth={1}
             />
+          ))}
+
+          {/* Y axis — horizontal price gridlines + labels (June 2026).
+              Labels sit INSIDE the plot, top-left of each line, in the
+              user's currency via the compact formatter (₦1.5M-style is
+              right for an axis; exact values live in tooltip + tiles).
+              Drawn BEFORE the area fill so the line/area read on top. */}
+          {yTicks.map((t, i) => (
+            <g key={`ygrid-${i}`}>
+              <line
+                x1={PAD_LEFT} x2={width - PAD_RIGHT}
+                y1={t.y} y2={t.y}
+                stroke={GRID_HEX_ALPHA}
+                strokeWidth={1}
+              />
+              <text
+                x={PAD_LEFT}
+                y={t.y - 4}
+                fontSize={10}
+                className="fill-ink-3 tabular-nums select-none"
+              >
+                {t.label}
+              </text>
+            </g>
           ))}
 
           {/* Area fill — step-after, capped at the chart bottom */}
@@ -812,6 +851,12 @@ interface Geometry {
   meanNgn:    number;
   currentRefY: number;
   axisTicks:  { x: number; label: string }[];
+  /** Drawn Y domain (NGN, incl. the 12% padding band). Exposed so the
+      component can build price gridlines snapped to "nice" steps in
+      the USER's display currency — snapping in NGN then converting
+      produced ugly labels (£302, £247) on non-NGN markets. */
+  yMinNgn:    number;
+  yMaxNgn:    number;
 }
 
 /* Monotone cubic Hermite spline → cubic Bezier path.
@@ -909,7 +954,7 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
       pathD: "", areaD: "", xs: [], ys: [],
       lowestIdx: 0, lowestNgn: 0, lowestX: 0, lowestY: 0,
       highestNgn: 0, meanNgn: 0,
-      currentRefY: PAD_TOP, axisTicks: [],
+      currentRefY: PAD_TOP, axisTicks: [], yMinNgn: 0, yMaxNgn: 0,
     };
   }
 
@@ -1071,7 +1116,37 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
        prices still appear at the top/bottom edge. */
     currentRefY: PAD_TOP, // placeholder; caller sets via buildHoverState's external use
     axisTicks,
+    yMinNgn: yMin,
+    yMaxNgn: yMax,
   };
+}
+
+/* "Nice" horizontal price gridlines for the Y axis (June 2026 user
+   request: put price on the Y axis). Unit-agnostic: callers pass the
+   domain in the USER's display currency so steps snap to round numbers
+   in what the user actually reads (£25 steps — not NGN-nice values that
+   convert to £247). Steps snap to 1/2/2.5/5 × 10^n. Y mapping is linear,
+   so positioning in display units lands on the same pixel as NGN. */
+function buildYTicks(
+  yMin: number,
+  yMax: number,
+  chartH: number,
+): { y: number; value: number }[] {
+  const span = yMax - yMin;
+  if (!(span > 0)) return [];
+  const rawStep = span / 3; // aim for ~3 gridlines
+  const mag  = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const norm = rawStep / mag;
+  const step = (norm >= 5 ? 5 : norm >= 2.5 ? 2.5 : norm >= 2 ? 2 : 1) * mag;
+  const ticks: { y: number; value: number }[] = [];
+  for (let v = Math.ceil(yMin / step) * step; v <= yMax + step * 1e-6; v += step) {
+    const y = PAD_TOP + ((yMax - v) / span) * chartH;
+    /* Skip ticks hugging the very top/bottom edge — they'd collide
+       with the line's padding band or the x-axis date row. */
+    if (y < PAD_TOP + 6 || y > CHART_HEIGHT - PAD_BOTTOM - 6) continue;
+    ticks.push({ y, value: v });
+  }
+  return ticks;
 }
 
 /* Add currentRefY post-hoc since it depends on `currentNgn` which
