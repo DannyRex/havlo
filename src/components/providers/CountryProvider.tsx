@@ -17,8 +17,8 @@ import {
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
-  COUNTRIES, COUNTRY_COOKIE, DEFAULT_COUNTRY, getCountry,
-  type Country,
+  COUNTRIES, COUNTRY_COOKIE, DEFAULT_COUNTRY, getCountry, USD_FX,
+  type Country, type FxSnapshot,
 } from "@/lib/country";
 
 const COUNTRY_CODES = new Set(COUNTRIES.map((c) => c.code));
@@ -27,16 +27,34 @@ interface CountryContextValue {
   country:    Country;
   countries:  Country[];
   setCountry: (code: string) => void;
+  /** "1 USD = X" rate table for price conversion. Always the SERVER's
+      snapshot when the layout passed one (see fxSnapshot below) —
+      read rates from here, never from an imported USD_FX, in any
+      component whose converted price appears in SSR HTML. */
+  fx:         FxSnapshot;
 }
 
 const CountryContext = createContext<CountryContextValue | null>(null);
 
 interface Props {
   initialCode?: string;
+  /** The server layout's resolved USD_FX, serialized through the RSC
+      payload. CRITICAL (hydration): the FX mirror
+      (fx-rates.generated.ts) is rewritten daily by the FX cron, and
+      the server module graph and the browser's compiled chunks can
+      hold DIFFERENT revisions of it — dev HMR across a rewrite, or a
+      visitor hydrating around a deploy boundary. Each side's imported
+      USD_FX is then a different table, and every converted price in
+      SSR HTML mismatches on hydration by a few units (the June 2026
+      "₦54,755 vs ₦54,738" TrendingDeals warning). A PROP can't drift:
+      hydration replays the serialized value the server rendered with,
+      byte-for-byte. Falls back to the bundled USD_FX only when no
+      snapshot is passed (both app layouts pass one). */
+  fxSnapshot?:  FxSnapshot;
   children:     ReactNode;
 }
 
-export function CountryProvider({ initialCode, children }: Props) {
+export function CountryProvider({ initialCode, fxSnapshot, children }: Props) {
   const router   = useRouter();
   const pathname = usePathname();
 
@@ -213,8 +231,9 @@ export function CountryProvider({ initialCode, children }: Props) {
       country:   getCountry(code),
       countries: COUNTRIES.filter((c) => !c.deferredLaunch),
       setCountry,
+      fx:        fxSnapshot ?? USD_FX,
     }),
-    [code, setCountry],
+    [code, setCountry, fxSnapshot],
   );
 
   return <CountryContext.Provider value={value}>{children}</CountryContext.Provider>;

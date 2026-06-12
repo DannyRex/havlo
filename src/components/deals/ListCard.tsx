@@ -17,19 +17,22 @@ import { displayStoreName } from "@/lib/store-display";
 import InfoTip from "@/components/ui/InfoTip";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import { useCountry } from "@/components/providers/CountryProvider";
-import { USD_FX, formatLocal, inferStoreCountry, isGlobalIntlStore, type Country } from "@/lib/country";
+import { formatLocal, inferStoreCountry, isGlobalIntlStore, type Country, type FxSnapshot } from "@/lib/country";
 import { pdpUrlForDeal } from "@/lib/pdp-url";
 import { landedTotal } from "@/lib/landed-price";
 import type { Deal } from "@/types";
 
 /* Convert any Deal price (NGN or USD) into the user's preferred
    currency. Mirrors MasonryCard's same-named helper so the two cards
-   never disagree on price. */
-function convertToUserCurrency(amount: number, dealCurrency: string, country: Country): number {
+   never disagree on price. `fx` is useCountry().fx — the server's
+   serialized snapshot, not the bundled USD_FX (see CountryProvider's
+   fxSnapshot note; same hydration-drift class as MasonryCard even
+   though this card currently only renders from client-side fetches). */
+function convertToUserCurrency(amount: number, dealCurrency: string, country: Country, fx: FxSnapshot): number {
   const dealCcy = dealCurrency as Country["currency"];
   if (dealCcy === country.currency) return amount;
-  const inUsd = dealCcy === "USD" ? amount : amount / (USD_FX[dealCcy] ?? 1);
-  return Math.round(inUsd * (USD_FX[country.currency] ?? 1));
+  const inUsd = dealCcy === "USD" ? amount : amount / (fx[dealCcy] ?? 1);
+  return Math.round(inUsd * (fx[country.currency] ?? 1));
 }
 
 /* Same onError fallback pattern as MasonryCard's ResilientImage —
@@ -68,7 +71,7 @@ interface Props {
 }
 
 export default function ListCard({ deal, linkHref }: Props) {
-  const { country } = useCountry();
+  const { country, fx } = useCountry();
   const dealCcy = deal.currency as Country["currency"];
   const sameCcy = dealCcy === country.currency;
 
@@ -78,8 +81,8 @@ export default function ListCard({ deal, linkHref }: Props) {
      country was showing Naira on mobile because ListCard always
      called formatCompact() with the deal's NGN price. Now the same
      conversion path MasonryCard already uses applies here too. */
-  const primarySale = sameCcy ? deal.salePrice : convertToUserCurrency(deal.salePrice, deal.currency, country);
-  const primaryOrig = sameCcy ? deal.originalPrice : convertToUserCurrency(deal.originalPrice, deal.currency, country);
+  const primarySale = sameCcy ? deal.salePrice : convertToUserCurrency(deal.salePrice, deal.currency, country, fx);
+  const primaryOrig = sameCcy ? deal.originalPrice : convertToUserCurrency(deal.originalPrice, deal.currency, country, fx);
   const primarySaved = primaryOrig > primarySale ? primaryOrig - primarySale : 0;
 
   const priceFmt = formatLocal(primarySale, country);

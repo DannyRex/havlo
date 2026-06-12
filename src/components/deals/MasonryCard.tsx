@@ -27,7 +27,8 @@ import StoreLogo from "@/components/compare/StoreLogo";
 import { resolveStoreLogoUrl } from "@/lib/store-logo";
 import { useCountry } from "@/components/providers/CountryProvider";
 import {
-  USD_FX, formatLocal, resolveStoreCountry, isGlobalIntlStore, type Country,
+  formatLocal, resolveStoreCountry, isGlobalIntlStore,
+  type Country, type FxSnapshot,
 } from "@/lib/country";
 import { getCashbackForStore } from "@/lib/cashback";
 import InfoTip from "@/components/ui/InfoTip";
@@ -63,20 +64,27 @@ interface Props {
 /* Convert a Deal's native price into the user's preferred currency.
    Handles three cases:
      1. Deal currency already matches user currency → no conversion
-     2. Deal in USD, user not USD → multiply by USD_FX
-     3. Deal in NGN, user not NGN → divide by USD_FX[NGN], multiply by user's
-   Returns 0 when conversion is impossible (defensive — shouldn't happen). */
-function convertToUserCurrency(amount: number, dealCurrency: string, country: Country): number {
+     2. Deal in USD, user not USD → multiply by fx rate
+     3. Deal in NGN, user not NGN → divide by fx[NGN], multiply by user's
+   Returns 0 when conversion is impossible (defensive — shouldn't happen).
+
+   `fx` MUST be useCountry().fx (the server's serialized snapshot), NOT
+   the imported USD_FX: this card's converted price ships in SSR HTML,
+   and the browser bundle's USD_FX can be a different revision of the
+   daily-rewritten FX mirror than the server's — which made every USD
+   card's price line mismatch on hydration by a few naira (June 2026
+   "₦54,755 vs ₦54,738" TrendingDeals warning). */
+function convertToUserCurrency(amount: number, dealCurrency: string, country: Country, fx: FxSnapshot): number {
   const dealCcy = dealCurrency as Country["currency"];
   if (dealCcy === country.currency) return amount;
 
   // Convert deal currency → USD as intermediate hop
   const inUsd = dealCcy === "USD"
     ? amount
-    : amount / (USD_FX[dealCcy] ?? 1);
+    : amount / (fx[dealCcy] ?? 1);
 
   // USD → user currency
-  return Math.round(inUsd * (USD_FX[country.currency] ?? 1));
+  return Math.round(inUsd * (fx[country.currency] ?? 1));
 }
 
 /* Resilient image renderer. Tries the deal's imageUrl; on load
@@ -148,8 +156,8 @@ function ResilientImage({ deal, priority }: { deal: Deal; priority: boolean }) {
 }
 
 export default function MasonryCard({ deal, aspect, showOriginBadge = true, priority = false, linkHref, showCashback = true }: Props) {
-  const { country } = useCountry();
-  const router      = useRouter();
+  const { country, fx } = useCountry();
+  const router          = useRouter();
   const dealCcy = deal.currency as Country["currency"];
   const sameCcy = dealCcy === country.currency;
 
@@ -173,8 +181,8 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
   /* Primary price = user's preferred currency.
      Secondary price = original currency (only when different) so the
      user can sanity-check against the source listing. */
-  const primarySale = sameCcy ? deal.salePrice : convertToUserCurrency(deal.salePrice, deal.currency, country);
-  const primaryOrig = sameCcy ? deal.originalPrice : convertToUserCurrency(deal.originalPrice, deal.currency, country);
+  const primarySale = sameCcy ? deal.salePrice : convertToUserCurrency(deal.salePrice, deal.currency, country, fx);
+  const primaryOrig = sameCcy ? deal.originalPrice : convertToUserCurrency(deal.originalPrice, deal.currency, country, fx);
   const primarySaved = primaryOrig > primarySale ? primaryOrig - primarySale : 0;
 
   const priceFmt = formatLocal(primarySale, country);

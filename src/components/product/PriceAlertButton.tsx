@@ -29,8 +29,8 @@
 
 import { useRef, useState } from "react";
 import { Bell, BellRing, Check, X } from "lucide-react";
-import type { Country } from "@/lib/country";
-import { USD_FX } from "@/lib/country";
+import type { Country, FxSnapshot } from "@/lib/country";
+import { useCountry } from "@/components/providers/CountryProvider";
 
 interface Props {
   productId:        string;
@@ -43,6 +43,12 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UUID_RE  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default function PriceAlertButton({ productId, productTitle, currentPriceNgn, country }: Props) {
+  /* fx from context (the server's serialized snapshot) — see the
+     fxSnapshot note in CountryProvider. The alert form only renders
+     post-click so its converted text never ships in SSR HTML, but
+     using the context rate keeps the threshold math byte-identical
+     to the prices the surrounding PDP displays. */
+  const { fx } = useCountry();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const targetInputRef = useRef<HTMLInputElement>(null);
@@ -50,7 +56,7 @@ export default function PriceAlertButton({ productId, productTitle, currentPrice
      shoppers want a meaningful discount, not a 1% improvement.
      Rounded for readability. */
   const defaultTargetNgn = Math.round(currentPriceNgn * 0.9 / 100) * 100;
-  const defaultTargetDisplay = Math.round(ngnToDisplay(defaultTargetNgn, country));
+  const defaultTargetDisplay = Math.round(ngnToDisplay(defaultTargetNgn, country, fx));
   /* Store formatted display string. Raw value for submission is
      parsed back on handleSubmit. Pre-format the default so the
      initial render is consistent with the typing experience. */
@@ -74,7 +80,7 @@ export default function PriceAlertButton({ productId, productTitle, currentPrice
     }
     /* Convert the user's display-currency input back to NGN before
        POSTing. The DB stores NGN canonically. */
-    const targetNgn = displayToNgn(targetNumber, country);
+    const targetNgn = displayToNgn(targetNumber, country, fx);
     if (targetNgn >= currentPriceNgn) {
       setErrorMsg("Pick a target below the current price.");
       return;
@@ -241,26 +247,29 @@ export default function PriceAlertButton({ productId, productTitle, currentPrice
 /* ── Currency math ─────────────────────────────────────────────────
    The DB stores NGN as the canonical price-comparison currency.
    USD-source offers get converted on read; targets get converted on
-   write. We use the same USD_FX rates the rest of the app reads so
-   conversions stay consistent across surfaces. */
+   write. `fx` is useCountry().fx — the server's serialized snapshot,
+   same table every other surface converts with — so the threshold a
+   user types matches the prices they see (see CountryProvider's
+   fxSnapshot note for why the imported USD_FX is off-limits in
+   client components). */
 
-function ngnToDisplay(ngn: number, country: Country): number {
+function ngnToDisplay(ngn: number, country: Country, fx: FxSnapshot): number {
   /* country.currency is the user's display currency code. NG → NGN,
-     no conversion. Others → divide by their USD_FX rate, since the
+     no conversion. Others → divide by their fx rate, since the
      rates are expressed as "1 USD = X local". To convert NGN → USD
-     we'd do ngn / USD_FX.NGN; to convert NGN → other-local we then
-     multiply by USD_FX.OTHER. */
+     we'd do ngn / fx.NGN; to convert NGN → other-local we then
+     multiply by fx.OTHER. */
   if (country.currency === "NGN") return ngn;
-  const usd = ngn / USD_FX.NGN;
-  const rate = USD_FX[country.currency as keyof typeof USD_FX] ?? 1;
+  const usd = ngn / fx.NGN;
+  const rate = fx[country.currency] ?? 1;
   return usd * rate;
 }
 
-function displayToNgn(displayAmount: number, country: Country): number {
+function displayToNgn(displayAmount: number, country: Country, fx: FxSnapshot): number {
   if (country.currency === "NGN") return displayAmount;
-  const rate = USD_FX[country.currency as keyof typeof USD_FX] ?? 1;
+  const rate = fx[country.currency] ?? 1;
   const usd = displayAmount / rate;
-  return usd * USD_FX.NGN;
+  return usd * fx.NGN;
 }
 
 /* Format a raw target-price input string into a display string with

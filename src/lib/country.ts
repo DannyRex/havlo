@@ -117,6 +117,17 @@ export const USD_FX: Record<Country["currency"], number> = (() => {
   return out;
 })();
 
+/* A resolved "1 USD = X" rate table. USD_FX above is the snapshot this
+   module graph was COMPILED with — which is not always the snapshot the
+   page was SERVER-RENDERED with: the daily FX cron rewrites
+   fx-rates.generated.ts, and the server module graph and the browser's
+   chunks can straddle that rewrite (dev HMR mid-session, deploy skew).
+   Server layouts therefore pass their USD_FX into CountryProvider as a
+   PROP; the prop rides the RSC payload, so hydration replays the exact
+   numbers the server rendered with. Price-converting client components
+   must read the rate via useCountry().fx, not import USD_FX directly. */
+export type FxSnapshot = Record<Country["currency"], number>;
+
 /** Convert a USD amount to the country's local currency. */
 export function usdToLocal(usd: number, country: Country): number {
   return Math.round(usd * USD_FX[country.currency]);

@@ -32,6 +32,7 @@ import {
   isCrossBorderForUser,
 } from "@/lib/landed-price";
 import { isOfferAllowedForCountry } from "@/lib/country";
+import { useCountry } from "@/components/providers/CountryProvider";
 import { trackClick } from "@/lib/trackClick";
 import StoreLogo from "@/components/compare/StoreLogo";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
@@ -53,6 +54,11 @@ interface Props {
 }
 
 export default function CompareAnchorCard({ anchor, dupes, country, query, canCompare = false }: Props) {
+  /* fx from context (server-serialized snapshot) — this card SSRs for
+     deep-linked /compare?q= URLs (the page passes initialResult), so
+     its converted prices ship in SSR HTML and must hydrate against
+     the same rates the server used. See CountryProvider fxSnapshot. */
+  const { fx } = useCountry();
   /* Price summary line — cheapest store's price as headline, spread vs
      the most-expensive store ("save up to X across stores"). Sort + show
      the RAW merchant price (#16) so this matches the PDP hero / chart /
@@ -148,11 +154,11 @@ export default function CompareAnchorCard({ anchor, dupes, country, query, canCo
             {anchor.offers.length > 0 && anchor.bestPrice > 0 && (
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
                 <span className="text-lg sm:text-xl font-bold text-ink">
-                  {formatPriceForUser(cheapest?.eff ?? anchor.bestPrice, country)}
+                  {formatPriceForUser(cheapest?.eff ?? anchor.bestPrice, country, "NGN", fx)}
                 </span>
                 {spread > 0 && (
                   <span className="text-xs text-ink-3">
-                    Save up to <span className="text-success font-semibold">{formatPriceDeltaForUser(dearest!.eff, cheapest!.eff, country)}</span> across stores
+                    Save up to <span className="text-success font-semibold">{formatPriceDeltaForUser(dearest!.eff, cheapest!.eff, country, "NGN", fx)}</span> across stores
                   </span>
                 )}
               </div>
@@ -199,7 +205,7 @@ export default function CompareAnchorCard({ anchor, dupes, country, query, canCo
 
             {hasDupes && dupes[0].savingsPercent > 0 && (
               <p className="mt-2 text-xs text-success font-medium">
-                Alternatives from {formatPriceForUser(cheapestDupeBest, country)}
+                Alternatives from {formatPriceForUser(cheapestDupeBest, country, "NGN", fx)}
               </p>
             )}
           </div>
@@ -365,11 +371,11 @@ export default function CompareAnchorCard({ anchor, dupes, country, query, canCo
                               chart / spectrum. The cross-border "+ ~30%
                               shipping/customs" caveat is in the footnote
                               disclosure below, so no per-row "est." cue. */}
-                          {formatPriceForUser(eff, country)}
+                          {formatPriceForUser(eff, country, "NGN", fx)}
                         </p>
                         {savings > 0 && (
                           <p className="text-[11px] text-ink-3 tabular-nums">
-                            +{formatPriceDeltaForUser(eff, rowsCheapest, country)}
+                            +{formatPriceDeltaForUser(eff, rowsCheapest, country, "NGN", fx)}
                           </p>
                         )}
                       </div>

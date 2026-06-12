@@ -25,7 +25,7 @@
 
 import { notFound } from "next/navigation";
 import { CountryProvider } from "@/components/providers/CountryProvider";
-import { COUNTRIES } from "@/lib/country";
+import { COUNTRIES, USD_FX } from "@/lib/country";
 
 export function generateStaticParams() {
   return COUNTRIES.map((c) => ({ country: c.code }));
@@ -46,5 +46,13 @@ export default function CountryLayout({
      /[country]/. So /uk/deals SSR'd cards link to /uk/p/..., not
      /ng/p/... (the bug before this layout existed — useCountry()'s
      server-side value defaulted to NG). */
-  return <CountryProvider initialCode={code}>{children}</CountryProvider>;
+  /* fxSnapshot: this layout's resolved FX table rides the RSC payload,
+     so converted prices in SSR HTML hydrate against the same rates the
+     server used — see the fxSnapshot note in CountryProvider. Plain
+     module read; keeps the no-dynamic-functions rule above intact. */
+  return (
+    <CountryProvider initialCode={code} fxSnapshot={USD_FX}>
+      {children}
+    </CountryProvider>
+  );
 }

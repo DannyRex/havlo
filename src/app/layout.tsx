@@ -6,6 +6,7 @@ import Footer from "@/components/layout/Footer";
 import ThemeProvider from "@/components/ui/ThemeProvider";
 import ScrollReset from "@/components/ui/ScrollReset";
 import { CountryProvider } from "@/components/providers/CountryProvider";
+import { USD_FX } from "@/lib/country";
 import JsonLd from "@/components/seo/JsonLd";
 import DeferredConsentStack from "@/components/seo/DeferredConsentStack";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/seo";
@@ -204,7 +205,13 @@ export default function RootLayout({
               landing components take `country` as a prop. The only cost is
               a one-frame flag flash on non-NG country pages — a documented,
               accepted trade-off for an ISR-able site. */}
-          <CountryProvider>
+          {/* fxSnapshot: the server's resolved FX table, serialized into
+              the RSC payload so the client hydrates prices with the EXACT
+              rates this render used — the browser's own bundled USD_FX can
+              be a different revision of fx-rates.generated.ts (the daily
+              FX cron rewrites it). A plain module read, no dynamic
+              functions, so the ISR constraint above is untouched. */}
+          <CountryProvider fxSnapshot={USD_FX}>
             <ScrollReset />
             <Navbar />
             <main className="flex-1">{children}</main>

@@ -38,13 +38,14 @@ import type { MerchantTrust } from "@/lib/merchant-trust";
 import type { PerStoreOffer } from "@/lib/pdp-stats";
 import type { PriceHistorySummary } from "@/lib/search/price-history";
 import {
-  USD_FX,
   formatLocal,
   resolveStoreCountry,
   isGlobalIntlStore,
   getCountry,
   type Country,
+  type FxSnapshot,
 } from "@/lib/country";
+import { useCountry } from "@/components/providers/CountryProvider";
 
 /* Shape passed from the server-rendered page. Mirrors the offer
    fields the page already has — no separate fetch from the client. */
@@ -143,23 +144,34 @@ interface Props {
 
 /* Convert any price (NGN or USD) to the user's preferred currency.
    Same helper as MasonryCard / ListCard — kept inline here so the
-   PDP doesn't pull in those card files just for the conversion. */
+   PDP doesn't pull in those card files just for the conversion.
+
+   `fx` MUST be useCountry().fx (the server's serialized snapshot),
+   NOT an imported USD_FX: the hero price ships in SSR HTML, and the
+   browser bundle's USD_FX can be a different revision of the
+   daily-rewritten FX mirror than the server's — the MasonryCard
+   hydration-drift class (see CountryProvider's fxSnapshot note). */
 function convertToUserCurrency(
   amount: number,
   dealCurrency: "NGN" | "USD",
   country: Country,
+  fx: FxSnapshot,
 ): number {
   if (dealCurrency === country.currency) return amount;
   /* Both NGN and USD route through USD as the intermediate currency
-     since USD_FX is "1 USD = X local". Round to whole units for
+     since the fx table is "1 USD = X local". Round to whole units for
      non-USD targets to match formatLocal's display rounding. */
-  const usd = dealCurrency === "USD" ? amount : amount / USD_FX.NGN;
-  const out = usd * USD_FX[country.currency];
+  const usd = dealCurrency === "USD" ? amount : amount / fx.NGN;
+  const out = usd * fx[country.currency];
   return country.currency === "USD" ? Math.round(out * 100) / 100 : Math.round(out);
 }
 
 export default function ProductHero({ offer, countryCode, totalStores, perStoreOffers, priceHistory, signedOutboundUrl, localAlternative, isLocallyShoppable, loading }: Props) {
   const country = getCountry(countryCode);
+  /* Only fx comes from context — country stays prop-derived (the PDP
+     is rendered per /[country]/ URL, which must win over any
+     cookie-resolved context country). */
+  const { fx } = useCountry();
   const [imgFailed, setImgFailed] = useState(false);
 
   const cleanedTitle = cleanTitle(offer.title);
@@ -193,7 +205,7 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
   })();
 
   /* Primary price in the user's currency. */
-  const primaryAmount = convertToUserCurrency(offer.currentPrice, offer.currency, country);
+  const primaryAmount = convertToUserCurrency(offer.currentPrice, offer.currency, country, fx);
 
   /* PriceComparisonBar takes NGN values and runs the user-currency
      conversion at render time via formatPriceForUser. Pass priceStats
@@ -204,7 +216,7 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
      (no priceStats) still needs an NGN anchor value for the bar's
      props, computed inline below. */
   const anchorPriceNgn = offer.currency === "USD"
-    ? Math.round(offer.currentPrice * USD_FX.NGN)
+    ? Math.round(offer.currentPrice * fx.NGN)
     : offer.currentPrice;
 
   const primaryStr = country.currency === "NGN"
@@ -337,7 +349,7 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
                      178,800 NGN and rendered as "£178,800" on /uk
                      (user-reported). NG pages looked correct only because
                      NGN already matches the page currency. */
-                  ? <><span className="font-semibold text-ink">{displayStore}</span> may not ship directly to {country.name}. The same product is available at <span className="font-semibold text-ink">{displayStoreName(localAlternative.storeName)}</span> for <span className="font-semibold text-ink">{formatLocal(convertToUserCurrency(localAlternative.price, "NGN", country), country)}</span>.</>
+                  ? <><span className="font-semibold text-ink">{displayStore}</span> may not ship directly to {country.name}. The same product is available at <span className="font-semibold text-ink">{displayStoreName(localAlternative.storeName)}</span> for <span className="font-semibold text-ink">{formatLocal(convertToUserCurrency(localAlternative.price, "NGN", country, fx), country)}</span>.</>
                   : <><span className="font-semibold text-ink">{displayStore}</span> may not ship directly to {country.name} - visit the store to confirm shipping options before ordering.</>}
               </div>
             </div>
@@ -473,10 +485,10 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             {hasDiscount && (
               <span className="text-base sm:text-lg text-ink-3 line-through tabular-nums">
                 {country.currency === "USD"
-                  ? formatUSDPrice(convertToUserCurrency(offer.originalPrice, offer.currency, country))
+                  ? formatUSDPrice(convertToUserCurrency(offer.originalPrice, offer.currency, country, fx))
                   : country.currency === "NGN"
-                    ? formatCompact(convertToUserCurrency(offer.originalPrice, offer.currency, country))
-                    : formatLocal(convertToUserCurrency(offer.originalPrice, offer.currency, country), country)}
+                    ? formatCompact(convertToUserCurrency(offer.originalPrice, offer.currency, country, fx))
+                    : formatLocal(convertToUserCurrency(offer.originalPrice, offer.currency, country, fx), country)}
               </span>
             )}
           </div>
@@ -498,10 +510,10 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
           {hasDiscount && savingsAbs > 0 && (
             <p className="text-sm text-success mt-2 font-medium">
               You save {country.currency === "USD"
-                ? formatUSDPrice(convertToUserCurrency(savingsAbs, offer.currency, country))
+                ? formatUSDPrice(convertToUserCurrency(savingsAbs, offer.currency, country, fx))
                 : country.currency === "NGN"
-                  ? formatCompact(convertToUserCurrency(savingsAbs, offer.currency, country))
-                  : formatLocal(convertToUserCurrency(savingsAbs, offer.currency, country), country)}
+                  ? formatCompact(convertToUserCurrency(savingsAbs, offer.currency, country, fx))
+                  : formatLocal(convertToUserCurrency(savingsAbs, offer.currency, country, fx), country)}
             </p>
           )}
         </div>

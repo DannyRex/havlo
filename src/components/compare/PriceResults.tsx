@@ -19,7 +19,7 @@ export default function PriceResults({
   query?: string;
   mode?: string;
 }) {
-  const { country } = useCountry();
+  const { country, fx } = useCountry();
   const { offers, bestPrice, maxSavings, title, imageUrl, category, storeCount } = group;
 
   /* Compute "INTL for this visitor" at the UI layer rather than
@@ -82,11 +82,11 @@ export default function PriceResults({
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-3">
             <div>
               <span className="text-[11px] text-ink-3">Best price · </span>
-              <span className="text-lg font-bold text-success">{formatPriceForUser(bestPrice, country)}</span>
+              <span className="text-lg font-bold text-success">{formatPriceForUser(bestPrice, country, "NGN", fx)}</span>
             </div>
             {maxSavings > 0 && (
               <div className="text-xs text-ink-2">
-                Save up to <span className="font-semibold text-ink">{formatPriceDeltaForUser(bestPrice + maxSavings, bestPrice, country)}</span> vs. highest
+                Save up to <span className="font-semibold text-ink">{formatPriceDeltaForUser(bestPrice + maxSavings, bestPrice, country, "NGN", fx)}</span> vs. highest
               </div>
             )}
             <div className="text-xs text-ink-3">
@@ -181,9 +181,9 @@ export default function PriceResults({
               {/* Price */}
               <div className="text-right shrink-0">
                 <p className={`text-base sm:text-lg font-bold ${isBest ? "text-success" : "text-ink"}`}>
-                  {formatPriceForUser(p.price, country)}
+                  {formatPriceForUser(p.price, country, "NGN", fx)}
                 </p>
-                {extra > 0 && <p className="text-[11px] text-ink-3">+{formatPriceForUser(extra, country)}</p>}
+                {extra > 0 && <p className="text-[11px] text-ink-3">+{formatPriceForUser(extra, country, "NGN", fx)}</p>}
               </div>
 
               <ExternalLink size={14} className="text-ink-3 shrink-0" />

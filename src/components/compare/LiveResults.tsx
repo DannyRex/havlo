@@ -10,7 +10,7 @@ import {
 } from "@/lib/utils";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import { useCountry } from "@/components/providers/CountryProvider";
-import { USD_FX, formatLocal, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
+import { formatLocal, inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
 import { displayStoreName } from "@/lib/store-display";
 import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import type { Deal } from "@/types";
@@ -23,7 +23,12 @@ interface Props {
 
 /* ── Single live-result card — compact, image-first, varied aspect ── */
 function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
-  const { country } = useCountry();
+  /* fx from context — the server's serialized FX snapshot, not the
+     bundled USD_FX (CountryProvider fxSnapshot note). Live cards only
+     render from a client-side fetch, so there's no SSR text to
+     mismatch — using the context rate keeps these prices consistent
+     with the anchor/dupe cards beside them. */
+  const { country, fx } = useCountry();
   const isUSD = deal.currency === "USD";
   const saved = savings(deal.originalPrice, deal.salePrice);
 
@@ -47,7 +52,7 @@ function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
   const localOf = (usdAmount: number): number =>
     country.currency === "USD"
       ? Math.round(usdAmount * 100) / 100
-      : Math.round(usdAmount * USD_FX[country.currency]);
+      : Math.round(usdAmount * fx[country.currency]);
   const formatLocalOrUSD = (usdAmount: number): string =>
     country.currency === "USD"
       ? formatUSDPrice(usdAmount)

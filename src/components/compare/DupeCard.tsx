@@ -88,7 +88,7 @@ export default function DupeCard({
   /** Image aspect class for masonry-style varying heights */
   aspect?: string;
 }) {
-  const { country } = useCountry();
+  const { country, fx } = useCountry();
   const hasSavings = dupe.savingsPercent > 0;
   const bestOffer = dupe.offers[0];
   const extraStores = dupe.offers.length - 1;
@@ -190,11 +190,13 @@ export default function DupeCard({
             {formatPriceForUser(
               bestOffer ? bestOffer.price : dupe.bestPrice,
               country,
+              "NGN",
+              fx,
             )}
           </span>
           {hasSavings && (
             <span className="text-[11px] text-success font-semibold">
-              save {formatPriceForUser(dupe.savingsVsAnchor, country)}
+              save {formatPriceForUser(dupe.savingsVsAnchor, country, "NGN", fx)}
             </span>
           )}
         </div>
@@ -306,7 +308,7 @@ export default function DupeCard({
                         different numbers for the same offer. Cross-border
                         shipping/customs is surfaced separately, not baked
                         into the number. */}
-                    <span className="font-semibold text-ink tabular-nums">{formatPriceForUser(offer.price, country)}</span>
+                    <span className="font-semibold text-ink tabular-nums">{formatPriceForUser(offer.price, country, "NGN", fx)}</span>
                   </a>
                 ))}
               </div>
