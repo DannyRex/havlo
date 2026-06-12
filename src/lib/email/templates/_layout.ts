@@ -378,6 +378,51 @@ export interface DealCardData {
   discountPercent: number;
   storeName:       string;
   url:             string;
+  /** Product photo (June 2026). Optional — cards render text-only
+      without it, exactly as before. Run raw merchant URLs through
+      emailImageUrl() before passing. */
+  imageUrl?:       string | null;
+}
+
+/* ── Email-safe product image URL ─────────────────────────────────
+   Email clients need ABSOLUTE urls and won't send a merchant-friendly
+   Referer, so hotlink-defended CDNs (Amazon, ASOS, THG) can 403 the
+   fetch. Self-hosted Supabase Storage copies and anything already on
+   havlo.io pass through untouched; every other host is routed through
+   the site's /api/img-proxy (absolutized), the same defense the web
+   cards use. Returns null for anything non-http so templates can skip
+   the cell cleanly. */
+export function emailImageUrl(raw?: string | null): string | null {
+  if (!raw) return null;
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+  const host = u.hostname.toLowerCase();
+  if (host.endsWith(".supabase.co") || host === "havlo.io" || host === "www.havlo.io") {
+    return raw;
+  }
+  return `${SITE_URL}/api/img-proxy?url=${encodeURIComponent(raw)}`;
+}
+
+/* 80px square thumbnail cell shared by dealCard. display:block kills
+   the mystery baseline gap; explicit width/height attrs keep the box
+   stable while the image loads (or stays blocked); the white
+   background keeps transparent product PNGs legible in dark-mode
+   clients; alt stays empty because the adjacent title already names
+   the product (a blocked-image client would otherwise show the title
+   twice). object-fit is best-effort — Outlook ignores it, which just
+   means a slightly stretched thumb there. */
+function thumbCell(src: string, href: string): string {
+  return `<td width="100" valign="top" style="padding:18px 0 18px 20px;">
+              <a href="${escapeAttr(href)}" style="text-decoration:none;">
+                <img src="${escapeAttr(src)}" alt="" width="80" height="80"
+                  style="display:block;width:80px;height:80px;border-radius:8px;background-color:#ffffff;object-fit:cover;border:1px solid ${tokens.border};" />
+              </a>
+            </td>`;
 }
 
 export function dealCard(d: DealCardData): string {
@@ -405,11 +450,16 @@ export function dealCard(d: DealCardData): string {
       ? `<span style="display:inline-block;font-family:${tokens.fontFamily};font-size:12px;font-weight:600;color:${tokens.success};background-color:${tokens.successBg};padding:3px 8px;border-radius:999px;margin-left:10px;vertical-align:middle;">${d.discountPercent}% off</span>`
       : ""}`;
 
+  /* Optional product photo on the left (June 2026). Cards without an
+     image keep the exact single-cell layout they always had. */
+  const img = emailImageUrl(d.imageUrl);
+
   return `<tr>
     <td class="px-mobile" style="padding:0 32px 12px 32px;">
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="bg-card border" style="background-color:${tokens.surface};border:1px solid ${tokens.border};border-radius:12px;">
         <tr>
-          <td style="padding:18px 20px;">
+          ${img ? thumbCell(img, d.url) : ""}
+          <td valign="top" style="padding:18px 20px;">
             <p style="margin:0 0 8px 0;font-family:${tokens.fontFamily};font-size:15px;line-height:1.35;font-weight:600;color:${tokens.ink};" class="text-ink">
               <a href="${escapeAttr(d.url)}" style="color:${tokens.ink};text-decoration:none;" class="text-ink">${escapeHtml(d.title)}</a>
             </p>
@@ -436,14 +486,29 @@ export interface MatchRowData {
   priceDisplay: string;
   storeName: string;
   url:       string;
+  /** Product photo (June 2026) — optional, rows render text-only
+      without it. Run through emailImageUrl() before passing. */
+  imageUrl?: string | null;
 }
 
 export function matchRow(o: MatchRowData, isLast: boolean): string {
+  const img = emailImageUrl(o.imageUrl);
+  /* Slimmer 48px thumb than dealCard's 80px — these are compact list
+     rows, not feature cards. */
+  const imgCell = img
+    ? `<td width="60" valign="top" style="padding:14px 12px 14px 0;">
+            <a href="${escapeAttr(o.url)}" style="text-decoration:none;">
+              <img src="${escapeAttr(img)}" alt="" width="48" height="48"
+                style="display:block;width:48px;height:48px;border-radius:6px;background-color:#ffffff;object-fit:cover;border:1px solid ${tokens.border};" />
+            </a>
+          </td>`
+    : "";
   return `<tr>
     <td class="px-mobile" style="padding:0 32px;">
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-bottom:${isLast ? "0" : `1px solid ${tokens.border}`};" class="border-top">
         <tr>
-          <td style="padding:14px 0;">
+          ${imgCell}
+          <td valign="top" style="padding:14px 0;">
             <p style="margin:0 0 4px 0;font-family:${tokens.fontFamily};font-size:15px;line-height:1.4;font-weight:600;">
               <a href="${escapeAttr(o.url)}" style="color:${tokens.ink};text-decoration:none;" class="text-ink">${escapeHtml(o.title)}</a>
             </p>

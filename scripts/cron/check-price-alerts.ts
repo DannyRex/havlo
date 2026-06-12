@@ -103,15 +103,17 @@ async function main() {
   const productIds = Array.from(new Set(filteredRows.map((r) => r.product_id)));
   const { data: products, error: prodErr } = await supa
     .from("products")
-    .select("id,title")
+    .select("id,title,image_url")
     .in("id", productIds);
   if (prodErr) {
     console.error("[check-price-alerts] products lookup error:", prodErr.message);
     process.exit(1);
   }
   const titleById: Record<string, string> = {};
-  for (const p of (products ?? []) as Array<{ id: string; title: string }>) {
+  const imageById: Record<string, string | null> = {};
+  for (const p of (products ?? []) as Array<{ id: string; title: string; image_url: string | null }>) {
     titleById[p.id] = p.title;
+    imageById[p.id] = p.image_url;
   }
 
   /* Send the trigger emails serially with pacing, same shape as
@@ -138,6 +140,7 @@ async function main() {
       productUrl,
       country:         row.country,
       unsubscribeToken: row.token,
+      productImageUrl: imageById[row.product_id] ?? null,
     });
 
     const result = await sendEmail({

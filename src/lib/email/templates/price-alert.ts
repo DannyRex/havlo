@@ -22,6 +22,8 @@ import {
   spacer,
   textLink,
   escapeHtml,
+  escapeAttr,
+  emailImageUrl,
   plainTextShell,
   button,
 } from "./_layout";
@@ -86,11 +88,15 @@ interface TriggeredArgs {
   productUrl:      string;   // havlo.io/{country}/p/{offer_id}
   country:         string;
   unsubscribeToken: string;
+  /** Product photo (June 2026). Optional — the email renders text-only
+      without it. Raw merchant/Storage URL; emailImageUrl handles
+      proxying. */
+  productImageUrl?: string | null;
 }
 
 export function priceAlertTriggered({
   productTitle, targetPriceFmt, cheapestPriceFmt, storeName, productUrl,
-  country, unsubscribeToken,
+  country, unsubscribeToken, productImageUrl,
 }: TriggeredArgs): Email {
   const cc = country.toLowerCase();
   void cc;
@@ -106,8 +112,27 @@ export function priceAlertTriggered({
   const subject   = `${productTitle.slice(0, 55)} is now ${cheapestPriceFmt}`;
   const preheader = `Below your target of ${targetPriceFmt}. View the offer at ${storeLabel}.`;
 
+  /* Product photo above the headline (June 2026). 120px, linked to the
+     PDP, white background so transparent product PNGs stay legible in
+     dark-mode clients. Personal-shell emails stay light, so this only
+     renders when a photo exists. */
+  const img = emailImageUrl(productImageUrl);
+  const photoBlock = img
+    ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px 0;">
+        <tr>
+          <td>
+            <a href="${escapeAttr(productUrl)}" style="text-decoration:none;">
+              <img src="${escapeAttr(img)}" alt="" width="120" height="120"
+                style="display:block;width:120px;height:120px;border-radius:10px;background-color:#ffffff;object-fit:cover;border:1px solid #e5e7eb;" />
+            </a>
+          </td>
+        </tr>
+      </table>`
+    : "";
+
   const body = `
 ${paragraph("Quick heads-up.")}
+${photoBlock}
 ${paragraph(`<strong style="font-weight:600;">${escapeHtml(productTitle)}</strong> just dropped to <strong style="font-weight:600;">${escapeHtml(cheapestPriceFmt)}</strong> at ${escapeHtml(storeLabel)}.`)}
 ${paragraph(`That's below the target you set (${escapeHtml(targetPriceFmt)}).`)}
 ${button({ url: productUrl, label: `View at ${storeLabel}`, align: "left" })}

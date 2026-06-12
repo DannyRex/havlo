@@ -183,6 +183,11 @@ async function buildDigestDeals(
          history / cross-store compare before buying, and the affiliate
          click still happens via the PDP's "Visit store" CTA. */
       url:             `${SITE_URL}${pdpUrlForDeal(country.code, d)}`,
+      /* Product photo (June 2026) — dealCard renders an 80px thumb
+         when present, text-only otherwise. emailImageUrl inside the
+         template handles proxying/absolutizing, so the raw merchant
+         or Storage URL goes through as-is. */
+      imageUrl:        d.imageUrl ?? null,
     };
   });
 }
