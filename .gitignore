@@ -60,7 +60,3 @@ scripts/output/
 # of regenerable binaries don't bloat the repo.
 remotion/out/
 remotion/renders/
-
-# Strategy / planning docs generated locally — kept out of the repo so
-# they can be regenerated freely without polluting commits.
-docs/*.docx
