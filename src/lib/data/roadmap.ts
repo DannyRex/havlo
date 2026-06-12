@@ -21,6 +21,14 @@ export interface RoadmapItem {
   title: string;
   description: string;
   status: RoadmapStatus;
+  /** Country codes this item is relevant to. Absent = every market.
+      Used by roadmapItemsForCountry so an NG-only feature (solar hub)
+      doesn't show on /uk/roadmap and vice versa. */
+  markets?: readonly string[];
+  /** Country-specific description override — used where the global
+      copy embeds a currency or market example (a UK visitor should
+      not read "₦400k"). Falls back to `description`. */
+  localDescription?: Readonly<Record<string, string>>;
 }
 
 export const ROADMAP_ITEMS: RoadmapItem[] = [
@@ -40,8 +48,16 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
   {
     id: "ask-havlo",
     title: "Ask Havlo",
-    description: "Describe what you need, like 'best washing machine under ₦400k for a family of 5', and get an answer built from real prices across stores.",
+    description: "Describe what you need, like 'best washing machine under $450 for a family of 5', and get an answer built from real prices across stores.",
     status: "up-next",
+    /* Market-priced examples so the teaser reads native everywhere. */
+    localDescription: {
+      ng: "Describe what you need, like 'best washing machine under ₦400k for a family of 5', and get an answer built from real prices across stores.",
+      uk: "Describe what you need, like 'best washing machine under £350 for a family of 5', and get an answer built from real prices across stores.",
+      in: "Describe what you need, like 'best washing machine under ₹30,000 for a family of 5', and get an answer built from real prices across stores.",
+      ae: "Describe what you need, like 'best washing machine under AED 1,500 for a family of 5', and get an answer built from real prices across stores.",
+      za: "Describe what you need, like 'best washing machine under R8,000 for a family of 5', and get an answer built from real prices across stores.",
+    },
   },
   {
     id: "cashback",
@@ -86,6 +102,7 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     title: "Solar and inverter comparison",
     description: "Compare inverters, panels, and full solar bundles, with quotes from vetted installers.",
     status: "exploring",
+    markets: ["ng"],
   },
   {
     id: "creator-storefronts",
@@ -124,8 +141,26 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     title: "eBay UK inventory",
     description: "Real ebay.co.uk listings in the UK catalogue, accessories filtered out.",
     status: "shipped",
+    markets: ["uk"],
   },
 ];
+
+/** Country view of the roadmap: drops items tagged to other markets
+    and swaps in market-priced copy where a localDescription exists.
+    The vote API stays country-blind (votes aggregate globally). */
+export function roadmapItemsForCountry(countryCode: string): RoadmapItem[] {
+  const cc = countryCode.toLowerCase();
+  /* Strip markets + localDescription from the output (not just resolve
+     them): the items are serialized into the RSC payload for the client
+     board, and shipping every market's copy would leak other countries'
+     currency strings into the page source. */
+  return ROADMAP_ITEMS.filter(
+    (i) => !i.markets || i.markets.includes(cc),
+  ).map(({ markets: _m, localDescription, ...rest }) => ({
+    ...rest,
+    description: localDescription?.[cc] ?? rest.description,
+  }));
+}
 
 /** Validated lookup used by the vote API — votes only count for ids
     that exist and aren't shipped. */

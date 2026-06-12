@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { ChevronUp, CheckCircle2 } from "lucide-react";
-import { ROADMAP_ITEMS, type RoadmapItem, type RoadmapStatus } from "@/lib/data/roadmap";
+import type { RoadmapItem, RoadmapStatus } from "@/lib/data/roadmap";
 
 const LS_KEY = "havlo-roadmap-votes";
 
@@ -31,7 +31,7 @@ function readVoted(): Set<string> {
   }
 }
 
-export default function RoadmapBoard() {
+export default function RoadmapBoard({ items }: { items: RoadmapItem[] }) {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [voted, setVoted] = useState<Set<string>>(new Set());
 
@@ -67,8 +67,8 @@ export default function RoadmapBoard() {
   return (
     <div className="space-y-12">
       {GROUPS.map(({ status, title, blurb }) => {
-        const items = ROADMAP_ITEMS.filter((i) => i.status === status);
-        if (items.length === 0) return null;
+        const groupItems = items.filter((i) => i.status === status);
+        if (groupItems.length === 0) return null;
         return (
           <section key={status} aria-labelledby={`roadmap-${status}`}>
             <div className="mb-4">
@@ -78,7 +78,7 @@ export default function RoadmapBoard() {
               <p className="text-sm text-ink-3 mt-0.5">{blurb}</p>
             </div>
             <ul className="grid gap-3 sm:grid-cols-2">
-              {items.map((item) => (
+              {groupItems.map((item) => (
                 <RoadmapCard
                   key={item.id}
                   item={item}
