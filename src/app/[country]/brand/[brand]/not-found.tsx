@@ -69,7 +69,7 @@ export default function BrandNotFound() {
 
       <p className="mt-4 text-ink-2 text-[15px] sm:text-lg leading-relaxed max-w-md mx-auto">
         We may not track this brand in your country yet, or it has nothing
-        shoppable right now. Prices move fast — here are live deals and
+        shoppable right now. Prices move fast, so here are live deals and
         brands to explore instead.
       </p>
 

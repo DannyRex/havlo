@@ -43,20 +43,20 @@ export default function RoadmapPage({ params }: { params: { country: string } })
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
         <header className="mb-10 max-w-2xl">
           <h1 className="text-3xl sm:text-4xl font-bold text-ink tracking-[-0.025em] leading-[1.08] mb-3">
-            What we&apos;re building
+            What we&apos;re working on
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-base leading-relaxed">
-            The features on our list, in the open. Tap the arrow on anything
-            you want sooner. Votes genuinely set the order we build in.
+            We build in the open. Tap the arrow on anything you want sooner.
+            The votes decide what we ship next.
           </p>
         </header>
         <RoadmapBoard items={items} />
         <p className="mt-12 text-[13px] text-ink-3 leading-relaxed">
-          Have an idea that isn&apos;t here? Tell us at{" "}
+          Got an idea we haven&apos;t thought of? Send it to{" "}
           <a href="mailto:hello@havlo.io" className="underline underline-offset-2 hover:text-ink">
             hello@havlo.io
-          </a>
-          .
+          </a>{" "}
+          and we&apos;ll have a look.
         </p>
       </section>
     </main>

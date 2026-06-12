@@ -81,7 +81,7 @@ export default function ContactForm({ endpoint }: Props) {
           <p className="text-ink font-semibold mb-1">Message sent.</p>
           <p className="text-ink-2 text-sm leading-relaxed">
             Thanks for reaching out. We read every message and reply within
-            1–2 business days. Check your inbox (and spam, just in case).
+            1 to 2 business days. Check your inbox (and spam, just in case).
           </p>
         </div>
       </div>

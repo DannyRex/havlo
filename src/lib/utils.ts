@@ -543,8 +543,23 @@ export function formatCount(n: number): string {
 
    Imported lazily to avoid pulling country.ts into utils.ts which
    doesn't otherwise depend on it. */
-import type { Country } from "@/lib/country";
+import type { Country, FxSnapshot } from "@/lib/country";
 import { USD_FX, formatLocal, formatLocalExact } from "@/lib/country";
+
+/* HYDRATION CONTRACT for the user-currency formatters below: every
+   formatter takes an optional trailing `fx` snapshot, defaulting to
+   the bundled USD_FX. Server components and API routes can rely on
+   the default (the server's snapshot IS the authoritative one). A
+   CLIENT component whose formatted output ships in SSR HTML must
+   pass useCountry().fx instead — the bundled USD_FX in the browser
+   can be a different revision of the daily-rewritten FX mirror than
+   the server's (dev HMR across a rewrite, deploy skew), and the
+   default would re-derive a slightly different price on hydration
+   (the June 2026 "₦54,755 vs ₦54,738" MasonryCard warning class).
+   Client components whose prices only ever render from client-side
+   fetches (PriceComparisonBar, PriceHistoryChart, …) may keep the
+   default: their text never appears in SSR HTML, so there is
+   nothing to mismatch. */
 
 /* Format a price for the visitor's currency.
 
@@ -577,8 +592,9 @@ export function formatPriceForUser(
   amount:         number,
   country:        Country,
   sourceCurrency: "NGN" | "USD" = "NGN",
+  fx:             FxSnapshot = USD_FX,
 ): string {
-  const target = convertForUser(amount, country, sourceCurrency);
+  const target = convertForUser(amount, country, sourceCurrency, fx);
   /* No Math.round here — formatLocal hands off to Intl.NumberFormat
      with the right fraction-digit settings per currency, so the
      final rounding happens at display time on the floating value.
@@ -597,8 +613,9 @@ export function formatPriceForUserExact(
   amount:         number,
   country:        Country,
   sourceCurrency: "NGN" | "USD" = "NGN",
+  fx:             FxSnapshot = USD_FX,
 ): string {
-  const target = convertForUser(amount, country, sourceCurrency);
+  const target = convertForUser(amount, country, sourceCurrency, fx);
   return formatLocalExact(target, country);
 }
 
@@ -623,6 +640,7 @@ export function formatPriceDeltaForUser(
   bNgn:           number,
   country:        Country,
   sourceCurrency: "NGN" | "USD" = "NGN",
+  fx:             FxSnapshot = USD_FX,
 ): string {
   /* Round each operand to the EXACT value its own price label shows by
      running it through the identical formatter the labels use
@@ -637,7 +655,7 @@ export function formatPriceDeltaForUser(
      non-digits) so a symbol that contains a dot — AED's "د.إ" — can't
      corrupt the parse; then drop the en-locale thousands commas. */
   const toDisplay = (amt: number): number => {
-    const converted = convertForUser(amt, country, sourceCurrency);
+    const converted = convertForUser(amt, country, sourceCurrency, fx);
     const body = formatLocalExact(converted, country)
       .slice(country.symbol.length)
       .replace(/,/g, "");
@@ -653,14 +671,15 @@ export function convertForUser(
   amount:         number,
   country:        Country,
   sourceCurrency: "NGN" | "USD",
+  fx:             FxSnapshot = USD_FX,
 ): number {
   if (country.currency === sourceCurrency) return amount;
   /* Convert source → USD intermediate → target. When source IS
      USD, the first step is a pass-through. */
   const amountUsd = sourceCurrency === "USD"
     ? amount
-    : amount / USD_FX[sourceCurrency];
-  return amountUsd * USD_FX[country.currency];
+    : amount / fx[sourceCurrency];
+  return amountUsd * fx[country.currency];
 }
 
 export function savings(original: number, sale: number): number {
@@ -732,8 +751,10 @@ const TITLE_UNSAFE_CHARS = /[\u200B\u202A-\u202E\u2066-\u2069\uFEFF]/g;
 /* Clean up dirty product titles from upstream scrapers (especially ASOS
    which spits out "Brand – Product – – Material" with repeated en-dashes).
    Collapses any run of separator characters (en-dash, em-dash, hyphen, |)
-   with optional whitespace into a single " – ", and strips leading/trailing
-   separators. Safe to call multiple times (idempotent). */
+   with optional whitespace into a single " - " ASCII hyphen, and strips
+   leading/trailing separators. Brand-voice rule bans en/em dashes in
+   user-visible copy; cleanTitle runs on every product title before it
+   reaches cards, PDPs and emails. Safe to call multiple times. */
 export function cleanTitle(raw: string): string {
   return raw
     /* Strip embedded HTML tags. DHgate (and some SerpAPI seller feeds)
@@ -765,7 +786,7 @@ export function cleanTitle(raw: string): string {
        deLeetToken self-gates on a shape that excludes every real model
        code, so this is inert on the 99.98% of titles with no corruption. */
     .replace(/[A-Za-z0-9]+/g, deLeetToken)
-    .replace(/[–—|\-]+(\s*[–—|\-]+)+/g, " – ") // collapse runs
+    .replace(/[–—|\-]+(\s*[–—|\-]+)+/g, " - ") // collapse runs
     .replace(/^\s*[–—|\-]+\s*/, "")                       // trim leading
     .replace(/\s*[–—|\-]+\s*$/, "")                       // trim trailing
     .replace(/\s{2,}/g, " ")                                         // collapse spaces

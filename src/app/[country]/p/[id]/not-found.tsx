@@ -69,7 +69,7 @@ export default function ProductNotFound() {
 
       <p className="mt-4 text-ink-2 text-[15px] sm:text-lg leading-relaxed max-w-md mx-auto">
         It may have sold out, expired, or been removed by the store. Prices
-        move fast — here are live deals to explore instead.
+        move fast, so here are live deals to explore instead.
       </p>
 
       {/* Primary actions — full-width stacked on mobile, inline from sm up. */}

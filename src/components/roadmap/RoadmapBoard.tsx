@@ -22,9 +22,9 @@ import type { RoadmapItem, RoadmapStatus } from "@/lib/data/roadmap";
 const LS_KEY = "havlo-roadmap-votes";
 
 const GROUPS: Array<{ status: RoadmapStatus; title: string; blurb: string }> = [
-  { status: "up-next",   title: "Up next",   blurb: "Committed. Being built or next in line." },
-  { status: "exploring", title: "Exploring", blurb: "Your votes decide what gets built first." },
-  { status: "shipped",   title: "Shipped",   blurb: "Live on Havlo today." },
+  { status: "up-next",   title: "Up next",   blurb: "Already in the works." },
+  { status: "exploring", title: "Exploring", blurb: "Your votes here move things up the list." },
+  { status: "shipped",   title: "Shipped",   blurb: "Already live for you to use." },
 ];
 
 function readVoted(): Set<string> {

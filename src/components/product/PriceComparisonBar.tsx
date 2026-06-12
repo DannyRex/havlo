@@ -666,7 +666,7 @@ export default function PriceComparisonBar({
                 data-anchor={anchor}
               >
                 <p className="text-[10px] font-semibold uppercase tracking-[0.06em] opacity-80 mb-1.5 whitespace-nowrap">
-                  {clusterOffers.length} stores {sameBand ? `at ${minFmt}` : `· ${minFmt} – ${maxFmt}`}
+                  {clusterOffers.length} stores {sameBand ? `at ${minFmt}` : `· ${minFmt} to ${maxFmt}`}
                 </p>
                 <ul className="space-y-1">
                   {sortedOffers.map((o) => (
