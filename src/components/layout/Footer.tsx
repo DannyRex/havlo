@@ -38,6 +38,9 @@ const footerSections = [
     links: [
       { label: "About",          href: "/about" },
       { label: "Blog",           href: "/blog" },
+      /* Public roadmap — build-in-the-open page with one-tap feature
+         voting (/roadmap, root route like the legal pages). */
+      { label: "Roadmap",        href: "/roadmap" },
       /* For merchants — public partnership landing page added F4
          (KuantoKusta-inspired). Sits with About in the Company column
          because the audience overlaps (partners reading "About" to
