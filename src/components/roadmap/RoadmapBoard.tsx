@@ -15,6 +15,10 @@ import { useEffect, useState } from "react";
 import { ChevronUp, CheckCircle2 } from "lucide-react";
 import type { RoadmapItem, RoadmapStatus } from "@/lib/data/roadmap";
 
+/* localStorage stays as a UX optimization (instant voted-state on
+   first paint, before the API round-trip resolves). The server is the
+   source of truth — it dedupes by a per-browser client id cookie, so
+   clearing storage doesn't add a duplicate count. */
 const LS_KEY = "havlo-roadmap-votes";
 
 const GROUPS: Array<{ status: RoadmapStatus; title: string; blurb: string }> = [
@@ -43,25 +47,29 @@ export default function RoadmapBoard({ items }: { items: RoadmapItem[] }) {
       .catch(() => {});
   }, []);
 
-  function vote(id: string) {
-    if (voted.has(id)) return;
-    /* Optimistic: bump locally first; the POST result reconciles. */
-    const next = new Set(voted).add(id);
+  /* Toggle: if not voted → POST and bump; if voted → DELETE and decrement.
+     Optimistic everywhere; on network error we revert the local state so
+     the button never lies. */
+  function toggleVote(id: string) {
+    const isVoted = voted.has(id);
+    const next = new Set(voted);
+    if (isVoted) next.delete(id); else next.add(id);
     setVoted(next);
     try { localStorage.setItem(LS_KEY, JSON.stringify(Array.from(next))); } catch {}
-    setCounts((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }));
+    setCounts((c) => ({ ...c, [id]: Math.max(0, (c[id] ?? 0) + (isVoted ? -1 : 1)) }));
+
     fetch("/api/roadmap", {
-      method: "POST",
+      method: isVoted ? "DELETE" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ featureId: id }),
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d && typeof d.count === "number") {
-          setCounts((c) => ({ ...c, [id]: d.count }));
-        }
-      })
-      .catch(() => {});
+    }).catch(() => {
+      /* Revert on failure so the UI keeps matching reality. */
+      const revert = new Set(voted);
+      if (isVoted) revert.add(id); else revert.delete(id);
+      setVoted(revert);
+      try { localStorage.setItem(LS_KEY, JSON.stringify(Array.from(revert))); } catch {}
+      setCounts((c) => ({ ...c, [id]: Math.max(0, (c[id] ?? 0) + (isVoted ? 1 : -1)) }));
+    });
   }
 
   return (
@@ -84,7 +92,7 @@ export default function RoadmapBoard({ items }: { items: RoadmapItem[] }) {
                   item={item}
                   count={counts[item.id] ?? 0}
                   voted={voted.has(item.id)}
-                  onVote={() => vote(item.id)}
+                  onToggle={() => toggleVote(item.id)}
                 />
               ))}
             </ul>
@@ -96,12 +104,12 @@ export default function RoadmapBoard({ items }: { items: RoadmapItem[] }) {
 }
 
 function RoadmapCard({
-  item, count, voted, onVote,
+  item, count, voted, onToggle,
 }: {
   item: RoadmapItem;
   count: number;
   voted: boolean;
-  onVote: () => void;
+  onToggle: () => void;
 }) {
   const shipped = item.status === "shipped";
   return (
@@ -113,13 +121,17 @@ function RoadmapCard({
       ) : (
         <button
           type="button"
-          onClick={onVote}
-          disabled={voted}
+          onClick={onToggle}
           aria-pressed={voted}
-          aria-label={voted ? `Voted for ${item.title}` : `Vote for ${item.title}`}
+          aria-label={
+            voted
+              ? `You voted for ${item.title}. Tap again to retract your vote.`
+              : `Vote for ${item.title}`
+          }
+          title={voted ? "Tap to remove your vote" : "Vote"}
           className={`shrink-0 flex flex-col items-center justify-center w-12 min-h-[44px] rounded-xl border text-xs font-semibold transition-colors ${
             voted
-              ? "border-success/40 bg-success/10 text-success cursor-default"
+              ? "border-success/40 bg-success/10 text-success hover:border-success/60"
               : "border-border bg-bg text-ink-2 hover:border-border-strong hover:text-ink"
           }`}
         >

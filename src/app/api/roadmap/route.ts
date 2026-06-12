@@ -1,84 +1,127 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { getSupabaseAdmin } from "@/lib/providers/db-client";
 import { isVotableRoadmapId } from "@/lib/data/roadmap";
 
 /* /api/roadmap — vote counts + voting for the public roadmap.
 
-   GET  → { counts: { [featureId]: number } }
-   POST { featureId } → { ok, count } — one vote per (feature, voter).
-
-   Voter identity is a salted hash of ip + user-agent: good enough to
-   stop casual repeat-voting without storing any PII or requiring
-   accounts. The unique constraint in roadmap_votes (migration 0078)
-   makes repeats idempotent; the client also disables voted buttons via
-   localStorage. Both handlers degrade gracefully (empty counts /
-   accepted-but-uncounted) when the table hasn't been migrated yet, so
-   the page never breaks on a fresh environment. */
+   GET    → { counts, clientId } — counts and the caller's persistent
+            client id (a cookie set on first call). The client uses it
+            so it can vote and un-vote even from networks where many
+            users share an IP (Nigerian mobile carriers NAT thousands
+            behind a few ranges, popular phones share user-agents, so an
+            ip+ua hash would silently drop a second real user's vote).
+   POST   { featureId } → { ok } — idempotent insert keyed on
+            (feature_id, voter_hash) where voter_hash now hashes the
+            client id, not the request.
+   DELETE { featureId } → { ok } — retract a vote (misclick / changed
+            mind). PostHog-style un-vote rather than down-vote: still
+            measures pull, no drive-by negativity. */
 
 export const dynamic = "force-dynamic";
 
-function voterHash(req: NextRequest): string {
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    "unknown";
-  const ua = req.headers.get("user-agent") || "unknown";
+const CLIENT_ID_COOKIE = "havlo_rmid";
+const CLIENT_ID_MAX_AGE = 60 * 60 * 24 * 365 * 5; // 5 years
+
+function voterHashFor(clientId: string): string {
   const salt = process.env.ROADMAP_VOTE_SALT || "havlo-roadmap";
-  return createHash("sha256").update(`${salt}:${ip}:${ua}`).digest("hex");
+  return createHash("sha256").update(`${salt}:${clientId}`).digest("hex");
 }
 
-export async function GET() {
-  const supa = getSupabaseAdmin();
-  if (!supa) return NextResponse.json({ counts: {} });
-
-  const { data, error } = await supa
-    .from("roadmap_votes")
-    .select("feature_id");
-  if (error || !data) return NextResponse.json({ counts: {} });
-
-  const counts: Record<string, number> = {};
-  for (const row of data as Array<{ feature_id: string }>) {
-    counts[row.feature_id] = (counts[row.feature_id] ?? 0) + 1;
+/** Read or mint a per-browser client id (random uuid in an httpOnly,
+    sameSite=lax cookie). httpOnly so JS can't read/forge it; the client
+    receives its own id back from the JSON body of any roadmap call. */
+function ensureClientId(req: NextRequest): { clientId: string; setCookie: string | null } {
+  const existing = req.cookies.get(CLIENT_ID_COOKIE)?.value;
+  if (existing && /^[0-9a-f-]{36}$/i.test(existing)) {
+    return { clientId: existing, setCookie: null };
   }
-  return NextResponse.json(
-    { counts },
-    { headers: { "cache-control": "public, max-age=0, s-maxage=60" } },
+  const fresh = randomUUID();
+  const cookie =
+    `${CLIENT_ID_COOKIE}=${fresh}; Path=/; Max-Age=${CLIENT_ID_MAX_AGE}; ` +
+    `HttpOnly; SameSite=Lax${process.env.NODE_ENV === "production" ? "; Secure" : ""}`;
+  return { clientId: fresh, setCookie: cookie };
+}
+
+function withCookie(res: NextResponse, setCookie: string | null): NextResponse {
+  if (setCookie) res.headers.append("set-cookie", setCookie);
+  return res;
+}
+
+export async function GET(req: NextRequest) {
+  const { clientId, setCookie } = ensureClientId(req);
+  const supa = getSupabaseAdmin();
+  if (!supa) {
+    return withCookie(NextResponse.json({ counts: {}, clientId }), setCookie);
+  }
+
+  const { data, error } = await supa.from("roadmap_votes").select("feature_id");
+  const counts: Record<string, number> = {};
+  if (!error && data) {
+    for (const row of data as Array<{ feature_id: string }>) {
+      counts[row.feature_id] = (counts[row.feature_id] ?? 0) + 1;
+    }
+  }
+  return withCookie(
+    NextResponse.json({ counts, clientId }, { headers: { "cache-control": "private, no-store" } }),
+    setCookie,
   );
 }
 
 export async function POST(req: NextRequest) {
+  const { clientId, setCookie } = ensureClientId(req);
+
   let featureId: unknown;
   try {
     ({ featureId } = await req.json());
   } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+    return withCookie(NextResponse.json({ error: "Invalid body" }, { status: 400 }), setCookie);
   }
   if (typeof featureId !== "string" || !isVotableRoadmapId(featureId)) {
-    return NextResponse.json({ error: "Unknown feature" }, { status: 400 });
+    return withCookie(NextResponse.json({ error: "Unknown feature" }, { status: 400 }), setCookie);
   }
 
   const supa = getSupabaseAdmin();
-  if (!supa) return NextResponse.json({ ok: true, count: null });
+  if (!supa) return withCookie(NextResponse.json({ ok: true }), setCookie);
 
   /* Idempotent insert — the (feature_id, voter_hash) unique constraint
      turns a repeat vote into a no-op rather than an error the user
-     sees. */
-  const { error: insErr } = await supa
+     sees. Table missing (pre-migration) or transient → accept the
+     gesture, don't surface an error for a vote. */
+  await supa
     .from("roadmap_votes")
     .upsert(
-      { feature_id: featureId, voter_hash: voterHash(req) },
+      { feature_id: featureId, voter_hash: voterHashFor(clientId) },
       { onConflict: "feature_id,voter_hash", ignoreDuplicates: true },
     );
-  if (insErr) {
-    /* Table missing (pre-migration) or transient — accept the gesture,
-       don't surface an error for a vote. */
-    return NextResponse.json({ ok: true, count: null });
+
+  return withCookie(NextResponse.json({ ok: true }), setCookie);
+}
+
+export async function DELETE(req: NextRequest) {
+  const { clientId, setCookie } = ensureClientId(req);
+
+  let featureId: unknown;
+  try {
+    ({ featureId } = await req.json());
+  } catch {
+    return withCookie(NextResponse.json({ error: "Invalid body" }, { status: 400 }), setCookie);
+  }
+  if (typeof featureId !== "string" || !isVotableRoadmapId(featureId)) {
+    return withCookie(NextResponse.json({ error: "Unknown feature" }, { status: 400 }), setCookie);
   }
 
-  const { count } = await supa
+  const supa = getSupabaseAdmin();
+  if (!supa) return withCookie(NextResponse.json({ ok: true }), setCookie);
+
+  /* Un-vote: delete this client's row for the feature. No-op when no
+     row exists (the user wasn't voted), so the client can call this
+     freely. */
+  await supa
     .from("roadmap_votes")
-    .select("id", { count: "exact", head: true })
-    .eq("feature_id", featureId);
-  return NextResponse.json({ ok: true, count: count ?? null });
+    .delete()
+    .eq("feature_id", featureId)
+    .eq("voter_hash", voterHashFor(clientId));
+
+  return withCookie(NextResponse.json({ ok: true }), setCookie);
 }
