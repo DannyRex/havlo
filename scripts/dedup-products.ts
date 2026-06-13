@@ -137,6 +137,15 @@ async function main() {
 
   if (dupGroups.length === 0) {
     console.log("✓ Nothing to merge. Catalog is already canonical.");
+    /* Still refresh the matview — new offers may have been ingested since
+       the last refresh even when no products needed merging. Otherwise
+       freshly-ingested merchants stay invisible until a duplicate appears.
+       (June 2026: caught when Fouani's first ingest landed 100 new offers
+       in clean product_ids and this early return skipped the refresh.) */
+    const { error: refreshErr } = await supa.rpc("refresh_cheapest_offers");
+    console.log(refreshErr
+      ? `  ⚠ cheapest-offer matview refresh skipped: ${refreshErr.message}`
+      : `  ✓ cheapest-offer matview refreshed`);
     return;
   }
 
