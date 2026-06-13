@@ -120,8 +120,9 @@ async function main() {
   console.log(`✓ Flipped ${candidates.length} offers to in_stock=false.`);
 
   /* Refresh the cheapest-offer matview (QA Jun 2026 BLOCKER fix).
-     product_best_offers reads from mv_cheapest_offer, which only
-     recomputed on the post-dedup cron — never after THIS TTL sweep.
+     product_best_offers reads from mv_cheapest_offer_usd (0079; FX-
+     normalized cheapest pick), which only recomputed on the post-dedup
+     cron, never after THIS TTL sweep.
      So an offer flipped OOS here stayed the "cheapest in-stock" row in
      the matview until the next dedup run, surfacing sold-out best-
      prices on /deals and PDPs (11.1% of best-prices measured stale).
@@ -135,7 +136,7 @@ async function main() {
     console.error("✗ matview refresh failed:", refreshErr.message);
     process.exit(1);
   }
-  console.log("✓ Refreshed mv_cheapest_offer (cheapest-offer matview).");
+  console.log("✓ Refreshed cheapest-offer matview (FX-normalized).");
 }
 
 main().catch((err) => {
