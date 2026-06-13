@@ -60,10 +60,12 @@ const STORE_DOMAINS: Record<string, string> = {
   bestbuy: "bestbuy.com",
   target: "target.com",
   newegg: "newegg.com",
-  // US (CJ June 2026 ingest)
+  // US (CJ June 2026 ingest). Keys are canonicalStoreSlug form (alnum
+  // only): store_id "electronic-express" -> "electronicexpress",
+  // "plesser-s-appliances" -> "plessersappliances".
   ecosmetics: "ecosmetics.com",
   electronicexpress: "electronicexpress.com",
-  plessers: "plessers.com",
+  plessersappliances: "plessers.com",
   costco: "costco.com",
   macys: "macys.com",
   nordstrom: "nordstrom.com",
