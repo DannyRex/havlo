@@ -51,6 +51,11 @@ const STORE_DOMAINS: Record<string, string> = {
   bq: "diy.com",
   smythstoys: "smythstoys.com",
   asos: "asos.com",
+  // ── UK (Awin June 2026 ingest) ──
+  zonky: "zonky.uk",
+  morishsnacks: "morishsnacks.co.uk",
+  gardenistauk: "gardenistauk.com",
+  gameoverstore: "gameoverstore.co.uk",
   // ── US ──
   bestbuy: "bestbuy.com",
   target: "target.com",
@@ -88,6 +93,7 @@ const STORE_DOMAINS: Record<string, string> = {
   myliquorhub: "myliquorhub.com",
   essenza: "essenza.ng",
   ajebomarket: "ajebomarket.com",
+  fouani: "fouanistore.com",
   // ── DE ──
   mediamarkt: "mediamarkt.de",
   saturn: "saturn.de",
@@ -96,6 +102,7 @@ const STORE_DOMAINS: Record<string, string> = {
   idealo: "idealo.de",
   lidl: "lidl.de",
   cyberport: "cyberport.de",
+  houseofsneakers: "house-of-sneakers.de",
   // ── AE ──
   noon: "noon.com",
   sharafdg: "sharafdg.com",

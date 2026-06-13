@@ -41,6 +41,19 @@ export interface ShopifyConfig {
       500 max per collection. Most NG retailer catalogs fit easily
       below that ceiling. */
   pageLimit?: number;
+  /** Currency the Shopify store prices in. NGN by default for the
+      historical NG retailer use case; GBP / EUR / USD for the Awin UK +
+      DE merchants the scraper now also serves. Prices are converted to
+      USD at scrape time using a hard-coded FX table so the Deal pipeline
+      (which only knows "NGN" | "USD") stays unchanged; the display layer
+      then re-converts USD to the visitor's currency, so a UK shopper
+      sees GBP, an NG shopper sees NGN, etc. */
+  nativeCurrency?: "NGN" | "USD" | "GBP" | "EUR";
+  /** Country code for the resulting offers (stored on the offer row
+      via dealToOfferRow). Lets the country-resolver attribute a UK
+      Shopify store to UK even if the store-domain registry hasn't
+      caught up yet. Lowercase ISO 3166-1 alpha-2; defaults to "ng". */
+  storeCountry?: string;
   /** When true, fetch /collections.json first to discover EVERY
       collection on the store, then walk each. The `collections`
       array above is then used only to assign per-handle category
@@ -209,6 +222,20 @@ export async function scrapeShopifyCatalog(cfg: ShopifyConfig): Promise<RawDeal[
 
         if (salePrice <= 0) continue;
 
+        /* Normalize to USD for non-NGN stores so the Deal pipeline
+           (currency: "NGN" | "USD") stays unchanged. FX_PER_USD is a
+           1 USD = X table; divide native by that to get USD. NGN keeps
+           its raw value because the pipeline treats NGN as a first-class
+           currency (no conversion). The display layer then converts USD
+           back to the visitor's currency, so a UK shopper sees GBP, an
+           NG shopper sees NGN, etc. */
+        const nativeCurrency = cfg.nativeCurrency ?? "NGN";
+        const storedCurrency: "NGN" | "USD" = nativeCurrency === "NGN" ? "NGN" : "USD";
+        const FX_PER_USD: Record<string, number> = { USD: 1, GBP: 0.79, EUR: 0.92 };
+        const fx = FX_PER_USD[nativeCurrency] ?? 1;
+        const salePriceStored     = nativeCurrency === "NGN" ? salePrice     : Math.round((salePrice     / fx) * 100) / 100;
+        const originalPriceStored = nativeCurrency === "NGN" ? originalPrice : Math.round((originalPrice / fx) * 100) / 100;
+
         /* Category: try Shopify's product_type first ("Vitamins",
            "Skincare", "Beverages"). If our resolver doesn't know that
            label, fall through to the config's collection category
@@ -241,15 +268,15 @@ export async function scrapeShopifyCatalog(cfg: ShopifyConfig): Promise<RawDeal[
 
         deals.push({
           title:           p.title,
-          description:     p.body_html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200) || `${p.title} — shop on ${cfg.name}.`,
+          description:     p.body_html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200) || `${p.title} - shop on ${cfg.name}.`,
           category:        resolved.category,
           categorySlug:    resolved.slug,
           storeId:         cfg.storeId,
           storeName:       cfg.name,
-          originalPrice,
-          salePrice,
+          originalPrice:   originalPriceStored,
+          salePrice:       salePriceStored,
           discountPercent,
-          currency:        "NGN",
+          currency:        storedCurrency,
           imageUrl:        p.images[0]?.src,
           imageEmoji:      resolved.emoji,
           imageGradient:   resolved.gradient,

@@ -44,6 +44,14 @@ import { scrapeMedPlus }    from "./scrapers/medplus.js";
 import { scrapeEssenza }    from "./scrapers/essenza.js";
 import { scrapeAjebomarket } from "./scrapers/ajebomarket.js";
 import { scrapeBitmarte }   from "./scrapers/bitmarte.js";
+/* Fouani Store (Nigerian electronics + appliances) + 5 UK / DE Awin
+   merchants approved June 2026. All fetch-only (no Playwright). */
+import { scrapeFouani }     from "./scrapers/fouani.js";
+import { scrapeZonky }      from "./scrapers/zonky.js";
+import { scrapeMorishSnacks } from "./scrapers/morishsnacks.js";
+import { scrapeHouseOfSneakers } from "./scrapers/house-of-sneakers.js";
+import { scrapeGardenistaUK } from "./scrapers/gardenistauk.js";
+import { scrapeGameOverStore } from "./scrapers/gameoverstore.js";
 /* Disabled NG scrapers — files retained, imports commented. To
    revive one: verify selectors against live HTML, uncomment the
    import + matching entry in the orchestrator below. */
@@ -290,6 +298,20 @@ async function main() {
        scraper walks /customer/product/* link anchors up the DOM
        to find ₦ — same trick kara.ts uses. */
     { name: "Bitmarte",    probe: "https://bitmarte.com/customer",                fn: () => scrapeBitmarte(page) },
+
+    /* ── Fouani (NG) + Awin 5 (UK / DE), wired June 2026 ──
+       All fetch-only (no Playwright). Fouani crawls its sitemap + the
+       Next.js __NEXT_DATA__ blob; the 5 Awin merchants are Shopify and
+       go through _shopify-json with nativeCurrency conversion. The DE
+       merchant (house-of-sneakers) stays dormant for visitors until DE
+       joins ACTIVE_COUNTRIES, but its offers ingest now so the catalog
+       is ready when that lands. */
+    { name: "Fouani",      probe: "https://fouanistore.com/",                    fn: () => scrapeFouani(page) },
+    { name: "Zonky",       probe: "https://zonky.uk/",                           fn: () => scrapeZonky(page) },
+    { name: "MORiSH",      probe: "https://morishsnacks.co.uk/",                 fn: () => scrapeMorishSnacks(page) },
+    { name: "HouseOfSneakers", probe: "https://house-of-sneakers.de/",           fn: () => scrapeHouseOfSneakers(page) },
+    { name: "GardenistaUK", probe: "https://gardenistauk.com/",                  fn: () => scrapeGardenistaUK(page) },
+    { name: "GameOverStore", probe: "https://gameoverstore.co.uk/",              fn: () => scrapeGameOverStore(page) },
     /* ── Still disabled — need per-site verification ──
        These were stamped from one template that didn't fit. Each
        needs the same kind of investigation HealthPlus / Supermart /

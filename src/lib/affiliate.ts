@@ -83,6 +83,26 @@ const EBAY_MARKETPLACES: Array<[RegExp, { mkrid: string; siteid: string }]> = [
   [/(^|\.)ebay\.co\.uk$/i, { mkrid: "710-53481-19255-0", siteid: "3" }],
 ];
 
+/* Awin merchant lookup: hostname (lowercase, no leading "www.") -> Awin
+   merchant ID. Populated from AWIN_MERCHANT_IDS env var, a comma-
+   separated list of "host=mid" pairs ("zonky.uk=12345,morishsnacks.co.uk
+   =23456"). Parsed once at module load so the hot wrap() path stays a
+   plain Map.get. Empty / unset env = empty map = Awin rule no-ops. */
+const AWIN_PUBLISHER_ID = process.env.AWIN_PUBLISHER_ID?.trim() || "";
+const AWIN_MERCHANTS: Map<string, string> = (() => {
+  const out = new Map<string, string>();
+  const raw = process.env.AWIN_MERCHANT_IDS?.trim() ?? "";
+  if (!raw) return out;
+  for (const pair of raw.split(",")) {
+    const [host, mid] = pair.split("=").map((s) => s?.trim());
+    if (host && mid && /^\d+$/.test(mid)) out.set(host.toLowerCase(), mid);
+  }
+  return out;
+})();
+function stripWww(host: string): string {
+  return host.toLowerCase().replace(/^www\./, "");
+}
+
 const RULES: AffiliateRule[] = [
   /* ── Amazon Associates (per marketplace) ── */
   {
@@ -172,12 +192,20 @@ const RULES: AffiliateRule[] = [
      than appending a tag. URL becomes:
        https://www.awin1.com/cread.php?awinmid=MERCHANT&awinaffid=YOURID&p=ENCODED_DEST
      Activated only when AWIN_PUBLISHER_ID is set + we have a merchant
-     ID for the destination host (lookup table to add as merchants
-     get approved within Awin). */
+     ID for the destination host. AWIN_MERCHANT_IDS is a comma-separated
+     list of "host=mid" pairs (e.g. "zonky.uk=12345,morishsnacks.co.uk=23456");
+     parsed once at startup. Each merchant ID comes from the Awin
+     dashboard ("Programmes" -> the approved merchant -> Advertiser ID).
+     June 2026: wiring up the first 5 approved merchants. */
   {
     name: "awin",
-    match: () => false, // disabled until per-merchant ID table populated
-    wrap: () => null,
+    match: (host) => Boolean(AWIN_PUBLISHER_ID && AWIN_MERCHANTS.has(stripWww(host))),
+    wrap: (url) => {
+      const mid = AWIN_MERCHANTS.get(stripWww(url.host));
+      if (!mid || !AWIN_PUBLISHER_ID) return null;
+      const dest = encodeURIComponent(url.toString());
+      return new URL(`https://www.awin1.com/cread.php?awinmid=${mid}&awinaffid=${AWIN_PUBLISHER_ID}&p=${dest}`);
+    },
   },
 
   /* ── Impact (US/UAE aggregator) ──
