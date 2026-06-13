@@ -56,7 +56,10 @@ interface FouaniProduct {
   display_discounted_price?: number | string;
   discount_per?:             number;
   brand_name?:               string;
-  image?:                    { origin?: string; thumbnail?: string };
+  /* Fouani splits the image into a CDN base_url + relative filenames.
+     The full URL is base_url + "/" + (webp_image | origin). Storing
+     `origin` alone ("image.jpg?_dc=...") yields a broken path. */
+  image?:                    { base_url?: string; origin?: string; thumbnail?: string; webp_image?: string; webp_thumbnail?: string };
   product_categories?:       Array<{ name?: string }>;
   tags?:                     Array<{ name?: string } | string>;
 }
@@ -71,6 +74,19 @@ function parseProduct(html: string): FouaniProduct | null {
   } catch {
     return null;
   }
+}
+
+/** Build the absolute Fouani CDN image URL. The product JSON gives a
+    base_url plus relative filenames (webp_image / origin); joining them
+    yields e.g. https://salva.ams3.cdn.digitaloceanspaces.com/.../image.webp?_dc=…
+    Prefer the webp (smaller) and fall back to the jpg origin. */
+function fouaniImageUrl(img?: FouaniProduct["image"]): string | undefined {
+  if (!img) return undefined;
+  const file = img.webp_image || img.origin || img.webp_thumbnail || img.thumbnail;
+  if (!file) return undefined;
+  if (/^https?:\/\//i.test(file)) return file; // already absolute (defensive)
+  if (!img.base_url) return undefined;
+  return `${img.base_url.replace(/\/+$/, "")}/${file.replace(/^\/+/, "")}`;
 }
 
 function toNumber(v: unknown): number {
@@ -131,7 +147,7 @@ function productToDeal(p: FouaniProduct, url: string): RawDeal | null {
     salePrice,
     discountPercent,
     currency:        "NGN",
-    imageUrl:        p.image?.origin || p.image?.thumbnail || undefined,
+    imageUrl:        fouaniImageUrl(p.image),
     imageEmoji:      resolved.emoji,
     imageGradient:   resolved.gradient,
     url,
