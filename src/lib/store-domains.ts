@@ -60,6 +60,10 @@ const STORE_DOMAINS: Record<string, string> = {
   bestbuy: "bestbuy.com",
   target: "target.com",
   newegg: "newegg.com",
+  // US (CJ June 2026 ingest)
+  ecosmetics: "ecosmetics.com",
+  electronicexpress: "electronicexpress.com",
+  plessers: "plessers.com",
   costco: "costco.com",
   macys: "macys.com",
   nordstrom: "nordstrom.com",
