@@ -31,9 +31,18 @@ const PAGE_SIZE = 24;
    May 2026: /deals triggers live search when the catalog is thin. */
 const LIVE_SEARCH_THRESHOLD = 5;
 
+/* The page is called Deals, so it LEADS with deals: the default tier is
+   "10" (genuine markdowns, >=10% off), not "all". "All" is one tap away
+   for browsing the full catalogue, and "New in" (the newest sort) is the
+   honest home for fresh, full-price arrivals. Keeping full-price items
+   under a flat "Deals" header was the same quiet discount-theater the
+   rest of the site avoids. DEFAULT_TIER is the single source of truth;
+   it must agree with the server prefetch in deals/page.tsx and the
+   isDefaultView check below or the SSR seed mismatches. */
+const DEFAULT_TIER: DiscountTier = "10";
 const TIERS: { value: DiscountTier; label: string }[] = [
+  { value: "10",  label: "Deals" },
   { value: "all", label: "All" },
-  { value: "10",  label: "Deals only" },
   { value: "20",  label: "20%+" },
   { value: "50",  label: "50%+" },
 ];
@@ -46,7 +55,7 @@ const TIERS: { value: DiscountTier; label: string }[] = [
    ingestion writes timestamps per-store-batch. */
 const SORTS: { value: SortOption; label: string }[] = [
   { value: "relevance",  label: "Relevance" },
-  { value: "newest",     label: "Latest" },
+  { value: "newest",     label: "New in" },
   { value: "discount",   label: "Top discount" },
   /* Ranks by real 30d clicks from outbound_clicks + the
      popular_products() RPC (migration 0015). Ties on click count
@@ -191,10 +200,10 @@ export default function DealFeed({
       ? requestedCategoryRaw
       : null,
   );
-  const initialTierRaw = searchParams.get("minDiscount") ?? "all";
+  const initialTierRaw = searchParams.get("minDiscount") ?? DEFAULT_TIER;
   const initialTier = VALID_TIERS.has(initialTierRaw as DiscountTier)
     ? (initialTierRaw as DiscountTier)
-    : "all";
+    : DEFAULT_TIER;
   const initialSortRaw = searchParams.get("sort") ?? "relevance";
   const initialSort = VALID_SORTS.has(initialSortRaw as SortOption)
     ? (initialSortRaw as SortOption)
@@ -257,7 +266,7 @@ export default function DealFeed({
      server prefetched. Only then is the seed authoritative for this URL. */
   const isDefaultView =
     initialCategory === "all" &&
-    initialTier === "all" &&
+    initialTier === DEFAULT_TIER &&
     initialSort === "relevance" &&
     initialSearch.trim() === "" &&
     initialStores.size === 0 &&
@@ -362,8 +371,8 @@ export default function DealFeed({
     const newCategoryRaw = searchParams.get("category") ?? "all";
     const newCategory    = validCategorySlugs.has(newCategoryRaw) ? newCategoryRaw : "all";
     setCategory(newCategory);
-    const newTierRaw = searchParams.get("minDiscount") ?? "all";
-    setTier(VALID_TIERS.has(newTierRaw as DiscountTier) ? (newTierRaw as DiscountTier) : "all");
+    const newTierRaw = searchParams.get("minDiscount") ?? DEFAULT_TIER;
+    setTier(VALID_TIERS.has(newTierRaw as DiscountTier) ? (newTierRaw as DiscountTier) : DEFAULT_TIER);
     const newSortRaw = searchParams.get("sort") ?? "relevance";
     setSort(VALID_SORTS.has(newSortRaw as SortOption) ? (newSortRaw as SortOption) : "relevance");
     const newSearch = searchParams.get("search") ?? "";
@@ -531,6 +540,9 @@ export default function DealFeed({
   const buildParams = useCallback((offset: number) => {
     const p = new URLSearchParams();
     if (category !== "all") p.set("category", category);
+    /* API fetch: "all" means no discount filter; every other tier
+       (including the default "10"/Deals) sends minDiscount so the fetch
+       and the load-more pages stay scoped to the selected view. */
     if (tier !== "all")     p.set("minDiscount", tier);
     if (sort)               p.set("sort", sort);
     /* Use the debounced search so the fetch only fires after typing
@@ -714,7 +726,10 @@ export default function DealFeed({
   useEffect(() => {
     const params = new URLSearchParams();
     if (category !== "all") params.set("category", category);
-    if (tier !== "all")     params.set("minDiscount", tier);
+    /* Default tier (Deals) stays OUT of the URL so the default view keeps
+       a clean, cacheable, shareable URL; "All" and the deeper tiers are
+       written. The API fetch above still scopes to minDiscount=10. */
+    if (tier !== DEFAULT_TIER) params.set("minDiscount", tier);
     if (sort !== "relevance") params.set("sort", sort);
     /* URL syncs the DEBOUNCED search — keeping the URL in lockstep
        with every keystroke would flood router history and update
