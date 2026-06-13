@@ -39,12 +39,23 @@ const LIVE_SEARCH_THRESHOLD = 5;
    rest of the site avoids. DEFAULT_TIER is the single source of truth;
    it must agree with the server prefetch in deals/page.tsx and the
    isDefaultView check below or the SSR seed mismatches. */
-const DEFAULT_TIER: DiscountTier = "10";
+/* "Deals" = any genuine markdown (discount > 0, sent as minDiscount=1
+   since discount_percent is an integer so >=1 equals >0). This is the
+   SAME definition the rest of the site uses for a deal (the all_deals
+   precomputed column + the origin pills), so the homepage "Deals by
+   category" tile count and this page's default view show the exact same
+   number. Leading with the full catalogue under a Deals header was the
+   quiet discount-theater the rest of the site avoids. "All products" is
+   one tap to browse everything (full-price included); it sits LAST, away
+   from "Deals", so it never reads as "all deals". DEFAULT_TIER is the
+   single source of truth and must agree with the server prefetch in
+   deals/page.tsx and isDefaultView below or the SSR seed mismatches. */
+const DEFAULT_TIER: DiscountTier = "1";
 const TIERS: { value: DiscountTier; label: string }[] = [
-  { value: "10",  label: "Deals" },
-  { value: "all", label: "All" },
+  { value: "1",   label: "Deals" },
   { value: "20",  label: "20%+" },
   { value: "50",  label: "50%+" },
+  { value: "all", label: "All products" },
 ];
 
 /* Default = "relevance": a composite ranker that blends discount,
@@ -82,7 +93,7 @@ function SkeletonTile({ aspect }: { aspect: string }) {
 
 /* Whitelist of valid filter values from the URL — defends against
    junk params (e.g. /deals?tier=DROP%20TABLE) silently breaking state. */
-const VALID_TIERS = new Set<DiscountTier>(["all", "10", "20", "30", "50"]);
+const VALID_TIERS = new Set<DiscountTier>(["all", "1", "10", "20", "30", "50"]);
 const VALID_SORTS = new Set<SortOption>(["relevance", "newest", "discount", "popular", "price_asc", "price_desc"]);
 const VALID_ORIGINS = new Set<OriginFilter>(["all", "local", "intl"]);
 

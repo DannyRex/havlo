@@ -162,7 +162,7 @@ export interface SearchResult {
   maxSavings: number;
 }
 
-export type DiscountTier = "all" | "10" | "20" | "30" | "50";
+export type DiscountTier = "all" | "1" | "10" | "20" | "30" | "50";
 
 /* "popular" restored May 2026 (migration 0015 + lib/popularity.ts).
    Backed by the popular_products() RPC over a 30d rolling window. */

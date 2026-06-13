@@ -52,13 +52,15 @@ export async function GET(req: NextRequest) {
     const entries = await Promise.all(
       browsable.map(async (c): Promise<[string, number]> => {
         try {
-          /* Mirrors fetchPoolCached's provider call in /api/deals exactly:
-             origin='all', no min-discount, relevance sort. The pill +
-             displayed total both derive from filterDealsForCountry over
-             this pool, so the tile cannot diverge from the All-tab. */
+          /* Counts the DEALS subset (discount > 0, minDiscount=1 since
+             discount_percent is an integer), origin='all', matching the
+             precomputed all_deals column and the deals page's default
+             "Deals" view, so the tile number equals what a click lands on.
+             minDiscount=1 == discount>0 because the provider filters with
+             >= (route.ts/browse-db). */
           const pool = await provider.fetchDeals({
             categorySlug: c.slug,
-            minDiscount:  0,
+            minDiscount:  1,
             sort:         "relevance",
             origin:       "all",
             country:      cc,

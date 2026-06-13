@@ -114,11 +114,12 @@ async function fetchDefaultDeals(countryCode: string, seed: string): Promise<Ini
        everywhere — founder direction May 2026) so the SSR seed and the
        client's first render agree on the default view. */
     qs.set("origin", "local");
-    /* minDiscount=10 matches DealFeed's DEFAULT_TIER ("10", Deals): the
-       page is called Deals, so it leads with genuine markdowns by default.
-       Must stay in lockstep with DEFAULT_TIER + isDefaultView in DealFeed
-       or the SSR seed mismatches the client's first render. */
-    qs.set("minDiscount", "10");
+    /* minDiscount=1 matches DealFeed's DEFAULT_TIER ("1", Deals = any
+       genuine markdown, discount > 0). Same definition the homepage
+       "Deals by category" tiles count (all_deals), so the tile number and
+       the landed view agree. Must stay in lockstep with DEFAULT_TIER +
+       isDefaultView in DealFeed or the SSR seed mismatches the client. */
+    qs.set("minDiscount", "1");
     /* Pin the relevance rotation to one seed for this prerender, the
        SAME seed handed to DealFeed (initialSeed) so its client load-more
        continues the identical order — no recycling across offsets. On a

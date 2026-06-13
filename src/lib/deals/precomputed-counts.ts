@@ -62,7 +62,11 @@ export async function getPrecomputedCategoryCounts(
   if (!rows) return null;
   const out: Record<string, number> = {};
   for (const r of rows) {
-    if (r.category_slug !== "all") out[r.category_slug] = r.all_count;
+    /* all_DEALS (discount > 0), not all_count: the homepage "Deals by
+       category" tile must show the number you actually see when you click
+       it, and the deals page now leads with deals (DEFAULT_TIER "1" =
+       discount > 0). all_count would over-promise the full catalogue. */
+    if (r.category_slug !== "all") out[r.category_slug] = r.all_deals;
   }
   return out;
 }
