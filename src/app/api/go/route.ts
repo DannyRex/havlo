@@ -384,7 +384,10 @@ export async function GET(req: NextRequest) {
   const storeNameHint = req.nextUrl.searchParams.get("storeName")?.trim() ?? "";
   const offerIdHint   = req.nextUrl.searchParams.get("id")?.trim()        ?? "";
   const country = getServerCountry();
-  const ctx = { country: country.code };
+  /* subId feeds networks that support per-click attribution (CJ `sid`,
+     Awin clickref). Prefer the offer id, fall back to the store id, so a
+     conversion ties back to a specific Havlo listing. */
+  const ctx = { country: country.code, subId: offerIdHint || storeIdHint || undefined };
 
   /* Shared telemetry context. Each redirect branch calls logResolution
      with the same baseline + its own step + resolved URL. */

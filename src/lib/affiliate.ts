@@ -22,6 +22,10 @@
 interface WrapContext {
   /** Country code from the user's preference (lowercase ISO 3166-1) */
   country: string;
+  /** Optional sub-id for networks that support per-click attribution
+      (CJ's `sid`, Awin's clickref). Usually the offer or product id so
+      conversions attribute back to a specific Havlo listing. */
+  subId?: string;
 }
 
 interface AffiliateRule {
@@ -102,6 +106,33 @@ const AWIN_MERCHANTS: Map<string, string> = (() => {
 function stripWww(host: string): string {
   return host.toLowerCase().replace(/^www\./, "");
 }
+
+/* CJ (Commission Junction, cj.com) merchant lookup: hostname (lowercase,
+   no leading "www.") -> CJ link ID. CJ deep links route through a CJ
+   redirect domain (kqzyfj.com / tkqlhce.com / dpbolvw.net / jdoqocy.com,
+   all interchangeable, pick one) shaped as:
+     https://{domain}/click-{PID}-{LINK_ID}?sid={subid}&url={encoded dest}
+   where `url` is the MERCHANT's own product page (NOT havlo.io) and `sid`
+   is our sub-id for attribution. Populated from CJ_MERCHANT_LINK_IDS, a
+   comma-separated list of "host=linkId" pairs
+   ("ecosmetics.com=14080031,plessers.com=17271117"). Parsed once at module
+   load. Empty/unset CJ_MERCHANT_LINK_IDS or CJ_PUBLISHER_ID = rule no-ops.
+   Requires deep linking enabled for the program; otherwise CJ ignores the
+   `url` and drops the user on the merchant homepage. */
+const CJ_PUBLISHER_ID = process.env.CJ_PUBLISHER_ID?.trim() || "";
+const CJ_REDIRECT_DOMAIN = (process.env.CJ_REDIRECT_DOMAIN?.trim() || "www.kqzyfj.com")
+  .replace(/^https?:\/\//i, "")
+  .replace(/\/+$/, "");
+const CJ_MERCHANTS: Map<string, string> = (() => {
+  const out = new Map<string, string>();
+  const raw = process.env.CJ_MERCHANT_LINK_IDS?.trim() ?? "";
+  if (!raw) return out;
+  for (const pair of raw.split(",")) {
+    const [host, linkId] = pair.split("=").map((s) => s?.trim());
+    if (host && linkId && /^\d+$/.test(linkId)) out.set(host.toLowerCase(), linkId);
+  }
+  return out;
+})();
 
 const RULES: AffiliateRule[] = [
   /* ── Amazon Associates (per marketplace) ── */
@@ -208,6 +239,26 @@ const RULES: AffiliateRule[] = [
     },
   },
 
+  /* ── CJ (Commission Junction) ──
+     Deep link through a CJ redirect domain to the MERCHANT's product page.
+     URL shape: https://{domain}/click-{PID}-{LINK_ID}?sid={subid}&url={enc}
+     Activated only when CJ_PUBLISHER_ID is set AND we hold a link ID for
+     the destination host (CJ_MERCHANT_LINK_IDS). `sid` carries our sub-id
+     (the offer/product id from /api/go when present, else "havlo") for
+     per-listing attribution. June 2026: first 3 approved programs
+     (eCosmetics, Electronic Express, Plesser's Appliance). */
+  {
+    name: "cj",
+    match: (host) => Boolean(CJ_PUBLISHER_ID && CJ_MERCHANTS.has(stripWww(host))),
+    wrap: (url, ctx) => {
+      const linkId = CJ_MERCHANTS.get(stripWww(url.host));
+      if (!linkId || !CJ_PUBLISHER_ID) return null;
+      const sid = encodeURIComponent((ctx.subId || process.env.CJ_SID?.trim() || "havlo").slice(0, 64));
+      const dest = encodeURIComponent(url.toString());
+      return new URL(`https://${CJ_REDIRECT_DOMAIN}/click-${CJ_PUBLISHER_ID}-${linkId}?sid=${sid}&url=${dest}`);
+    },
+  },
+
   /* ── Impact (US/UAE aggregator) ──
      Same shape as Awin — redirect through impact.com with merchant +
      publisher IDs. Disabled until ID table populated. */
@@ -261,5 +312,7 @@ export function activeAffiliateRules(): string[] {
   if (envOrNull("JUMIA_AFFILIATE_KEY")) active.push("jumia");
   if (envOrNull("ALIEXPRESS_AFFILIATE_KEY")) active.push("aliexpress");
   active.push("ebay"); // campid 5339156340 baked in; env overrides
+  if (AWIN_PUBLISHER_ID && AWIN_MERCHANTS.size > 0) active.push(`awin (${AWIN_MERCHANTS.size})`);
+  if (CJ_PUBLISHER_ID && CJ_MERCHANTS.size > 0) active.push(`cj (${CJ_MERCHANTS.size})`);
   return active;
 }
