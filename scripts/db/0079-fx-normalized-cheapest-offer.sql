@@ -42,6 +42,16 @@
 -- 1) FX-normalized cheapest in-stock offer per product. WITH DATA so the
 --    repointed view has rows immediately. Same selection rule as 0075 but
 --    ranked on the USD-equivalent price.
+--
+--    NB: we inline a schema-qualified lookup against public.fx_rates rather
+--    than calling fx_rate('USD', currency). fx_rate() (0072) has no
+--    `set search_path`, so the planner INLINES it into this CREATE
+--    MATERIALIZED VIEW, and at build time an unqualified `fx_rates` failed
+--    to resolve in the SQL editor's search_path ("relation fx_rates does
+--    not exist"), even though products/offers resolved fine. Qualifying the
+--    table as public.fx_rates removes that dependency. Semantics are
+--    identical to fx_rate(): rate = quote-units per 1 USD, NGN fallback
+--    1650, everything else 1, so current_price / rate = USD-equivalent.
 create materialized view if not exists mv_cheapest_offer_usd as
 select
   p.id as product_id,
@@ -52,7 +62,13 @@ join lateral (
   from offers
   where offers.product_id = p.id
     and offers.in_stock = true
-  order by offers.current_price / fx_rate('USD', coalesce(offers.currency, 'USD')) asc
+  order by offers.current_price / coalesce(
+    (select fr.rate
+       from public.fx_rates fr
+      where fr.base = 'USD'
+        and fr.quote = coalesce(offers.currency, 'USD')),
+    case when coalesce(offers.currency, 'USD') = 'NGN' then 1650 else 1 end
+  ) asc
   limit 1
 ) o on true;
 
