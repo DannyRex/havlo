@@ -176,7 +176,13 @@ export default function RootLayout({
             ItemList JSON-LD on top. */}
         <JsonLd data={[organizationJsonLd, websiteJsonLd]} />
       </head>
-      <body className="min-h-[100dvh] flex flex-col antialiased font-sans bg-bg text-ink">
+      {/* body is a PLAIN BLOCK, not flex. A `position: sticky` element that is
+          a direct flex item of its scroll container silently fails to stick on
+          iOS Safari (WebKit bug), so a flex body made the navbar scroll away on
+          phones while Chromium stuck it fine. The footer-pinning that flex-col
+          used to provide now lives on the content wrapper below, keeping the
+          sticky header a child of a block body. Do NOT re-add flex here. */}
+      <body className="min-h-[100dvh] antialiased font-sans bg-bg text-ink">
         <ThemeProvider>
           {/* DO NOT pass an initialCode here, and DO NOT read headers()/
               cookies() (directly or via getRequestCountry/getServerCountry)
@@ -214,8 +220,14 @@ export default function RootLayout({
           <CountryProvider fxSnapshot={USD_FX}>
             <ScrollReset />
             <Navbar />
-            <main className="flex-1">{children}</main>
-            <Footer />
+            {/* Content wrapper carries the footer-pinning (flex-col + main
+                flex-1) that used to live on <body>. min-height subtracts the
+                64px (h-16) header + 1px border so the footer sits at the
+                viewport bottom on short pages without a 1px scroll. */}
+            <div className="min-h-[calc(100dvh-65px)] flex flex-col">
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </div>
           </CountryProvider>
         </ThemeProvider>
         {/* Post-paint stack: GA4, Skimlinks, CookieConsent.
