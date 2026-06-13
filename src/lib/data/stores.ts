@@ -57,17 +57,6 @@ export const stores: Store[] = [
     trusted: true,
   },
   {
-    id: "payporte",
-    name: "Payporte",
-    slug: "payporte",
-    logo: "PP",
-    color: "#EC4899",
-    url: "https://www.payporte.com",
-    country: "NG",
-    rating: 3.9,
-    trusted: true,
-  },
-  {
     id: "yaoota",
     name: "Yaoota",
     slug: "yaoota",

@@ -439,7 +439,7 @@ const NG_STORES = [
      already know. Touched widely in production data. */
   "konga", "jumia", "3c-hub", "3chub", "3c hub",
   "slot", "pointek", "fouani", "zit-trading", "hayathub",
-  "ajebomarket", "kara", "obiwezy", "pricepally", "payporte",
+  "ajebomarket", "kara", "obiwezy", "pricepally",
   /* v3 NG addition: Bitmarte. */
   "bitmarte",
 

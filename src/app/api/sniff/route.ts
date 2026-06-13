@@ -90,7 +90,6 @@ const STORE_MAP: [string, string][] = [
   ["kara.com.ng", "Kara"],
   ["pointek.ng", "Pointek"],
   ["jiji.ng", "Jiji"],
-  ["payporte.com", "Payporte"],
   ["noon.com", "Noon"],
   ["myntra.com", "Myntra"],
   ["flipkart.com", "Flipkart"],
@@ -332,7 +331,7 @@ function cleanTitleBasic(raw: string): string {
     .replace(/^amazon\.com\s*:\s*/i, "")
     // Trailing store suffixes after | or -
     .replace(
-      /\s*[|\-–—]\s*(jumia|konga|amazon|aliexpress|slot|kara|pointek|jiji|payporte|noon|buy online|online shopping|best price|nigeria|ng|official store|shop).*/gi,
+      /\s*[|\-–—]\s*(jumia|konga|amazon|aliexpress|slot|kara|pointek|jiji|noon|buy online|online shopping|best price|nigeria|ng|official store|shop).*/gi,
       "",
     )
     .replace(/^(buy|shop|order)\s+/i, "")

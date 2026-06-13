@@ -518,11 +518,6 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
      live; site 403s automation → homepage floor until the search param
      is verified in a browser. */
   "jd-williams":       { name: "JD Williams",       searchUrl: () => null, homepage: "https://www.jdwilliams.co.uk" },
-  /* Payporte (NG fashion) — the single highest-volume store in the guess
-     bucket (~1.4k offers). Most are direct PDPs (passthrough); the
-     curated entry adds the relay-fallback safety net and upgrades the
-     homepage guess to the real Shopify search (verified live). */
-  "payporte":          { name: "Payporte",          searchUrl: (q) => `https://payporte.com/search?q=${encodeURIComponent(q)}`, homepage: "https://payporte.com" },
 
   /* ── v7 additions (May 2026) — link-health probe of every in-stock
        store (scripts/_tmp-merchant-link-health.ts). Two classes of fix:

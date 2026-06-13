@@ -63,8 +63,6 @@ import { scrapeGameOverStore } from "./scrapers/gameoverstore.js";
 // import { scrapeCarfax }     from "./scrapers/carfax.js";
 // import { scrapeSwitz }      from "./scrapers/switz.js";
 // import { scrapeAddideMart } from "./scrapers/addidemart.js";
-/* scrapePayPorte intentionally not imported — their robots.txt
-   site-wide disallow rules us out. */
 import { isAllowedByRobots } from "./scrapers/robots.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -79,7 +77,6 @@ const STORE_STYLES: Record<string, string> = {
   jiji:      "linear-gradient(135deg, #10b981 0%, #047857 100%)",
   kara:      "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
   obiwezy:   "linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)",
-  payporte:  "linear-gradient(135deg, #ec4899 0%, #be185d 100%)",
 };
 
 function generateDealId(index: number): string {
@@ -246,10 +243,6 @@ async function main() {
     // { name: "Konga",      probe: "https://www.konga.com/category/phones-tablets-5261", fn: () => scrapeKonga(page) },
     { name: "Kara",       probe: "https://kara.com.ng/mobile-phones",             fn: () => scrapeKara(page) },
     { name: "Obiwezy",    probe: "https://obiwezy.com/category/phones",           fn: () => scrapeObiwezy(page) },
-    /* PayPorte excluded — their robots.txt has a site-wide Disallow.
-       We honor it (per the disclaimer commitment + scrapers/robots.ts
-       check). To re-enable: get explicit permission from PayPorte +
-       relax their robots.txt for our user-agent (HavloBot). */
     { name: "Spar",       probe: "https://www.sparng.com/",                       fn: () => scrapeSpar(page) },
     /* Jiji disabled — they rolled out Cloudflare across the site
        since the existing scraper was written, so /nigeria/* paths

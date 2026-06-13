@@ -32,11 +32,6 @@ const ROSTERS: Record<string, StoreEntry[]> = {
        chip flips it via `invert` in light, `invert-0` in dark. */
     { name: "3C Hub",     domain: "3chub.com", logo: "/logos/3chub.png", wideLogo: true, whiteLogo: true },
     { name: "Obiwezy",    domain: "obiwezy.com" },
-    /* PayPorte: scraper is disabled (robots.txt) but they're still
-       part of the NG retail landscape and worth showing. icon.horse
-       + the StoreLogoChip onError fallback will render a clean "P"
-       letter chip if the favicon returns broken / wrong. */
-    { name: "PayPorte",   domain: "payporte.com" },
     { name: "Spar",       domain: "sparnigeria.com" },
     /* Newly-scraped NG retailers (May 2026 batch) — pharmacies,
        grocery, fragrance. All four ingest into Havlo via the

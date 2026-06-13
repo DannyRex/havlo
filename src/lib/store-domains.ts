@@ -89,7 +89,6 @@ const STORE_DOMAINS: Record<string, string> = {
   slot: "slot.ng",
   kara: "kara.com.ng",
   obiwezy: "obiwezy.com",
-  payporte: "payporte.com",
   spar: "sparnigeria.com",
   healthplus: "healthplusnigeria.com",
   medplus: "medplusnig.com",
