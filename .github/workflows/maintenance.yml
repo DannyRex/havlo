@@ -63,8 +63,19 @@ jobs:
       - uses: actions/setup-node@v5
         with: { node-version: "20", cache: "npm" }
       - run: npm ci
-      - name: Prune price_history older than 90 days
-        run: npm run prune:price-history -- --apply
+      # DISABLED June 2026. The real history table is offer_price_history
+      # (the multi-store, time-stamped price graph: the moat). It must only
+      # ever GROW, so there is no retention prune. This step targeted a
+      # `price_history` table that does not exist (so it was already a
+      # no-op), but leaving it live was a landmine: if anyone ever created
+      # a price_history table or renamed offer_price_history, this would
+      # start deleting 90-day-old history and destroy the asset. Keep it
+      # off. If storage ever forces a policy, DOWNSAMPLE old rows (keep one
+      # point per offer per week beyond N days), never hard-delete.
+      # - name: Prune price_history older than 90 days
+      #   run: npm run prune:price-history -- --apply
+      - name: No-op (price-history retention is intentionally unlimited)
+        run: echo "offer_price_history retained indefinitely (moat). No prune."
 
   # ── Catalog-wide stale-offer TTL sweep ────────────────────────────
   # Closes the gap that the in-ingest per-store TTL sweep leaves
