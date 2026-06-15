@@ -38,6 +38,12 @@ export interface PerStoreOffer {
       LABELLED line so a used unit never silently undercuts the new
       price. May 2026 PDP-trust fix. */
   isUsed:        boolean;
+  /** True ONLY for rows in the separate out-of-stock context lane
+      (AnchorStats.outOfStock). Always false on the live spectrum rows. */
+  isOutOfStock:  boolean;
+  /** offers.scraped_at for an OOS row — lets the bar render "as of <ago>"
+      so a stale last-seen price can't be misread as current. */
+  lastSeenAt?:   string | null;
 }
 
 export interface AnchorStats {
@@ -66,6 +72,11 @@ export interface AnchorStats {
       new-only with all-used fallback). For callers that RENDER the rows (the
       /compare anchor card) so the displayed rows ARE the counted set. */
   comparableOffers: StoreOffer[];
+  /** Out-of-stock offers for the anchor product, as labelled CONTEXT only:
+      one row per store (cheapest last-seen), excludes any store also in the
+      live set, drops rows with no/ >90-day-old scraped_at, and is NEVER part
+      of totalStores / priceStats / comparableOffers. Empty when none qualify. */
+  outOfStock: PerStoreOffer[];
 }
 
 /* Same-store + same-price dedup on the RAW merchant price (#16: the PDP
@@ -110,9 +121,15 @@ export function computeAnchorStats(
   family?: string | null,
   anchorTitle?: string | null,
 ): AnchorStats {
+  /* OOS offers never enter the live spectrum / count / cheapest math — they
+     surface only as a separate "last seen — out of stock" context lane.
+     Partition FIRST; the entire existing pipeline below runs on liveOffers. */
+  const liveOffers = anchorOffers.filter((o) => o.inStock !== false);
+  const oosOffers  = anchorOffers.filter((o) => o.inStock === false);
+
   const countryFiltered = country.code === "ng"
-    ? anchorOffers
-    : anchorOffers.filter((o) => isOfferAllowedForCountry(o, country));
+    ? liveOffers
+    : liveOffers.filter((o) => isOfferAllowedForCountry(o, country));
 
   /* Accessory guard (May 2026 PDP-trust fix). A "Replacement Earpads
      for Bose QC Ultra" or "Silicone Cover for Sony WH-1000XM5" listing
@@ -183,6 +200,7 @@ export function computeAnchorStats(
       isCrossBorder: isCrossBorderForUser(o, country),
       offerId:       o.offerId,
       isUsed:        isUsedListing(o.storeName, o.productTitle),
+      isOutOfStock:  false,
     }))
     .filter((r) => r.effectiveNgn > 0)
     .sort((a, b) => a.effectiveNgn - b.effectiveNgn);
@@ -214,6 +232,45 @@ export function computeAnchorStats(
     .slice()
     .sort((a, b) => a.price - b.price);
 
+  /* ── Out-of-stock context lane ──────────────────────────────────────
+     Same country + accessory filtering as the live pool, then: one row per
+     store (cheapest last-seen), DROP any store already buyable in the live
+     set (so a store is never shown as both for-sale and sold-out), and drop
+     rows with no / over-90-day-old scraped_at (a stale "last seen" erodes
+     trust even when labelled). Pure context — excluded from every headline
+     number above (totalStores, priceStats, comparableOffers). */
+  const liveStoreIds   = new Set(perStoreOffers.map((r) => r.storeId));
+  const OOS_MAX_AGE_MS  = 90 * 24 * 60 * 60 * 1000;
+  const oosCountry = country.code === "ng"
+    ? oosOffers
+    : oosOffers.filter((o) => isOfferAllowedForCountry(o, country));
+  const oosAccessory = anchorIsAccessory
+    ? oosCountry
+    : oosCountry.filter((o) => !isAccessoryListing(o.productTitle));
+  const oosByStore = new Map<string, StoreOffer>();
+  for (const o of oosAccessory) {
+    if (o.price <= 0) continue;
+    if (liveStoreIds.has(o.storeId)) continue;              // buyable live → not "sold out"
+    if (!o.lastSeenAt) continue;                            // can't honestly date it
+    const age = Date.now() - Date.parse(o.lastSeenAt);
+    if (!Number.isFinite(age) || age < 0 || age > OOS_MAX_AGE_MS) continue;
+    const prev = oosByStore.get(o.storeId);
+    if (!prev || o.price < prev.price) oosByStore.set(o.storeId, o);
+  }
+  const outOfStock: PerStoreOffer[] = Array.from(oosByStore.values())
+    .map((o) => ({
+      storeId:       o.storeId,
+      storeName:     o.storeName,
+      storeLogoUrl:  o.storeLogoUrl,
+      effectiveNgn:  o.price,
+      isCrossBorder: isCrossBorderForUser(o, country),
+      offerId:       o.offerId,
+      isUsed:        isUsedListing(o.storeName, o.productTitle),
+      isOutOfStock:  true,
+      lastSeenAt:    o.lastSeenAt ?? null,
+    }))
+    .sort((a, b) => a.effectiveNgn - b.effectiveNgn);
+
   return {
     totalStores: Math.max(1, comparableStores),
     priceStats: effectives.length > 1
@@ -226,5 +283,6 @@ export function computeAnchorStats(
       : undefined,
     perStoreOffers,
     comparableOffers,
+    outOfStock,
   };
 }

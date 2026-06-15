@@ -196,6 +196,7 @@ async function synthesizeAnchorFromOfferRow(row: OfferRow, countryCode: string):
     mode:   "similar",
     query:  row.title,
     anchor,
+    outOfStock: spectrum.outOfStock,
     /* Include siblings + cross-brand in the rail. Cheaper-only price
        filter upstream keeps more-expensive siblings (Plus, Ultra,
        Pro Max) out automatically; what survives is genuinely-cheaper
@@ -242,7 +243,7 @@ function filterByCountry(
     const dupes = out.dupes
       .map(pruneOffers)
       .filter((d): d is DupeResult => d !== null);
-    return { mode: "similar", query: out.query, anchor, dupes };
+    return { mode: "similar", query: out.query, anchor, dupes, outOfStock: out.outOfStock };
   }
 
   return out;

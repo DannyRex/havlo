@@ -41,6 +41,9 @@ import type { Deal } from "@/types";
 export interface PdpData {
   totalStores: number;
   perStoreOffers: PerStoreOffer[];
+  /** Out-of-stock offers for the anchor product — labelled "last seen"
+      context only, never part of totalStores / the spectrum / cheapest. */
+  outOfStock: PerStoreOffer[];
   priceHistory: PriceHistorySummary | null;
   chartPoints: PriceHistoryPoint[];
   isTrackedProduct: boolean;
@@ -653,7 +656,7 @@ export async function loadPdpData(offerId: string, countryCode: string): Promise
     countryFilteredDupes,
     country.code,
   );
-  const { totalStores, perStoreOffers } = partition;
+  const { totalStores, perStoreOffers, outOfStock } = partition;
 
   /* Strip variants from the "You may also like" rail. They're now
      plotted on the spectrum as same-product price points; rendering
@@ -851,6 +854,7 @@ export async function loadPdpData(offerId: string, countryCode: string): Promise
   return {
     totalStores,
     perStoreOffers,
+    outOfStock,
     priceHistory: priceHistorySummary ?? null,
     chartPoints,
     isTrackedProduct,

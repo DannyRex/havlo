@@ -24,6 +24,10 @@ import { resolveStoreLogoUrl } from "@/lib/store-logo";
 import { isOfferAllowedForCountry, type Country } from "@/lib/country";
 import { isSignatureTightEnoughForPooling } from "./pg-fts";
 import type { MerchantTrust } from "@/lib/merchant-trust";
+/* Type-only import (erased at runtime, so the pdp-stats <-> search cycle is
+   a compile-time concern only). PerStoreOffer is the OOS-lane row shape the
+   /compare anchor card renders. */
+import type { PerStoreOffer } from "@/lib/pdp-stats";
 
 /* ── Public types ─────────────────────────────────────────────────── */
 
@@ -75,6 +79,15 @@ export interface StoreOffer {
       only — eBay-style unlabelled used can't be caught without ingest
       condition data. */
   isUsed?: boolean;
+  /** Merchant currently OUT OF STOCK (offers.in_stock = false). Only an
+      explicit `false` means OOS; true/undefined is treated as in stock
+      (matches `o.in_stock !== false` upstream). Drives the separate
+      "last seen — out of stock" context lane and is NEVER counted in
+      totalStores / the spectrum / the cheapest math. */
+  inStock?: boolean;
+  /** offers.scraped_at — dates the "last seen" label on an OOS row so a
+      stale price can't be misread as current. */
+  lastSeenAt?: string | null;
 }
 
 export interface ProductGroup {
@@ -112,7 +125,7 @@ export interface SearchSuggestion {
 export type SearchOutput =
   | { mode: "single"; query: string; group: ProductGroup; alternatives: ProductGroup[] }
   | { mode: "list"; query: string; groups: ProductGroup[]; total: number }
-  | { mode: "similar"; query: string; anchor: ProductGroup; dupes: DupeResult[] }
+  | { mode: "similar"; query: string; anchor: ProductGroup; dupes: DupeResult[]; outOfStock?: PerStoreOffer[] }
   | { mode: "empty"; query: string; suggestions: SearchSuggestion[] };
 
 /* ── Store metadata ───────────────────────────────────────────────── */

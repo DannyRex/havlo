@@ -120,6 +120,7 @@ export default function PdpInteractive({ offer, countryCode, signedOutboundUrl, 
         signedOutboundUrl={signedOutboundUrl}
         totalStores={data?.totalStores}
         perStoreOffers={data?.perStoreOffers}
+        outOfStockOffers={data?.outOfStock ?? []}
         priceHistory={data?.priceHistory ?? undefined}
         localAlternative={data?.localAlternative ?? undefined}
         isLocallyShoppable={isLocallyShoppable}

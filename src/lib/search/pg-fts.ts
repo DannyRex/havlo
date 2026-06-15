@@ -80,6 +80,7 @@ interface NestedOffer {
   discount_percent: number | null;
   currency:         "NGN" | "USD";
   in_stock:         boolean | null;
+  scraped_at:       string | null;
   stores:           NestedStore | null;
 }
 
@@ -188,6 +189,11 @@ function offerToStoreOffer(o: NestedOffer, productTitle?: string): StoreOffer {
        "… Renewed"). Lets compare cards label the offer instead of
        pooling it silently beside new listings. */
     isUsed:         isUsedListing(store?.name ?? o.store_id, productTitle),
+    /* Stock + last-seen carried through so computeAnchorStats can split OOS
+       offers into the separate "last seen — out of stock" context lane
+       (never counted in the live spectrum). Only an explicit false is OOS. */
+    inStock:        o.in_stock !== false,
+    lastSeenAt:     o.scraped_at,
   };
 }
 
@@ -303,7 +309,7 @@ async function fetchAnchorProductWithSiblings(
     .select(`
       id, title, category_slug, brand, image_url, signature,
       offers (
-        id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
+        id, store_id, url, current_price, original_price, discount_percent, currency, in_stock, scraped_at,
         stores ( id, name, logo_url, is_international, country )
       )
     `)
@@ -332,7 +338,7 @@ async function fetchAnchorProductWithSiblings(
     .select(`
       id, title, category_slug, brand, image_url,
       offers (
-        id, store_id, url, current_price, original_price, discount_percent, currency, in_stock,
+        id, store_id, url, current_price, original_price, discount_percent, currency, in_stock, scraped_at,
         stores ( id, name, logo_url, is_international, country )
       )
     `)
@@ -366,8 +372,12 @@ function buildAnchorGroup(p: AnchorProduct): ProductGroup {
         bounced to /ng?deal_unavailable=1 (open new tab → immediate
         redirect home → confusing). Same gate /deals already applies
         via browse-db.ts. */
-  const inStock = p.offers
-    .filter((o) => o.in_stock !== false)
+  /* Keep BOTH in-stock and out-of-stock offers (each tagged via
+     offerToStoreOffer's inStock). OOS rows ride through to computeAnchorStats,
+     which splits them into the separate "last seen" context lane. The
+     usable-URL gate still drops relay-only URLs for both; the headline
+     count/price below stay in-stock-only. */
+  const usable = p.offers
     .filter((o) => isUsableMerchantUrl(o.url));
   /* Pass the parent product's title down to each offer so the
      comparison rows on /compare can show 'as titled at this store'
@@ -385,7 +395,7 @@ function buildAnchorGroup(p: AnchorProduct): ProductGroup {
      SHOULD have anchored on the real phone. Filtering at the
      offer level keeps the phone offers and drops the accessory
      ones. */
-  const offers = inStock
+  const offers = usable
     .map((o) => offerToStoreOffer(o, (o as NestedOffer & { productTitle?: string }).productTitle ?? p.title))
     /* Pass the product title so the per-flagship floor catches
        counterfeits (AirPods Pro 2 ₦30K, iPhone 17 Pro DHgate ₦42K)
@@ -399,7 +409,10 @@ function buildAnchorGroup(p: AnchorProduct): ProductGroup {
        is surfaced separately via landedCostExtra on the card, never baked
        into the headline. */
     .sort((a, b) => a.price - b.price);
-  const prices = offers.map((o) => o.price);
+  /* storeCount / bestPrice / worstPrice describe what's BUYABLE — in-stock
+     only — so the headline count + cheapest never count a sold-out store.
+     OOS rows stay in `offers` for computeAnchorStats's context lane. */
+  const prices = offers.filter((o) => o.inStock !== false).map((o) => o.price);
   return {
     key:            p.id,
     title:          p.title,
@@ -409,7 +422,7 @@ function buildAnchorGroup(p: AnchorProduct): ProductGroup {
     model:          null,
     storageGb:      null,
     inches:         null,
-    storeCount:     offers.length,
+    storeCount:     prices.length,
     bestPrice:      prices.length > 0 ? Math.min(...prices) : 0,
     worstPrice:     prices.length > 0 ? Math.max(...prices) : 0,
     maxSavings:     prices.length > 0 ? Math.max(...prices) - Math.min(...prices) : 0,
@@ -1068,6 +1081,9 @@ export async function pgFtsFindByProductId(
     mode: "similar",
     query: anchorPayload.title,
     anchor: augmentedAnchor,
+    /* OOS price context for the anchor product — rendered as a labelled
+       "last seen — out of stock" lane on the /compare card, never counted. */
+    outOfStock: spectrum.outOfStock,
     /* Cheaper-alternatives rail (May 2026 launch-readiness audit):
        siblings DROPPED from the rail. The May 2026 v3 attempt to
        include them on the theory that "the cheaper-only filter would
@@ -1141,6 +1157,9 @@ export interface AnchorSpectrum {
   /** Full StoreOffers behind totalStores (cheapest-first, new-only). A caller
       that RENDERS rows uses these so the displayed rows ARE the counted set. */
   comparableOffers: StoreOffer[];
+  /** Out-of-stock context lane for the anchor product (labelled "last seen";
+      never part of totalStores / priceStats / comparableOffers). */
+  outOfStock:       AnchorStats["outOfStock"];
   /** baseOffers + variant offers, pre-stats. */
   spectrumOffers:   StoreOffer[];
   likelyVariants:   DupeResult[];
@@ -1225,6 +1244,7 @@ export async function computeAnchorSpectrum(
     perStoreOffers:   stats.perStoreOffers,
     priceStats:       stats.priceStats,
     comparableOffers: stats.comparableOffers,
+    outOfStock:       stats.outOfStock,
     spectrumOffers,
     likelyVariants:   partition.likelyVariants,
     siblingVariants:  partition.siblingVariants,

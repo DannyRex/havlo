@@ -22,8 +22,8 @@
    Audit May 2026 caught that mismatch. */
 
 import Link from "next/link";
-import { Star, Plane, ChevronRight, ArrowDown, ShieldCheck } from "lucide-react";
-import { formatPriceForUser, formatPriceDeltaForUser, formatCount, cleanTitle } from "@/lib/utils";
+import { Star, Plane, ChevronRight, ArrowDown, ShieldCheck, PackageX } from "lucide-react";
+import { formatPriceForUser, formatPriceDeltaForUser, formatCount, cleanTitle, timeAgo } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import { pdpUrlForOffer } from "@/lib/pdp-url";
 import {
@@ -39,6 +39,7 @@ import HavloLogoFallback from "@/components/ui/HavloLogoFallback";
 import MerchantVerifiedChip from "@/components/ui/MerchantVerifiedChip";
 import type { Country } from "@/lib/country";
 import type { ProductGroup, DupeResult } from "@/lib/search";
+import type { PerStoreOffer } from "@/lib/pdp-stats";
 
 interface Props {
   anchor: ProductGroup;
@@ -51,9 +52,14 @@ interface Props {
       a no-price paste never just pushes the user back to the store they came
       from. */
   canCompare?: boolean;
+  /** Out-of-stock offers for the anchor product — rendered as a labelled
+      "last seen — out of stock" lane below the in-stock rows. NEVER part of
+      the counted rows / "Across N stores" / cheapest (those run on
+      anchor.offers, which is the in-stock comparableOffers set). */
+  outOfStock?: PerStoreOffer[];
 }
 
-export default function CompareAnchorCard({ anchor, dupes, country, query, canCompare = false }: Props) {
+export default function CompareAnchorCard({ anchor, dupes, country, query, canCompare = false, outOfStock }: Props) {
   /* fx from context (server-serialized snapshot) — this card SSRs for
      deep-linked /compare?q= URLs (the page passes initialResult), so
      its converted prices ship in SSR HTML and must hydrate against
@@ -407,11 +413,40 @@ export default function CompareAnchorCard({ anchor, dupes, country, query, canCo
                 last-recorded rather than guaranteed-current. Quiet,
                 always-on cue for the at-a-glance comparison; the PDP
                 carries the louder per-offer staleness warning at the
-                actual click-out. Out-of-stock offers are already
-                dropped upstream (buildAnchorGroup in pg-fts.ts). */}
+                actual click-out. The rows above are in-stock only; sold-out
+                offers appear as the separate "last seen" lane below. */}
             <p className="mt-3 text-[11px] text-ink-3 leading-relaxed">
               Prices are the latest we recorded and may have changed at the store.
             </p>
+
+            {/* ── Out-of-stock context (#5) — labelled "last seen", never
+                counted in the rows / "Across N stores" / cheapest above. */}
+            {outOfStock && outOfStock.length > 0 && (
+              <div className="mt-3 px-3.5 py-2.5 rounded-xl border border-border bg-surface-2">
+                <div className="flex items-start gap-2.5">
+                  <PackageX size={14} className="text-ink-3 shrink-0 mt-0.5" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="text-[12px] text-ink-2 leading-relaxed">
+                      Last seen out of stock from{" "}
+                      <span className="font-semibold text-ink tabular-nums">{formatPriceForUser(outOfStock[0].effectiveNgn, country)}</span>{" "}
+                      at <span className="font-medium text-ink">{displayStoreName(outOfStock[0].storeName)}</span>
+                      {outOfStock[0].lastSeenAt && (
+                        <span className="text-ink-3 whitespace-nowrap">
+                          {" "}· as of{" "}
+                          <time dateTime={outOfStock[0].lastSeenAt} suppressHydrationWarning>{timeAgo(outOfStock[0].lastSeenAt)}</time>
+                        </span>
+                      )}
+                      {outOfStock.length > 1 && (
+                        <span className="text-ink-3"> · {outOfStock.length - 1} more {outOfStock.length - 1 === 1 ? "store" : "stores"}</span>
+                      )}
+                    </p>
+                    <p className="text-[11px] text-ink-3 leading-relaxed mt-0.5">
+                      Not available to buy right now — shown for price context only.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

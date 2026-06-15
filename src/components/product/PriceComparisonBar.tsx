@@ -41,7 +41,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Check, Globe, AlertCircle, TrendingDown, Award, History, ArrowRight, Plane, RotateCcw } from "lucide-react";
+import { Check, Globe, AlertCircle, TrendingDown, Award, History, ArrowRight, Plane, RotateCcw, PackageX } from "lucide-react";
 import { formatPriceForUser, formatPriceDeltaForUser, timeAgo } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import { type Country } from "@/lib/country";
@@ -81,6 +81,11 @@ interface Props {
   productId?:          string;
   /** Product title for the cheaper-at action's `?q=` parameter. */
   productSearchTitle?: string;
+  /** Out-of-stock offers for THIS product, as labelled context only
+      (computeAnchorStats.outOfStock). Rendered as a greyed "last seen —
+      out of stock" strip below the bar; NEVER part of the spectrum / verdict
+      / cheapest math (those run on perStoreOffers, which is in-stock only). */
+  outOfStockOffers?:   PerStoreOffer[];
 }
 
 /* Visual constants. */
@@ -102,6 +107,7 @@ export default function PriceComparisonBar({
   countryCode,
   productId,
   productSearchTitle,
+  outOfStockOffers,
 }: Props) {
   /* Cluster-based popover (May 2026 rewrite). Dots within
      CLUSTER_THRESHOLD_PCT of each other on the spectrum belong to
@@ -823,6 +829,45 @@ export default function PriceComparisonBar({
                 </p>
                 <p className="text-[11px] text-ink-3 leading-relaxed mt-0.5">
                   Not included in the price ranking above.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Out-of-stock context (#5) ───────────────────────────────
+          OOS offers for this product, shown ONLY as labelled "last seen"
+          context. They are NOT in perStoreOffers, so the spectrum, verdict,
+          dots and "cheapest" above never see them — a sold-out price can
+          never win the headline or feed the savings. The "as of" date makes
+          a stale price impossible to misread as current. */}
+      {outOfStockOffers && outOfStockOffers.length > 0 && (() => {
+        const cheapest  = outOfStockOffers[0];
+        const moreCount = outOfStockOffers.length - 1;
+        return (
+          <div className="mb-3 px-3.5 py-2.5 rounded-xl border border-border bg-surface-2">
+            <div className="flex items-start gap-2.5">
+              <PackageX size={14} className="text-ink-3 shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-[12px] text-ink-2 leading-relaxed">
+                  Last seen out of stock from{" "}
+                  <span className="font-semibold text-ink tabular-nums">
+                    {formatPriceForUser(cheapest.effectiveNgn, country)}
+                  </span>{" "}
+                  at <span className="font-medium text-ink">{displayStoreName(cheapest.storeName)}</span>
+                  {cheapest.lastSeenAt && (
+                    <span className="text-ink-3 whitespace-nowrap">
+                      {" "}· as of{" "}
+                      <time dateTime={cheapest.lastSeenAt} suppressHydrationWarning>{timeAgo(cheapest.lastSeenAt)}</time>
+                    </span>
+                  )}
+                  {moreCount > 0 && (
+                    <span className="text-ink-3"> · {moreCount} more {moreCount === 1 ? "store" : "stores"}</span>
+                  )}
+                </p>
+                <p className="text-[11px] text-ink-3 leading-relaxed mt-0.5">
+                  Not available to buy right now — shown for price context only.
                 </p>
               </div>
             </div>

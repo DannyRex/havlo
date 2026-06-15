@@ -105,6 +105,10 @@ interface Props {
       Empty array when the anchor pool is empty (curated PDPs with
       synthetic product_id). */
   perStoreOffers?: PerStoreOffer[];
+  /** Out-of-stock offers for this product — rendered as a separate
+      "last seen — out of stock" context strip in the bar, never counted
+      in the spectrum / cheapest. */
+  outOfStockOffers?: PerStoreOffer[];
   /** Price history summary — drives "all-time low" + "this store's
       lowest" callouts on the bar. Undefined when product_price_history
       RPC is unavailable or the product has no history rows yet. */
@@ -166,7 +170,7 @@ function convertToUserCurrency(
   return country.currency === "USD" ? Math.round(out * 100) / 100 : Math.round(out);
 }
 
-export default function ProductHero({ offer, countryCode, totalStores, perStoreOffers, priceHistory, signedOutboundUrl, localAlternative, isLocallyShoppable, loading }: Props) {
+export default function ProductHero({ offer, countryCode, totalStores, perStoreOffers, outOfStockOffers, priceHistory, signedOutboundUrl, localAlternative, isLocallyShoppable, loading }: Props) {
   const country = getCountry(countryCode);
   /* Only fx comes from context — country stays prop-derived (the PDP
      is rendered per /[country]/ URL, which must win over any
@@ -724,6 +728,7 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             thisIsCrossBorder={isCrossBorder}
             country={country}
             perStoreOffers={perStoreOffers ?? []}
+            outOfStockOffers={outOfStockOffers ?? []}
             priceHistory={priceHistory}
             lastCheckedAt={offer.scrapedAt}
             storeCountry={dealStoreCountry}

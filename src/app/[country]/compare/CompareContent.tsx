@@ -668,6 +668,7 @@ export default function CompareContent({
             dupes={result.dupes}
             country={country}
             query={query}
+            outOfStock={result.outOfStock}
             canCompare={result.dupes.length > 0 || liveResults.length > 0 || liveLoading}
           />
 
