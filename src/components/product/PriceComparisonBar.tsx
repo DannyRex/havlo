@@ -41,7 +41,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Check, Globe, AlertCircle, TrendingDown, Award, History, ArrowRight, Plane, RotateCcw, PackageX } from "lucide-react";
+import { Check, Globe, AlertCircle, TrendingDown, Award, History, ArrowRight, Plane, RotateCcw } from "lucide-react";
 import { formatPriceForUser, formatPriceDeltaForUser, timeAgo } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import { type Country } from "@/lib/country";
@@ -457,23 +457,11 @@ export default function PriceComparisonBar({
      DB flag) so UK retailers on a UK PDP don't trigger it. */
   const anyXBorder = perStoreOffers.some((r) => r.isCrossBorder);
 
-  /* ── Confidence indicator ───────────────────────────────────────
-     Transparent freshness signal — not a fake score. Bands:
-       high   — ≥3 stores AND last verified < 24h ago
-       medium — ≥2 stores OR last verified < 7d ago
-       limited — anything else
-     The PDP visit-time test for `< 24h` uses lastCheckedAt as a
-     proxy for "is our data current?"; richer sources (per-store
-     scraped_at timestamps) would refine this in a future pass. */
-  const confidence = (() => {
-    const stores = perStoreOffers.length;
-    const ageMs = lastCheckedAt ? Date.now() - new Date(lastCheckedAt).getTime() : Infinity;
-    const fresh24h = ageMs < 24 * 60 * 60 * 1000;
-    const fresh7d  = ageMs < 7 * 24 * 60 * 60 * 1000;
-    if (stores >= 3 && fresh24h) return { label: "High confidence",    tone: "text-emerald-600 dark:text-emerald-400" };
-    if (stores >= 2 || fresh7d)   return { label: "Medium confidence",  tone: "text-ink-2" };
-    return                              { label: "Limited data",        tone: "text-amber-600 dark:text-amber-400" };
-  })();
+  /* Confidence score ("High/Medium confidence" / "Limited data") removed
+     June 2026: a derived meta-label that added anxiety ("Limited data") and
+     contradicted the chart's "Price history from N stores" right below it.
+     The honest signals carry the trust without a fake score: "Verified Xago"
+     freshness in the strip + the store count in the subtitle. */
 
   return (
     <div className="rounded-2xl bg-surface border border-border p-4 sm:p-5 mb-7">
@@ -836,34 +824,12 @@ export default function PriceComparisonBar({
         );
       })()}
 
-      {/* ── Out-of-stock context (#5) ───────────────────────────────
-          OOS offers for this product, shown ONLY as labelled "last seen"
-          context. They are NOT in perStoreOffers, so the spectrum, verdict,
-          dots and "cheapest" above never see them — a sold-out price can
-          never win the headline or feed the savings. The "as of" date makes
-          a stale price impossible to misread as current. */}
-      {outOfStockOffers && outOfStockOffers.length > 0 && (() => {
-        const cheapest  = outOfStockOffers[0];
-        const moreCount = outOfStockOffers.length - 1;
-        return (
-          <div className="mb-3 px-3.5 py-2.5 rounded-xl border border-border bg-surface-2">
-            <div className="flex items-start gap-2.5">
-              <PackageX size={14} className="text-ink-3 shrink-0 mt-0.5" aria-hidden="true" />
-              <p className="text-[12px] text-ink-2 leading-relaxed min-w-0">
-                Out of stock. Last seen{" "}
-                <span className="font-semibold text-ink tabular-nums">{formatPriceForUser(cheapest.effectiveNgn, country)}</span>{" "}
-                at <span className="font-medium text-ink">{displayStoreName(cheapest.storeName)}</span>
-                {cheapest.lastSeenAt && (
-                  <span className="text-ink-3 whitespace-nowrap">{" "}(<time dateTime={cheapest.lastSeenAt} suppressHydrationWarning>{timeAgo(cheapest.lastSeenAt)}</time>)</span>
-                )}
-                {moreCount > 0 && (
-                  <span className="text-ink-3">, +{moreCount} more</span>
-                )}
-              </p>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Out-of-stock "last seen" context removed (June 2026): an
+          unactionable, dated price from stores that don't carry the item
+          read as noise on the PDP — the price-history chart + spectrum
+          already give real price context. The outOfStockOffers prop is
+          kept on the interface (compare still renders the lane) but is no
+          longer shown here. */}
 
       {/* ── Historical signal ──────────────────────────────────── */}
       {priceHistory && !isHistoricalLow && (
@@ -895,12 +861,9 @@ export default function PriceComparisonBar({
         </div>
       )}
 
-      {/* ── Single-store hint ──────────────────────────────────── */}
-      {isSingleStore && (
-        <p className="text-[12px] text-ink-2 mb-3">
-          We&apos;ll compare prices here as more stores list it.
-        </p>
-      )}
+      {/* Single-store hint ("We'll compare as more stores list it")
+          removed June 2026: redundant with the "Only seller we track right
+          now" subtitle above. */}
 
       {/* ── Trust strip ────────────────────────────────────────────
           Confidence + cheapest-store + verification timestamp +
@@ -908,21 +871,13 @@ export default function PriceComparisonBar({
           disclaimer so the trust signals live next to the price
           claim they support. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] pt-3 border-t border-border">
-        <span className={`inline-flex items-center gap-1 font-medium ${confidence.tone}`}>
-          <Check size={11} aria-hidden="true" />
-          {confidence.label}
-        </span>
         {lastCheckedAt && (
-          /* Plain provenance only. The ProductHero amber chip above
-             is the single authoritative "price may have changed"
-             warning — naming the merchant, top of fold, loud enough
-             to actually be read. Restating the same warning here
-             (and again under the chart) was diluting the chip's
-             authority instead of reinforcing it; the user reads it
-             three times, then trusts each instance less. May 29 2026
-             trust-signal consolidation. */
-          <span className="inline-flex items-center gap-1 text-ink-3" suppressHydrationWarning>
-            <span aria-hidden="true">·</span>
+          /* Freshness is the lead trust signal now that the derived
+             confidence score is gone. The ProductHero amber chip above
+             remains the single authoritative "price may have changed"
+             warning, so this stays plain provenance, not a restated alarm. */
+          <span className="inline-flex items-center gap-1 text-ink-2 font-medium" suppressHydrationWarning>
+            <Check size={11} aria-hidden="true" />
             Verified {timeAgo(lastCheckedAt)}
           </span>
         )}
