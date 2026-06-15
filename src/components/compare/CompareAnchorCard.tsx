@@ -22,8 +22,8 @@
    Audit May 2026 caught that mismatch. */
 
 import Link from "next/link";
-import { Star, Plane, ChevronRight, ArrowDown, ShieldCheck, PackageX } from "lucide-react";
-import { formatPriceForUser, formatPriceDeltaForUser, formatCount, cleanTitle, timeAgo } from "@/lib/utils";
+import { Star, Plane, ChevronRight, ArrowDown, ShieldCheck } from "lucide-react";
+import { formatPriceForUser, formatPriceDeltaForUser, formatCount, cleanTitle } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import { pdpUrlForOffer } from "@/lib/pdp-url";
 import {
@@ -419,26 +419,16 @@ export default function CompareAnchorCard({ anchor, dupes, country, query, canCo
               Prices are the latest we recorded and may have changed at the store.
             </p>
 
-            {/* ── Out-of-stock context (#5) — labelled "last seen", never
-                counted in the rows / "Across N stores" / cheapest above. */}
-            {outOfStock && outOfStock.length > 0 && (
-              <div className="mt-3 px-3.5 py-2.5 rounded-xl border border-border bg-surface-2">
-                <div className="flex items-start gap-2.5">
-                  <PackageX size={14} className="text-ink-3 shrink-0 mt-0.5" aria-hidden="true" />
-                  <p className="text-[12px] text-ink-2 leading-relaxed min-w-0">
-                    Out of stock. Last seen{" "}
-                    <span className="font-semibold text-ink tabular-nums">{formatPriceForUser(outOfStock[0].effectiveNgn, country)}</span>{" "}
-                    at <span className="font-medium text-ink">{displayStoreName(outOfStock[0].storeName)}</span>
-                    {outOfStock[0].lastSeenAt && (
-                      <span className="text-ink-3 whitespace-nowrap">{" "}(<time dateTime={outOfStock[0].lastSeenAt} suppressHydrationWarning>{timeAgo(outOfStock[0].lastSeenAt)}</time>)</span>
-                    )}
-                    {outOfStock.length > 1 && (
-                      <span className="text-ink-3">, +{outOfStock.length - 1} more</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-            )}
+            {/* Out-of-stock "last seen" context removed (June 2026) for
+                parity with the PDP (PriceComparisonBar made the same call):
+                a dated, unactionable price from a store that no longer
+                stocks the item — often a foreign/refurb marketplace shown in
+                the user's currency (e.g. "Last seen ₦1.3M at Back Market 3w
+                ago") — read as noise and could anchor the shopper to a price
+                they can't actually buy. The in-stock rows and the "latest we
+                recorded" line above carry the real price context. The
+                `outOfStock` prop stays on the interface (data still flows in)
+                but is no longer rendered. */}
           </div>
         )}
       </div>
