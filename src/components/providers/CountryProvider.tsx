@@ -136,12 +136,23 @@ export function CountryProvider({ initialCode, fxSnapshot, children }: Props) {
        guard keeps it a no-op for the inner [country] provider
        (initialCode set) and when the cookie names the current country. */
     if (!initialCode) {
-      const cookie = readCookie(COUNTRY_COOKIE);
-      if (cookie && COUNTRY_CODES.has(cookie) && cookie !== code) {
-        setCode(cookie);
+      const cookie = readCookie(COUNTRY_COOKIE)?.toLowerCase();
+      if (cookie && COUNTRY_CODES.has(cookie)) {
+        if (cookie !== code) setCode(cookie);
+        /* Country awareness for the bare brand homepage `/` (now a real
+           INDEXABLE page, not a redirect). Send a RETURNING visitor whose
+           saved market isn't the NG default to their country homepage.
+           Cookie-gated, so a crawler (which carries no cookie) is NEVER
+           redirected and `/` stays indexable for the "havlo" brand search;
+           no cloaking. Scoped to `/` exactly, so it cannot loop or touch any
+           other surface; deeper bare paths (/deals) are handled by
+           middleware. */
+        if (pathname === "/" && cookie !== DEFAULT_COUNTRY) {
+          router.replace(`/${cookie}`);
+        }
       }
     }
-  }, [pathname, code, initialCode]);
+  }, [pathname, code, initialCode, router]);
 
   const setCountry = useCallback(
     (next: string) => {
