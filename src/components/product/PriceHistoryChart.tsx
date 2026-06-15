@@ -875,73 +875,31 @@ interface Geometry {
   axisTicks:  { x: number; label: string }[];
 }
 
-/* Monotone cubic Hermite spline → cubic Bezier path.
+/* Step-after price path: hold each observed price flat until the next
+   observation, then step vertically to the new price.
 
-   Implements Fritsch–Carlson tangent estimation so the resulting
-   curve:
-     • Passes exactly through every data point.
-     • Cannot overshoot the data range between points (monotonic
-       on each segment when the underlying data is monotonic).
-     • Flattens its tangent at local extrema so peaks and troughs
-       round naturally instead of forming kinks.
+   This is the honest interpolation for a price series — a price IS
+   constant between readings; it does not ramp smoothly from one value to
+   the next. (v2 briefly drew a monotone cubic spline, which rendered
+   gradual price ramps the merchant never actually charged. The weekly
+   snapshot — migration 0082 — gives the series enough points that the
+   held-flat stretches read clearly as steps rather than a lonely dot.)
 
-   Input: parallel xs / ys arrays of length n ≥ 2 (single-point
-   case handled in the caller).
-   Output: an SVG path string starting with M then n−1 C cubic
-   segments. */
-function buildMonotonePath(xs: number[], ys: number[]): string {
+   Input: parallel xs / ys arrays of length n ≥ 1. Output: an SVG path that
+   holds ys[i] from xs[i] across to xs[i+1], then steps to ys[i+1]. The
+   caller appends a final horizontal extension to "today". */
+function buildStepAfterPath(xs: number[], ys: number[]): string {
   const n = xs.length;
-  if (n < 2) return n === 1 ? `M ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}` : "";
-  if (n === 2) {
-    /* Two-point case: a single straight cubic. No tangent estimation
-       needed — just use the slope itself. */
-    return `M ${xs[0].toFixed(2)} ${ys[0].toFixed(2)} L ${xs[1].toFixed(2)} ${ys[1].toFixed(2)}`;
+  if (n === 0) return "";
+  let d = `M ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}`;
+  for (let i = 1; i < n; i++) {
+    /* horizontal hold at the previous price... */
+    d += ` L ${xs[i].toFixed(2)} ${ys[i - 1].toFixed(2)}`;
+    /* ...then a vertical step to the new price, exactly at the new
+       observation's x. */
+    d += ` L ${xs[i].toFixed(2)} ${ys[i].toFixed(2)}`;
   }
-
-  /* Step 1: secant slopes between consecutive points. */
-  const dx: number[] = new Array(n - 1);
-  const slope: number[] = new Array(n - 1);
-  for (let i = 0; i < n - 1; i++) {
-    const dxi = xs[i + 1] - xs[i];
-    dx[i] = dxi === 0 ? 1e-6 : dxi;  // guard against duplicate x
-    slope[i] = (ys[i + 1] - ys[i]) / dx[i];
-  }
-
-  /* Step 2: tangent at each point.
-       Endpoints use the adjacent secant slope (one-sided).
-       Interior points use the Fritsch–Carlson weighted harmonic
-       mean of the two surrounding secants — IF the slopes share
-       sign; otherwise the tangent is forced to zero (preserves
-       monotonicity through local extrema). */
-  const tangent: number[] = new Array(n);
-  tangent[0] = slope[0];
-  tangent[n - 1] = slope[n - 2];
-  for (let i = 1; i < n - 1; i++) {
-    if (slope[i - 1] * slope[i] <= 0) {
-      tangent[i] = 0;
-    } else {
-      const w1 = 2 * dx[i] + dx[i - 1];
-      const w2 = dx[i] + 2 * dx[i - 1];
-      tangent[i] = (w1 + w2) / (w1 / slope[i - 1] + w2 / slope[i]);
-    }
-  }
-
-  /* Step 3: emit cubic Bezier segments. Control-point distance is
-     dx/3 from each endpoint along the local tangent — the standard
-     conversion from Hermite to Bezier for unit-time parameters. */
-  const parts: string[] = [`M ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}`];
-  for (let i = 0; i < n - 1; i++) {
-    const cp1x = xs[i] + dx[i] / 3;
-    const cp1y = ys[i] + (tangent[i] * dx[i]) / 3;
-    const cp2x = xs[i + 1] - dx[i] / 3;
-    const cp2y = ys[i + 1] - (tangent[i + 1] * dx[i]) / 3;
-    parts.push(
-      `C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)} ` +
-      `${cp2x.toFixed(2)} ${cp2y.toFixed(2)} ` +
-      `${xs[i + 1].toFixed(2)} ${ys[i + 1].toFixed(2)}`,
-    );
-  }
-  return parts.join(" ");
+  return d;
 }
 
 /* Hydration-safe "now": snapped to UTC midnight of the current day.
@@ -1041,41 +999,24 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
   }
   const todayX = leftPad + usableW;
 
-  /* Monotone cubic Hermite spline (the "curveMonotoneX" curve from
-     D3, attributable to Fritsch–Carlson 1980).
+  /* Step-after price path (buildStepAfterPath): the price holds flat at
+     each observation until the next reading, then steps to it. This is the
+     honest shape for a price series — prices jump, they don't ramp — and
+     it never claims a value the data doesn't contain. The weekly snapshot
+     (migration 0082) feeds it enough points that a steady price reads as a
+     long flat step rather than a single dot.
 
-     Why this curve, not a generic Catmull-Rom or simple bezier:
-       • Passes EXACTLY through every data point. Critical for a
-         price chart — the curve can't claim a price the data
-         doesn't.
-       • Cannot overshoot the data range between points. A cheap
-         bezier or Catmull-Rom can produce visible humps that
-         look like prices that never existed; monotone is
-         guaranteed not to.
-       • Tangents flatten naturally at local minima / maxima, so
-         the "lowest ever" point gets a soft cup shape rather
-         than a kink. Reads as a trend.
+     Path extends from the last data point horizontally to TODAY at the
+     right edge whenever the latest reading is older than now — communicates
+     "no change since the last reading" while keeping the right edge
+     anchored on a meaningful date. The extension is a horizontal L segment,
+     consistent with the step semantics, so we never claim an unobserved
+     price.
 
-     We trade off the step-after honesty of v1 ("price held flat
-     until the next event") for the natural readability of a
-     curve. The deception is bounded: between two known prices
-     the spline interpolates smoothly rather than holding flat,
-     but the curve never claims a price outside the [low, high]
-     band of the surrounding data because of the monotonicity
-     guarantee. Net: cleaner reading, no real signal lost.
-
-     Path now extends from the last data point horizontally to TODAY
-     at the right edge whenever the latest reading is older than now
-     — communicates "no change since the last reading" while keeping
-     the right edge anchored on a meaningful date (today). The
-     extension is a simple L segment; no curve interpolation, so we
-     never claim a price we haven't observed.
-
-     Single-point path: flat horizontal line at the price level from
-     the chart's left edge through the dot at its actual date X, then
-     extending to today on the right. The dot sits where its date
-     belongs; the hold-line carries it visually across the window
-     until "now". */
+     Single-point path: flat horizontal line at the price level from the
+     chart's left edge through the dot at its actual date X, then extending
+     to today on the right — the same hold-flat semantics for a lone
+     reading. */
   const lastPointX = xs[xs.length - 1];
   const lastPointY = ys[ys.length - 1];
   const todayExtension = lastPointX < todayX
@@ -1084,7 +1025,7 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
 
   const pathD = points.length === 1
     ? `M ${leftPad.toFixed(2)} ${ys[0].toFixed(2)} L ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}${todayExtension}`
-    : buildMonotonePath(xs, ys) + todayExtension;
+    : buildStepAfterPath(xs, ys) + todayExtension;
 
   const areaBottom = CHART_HEIGHT - PAD_BOTTOM;
   const areaRightX = Math.max(lastPointX, todayX);

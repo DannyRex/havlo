@@ -1,4 +1,4 @@
-name: Maintenance (resignature + price prune)
+name: Maintenance (resignature + price snapshot)
 
 # ── Why this exists ──────────────────────────────────────────────────
 # Two cheap, idempotent maintenance jobs that keep the DB bounded as
@@ -49,6 +49,31 @@ jobs:
         # unsafe collisions (brand|? or ?|model) and the price-spread
         # guard rejects accessory-into-product over-merges.
         run: npm run resignature -- --apply
+
+  # ── Weekly price snapshot ─────────────────────────────────────────
+  # Gives the PDP price-history chart DEPTH. The on-change trigger only
+  # writes offer_price_history when a price MOVES, so a steady price leaves
+  # a single point and the chart can't show "held flat at X, then dropped".
+  # snapshot_offer_prices() (migration 0082) inserts one row per active
+  # offer that lacks a history row in the last 6 days — a weekly cadence of
+  # points, bounded to ~1 row/offer/week so the table stays Micro-friendly.
+  # All countries (the table is global). Weekly Sunday run is the quietest
+  # window, same as the rest of this workflow.
+  price-snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: "20", cache: "npm" }
+      - run: npm ci
+      - name: Snapshot active-offer prices (chart depth)
+        run: npm run snapshot:prices
 
   price-prune:
     runs-on: ubuntu-latest

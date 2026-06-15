@@ -33,6 +33,8 @@
     "newsletter:dry-run": "tsx --tsconfig tsconfig.scripts.json scripts/cron/send-newsletter.ts --dry-run",
     "alerts:check": "tsx --tsconfig tsconfig.scripts.json scripts/cron/check-price-alerts.ts",
     "alerts:dry-run": "tsx --tsconfig tsconfig.scripts.json scripts/cron/check-price-alerts.ts --dry-run",
+    "snapshot:prices": "tsx --tsconfig tsconfig.scripts.json scripts/cron/snapshot-prices.ts",
+    "snapshot:dry-run": "tsx --tsconfig tsconfig.scripts.json scripts/cron/snapshot-prices.ts --dry-run",
     "test:matcher": "tsx --tsconfig tsconfig.scripts.json scripts/test-matcher.ts",
     "retag": "tsx --tsconfig tsconfig.scripts.json scripts/retag-categories.ts",
     "resignature": "tsx --tsconfig tsconfig.scripts.json scripts/resignature-products.ts",
