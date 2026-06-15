@@ -524,7 +524,7 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
                 className={`shrink-0 inline-flex items-center justify-center gap-1.5 transition-all duration-200 rounded-full
                   h-11 w-11 sm:h-10 sm:w-auto sm:px-4 ${
                   hasInput
-                    ? "bg-brand text-white hover:bg-brand-hover shadow-brand active:scale-95"
+                    ? "bg-ink text-bg hover:opacity-90 active:scale-95"
                     : "bg-ink/8 text-ink-3 cursor-not-allowed"
                 }`}
               >

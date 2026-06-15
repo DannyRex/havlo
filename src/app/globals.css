@@ -37,6 +37,16 @@
   /* Status — vibrant deal-green (green-600). Brighter override in .dark. */
   --success-rgb: 22 163 74;
 
+  /* Primary action / brand accent — neutral ink (was deal-green #16A34A).
+     Green is demoted to a SAVINGS + status accent only (price badges,
+     verified, in-stock, success); the action language across the app is
+     this neutral, so green keeps its meaning = "money saved". Mirrors
+     --ink so every existing *-brand utility reads as the neutral action
+     colour and auto-inverts in dark mode. June 2026 (Danny: "green just a
+     minor subtle colour"). */
+  --brand-rgb:       15 23 42;
+  --brand-hover-rgb: 61 75 96;
+
   /* iOS safe-area */
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -62,6 +72,11 @@
 
   /* Status — brighter green (green-400) so it stays vibrant on dark. */
   --success-rgb: 74 222 128;
+
+  /* Primary action / brand accent — neutral ink (near-white on dark),
+     mirroring --ink so *-brand utilities invert with the theme. */
+  --brand-rgb:       246 248 251;
+  --brand-hover-rgb: 178 184 196;
 }
 
 /* ── Border policy by mode (June 2026, Danny) ───────────────────────
@@ -164,12 +179,17 @@ h1, h2, h3, h4, h5, h6 {
 @layer components {
 
   /* Buttons */
+  /* Primary action — single neutral-ink colour app-wide (matches the
+     dominant `bg-ink text-bg` button pattern). Green is no longer an
+     action colour; it's reserved for savings/status. Auto-inverts:
+     near-black on white, near-white on dark. */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-white text-sm transition-all duration-150;
-    background: #16A34A;
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm transition-all duration-150;
+    background: rgb(var(--ink-rgb));
+    color: rgb(var(--bg-rgb));
   }
-  .btn-primary:hover { background: #15803D; }
-  .btn-primary:focus-visible { outline: 2px solid #16A34A; outline-offset: 2px; }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-primary:focus-visible { outline: 2px solid rgb(var(--ink-rgb)); outline-offset: 2px; }
 
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm transition-all duration-150;
@@ -209,8 +229,8 @@ h1, h2, h3, h4, h5, h6 {
   }
   .input-field::placeholder { color: rgb(var(--ink-3-rgb)); }
   .input-field:focus {
-    border-color: #16A34A;
-    box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.10);
+    border-color: rgb(var(--ink-rgb));
+    box-shadow: 0 0 0 4px rgb(var(--ink-rgb) / 0.08);
   }
 
   /* Composer (dupe.com style search box) */
@@ -227,8 +247,8 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   }
   .composer:focus-within {
-    border-color: rgba(22, 163, 74, 0.55);
-    box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.12);
+    border-color: rgb(var(--ink-rgb) / 0.55);
+    box-shadow: 0 0 0 4px rgb(var(--ink-rgb) / 0.10);
   }
   .composer textarea {
     @apply w-full bg-transparent outline-none resize-none text-base leading-relaxed;

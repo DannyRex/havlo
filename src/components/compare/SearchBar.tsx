@@ -356,13 +356,11 @@ export default function SearchBar({ initialQuery, onSearch, loading, hideTrendin
             className={`m-1.5 shrink-0 inline-flex items-center justify-center gap-1.5 rounded-full text-sm font-semibold transition-all
               h-10 w-10 sm:h-10 sm:w-auto sm:px-4
               ${canSubmit
-                ? isUrlInput
-                  ? "bg-brand text-white hover:bg-brand-hover active:scale-95"
-                  : "bg-ink text-bg hover:opacity-90 active:scale-95"
+                ? "bg-ink text-bg hover:opacity-90 active:scale-95"
                 : "bg-ink/10 text-ink-3 cursor-not-allowed"}`}
           >
             {loading ? (
-              <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              <span className="w-4 h-4 rounded-full border-2 border-bg/30 border-t-bg animate-spin" />
             ) : isUrlInput ? (
               <>
                 <Link2 size={14} className="sm:hidden" />

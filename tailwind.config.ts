@@ -14,11 +14,16 @@ const config: Config = {
         display: ["var(--font-display)", "Bricolage Grotesque", "Inter", "system-ui", "sans-serif"],
       },
       colors: {
-        // Brand
+        /* Brand / primary action — neutral ink, mode-aware via --brand-rgb
+           (globals.css). Was deal-green #16A34A; green is now a savings +
+           status accent only (see `success` below). Every `*-brand` utility
+           (bg/text/border) now reads as the neutral action colour and
+           inverts in dark mode, matching the dominant `bg-ink text-bg`
+           button pattern. June 2026 (Danny). */
         brand: {
-          DEFAULT: "#16A34A",
-          hover:   "#15803D",
-          subtle:  "rgba(22, 163, 74, 0.08)",
+          DEFAULT: "rgb(var(--brand-rgb) / <alpha-value>)",
+          hover:   "rgb(var(--brand-hover-rgb) / <alpha-value>)",
+          subtle:  "rgb(var(--brand-rgb) / 0.08)",
         },
         // Semantic surfaces (use bg-bg, bg-surface, etc.)
         bg:           "rgb(var(--bg-rgb) / <alpha-value>)",
@@ -48,8 +53,10 @@ const config: Config = {
            match the palette; surface-2's lightness carries dark mode. */
         "card-lg":       "0 1px 3px rgba(15, 23, 42, 0.05), 0 12px 28px -10px rgba(15, 23, 42, 0.13)",
         "card-lg-hover": "0 2px 6px rgba(15, 23, 42, 0.06), 0 20px 40px -12px rgba(15, 23, 42, 0.18)",
-        "brand":     "0 6px 20px rgba(22, 163, 74, 0.20)",
-        "input":     "0 0 0 4px rgba(22, 163, 74, 0.10)",
+        /* Neutral focus/elevation glows (were green). Keeps the input
+           focus ring + button float in the neutral action language. */
+        "brand":     "0 6px 20px rgb(var(--ink-rgb) / 0.16)",
+        "input":     "0 0 0 4px rgb(var(--ink-rgb) / 0.08)",
       },
       borderRadius: {
         xl: "0.875rem",
