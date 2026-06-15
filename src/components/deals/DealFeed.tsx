@@ -1106,14 +1106,24 @@ export default function DealFeed({
             many tier pills can still scroll horizontally if needed,
             but in practice 4 tier buttons + sliders icon fit. */}
         <div className="mt-3 flex items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-1 flex-shrink-0 overflow-x-auto no-scrollbar">
-            <SlidersHorizontal size={13} className="text-ink-3 mr-1.5" />
+          {/* Mobile: this pill cluster is the flexible element (flex-1 +
+              min-w-0) so it absorbs all the leftover row width and lets its
+              own overflow-x-auto scroll the pills when they don't fit — the
+              Stores button beside it then keeps its natural, legible width.
+              (Was flex-shrink-0, which forced the cluster to full content
+              width and shoved Stores ≈26px off the right edge on a 375px
+              viewport.) Desktop reverts to intrinsic width (sm:flex-none) so
+              it stays compact-left with the count+sort cluster on the right.
+              Pills stay flex-shrink-0 so they keep their labels and the row
+              scrolls cleanly instead of squishing. */}
+          <div className="flex items-center gap-1 min-w-0 flex-1 sm:flex-none overflow-x-auto no-scrollbar">
+            <SlidersHorizontal size={13} className="text-ink-3 mr-1.5 flex-shrink-0" />
             {TIERS.map(({ value, label }) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => setTier(value)}
-                className={`px-2.5 py-1 rounded-full text-[12px] sm:text-xs whitespace-nowrap transition-colors ${
+                className={`px-2.5 py-1 flex-shrink-0 rounded-full text-[12px] sm:text-xs whitespace-nowrap transition-colors ${
                   tier === value
                     ? "bg-ink text-bg font-semibold"
                     : "text-ink-2 hover:text-ink hover:bg-surface-2"
@@ -1123,13 +1133,12 @@ export default function DealFeed({
               </button>
             ))}
           </div>
-          {/* Stores filter takes the remaining width on mobile so
-              the button reads as a full action surface (was a
-              tight pill with empty space to the right). On desktop
-              it stays inline-flex / intrinsic width since the
-              right cluster (deal count + sort) sits beside it. */}
+          {/* Stores filter holds its natural width (flex-none) on both
+              mobile and desktop; the tier-pill cluster to its left is the
+              flexible element that fills the row, so "Stores ▾" never gets
+              squeezed narrow enough to clip its chevron. */}
           {storeOptions.length > 0 && (
-            <div className="flex-1 sm:flex-none ml-1.5">
+            <div className="flex-none">
               <StoreFilter
                 stores={storeOptions}
                 selected={selectedStores}
