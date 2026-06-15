@@ -46,7 +46,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 const supa = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const SLIM_COLS =
-  "store_id,store_name,store_country,currency,category_slug,discount_percent,is_international";
+  "store_id,store_name,store_country,currency,category_slug,discount_percent,is_international,is_real_deal";
 const PAGE = 1000;
 
 interface SlimRow {
@@ -57,6 +57,7 @@ interface SlimRow {
   category_slug: string | null;
   discount_percent: number | null;
   is_international: boolean;
+  is_real_deal: boolean | null;
 }
 
 /* ONE sequential pass — page by page, stop at the first short page. No
@@ -85,6 +86,7 @@ function toDeal(r: SlimRow) {
     tags: [r.store_name, r.is_international ? "intl" : "local"],
     categorySlug: r.category_slug ?? "all",
     discountPercent: r.discount_percent ?? 0,
+    isRealDeal: r.is_real_deal ?? ((r.discount_percent ?? 0) > 0),
   };
 }
 
@@ -96,6 +98,9 @@ const CURATED = curatedAmazonDeals.map((d) => ({
   tags: d.tags ?? [],
   categorySlug: d.categorySlug ?? "all",
   discountPercent: d.discountPercent ?? 0,
+  /* Curated rows have no matview is_real_deal — keep the discount-only
+     definition so they stay consistent with the live curated fallback. */
+  isRealDeal: (d.discountPercent ?? 0) > 0,
 }));
 
 type Deal = ReturnType<typeof toDeal>;
@@ -114,7 +119,10 @@ interface CountRow {
 function bucket(country: Country, slug: string, deals: Deal[]): CountRow {
   const local = deals.filter((d) => isDealLocalToCountry(d, country));
   const intl = deals.filter((d) => !isDealLocalToCountry(d, country));
-  const disc = (a: Deal[]) => a.filter((d) => d.discountPercent > 0).length;
+  /* "deals" = is_real_deal (0083): a markdown OR cross-store-cheapest OR
+     below-30d-high. The SAME predicate the live /api/deals pill + browse-db
+     getOriginCounts use, so the precomputed tile == the live count. */
+  const disc = (a: Deal[]) => a.filter((d) => d.isRealDeal).length;
   return {
     country: country.code,
     category_slug: slug,

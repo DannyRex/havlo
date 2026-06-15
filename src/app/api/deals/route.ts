@@ -89,7 +89,7 @@ const SEARCH_POOL_MIN_CACHEABLE = 24;
    user report: "NG intl back to 15 (Amazon-only) hours after the
    3-pass deploy" — caused by an old instance that kept refreshing
    the default-sort NG cache entry. */
-const POOL_CACHE_VERSION = "v4-may2026-is-deal-backfill";
+const POOL_CACHE_VERSION = "v5-real-deal";
 
 async function fetchPoolCached(params: {
   categorySlug?: string;
@@ -399,6 +399,16 @@ export async function GET(req: NextRequest) {
        the default tier; this change just makes that data visible
        in the dropdown for higher tiers too. */
     const userMinDiscount = minDiscount ? parseInt(minDiscount, 10) : 0;
+    /* "Deals" tier sentinel: minDiscount===1 means the richer is_real_deal view
+       (0083: a markdown OR cross-store-cheapest OR below-30d-high), NOT a literal
+       >=1% threshold (DealFeed already labels "1" as "Deals"). In that mode we
+       fetch the BROAD pool (poolMinDiscount=0) so discount=0 cross-store-cheapest
+       products aren't filtered out by the RPC, then gate items + the "deals" pill
+       on isRealDeal app-side — so the Deals tab, the homepage tiles (precomputed
+       all_deals = is_real_deal), and the live pill all show the same set. The
+       20%+/50%+ tiers stay literal discount thresholds. */
+    const isDealsMode     = userMinDiscount === 1;
+    const poolMinDiscount = isDealsMode ? 0 : userMinDiscount;
     /* Pool fetch goes through fetchPoolCached (defined at module top)
        so all paginations of the same query share one warm RPC result.
        Pre-cache: each load-more was 5-8s (full RPC pipeline per offset).
@@ -441,12 +451,12 @@ export async function GET(req: NextRequest) {
         /* Push the tier into the fetch so the qualifying count is
            sort-stable. `|| undefined` for tier=all keeps the broad
            pool's shared cache key (no cold-bust, no per-default egress). */
-        minDiscount: userMinDiscount || undefined,
+        minDiscount: poolMinDiscount || undefined,
       }),
       countryCorrectDropdownRows({
         countryCode: country.code,
         category:    category,
-        minDiscount: userMinDiscount,
+        minDiscount: poolMinDiscount,
         search:      search ?? null,
         /* Origin-scoped dropdown: "Local" tab shows only country-
            anchored stores, "Cross-border" shows only intl, "All"
@@ -530,9 +540,14 @@ export async function GET(req: NextRequest) {
     /* Apply the user's discount tier to derive the qualifying pool
        (items list narrowed by tier). When tier=0 this is identical
        to broadCountryFiltered, so no extra work for default views. */
-    const qualifyingCountryFiltered = userMinDiscount > 0
-      ? broadCountryFiltered.filter((d) => d.discountPercent >= userMinDiscount)
-      : broadCountryFiltered;
+    const qualifyingCountryFiltered =
+      isDealsMode
+        /* "Deals" = is_real_deal. Fallback to discount>0 for non-matview Deals
+           (curated / live-search) whose isRealDeal is undefined. */
+        ? broadCountryFiltered.filter((d) => d.isRealDeal ?? (d.discountPercent > 0))
+        : userMinDiscount > 0
+          ? broadCountryFiltered.filter((d) => d.discountPercent >= userMinDiscount)
+          : broadCountryFiltered;
     const qualifyingLocal = qualifyingCountryFiltered.filter(isLocalToUser);
     const qualifyingIntl  = qualifyingCountryFiltered.filter((d) => !isLocalToUser(d));
 
@@ -545,9 +560,12 @@ export async function GET(req: NextRequest) {
       all:   qualifyingCountryFiltered.length,
       local: qualifyingLocal.length,
       intl:  qualifyingIntl.length,
-      allDeals:   qualifyingCountryFiltered.filter((d) => d.discountPercent > 0).length,
-      localDeals: qualifyingLocal.filter((d) => d.discountPercent > 0).length,
-      intlDeals:  qualifyingIntl.filter((d) => d.discountPercent > 0).length,
+      /* "deals" = is_real_deal (0083), matching the precomputed all_deals +
+         browse-db getOriginCounts, so the pill == the homepage tile. Fallback
+         to discount>0 for non-matview Deals whose isRealDeal is undefined. */
+      allDeals:   qualifyingCountryFiltered.filter((d) => d.isRealDeal ?? (d.discountPercent > 0)).length,
+      localDeals: qualifyingLocal.filter((d) => d.isRealDeal ?? (d.discountPercent > 0)).length,
+      intlDeals:  qualifyingIntl.filter((d) => d.isRealDeal ?? (d.discountPercent > 0)).length,
     };
 
     /* Default BROWSE view (no search, no tier): prefer the accurate

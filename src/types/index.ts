@@ -107,6 +107,14 @@ export interface Deal {
       condition capture the read-only catalog doesn't expose yet. */
   isUsed?: boolean;
 
+  /** Richer offline "deal" flag (migration 0083): true when this is a real
+      markdown OR the cross-store cheapest OR below its 30-day high. Set by
+      rowToDeal from product_best_offers.is_real_deal; undefined for non-matview
+      Deals (curated / live-search), where callers fall back to
+      discountPercent>0. Drives the "Deals" tier + the "N deals" pill so the
+      count matches what the tab shows. */
+  isRealDeal?: boolean;
+
   /** Denoised extra product text the source returned beyond the title -- for
       SerpAPI Google Shopping that's `snippet` + the attribute `extensions`
       ("Black", "Leather", "Men's", a short description sentence), promo/shipping

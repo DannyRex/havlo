@@ -37,6 +37,9 @@ interface BestOfferRow {
       the hardcoded JS roster — fixes /za/deals showing 4 cards
       despite 159 ZA-anchored offers in the view. */
   store_country: string | null;
+  /** Richer offline deal flag (migration 0083). NULL on pre-migration rows;
+      rowToDeal falls back to discount_percent>0 then. */
+  is_real_deal: boolean | null;
 }
 
 function rowToDeal(r: BestOfferRow, popularity?: PopularityRecord): Deal {
@@ -81,6 +84,9 @@ function rowToDeal(r: BestOfferRow, popularity?: PopularityRecord): Deal {
        pure string check (no extra DB read) over the title + store
        name the row already carries. */
     isUsed: isUsedListing(r.store_name, r.title),
+    /* is_real_deal (0083). ?? keeps pre-migration / NULL rows on the old
+       discount-only definition so deploying before the migration is safe. */
+    isRealDeal: r.is_real_deal ?? ((r.discount_percent ?? 0) > 0),
   };
 }
 
@@ -288,7 +294,7 @@ const originCountsCache = new Map<string, { value: OriginCounts; expires: number
 const INTL_POOL_TTL_MS = 5 * 60 * 1000;
 const INTL_POOL_MAX = 1000;
 const INTL_POOL_COLS =
-  "product_id,title,category_slug,brand,image_url,offer_id,store_id,url,current_price,original_price,discount_percent,currency,scraped_at,store_name,is_international,store_logo_url,store_country";
+  "product_id,title,category_slug,brand,image_url,offer_id,store_id,url,current_price,original_price,discount_percent,currency,scraped_at,store_name,is_international,store_logo_url,store_country,is_real_deal";
 const intlPoolCache = new Map<string, { data: BestOfferRow[]; expires: number }>();
 
 async function fetchCrossBorderPool(
@@ -882,25 +888,15 @@ export const dbBrowseProvider: BrowseProvider = {
            anchored retailers that don't realistically ship to
            the visitor's market. */
         baseFilter(supa.from("product_best_offers")).eq("is_international", true).is("store_country", null),
-        /* Sub-count: rows with a real positive discount.
-
-           Was previously `.eq("is_deal", true)`, but the May 2026
-           is_deal semantic relaxation (see ingestion.ts:344)
-           re-defined that column as "valid in-stock catalog row"
-           rather than "has a markdown". Counting is_deal=true and
-           labelling it "on sale" produced (deals == total) for
-           every browse — user-visible as "All 4,469 products are
-           on sale right now" which is plainly false.
-
-           discount_percent is the actual markdown signal. The
-           ingest pipeline writes `discount_percent = NULL` when no
-           MSRP was surfaced (Jumia rich snippets, pharmacy feeds,
-           Shopify-no-compare-at-price), and a positive integer
-           when there's a real reduction. Postgres `> 0` against
-           NULL is NULL (not TRUE) so the NULL rows correctly
-           drop out — only genuine markdowns are counted. */
-        baseFilter(supa.from("product_best_offers")).eq("store_country", userCountry).gt("discount_percent", 0),
-        baseFilter(supa.from("product_best_offers")).eq("is_international", true).is("store_country", null).gt("discount_percent", 0),
+        /* Sub-count: "deals" = is_real_deal (migration 0083) — a real markdown
+           OR the cross-store cheapest OR below its 30-day high. This is the
+           SAME predicate the precomputed all_deals column
+           (compute-category-counts.ts) and the live /api/deals pill (route.ts)
+           use, so the homepage tile, the /deals pill, and the Deals tab content
+           all agree. (Earlier this gated on discount_percent>0; the richer flag
+           widens it to genuine cross-store savings that carry no % tag.) */
+        baseFilter(supa.from("product_best_offers")).eq("store_country", userCountry).eq("is_real_deal", true),
+        baseFilter(supa.from("product_best_offers")).eq("is_international", true).is("store_country", null).eq("is_real_deal", true),
       ]);
       const local = localRes.count ?? 0;
       const intl  = intlRes.count  ?? 0;
@@ -914,12 +910,11 @@ export const dbBrowseProvider: BrowseProvider = {
       baseFilter(supa.from("product_best_offers")),
       baseFilter(supa.from("product_best_offers")).eq("is_international", false),
       baseFilter(supa.from("product_best_offers")).eq("is_international", true),
-      /* Discount sub-counts via `discount_percent > 0` rather than
-         is_deal=true — see the country-aware branch above for the
-         full rationale (May 2026 audit). */
-      baseFilter(supa.from("product_best_offers")).gt("discount_percent", 0),
-      baseFilter(supa.from("product_best_offers")).eq("is_international", false).gt("discount_percent", 0),
-      baseFilter(supa.from("product_best_offers")).eq("is_international", true).gt("discount_percent", 0),
+      /* "deals" sub-counts via is_real_deal (0083) — see the country-aware
+         branch above for the rationale + the cross-surface alignment. */
+      baseFilter(supa.from("product_best_offers")).eq("is_real_deal", true),
+      baseFilter(supa.from("product_best_offers")).eq("is_international", false).eq("is_real_deal", true),
+      baseFilter(supa.from("product_best_offers")).eq("is_international", true).eq("is_real_deal", true),
     ]);
 
     return cacheCounts({
