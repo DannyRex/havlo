@@ -31,6 +31,18 @@ export async function POST(req: NextRequest) {
     return new NextResponse("Invalid unsubscribe link.", { status: 400 });
   }
 
+  /* RFC 8058 §3.1: a genuine mailbox one-click sends a form-encoded body
+     of exactly `List-Unsubscribe=One-Click`. Requiring it stops naive
+     email-security scanners that blindly POST to List-Unsubscribe-Post
+     targets from unsubscribing real users (the same class of automated
+     hit that, via the GET unsubscribe PAGE, silently emptied the list).
+     Gmail / Apple Mail / Yahoo all send this body, so real one-click is
+     unaffected. */
+  const rawBody = await req.text().catch(() => "");
+  if (new URLSearchParams(rawBody).get("List-Unsubscribe") !== "One-Click") {
+    return new NextResponse("One-click confirmation required.", { status: 400 });
+  }
+
   const supa = getSupabaseAdmin();
   if (supa) {
     /* Flip every (email, source) row for this address to 'unsubscribed'
