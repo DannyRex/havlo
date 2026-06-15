@@ -36,7 +36,7 @@ const SITEMAP_PAGE = 1_000;
    priority. Out-of-stock pages are already noindex via robots
    metadata; emitting them as sitemap entries would tell Google to
    spend budget on URLs we don't want indexed. */
-async function fetchProductSitemapRows(): Promise<Array<{ offerId: string; updatedAt: string }>> {
+async function fetchProductSitemapRows(): Promise<Array<{ productId: string; updatedAt: string }>> {
   const supa = getSupabaseAdmin();
   if (!supa) return [];
   /* Paginate with .range(). The previous .limit(45_000) was silently
@@ -44,15 +44,15 @@ async function fetchProductSitemapRows(): Promise<Array<{ offerId: string; updat
      sitemap carried only the 1,000 most-recently-scraped products —
      ~91% of the ~12k catalog was missing (GSC audit C1, May 2026).
      Walk 1,000-row pages until the catalog is exhausted or we reach
-     MAX_SITEMAP_URLS. Dedupe offer_ids: the best-offer view can list
-     the same offer under sibling product rows, which would otherwise
-     emit duplicate <url> entries. */
+     MAX_SITEMAP_URLS. Dedupe by product_id: the canonical PDP URL is now
+     keyed by the STABLE product_id (not the volatile offer_id), so we emit
+     one <url> per product, matching the canonical tag the page renders. */
   const seen = new Set<string>();
-  const out: Array<{ offerId: string; updatedAt: string }> = [];
+  const out: Array<{ productId: string; updatedAt: string }> = [];
   for (let from = 0; from < MAX_SITEMAP_URLS; from += SITEMAP_PAGE) {
     const { data, error } = await supa
       .from("product_best_offers")
-      .select("offer_id, scraped_at")
+      .select("product_id, scraped_at")
       /* Image required (June 2026 GSC audit): imageless UUID PDPs are the
          thinnest pages we emit and feed "Crawled - currently not indexed"
          (503 URLs). Keep them OUT of the sitemap so Google's crawl budget
@@ -62,11 +62,11 @@ async function fetchProductSitemapRows(): Promise<Array<{ offerId: string; updat
       .order("scraped_at", { ascending: false })
       .range(from, from + SITEMAP_PAGE - 1);
     if (error || !data) break;
-    const batch = data as Array<{ offer_id: string; scraped_at: string }>;
+    const batch = data as Array<{ product_id: string; scraped_at: string }>;
     for (const r of batch) {
-      if (!r.offer_id || seen.has(r.offer_id)) continue;
-      seen.add(r.offer_id);
-      out.push({ offerId: r.offer_id, updatedAt: r.scraped_at });
+      if (!r.product_id || seen.has(r.product_id)) continue;
+      seen.add(r.product_id);
+      out.push({ productId: r.product_id, updatedAt: r.scraped_at });
     }
     /* Short page = last page. */
     if (batch.length < SITEMAP_PAGE) break;
@@ -203,11 +203,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const rows = await fetchProductSitemapRows();
     productRoutes = rows.map((r) => ({
-      url:             `${SITE_URL}/ng/p/${r.offerId}`,
+      url:             `${SITE_URL}/ng/p/${r.productId}`,
       priority:        0.6,
       changeFrequency: "weekly" as const,
       lastModified:    new Date(r.updatedAt),
-      alternates:      { languages: buildHreflangAlternates(`p/${r.offerId}`) },
+      alternates:      { languages: buildHreflangAlternates(`p/${r.productId}`) },
     }));
   } catch (err) {
     /* Sitemap is build-time critical — if Supabase is unreachable

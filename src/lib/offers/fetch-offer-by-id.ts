@@ -199,3 +199,105 @@ export const fetchOfferById = cache(async function fetchOfferByIdImpl(offerId: s
 
   return null;
 });
+
+/* ──────────────────────────────────────────────────────────────────
+   Resolve the canonical PDP offer by PRODUCT id (the STABLE key).
+
+   Mirrors fetchOfferById but keyed on product_id, so the PDP URL can be
+   /[country]/p/{product_id} (constant) instead of /p/{offer_id} (which
+   churns every scrape cycle as the cheapest in-stock offer flips or the
+   stale-sweep marks the old one OOS — the root cause of the Search Console
+   "noindex" + "alternative canonical" collapse: an indexed offer_id URL
+   went OOS-noindex while the product moved to a new offer_id URL).
+
+   Returns the current cheapest IN-STOCK offer for the product; falls back
+   to the cheapest offer of ANY stock state so an all-OOS product_id URL
+   still renders (noindex) instead of 404ing.
+   ────────────────────────────────────────────────────────────────── */
+export const fetchOfferByProductId = cache(async function fetchOfferByProductIdImpl(productId: string): Promise<OfferRow | null> {
+  if (!productId) return null;
+
+  const supa = getSupabaseAdmin();
+
+  if (supa) {
+    /* (1) product_best_offers — cheapest in-stock offer for this product.
+       Same column list as fetchOfferById's view query. */
+    const { data: viewRow } = await supa
+      .from("product_best_offers")
+      .select("product_id, offer_id, store_id, url, current_price, original_price, discount_percent, currency, scraped_at, title, category_slug, brand, image_url, store_name, store_logo_url, is_international, store_country")
+      .eq("product_id", productId)
+      .maybeSingle();
+
+    if (viewRow) {
+      return { ...(viewRow as Omit<OfferRow, "in_stock">), in_stock: true };
+    }
+
+    /* (2) offers join — covers all-OOS products (the view is in-stock
+       only). Prefer any in-stock row, then the cheapest, and take ONE
+       (limit(1) before maybeSingle: a product has many offers). */
+    const { data: offer } = await supa
+      .from("offers")
+      .select("id, product_id, store_id, url, current_price, original_price, discount_percent, currency, in_stock, scraped_at")
+      .eq("product_id", productId)
+      .order("in_stock", { ascending: false })
+      .order("current_price", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (offer) {
+      const [{ data: product }, { data: store }] = await Promise.all([
+        supa.from("products").select("title, category_slug, brand, image_url").eq("id", offer.product_id).maybeSingle(),
+        supa.from("stores").select("name, logo_url, is_international, country").eq("id", offer.store_id).maybeSingle(),
+      ]);
+      if (product && store) {
+        return {
+          offer_id:         offer.id,
+          product_id:       offer.product_id,
+          store_id:         offer.store_id,
+          url:              offer.url,
+          current_price:    offer.current_price,
+          original_price:   offer.original_price,
+          discount_percent: offer.discount_percent,
+          currency:         offer.currency as "NGN" | "USD",
+          scraped_at:       offer.scraped_at,
+          in_stock:         offer.in_stock ?? true,
+          title:            product.title,
+          category_slug:    product.category_slug,
+          brand:            product.brand,
+          image_url:        product.image_url,
+          store_name:       store.name,
+          store_logo_url:   store.logo_url,
+          is_international: store.is_international ?? false,
+          store_country:    (store as { country?: string | null }).country ?? null,
+        };
+      }
+    }
+  }
+
+  /* (3) Curated Amazon — curated ids double as their product_id. */
+  const curated = curatedAmazonDeals.find((d) => d.id === productId);
+  if (curated) {
+    return {
+      offer_id:         curated.id,
+      product_id:       curated.id,
+      store_id:         curated.storeId,
+      url:              curated.url,
+      current_price:    curated.salePrice,
+      original_price:   curated.originalPrice ?? curated.salePrice,
+      discount_percent: curated.discountPercent ?? 0,
+      currency:         curated.currency,
+      scraped_at:       curated.postedAt + "T00:00:00Z",
+      in_stock:         true,
+      title:            curated.title,
+      category_slug:    curated.categorySlug,
+      brand:            null,
+      image_url:        curated.imageUrl ?? null,
+      store_name:       curated.storeName,
+      store_logo_url:   `/logos/${curated.storeId}.png`,
+      is_international: curated.currency === "USD",
+      store_country:    (curated.id.match(/^amazon-(us|uk|de|ae|in)-/i)?.[1] ?? "").toUpperCase() || null,
+    };
+  }
+
+  return null;
+});

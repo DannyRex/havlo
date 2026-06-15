@@ -46,6 +46,10 @@ function rowToDeal(r: BestOfferRow, popularity?: PopularityRecord): Deal {
   const original = r.original_price ?? r.current_price;
   return {
     id: r.offer_id,
+    /* Stable product key for the canonical PDP URL (SEO: kills offer_id
+       churn). BestOfferRow already carries product_id (used for the
+       popularity lookup below). */
+    productId: r.product_id,
     title: r.title,
     description: r.title,
     category: r.category_slug ?? "general",

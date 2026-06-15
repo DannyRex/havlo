@@ -42,6 +42,14 @@ export interface Deal {
       /api/deals isLocalToUser can correctly bucket country-tagged
       stores that aren't in the hardcoded JS roster. */
   storeCountry?: string | null;
+
+  /** Stable products.id (UUID). When present, pdpUrlForDeal emits the
+      canonical /[country]/p/{productId} (which never churns) instead of
+      /p/{offer_id} (volatile: the cheapest-offer id changes every scrape
+      cycle, which was collapsing Google's index). Undefined for synthetic /
+      curated / live-search deals, where pdpUrlForDeal falls back to the
+      offer-id URL. Populated by browse-db rowToDeal from the matview. */
+  productId?: string;
   originalPrice: number;
   salePrice: number;
   discountPercent: number;

@@ -65,7 +65,13 @@ export function toAbsoluteMerchantUrl(rawUrl: string): string {
     path for real ones. */
 export function pdpUrlForDeal(countryCode: string, deal: Deal): string {
   if (!isSyntheticId(deal.id)) {
-    return `/${countryCode}/p/${encodeURIComponent(deal.id)}`;
+    /* Prefer the STABLE product_id over the volatile offer_id (deal.id).
+       The PDP route resolves either, but emitting product_id keeps the
+       canonical URL constant across scrape cycles so Google stops
+       churning the index. Falls back to the offer id when productId
+       isn't carried (older data paths). */
+    const stableId = deal.productId ?? deal.id;
+    return `/${countryCode}/p/${encodeURIComponent(stableId)}`;
   }
   const params = new URLSearchParams();
   params.set("t",  deal.title.slice(0, 250));

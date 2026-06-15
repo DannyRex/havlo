@@ -46,7 +46,7 @@ import { notFound, redirect } from "next/navigation";
 import { unstable_cache } from "next/cache";
 import { getCountry, COUNTRIES, isOfferAllowedForCountry } from "@/lib/country";
 import { SITE_URL, buildBreadcrumbList, buildHreflangAlternates, canonicalGtin, cleanMpn } from "@/lib/seo";
-import { fetchOfferById, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
+import { fetchOfferById, fetchOfferByProductId, type OfferRow } from "@/lib/offers/fetch-offer-by-id";
 import { fetchProductMeta } from "@/lib/offers/fetch-product-description";
 import { cleanTitle, formatPriceForUser, convertForUser, getClickThroughUrl } from "@/lib/utils";
 import { getCategory } from "@/lib/data/categories";
@@ -137,7 +137,9 @@ function offerRowToHero(row: OfferRow): OfferData {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const country = getCountry(params.country);
-  const offer = await fetchOfferById(params.id);
+  /* Resolve product_id FIRST (the stable canonical key), then offer_id
+     (legacy/crawled URLs). React.cache dedups these across the body. */
+  const offer = (await fetchOfferByProductId(params.id)) ?? (await fetchOfferById(params.id));
   if (!offer) {
     /* Missing/dead offer: noindex so crawlers drop the URL, and a title
        that matches the not-found.tsx boundary's "no longer available"
@@ -153,7 +155,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  const url   = `${SITE_URL}/${country.code}/p/${offer.offer_id}`;
+  /* Canonical = the STABLE product_id URL, never the volatile offer_id. */
+  const canonicalId = offer.product_id ?? offer.offer_id;
+  const url   = `${SITE_URL}/${country.code}/p/${canonicalId}`;
   /* Use the same cleaned title + display store name the hero renders,
      so the SERP entry matches the page (no raw "Amazon.co.uk -
      Amazon.co.uk-Seller" strings leaking into Google). */
@@ -205,7 +209,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description: metaDesc,
     alternates: {
       canonical: url,
-      languages: buildHreflangAlternates(`p/${offer.offer_id}`),
+      languages: buildHreflangAlternates(`p/${canonicalId}`),
     },
     openGraph: {
       type: "website",
@@ -268,8 +272,13 @@ export default async function ProductPage({ params }: PageProps) {
     params.id = stripped;
   }
 
-  const offer = await fetchOfferById(params.id);
+  /* Resolve product_id FIRST (stable canonical), offer_id as fallback for
+     legacy/crawled URLs. React.cache dedups with generateMetadata. */
+  const offer = (await fetchOfferByProductId(params.id)) ?? (await fetchOfferById(params.id));
   if (!offer) notFound();
+  /* Stable canonical key for every URL this page emits (canonical, OG,
+     breadcrumb, JSON-LD @id, productID). product_id never churns. */
+  const canonicalId = offer.product_id ?? offer.offer_id;
 
   /* products.description / gtin / mpn for the JSON-LD. The ONE remaining
      server-side DB read besides the offer itself — kept here (not moved
@@ -333,10 +342,10 @@ export default async function ProductPage({ params }: PageProps) {
           url:  `${SITE_URL}/${country.code}/deals/${offer.category_slug}`,
         }]
       : []),
-    { name: offer.title,  url: `${SITE_URL}/${country.code}/p/${offer.offer_id}` },
+    { name: offer.title,  url: `${SITE_URL}/${country.code}/p/${canonicalId}` },
   ]);
 
-  const productUrl = `${SITE_URL}/${country.code}/p/${offer.offer_id}`;
+  const productUrl = `${SITE_URL}/${country.code}/p/${canonicalId}`;
   /* JSON-LD description: prefer the real merchant body when we have one
      (richer, on-topic prose Google's NLP weights highly), fall back to
      the templated line otherwise. Cap at 500 chars; strip inline HTML so
@@ -389,7 +398,7 @@ export default async function ProductPage({ params }: PageProps) {
     brand:              offer.brand ? { "@type": "Brand", name: offer.brand } : undefined,
     category:           offer.category_slug ?? undefined,
     sku:                offer.offer_id,
-    productID:          offer.offer_id,
+    productID:          canonicalId,
     ...(gtin ? { gtin } : {}),
     ...(mpn  ? { mpn }  : {}),
     mainEntityOfPage:   productUrl,
