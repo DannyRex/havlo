@@ -24,7 +24,6 @@ import { jumiaSerpapiProvider } from "./search-jumia-serpapi";
 import { pgFtsSearchProvider } from "./search-pgfts";
 import { kongaSearchProvider } from "./search-konga";
 import { aliexpressSearchProvider } from "./search-aliexpress";
-import { amazonSearchProvider } from "./search-amazon";
 
 /* Order matters for parallel fan-out:
      - pg-fts hits our own DB (free, fast, local truth)
@@ -44,7 +43,11 @@ const SEARCH_PROVIDERS: SearchProvider[] = [
   pgFtsSearchProvider,
   kongaSearchProvider,
   aliexpressSearchProvider,
-  amazonSearchProvider,    // Free; covers .com / .co.uk / .de / .ae / .in
+  /* Amazon: the PA-API live provider was RETIRED (engine deprecated May
+     2026 — see the deleted search-amazon.ts). Amazon depth is now grown by
+     the SerpAPI engine=amazon INGEST (scripts/ingest-amazon-serpapi.ts on
+     the Wednesday cron), deliberately kept OUT of this live-search fan-out
+     so user queries don't each burn an extra Amazon credit. */
   /* Jumia via SerpAPI's dedicated jumia engine — fills the NG-local
      gap that SerpAPI's google_shopping engine can't (Google Shopping
      doesn't operate in NG). The Playwright Jumia scraper was

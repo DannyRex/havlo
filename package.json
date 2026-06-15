@@ -21,6 +21,7 @@
     "ingest:scraped": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-scraped.ts",
     "ingest:curated": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-curated-targets.ts",
     "ingest:uk-retailers": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-uk-retailers.ts",
+    "ingest:amazon": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-amazon-serpapi.ts",
     "ingest:cross-border": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-cross-border.ts",
     "ingest:jumia": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-jumia.ts",
     "ingest:ng-serpapi": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-ng-serpapi.ts",

@@ -1,16 +1,15 @@
 /* Curated Amazon catalog — manually-maintained baseline of high-intent
    products across 5 marketplaces (US, UK, DE, AE, IN).
 
-   Why this exists: Amazon was previously ingested via SerpAPI's Google
-   Shopping API. With SerpAPI disabled (out of credits), that ingest
-   stopped and existing rows were filtered (Google-relay URLs the
-   resolver couldn't unpack). Result: zero Amazon inventory in the
-   feed, despite the affiliate tags being live across all 5 markets.
-
-   This file is the bridge until either (a) SerpAPI credits return,
-   (b) the Amazon scraper is fixed, or (c) we get PAAPI access. Each
-   product is replicated across the 5 marketplaces so every
-   country's homepage sees the right storefront.
+   Why this exists: a guaranteed always-present Amazon baseline that
+   needs no API credits, so every country's homepage shows a storefront
+   even if a cron run fails or SerpAPI is paused. The live Amazon
+   catalogue is now grown by the SerpAPI engine=amazon INGEST
+   (scripts/ingest-amazon-serpapi.ts, Wednesday cron) — that replaced the
+   retired Amazon PA-API path (engine deprecated May 2026). This curated
+   set remains the dependency-free floor under that live data. Each
+   product is replicated across the 5 marketplaces so every country's
+   homepage sees the right storefront.
 
    Why search URLs instead of /dp/ASIN URLs: ASINs rotate (regional
    variants, refurb editions, deprecations). A bad ASIN produces a

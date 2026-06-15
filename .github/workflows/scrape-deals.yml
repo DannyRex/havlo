@@ -18,8 +18,10 @@ on:
     #     cross-border (SHEIN)    40   (4 markets x 10 SKUs)
     #     -------------------------------
     #     ~270 credits/run  x  ~13 runs/mo  =  ~3,500/mo  (~70% of plan)
+    #     + amazon (engine=amazon) 64/run, WEDNESDAYS ONLY  =  ~275/mo
+    #     = ~3,775/mo total  (~75% of plan)
     #
-    # Leaves ~1,500/mo for live-search + growth. (Jun 2026 recount: the
+    # Leaves ~1,225/mo for live-search + growth. (Jun 2026 recount: the
     # earlier "~1,384/mo" here was stale, pre-Konga and pre-cross-border.)
     # True daily would be ~270 x 30 = ~8,200/mo, OVER the 5k ceiling, so
     # daily needs a plan bump, not just a cron change. Note a cadence
@@ -361,6 +363,56 @@ jobs:
         if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
         run: npm run ingest:cross-border -- --merchants=shein
 
+  # ── Job 4c: Amazon marketplace ingest via SerpAPI's engine=amazon.
+  #           The google_shopping lane only surfaces Amazon when Google
+  #           happens to rank an Amazon listing, leaving our Amazon catalog
+  #           thin + lopsided (amazon-us had ~5 offers). This lane queries
+  #           each marketplace's OWN catalogue directly for flagship SKUs,
+  #           deepening cross-store comparison on the PDP spectrum +
+  #           /compare. Replaces the retired Amazon PA-API path (engine
+  #           deprecated May 2026).
+  #           Markets: US/UK/AE/IN (ZA has no SerpAPI amazon engine, DE is
+  #           deferred-launch, NG has no marketplace).
+  #           WEDNESDAY ONLY: 4 markets x 16 SKUs = 64 credits/run x ~4.3
+  #           Wed/mo = ~275/month, preserving live-search headroom. On
+  #           Mon/Fri the job spins up but the step no-ops, keeping dedup's
+  #           needs-chain satisfied without spending credits. ──
+  ingest-amazon:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SERPAPI_KEY:                ${{ secrets.SERPAPI_KEY }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Day-gate lives in the run block (a step-level `if` can't read the
+      # shell date) — same pattern as the ingest-serpapi enrich gate.
+      - name: Ingest Amazon marketplace deals (SerpAPI engine=amazon) → Supabase
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SERPAPI_KEY != '' && inputs.skip_serpapi != true
+        run: |
+          # Wednesday (UTC day-of-week 3) OR a manual enrich=true run only.
+          # Caps Amazon enrichment at ~275 credits/month. Other days no-op
+          # (job still completes green so dedup's needs-chain is satisfied).
+          if [ "$(date -u +%u)" = "3" ] || [ "${{ inputs.enrich }}" = "true" ]; then
+            echo "::notice::Amazon engine=amazon ingest running (US/UK/AE/IN)"
+            npm run ingest:amazon
+          else
+            echo "Amazon ingest is Wednesday-only — skipping (today is UTC day $(date -u +%u))."
+          fi
+
   # ── Job 5: Dedup pass. Re-keys product signatures with the compact
   #          'brand|model[|inches]' form and merges any near-
   #          duplicates the four ingest jobs just created. Pure DB
@@ -372,7 +424,7 @@ jobs:
   #          ingest failed — better to dedup the partial catalog than
   #          skip the merge entirely. ──
   dedup:
-    needs: [scrape, ingest-aliexpress, ingest-serpapi, ingest-uk-retailers, ingest-jumia]
+    needs: [scrape, ingest-aliexpress, ingest-serpapi, ingest-uk-retailers, ingest-jumia, ingest-amazon]
     # success() || failure() runs dedup whenever the workflow ran to
     # completion (any combo of pass/fail across upstream jobs), but
     # NOT when the workflow was manually cancelled — that would waste
