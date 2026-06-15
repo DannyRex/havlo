@@ -1105,7 +1105,7 @@ export default function DealFeed({
             right). The cluster as a whole has overflow-x-auto so
             many tier pills can still scroll horizontally if needed,
             but in practice 4 tier buttons + sliders icon fit. */}
-        <div className="mt-3 flex items-center gap-2 sm:gap-3">
+        <div className="mt-3 flex items-center gap-1 sm:gap-3">
           {/* Mobile: this pill cluster is the flexible element (flex-1 +
               min-w-0) so it absorbs all the leftover row width and lets its
               own overflow-x-auto scroll the pills when they don't fit — the
@@ -1116,14 +1116,14 @@ export default function DealFeed({
               it stays compact-left with the count+sort cluster on the right.
               Pills stay flex-shrink-0 so they keep their labels and the row
               scrolls cleanly instead of squishing. */}
-          <div className="flex items-center gap-1 min-w-0 flex-1 sm:flex-none overflow-x-auto no-scrollbar">
-            <SlidersHorizontal size={13} className="text-ink-3 mr-1.5 flex-shrink-0" />
+          <div className="flex items-center gap-0.5 min-w-0 flex-1 sm:flex-none overflow-x-auto no-scrollbar">
+            <SlidersHorizontal size={13} className="text-ink-3 mr-1 flex-shrink-0" />
             {TIERS.map(({ value, label }) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => setTier(value)}
-                className={`px-2.5 py-1 flex-shrink-0 rounded-full text-[12px] sm:text-xs whitespace-nowrap transition-colors ${
+                className={`px-2 py-1 flex-shrink-0 rounded-full text-[12px] sm:text-xs whitespace-nowrap transition-colors ${
                   tier === value
                     ? "bg-ink text-bg font-semibold"
                     : "text-ink-2 hover:text-ink hover:bg-surface-2"

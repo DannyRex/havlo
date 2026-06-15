@@ -382,7 +382,10 @@ export default function StoreFilter({ stores, selected, onChange, fillRow = fals
                 count badge (when present) on the right. ChevronDown
                 cap on the right edge signals it's a dropdown control,
                 not just a static label. */
-            ? "flex w-full justify-between"
+            /* px-2 (overrides the base px-3 via tailwind-merge) trims the
+                trigger in the deals filter row so the tier-pill cluster to
+                its left has room to show "All products" without truncating. */
+            ? "flex w-full justify-between px-2"
             : "inline-flex",
           selectedCount > 0
             ? "bg-ink text-bg border-ink font-semibold"
