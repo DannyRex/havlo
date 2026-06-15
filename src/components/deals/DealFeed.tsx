@@ -33,7 +33,7 @@ const LIVE_SEARCH_THRESHOLD = 5;
 
 /* The page is called Deals, so it LEADS with deals: the default tier is
    "10" (genuine markdowns, >=10% off), not "all". "All" is one tap away
-   for browsing the full catalogue, and "New in" (the newest sort) is the
+   for browsing the full catalogue, and "Latest" (the newest sort) is the
    honest home for fresh, full-price arrivals. Keeping full-price items
    under a flat "Deals" header was the same quiet discount-theater the
    rest of the site avoids. DEFAULT_TIER is the single source of truth;
@@ -66,7 +66,7 @@ const TIERS: { value: DiscountTier; label: string }[] = [
    ingestion writes timestamps per-store-batch. */
 const SORTS: { value: SortOption; label: string }[] = [
   { value: "relevance",  label: "Relevance" },
-  { value: "newest",     label: "New in" },
+  { value: "newest",     label: "Latest" },
   { value: "discount",   label: "Top discount" },
   /* Ranks by real 30d clicks from outbound_clicks + the
      popular_products() RPC (migration 0015). Ties on click count
