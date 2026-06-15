@@ -103,10 +103,28 @@ export function middleware(req: NextRequest) {
 
   /* Bare root `/` renders a REAL, indexable homepage (the NG / x-default
      market) so the brand domain havlo.io can be indexed + rank for "havlo".
-     It is NO LONGER redirected to /{country}. Country-specific bare paths
-     (/deals, /compare, …) still geo-redirect in Case 2 below; only the bare
-     `/` passes through. See src/app/page.tsx. */
-  if (path === "/") return passThrough();
+
+     Country awareness, done server-side + COOKIE-gated (NOT geo): a RETURNING
+     visitor who explicitly chose a non-NG market (the havlo-country cookie,
+     set only by the country picker) is sent to their country homepage. A
+     crawler carries no cookie, so it is NEVER redirected and `/` stays one
+     indexable page — no cloaking, and Googlebot (crawled from any geo) is
+     never bounced off `/`. First-time / NG-cookie visitors render `/`.
+
+     Cookie-only on purpose: geo-redirecting first-timers would also redirect
+     Googlebot (US-crawled) to /us and de-index `/`. Other bare paths (/deals)
+     still geo-redirect in Case 2 below; this is `/` exactly. */
+  if (path === "/") {
+    const chosen = req.cookies.get(COUNTRY_COOKIE)?.value?.toLowerCase();
+    if (chosen && SUPPORTED.has(chosen) && chosen !== "ng" && !DEFERRED_LAUNCH.has(chosen)) {
+      const target = req.nextUrl.clone();
+      target.pathname = `/${chosen}`;
+      const res = NextResponse.redirect(target, 307);
+      res.headers.set("Cache-Control", "no-store");
+      return res;
+    }
+    return passThrough();
+  }
 
   /* Case 1: URL has a valid country prefix.
 
