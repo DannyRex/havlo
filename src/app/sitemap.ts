@@ -101,6 +101,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     alternates:     { languages: buildHreflangAlternates("") },
   }));
 
+  /* The bare brand homepage `/` — now a REAL indexable page (the x-default
+     market), so Google can index + rank havlo.io itself. The /[country]
+     entries above are its hreflang locale variants. */
+  const rootHomepage: MetadataRoute.Sitemap = [{
+    url:            `${SITE_URL}/`,
+    priority:       1.0,
+    changeFrequency: "weekly",
+    lastModified:   HOMEPAGE_LAST_MODIFIED,
+    alternates:     { languages: buildHreflangAlternates("") },
+  }];
+
   const dealsPages: MetadataRoute.Sitemap = ACTIVE_COUNTRIES.map((c) => ({
     url:            `${SITE_URL}/${c.code}/deals`,
     priority:       0.9,
@@ -289,6 +300,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   return [
+    ...rootHomepage,
     ...homepages,
     ...dealsPages,
     ...comparePages,

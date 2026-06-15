@@ -41,8 +41,11 @@ export function buildHreflangAlternates(pathBelowCountry: string = ""): Record<s
     alternates[lang] = `${SITE_URL}/${c.code}${path ? `/${path}` : ""}`;
   }
 
-  /* x-default → fall back to NG (Havlo's primary market) */
-  alternates["x-default"] = `${SITE_URL}/ng${path ? `/${path}` : ""}`;
+  /* x-default → the bare brand homepage `/` for the homepage itself (now a
+     real indexable page at the root), so the whole homepage cluster (/, /ng,
+     /uk, …) agrees on `/` as the default. Deeper paths keep NG (primary
+     market) as their x-default since there is no root-level variant of them. */
+  alternates["x-default"] = path ? `${SITE_URL}/ng/${path}` : `${SITE_URL}/`;
 
   return alternates;
 }

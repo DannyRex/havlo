@@ -101,6 +101,13 @@ export function middleware(req: NextRequest) {
     return NextResponse.next({ request: { headers: fwd } });
   };
 
+  /* Bare root `/` renders a REAL, indexable homepage (the NG / x-default
+     market) so the brand domain havlo.io can be indexed + rank for "havlo".
+     It is NO LONGER redirected to /{country}. Country-specific bare paths
+     (/deals, /compare, …) still geo-redirect in Case 2 below; only the bare
+     `/` passes through. See src/app/page.tsx. */
+  if (path === "/") return passThrough();
+
   /* Case 1: URL has a valid country prefix.
 
      Middleware does NOT touch the country cookie here. The cookie is

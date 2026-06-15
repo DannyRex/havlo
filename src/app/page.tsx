@@ -1,30 +1,68 @@
-/* Root redirect — sends users to /{their-country}/.
-   Reads the cookie if set; otherwise lands on the NG default.
+/* Bare-domain homepage — havlo.io/
 
-   Metadata: noindex + canonical to /uk (most common English market).
+   PREVIOUSLY: this route was noindex + a geo 307 redirect to /{country},
+   so the bare brand domain could never be indexed (only /ng, /uk, … were).
+   For a brand search like "havlo" there was no indexable homepage at the
+   root, which hurt brand ranking.
 
-   Why noindex: Google was crawling havlo.io/ from US data centres,
-   following the geo-IP redirect to /us, and then indexing the BARE
-   havlo.io URL with /us page metadata. UK searchers Googling the
-   site name then saw "Find similar products for less in United
-   States" under havlo.io. QA report May 2026.
+   NOW: `/` renders a REAL, indexable homepage — the NG market, which is
+   Havlo's primary market AND the hreflang x-default — with a self-canonical
+   to https://havlo.io/. Country-specific bare paths (/deals, /compare, …)
+   still geo-redirect via middleware; only the bare `/` renders. A visitor
+   who wants another market switches with the country picker (which
+   navigates to /uk, /us, …).
 
-   Fix: tell Google not to index the bare URL at all. Each
-   /[country]/ page is its own canonical (already set in
-   [country]/page.tsx metadata) with hreflang alternates pointing
-   to all 7 country variants. Google routes the right one to each
-   user. The bare havlo.io stays a courtesy redirect for humans
-   (cookie/geo aware) but doesn't confuse the index. */
+   Why this is safe (hydration): the root layout's CountryProvider passes no
+   initialCode, so at `/` it resolves to the NG default — the SAME country we
+   render here — so the prop-driven sections and the country context agree on
+   the server and the client's first paint. (The original "havlo.io/ indexed
+   with /us metadata" bug is gone a different way: the metadata below is a
+   FIXED brand/NG block, not the geo-dependent target of a redirect.) */
 
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { getServerCountry } from "@/lib/country-server";
+import HomePage from "./[country]/page";
+import { SITE_URL, buildHreflangAlternates } from "@/lib/seo";
+
+/* ISR — mirror the country homepage's window so the bare domain stays a
+   cheap static render. */
+export const revalidate = 300;
 
 export const metadata: Metadata = {
-  robots: { index: false, follow: true },
+  /* Absolute (bypasses the layout's "%s · Havlo" template) so the brand
+     leads the SERP title for "havlo" queries. */
+  title: { absolute: "Havlo · Find similar products for less" },
+  description:
+    "Before you buy it, find it for less. Havlo compares prices across the stores you already shop, so you never overpay online.",
+  alternates: {
+    /* Self-canonical to the bare domain so Google indexes havlo.io/ as the
+       homepage. buildHreflangAlternates now emits x-default → / for the
+       homepage cluster (see lib/seo.ts). */
+    canonical: `${SITE_URL}/`,
+    languages: buildHreflangAlternates(""),
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  openGraph: {
+    type: "website",
+    title: "Havlo · Find similar products for less",
+    description:
+      "Before you buy it, find it for less. Havlo compares prices across the stores you already shop.",
+    url: `${SITE_URL}/`,
+    siteName: "Havlo",
+  },
 };
 
-export default function RootIndex() {
-  const country = getServerCountry();
-  redirect(`/${country.code}`);
+export default function RootHome() {
+  /* Reuse the country homepage rendered for NG. country="ng" matches the
+     root CountryProvider's default, so the prop-driven sections (NG deals,
+     NGN prices) and the country context stay consistent. */
+  return <HomePage params={{ country: "ng" }} />;
 }
