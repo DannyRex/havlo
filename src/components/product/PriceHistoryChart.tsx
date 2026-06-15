@@ -477,7 +477,7 @@ export default function PriceHistoryChart({
             </g>
           ))}
 
-          {/* Area fill — step-after, capped at the chart bottom */}
+          {/* Area fill under the smooth line, capped at the chart bottom */}
           <path d={geom.areaD} fill={`url(#grad-${uid})`} />
 
           {/* Reference line: visitor's current price. Dashed,
@@ -494,7 +494,7 @@ export default function PriceHistoryChart({
             opacity="0.55"
           />
 
-          {/* The price line itself — step-after, emerald */}
+          {/* The price line itself — smooth monotone curve, emerald */}
           <path
             d={geom.pathD}
             fill="none"
@@ -875,29 +875,60 @@ interface Geometry {
   axisTicks:  { x: number; label: string }[];
 }
 
-/* Step-after price path: hold each observed price flat until the next
-   observation, then step vertically to the new price.
+/* Smooth price line: monotone-cubic (Fritsch-Carlson) interpolation
+   through the observed points. "Curvy" by founder request (June 2026),
+   replacing the earlier step-after path. The tangents are clamped so the
+   curve never overshoots the data band: it cannot dip below the lowest or
+   rise above the highest observed price, so the rounded line stays honest
+   about the range even though it bends smoothly between points.
 
-   This is the honest interpolation for a price series — a price IS
-   constant between readings; it does not ramp smoothly from one value to
-   the next. (v2 briefly drew a monotone cubic spline, which rendered
-   gradual price ramps the merchant never actually charged. The weekly
-   snapshot — migration 0082 — gives the series enough points that the
-   held-flat stretches read clearly as steps rather than a lonely dot.)
-
-   Input: parallel xs / ys arrays of length n ≥ 1. Output: an SVG path that
-   holds ys[i] from xs[i] across to xs[i+1], then steps to ys[i+1]. The
-   caller appends a final horizontal extension to "today". */
-function buildStepAfterPath(xs: number[], ys: number[]): string {
+   Input: parallel xs / ys arrays. n < 3 falls back to straight segments (a
+   curve needs at least 3 points). The caller appends a flat horizontal
+   extension to "today". */
+function buildSmoothPath(xs: number[], ys: number[]): string {
   const n = xs.length;
   if (n === 0) return "";
   let d = `M ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}`;
-  for (let i = 1; i < n; i++) {
-    /* horizontal hold at the previous price... */
-    d += ` L ${xs[i].toFixed(2)} ${ys[i - 1].toFixed(2)}`;
-    /* ...then a vertical step to the new price, exactly at the new
-       observation's x. */
-    d += ` L ${xs[i].toFixed(2)} ${ys[i].toFixed(2)}`;
+  if (n === 1) return d;
+  if (n === 2) return d + ` L ${xs[1].toFixed(2)} ${ys[1].toFixed(2)}`;
+
+  /* Per-segment secant slopes. */
+  const dx: number[] = [];
+  const slope: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    dx[i] = xs[i + 1] - xs[i];
+    slope[i] = dx[i] !== 0 ? (ys[i + 1] - ys[i]) / dx[i] : 0;
+  }
+  /* Tangent at each point: endpoints take the adjacent secant; interior
+     points average their two neighbours, forced to 0 at a local peak or
+     trough (sign change) so the curve flattens there instead of bulging. */
+  const m: number[] = new Array(n);
+  m[0] = slope[0];
+  m[n - 1] = slope[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    m[i] = slope[i - 1] * slope[i] <= 0 ? 0 : (slope[i - 1] + slope[i]) / 2;
+  }
+  /* Fritsch-Carlson monotonicity clamp: keep each tangent within 3x its
+     secant so no Bezier segment overshoots its endpoints' value range. */
+  for (let i = 0; i < n - 1; i++) {
+    if (slope[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+    const a = m[i] / slope[i];
+    const b = m[i + 1] / slope[i];
+    const h = Math.hypot(a, b);
+    if (h > 3) {
+      const t = 3 / h;
+      m[i] = t * a * slope[i];
+      m[i + 1] = t * b * slope[i];
+    }
+  }
+  /* One cubic Bezier per segment, control points a third of the way along
+     each gap and tangent to m[]. */
+  for (let i = 0; i < n - 1; i++) {
+    const c1x = xs[i] + dx[i] / 3;
+    const c1y = ys[i] + (m[i] * dx[i]) / 3;
+    const c2x = xs[i + 1] - dx[i] / 3;
+    const c2y = ys[i + 1] - (m[i + 1] * dx[i]) / 3;
+    d += ` C ${c1x.toFixed(2)} ${c1y.toFixed(2)}, ${c2x.toFixed(2)} ${c2y.toFixed(2)}, ${xs[i + 1].toFixed(2)} ${ys[i + 1].toFixed(2)}`;
   }
   return d;
 }
@@ -999,12 +1030,12 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
   }
   const todayX = leftPad + usableW;
 
-  /* Step-after price path (buildStepAfterPath): the price holds flat at
-     each observation until the next reading, then steps to it. This is the
-     honest shape for a price series — prices jump, they don't ramp — and
-     it never claims a value the data doesn't contain. The weekly snapshot
-     (migration 0082) feeds it enough points that a steady price reads as a
-     long flat step rather than a single dot.
+  /* Smooth price path (buildSmoothPath): a monotone cubic curve through the
+     observations, clamped so it never overshoots the data band (the rounded
+     line can't claim a price below the lowest or above the highest reading).
+     "Curvy" by founder request (June 2026), replacing the step-after path.
+     The weekly snapshot (migration 0082) feeds it enough points that the
+     curve reads as a real trend rather than a single dot.
 
      Path extends from the last data point horizontally to TODAY at the
      right edge whenever the latest reading is older than now — communicates
@@ -1025,7 +1056,7 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
 
   const pathD = points.length === 1
     ? `M ${leftPad.toFixed(2)} ${ys[0].toFixed(2)} L ${xs[0].toFixed(2)} ${ys[0].toFixed(2)}${todayExtension}`
-    : buildStepAfterPath(xs, ys) + todayExtension;
+    : buildSmoothPath(xs, ys) + todayExtension;
 
   const areaBottom = CHART_HEIGHT - PAD_BOTTOM;
   const areaRightX = Math.max(lastPointX, todayX);
