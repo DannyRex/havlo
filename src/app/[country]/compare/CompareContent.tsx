@@ -27,6 +27,11 @@ function looksLikeUrl(v: string): boolean {
   return /^https?:\/\//i.test(t) || /^(www\.|[a-z]+\.(com|ng|co))/i.test(t);
 }
 
+/** Normalise a query for anchor-identity comparison (trim + lowercase). */
+function normalizeQ(v: string): string {
+  return v.trim().toLowerCase();
+}
+
 /* Paid-live gate (June 2026). The free AliExpress teaser always runs,
    but the PAID Google Shopping (SerpAPI) lane only fires when our own
    catalog couldn't already assemble a useful cross-store comparison.
@@ -102,6 +107,21 @@ export default function CompareContent({
      `result`. Flipped off in the URL-load effect after we skip the
      redundant client refetch. Mirrors DealFeed's hasConsumedInitialRef. */
   const hasInitialResultRef = useRef<boolean>(initialResult != null);
+
+  /* Anchor backstop for re-submits. The PDP "Compare prices" CTA lands on
+     /compare?q=<title>&pid=<uuid>&oid=<uuid>; the initial load resolves by
+     pid (the exact product). But clicking "Find cheaper" with the title
+     still in the box re-submits q ALONE — dropping pid/oid and forcing a
+     bare FTS search of the title, which the matcher's variant/brand/price
+     gates can reject outright, even for the product's OWN title. Result: the
+     product you just opened "can't be found" and you get "Did you mean…".
+     We keep pid/oid keyed to the query they belong to and re-attach them
+     whenever the SAME (unchanged) query is re-submitted, so the anchor
+     always resolves. A genuinely edited query no longer matches the key and
+     falls through to a fresh FTS search exactly as before. */
+  const anchorBackstopRef = useRef<{ q: string; pid: string; oid: string } | null>(
+    (initialPid || initialOid) ? { q: normalizeQ(initialQuery), pid: initialPid, oid: initialOid } : null,
+  );
 
   /* ── Fetch live results alongside the internal (DB) search ──
      `dbAltsPromise` resolves to the number of cross-store alternatives
@@ -328,9 +348,26 @@ export default function CompareContent({
 
     setQuery(q);
     setSniffResult(null);
+
+    /* Re-attach the pid/oid backstop when the SAME anchor query is
+       re-submitted without one (see anchorBackstopRef). An explicit pid/oid
+       (autocomplete pick, mount-time URL load) always wins and refreshes the
+       stored backstop; an edited query clears it and searches fresh. */
+    const norm = normalizeQ(q);
+    let effPid = pid;
+    let effOid = oid;
+    if (pid || oid) {
+      anchorBackstopRef.current = { q: norm, pid: pid ?? "", oid: oid ?? "" };
+    } else if (anchorBackstopRef.current?.q === norm) {
+      effPid = anchorBackstopRef.current.pid || undefined;
+      effOid = anchorBackstopRef.current.oid || undefined;
+    } else {
+      anchorBackstopRef.current = null;
+    }
+
     const params = new URLSearchParams({ q, mode: "similar" });
-    if (pid) params.set("pid", pid);
-    if (oid) params.set("oid", oid);
+    if (effPid) params.set("pid", effPid);
+    if (effOid) params.set("oid", effOid);
     /* Country-prefixed — see comment on line 104. */
     router.replace(`/${country.code}/compare?${params.toString()}`, { scroll: false });
     setLoading(true);
@@ -343,8 +380,8 @@ export default function CompareContent({
        miss — /api/compare synthesises an anchor from the offer-row
        directly so the user always sees their product. */
     const apiParams = new URLSearchParams({ q, mode: "similar", country: country.code });
-    if (pid) apiParams.set("pid", pid);
-    if (oid) apiParams.set("oid", oid);
+    if (effPid) apiParams.set("pid", effPid);
+    if (effOid) apiParams.set("oid", effOid);
     const comparePromise = fetch(`/api/compare?${apiParams.toString()}`)
       .then((r) => r.json() as Promise<SearchOutput>);
 
@@ -468,6 +505,7 @@ export default function CompareContent({
           setLiveResults([]);
           setLiveProviders([]);
           setLiveChecked(false);
+          anchorBackstopRef.current = null;
           router.replace(`/${country.code}/compare`, { scroll: false });
         }}
       />
@@ -735,16 +773,33 @@ export default function CompareContent({
                 </p>
               </div>
             </div>
+          ) : result.anchor.offers.length >= 2 ? (
+            /* We DID find the product across multiple stores (shown in the
+               anchor card above) — there just isn't a cheaper DIFFERENT
+               product to surface. Saying "nothing found anywhere" here reads
+               as a failure when the cross-store comparison above IS the
+               result. So frame it as "this is the full picture". */
+            <div className="text-center py-10">
+              <div className="max-w-sm mx-auto">
+                <CheckCircle size={26} className="text-success mx-auto mb-3" strokeWidth={1.5} />
+                <p className="text-sm text-ink font-medium mb-1">
+                  You&apos;re seeing every store we found
+                </p>
+                <p className="text-xs text-ink-3">
+                  No cheaper alternative came up. The prices above are the best we have for this one.
+                </p>
+              </div>
+            </div>
           ) : (
-            /* Both internal and live came back empty for real */
+            /* Genuinely thin — a single offer and nothing comparable yet. */
             <div className="text-center py-12">
               <div className="max-w-sm mx-auto">
                 <SearchX size={28} className="text-ink-3 mx-auto mb-3" strokeWidth={1.5} />
                 <p className="text-sm text-ink font-medium mb-1">
-                  No alternatives found anywhere
+                  No cheaper alternatives yet
                 </p>
                 <p className="text-xs text-ink-3">
-                  Try a different product or a broader search like &quot;earbuds&quot; or &quot;laptop&quot;.
+                  We&apos;ll keep checking. Try a broader search like &quot;earbuds&quot; or &quot;laptop&quot; for more options.
                 </p>
               </div>
             </div>
