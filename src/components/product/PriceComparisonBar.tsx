@@ -849,27 +849,17 @@ export default function PriceComparisonBar({
           <div className="mb-3 px-3.5 py-2.5 rounded-xl border border-border bg-surface-2">
             <div className="flex items-start gap-2.5">
               <PackageX size={14} className="text-ink-3 shrink-0 mt-0.5" aria-hidden="true" />
-              <div className="min-w-0">
-                <p className="text-[12px] text-ink-2 leading-relaxed">
-                  Last seen out of stock from{" "}
-                  <span className="font-semibold text-ink tabular-nums">
-                    {formatPriceForUser(cheapest.effectiveNgn, country)}
-                  </span>{" "}
-                  at <span className="font-medium text-ink">{displayStoreName(cheapest.storeName)}</span>
-                  {cheapest.lastSeenAt && (
-                    <span className="text-ink-3 whitespace-nowrap">
-                      {" "}· as of{" "}
-                      <time dateTime={cheapest.lastSeenAt} suppressHydrationWarning>{timeAgo(cheapest.lastSeenAt)}</time>
-                    </span>
-                  )}
-                  {moreCount > 0 && (
-                    <span className="text-ink-3"> · {moreCount} more {moreCount === 1 ? "store" : "stores"}</span>
-                  )}
-                </p>
-                <p className="text-[11px] text-ink-3 leading-relaxed mt-0.5">
-                  Not available to buy right now — shown for price context only.
-                </p>
-              </div>
+              <p className="text-[12px] text-ink-2 leading-relaxed min-w-0">
+                Out of stock. Last seen{" "}
+                <span className="font-semibold text-ink tabular-nums">{formatPriceForUser(cheapest.effectiveNgn, country)}</span>{" "}
+                at <span className="font-medium text-ink">{displayStoreName(cheapest.storeName)}</span>
+                {cheapest.lastSeenAt && (
+                  <span className="text-ink-3 whitespace-nowrap">{" "}(<time dateTime={cheapest.lastSeenAt} suppressHydrationWarning>{timeAgo(cheapest.lastSeenAt)}</time>)</span>
+                )}
+                {moreCount > 0 && (
+                  <span className="text-ink-3">, +{moreCount} more</span>
+                )}
+              </p>
             </div>
           </div>
         );

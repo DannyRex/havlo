@@ -80,6 +80,14 @@ export default function CompareContent({
   const [liveResults, setLiveResults]   = useState<Deal[]>([]);
   const [liveLoading, setLiveLoading]   = useState(false);
   const [liveProviders, setLiveProviders] = useState<string[]>([]);
+  /* True only once the FULL live-search request has definitively
+     resolved (success path, providers array read off the response).
+     Distinguishes a genuine "no active providers" answer from the
+     ambient empty state — initial mount, a skipped paid lane, or a
+     transient fetch failure all leave liveProviders=[] without ever
+     proving providers are down. The "Live search unavailable" copy is
+     gated on this so a network blip never masquerades as an outage. */
+  const [liveChecked, setLiveChecked] = useState(false);
   /* Guards fetchLive against the StrictMode double-invoke and rapid
      re-search firing the same live query twice. A duplicate live
      search also spawns a duplicate server-side persist run — the
@@ -113,6 +121,7 @@ export default function CompareContent({
     setLiveLoading(true);
     setLiveResults([]);
     setLiveProviders([]);
+    setLiveChecked(false);
 
     const enc = encodeURIComponent(trimmed);
     const stillCurrent = () => lastLiveQueryRef.current === trimmed;
@@ -152,6 +161,10 @@ export default function CompareContent({
             fullDoneRef.current = true;
             setLiveResults(Array.isArray(data.items) ? (data.items as Deal[]) : []);
             setLiveProviders(Array.isArray(data.providers) ? (data.providers as string[]) : []);
+            /* The server gave a definitive providers answer — only now is
+               an empty providers list a real "live search unavailable"
+               signal rather than the ambient initial/failed state. */
+            setLiveChecked(true);
           })
           /* If the full request fails, KEEP whatever the teaser already
              painted rather than wiping it — graceful degradation. */
@@ -454,6 +467,7 @@ export default function CompareContent({
           setResult(null);
           setLiveResults([]);
           setLiveProviders([]);
+          setLiveChecked(false);
           router.replace(`/${country.code}/compare`, { scroll: false });
         }}
       />
@@ -704,8 +718,12 @@ export default function CompareContent({
               loading={liveLoading}
               providers={liveProviders}
             />
-          ) : !liveLoading && liveProviders.length === 0 ? (
-            /* Live providers misconfigured — distinct from "nothing matches" */
+          ) : !liveLoading && liveChecked && liveProviders.length === 0 ? (
+            /* Live providers genuinely inactive — server returned an empty
+               providers array. Gated on liveChecked so a transient fetch
+               failure (which also leaves liveProviders=[]) falls through to
+               the "nothing matches" guidance below instead of falsely
+               claiming an outage. */
             <div className="text-center py-12">
               <div className="max-w-sm mx-auto">
                 <AlertCircle size={28} className="text-amber-500 mx-auto mb-3" strokeWidth={1.5} />
@@ -747,7 +765,10 @@ export default function CompareContent({
 
         // Live providers configured but returned 0? vs not configured at all?
         const liveAvailable = liveLoading || liveResults.length > 0;
-        const liveMisconfigured = !liveLoading && liveProviders.length === 0;
+        /* Only a definitive server answer (liveChecked) counts as
+           "misconfigured" — see liveChecked declaration. A failed/never-run
+           live fetch falls through to the layered recovery state below. */
+        const liveMisconfigured = !liveLoading && liveChecked && liveProviders.length === 0;
 
         return (
           <div className="mt-12">

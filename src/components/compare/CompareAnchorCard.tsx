@@ -425,25 +425,17 @@ export default function CompareAnchorCard({ anchor, dupes, country, query, canCo
               <div className="mt-3 px-3.5 py-2.5 rounded-xl border border-border bg-surface-2">
                 <div className="flex items-start gap-2.5">
                   <PackageX size={14} className="text-ink-3 shrink-0 mt-0.5" aria-hidden="true" />
-                  <div className="min-w-0">
-                    <p className="text-[12px] text-ink-2 leading-relaxed">
-                      Last seen out of stock from{" "}
-                      <span className="font-semibold text-ink tabular-nums">{formatPriceForUser(outOfStock[0].effectiveNgn, country)}</span>{" "}
-                      at <span className="font-medium text-ink">{displayStoreName(outOfStock[0].storeName)}</span>
-                      {outOfStock[0].lastSeenAt && (
-                        <span className="text-ink-3 whitespace-nowrap">
-                          {" "}· as of{" "}
-                          <time dateTime={outOfStock[0].lastSeenAt} suppressHydrationWarning>{timeAgo(outOfStock[0].lastSeenAt)}</time>
-                        </span>
-                      )}
-                      {outOfStock.length > 1 && (
-                        <span className="text-ink-3"> · {outOfStock.length - 1} more {outOfStock.length - 1 === 1 ? "store" : "stores"}</span>
-                      )}
-                    </p>
-                    <p className="text-[11px] text-ink-3 leading-relaxed mt-0.5">
-                      Not available to buy right now — shown for price context only.
-                    </p>
-                  </div>
+                  <p className="text-[12px] text-ink-2 leading-relaxed min-w-0">
+                    Out of stock. Last seen{" "}
+                    <span className="font-semibold text-ink tabular-nums">{formatPriceForUser(outOfStock[0].effectiveNgn, country)}</span>{" "}
+                    at <span className="font-medium text-ink">{displayStoreName(outOfStock[0].storeName)}</span>
+                    {outOfStock[0].lastSeenAt && (
+                      <span className="text-ink-3 whitespace-nowrap">{" "}(<time dateTime={outOfStock[0].lastSeenAt} suppressHydrationWarning>{timeAgo(outOfStock[0].lastSeenAt)}</time>)</span>
+                    )}
+                    {outOfStock.length > 1 && (
+                      <span className="text-ink-3">, +{outOfStock.length - 1} more</span>
+                    )}
+                  </p>
                 </div>
               </div>
             )}
