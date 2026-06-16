@@ -245,22 +245,56 @@ export const fetchBrandHubOffers = cache(async (
     return [];
   }
   /* Defensive brand-hub guard. products.brand is derived from the product
-     TITLE at ingest (buildSignature), which over-tags third-party "made for
-     X" accessories (e.g. "Roller Brush for Dyson", "Battery For Apple
-     macbook", "Controller for PS4") and the odd false token. The exact-brand
-     query above is correct; the underlying DATA is over-broad. Until the
-     extractor is tightened + the catalog re-ingested, drop the clearest
-     third-party items at display time so a brand page shows genuine brand
-     products, not accessories made for the brand. High precision: only
-     removes titles that explicitly say "compatible with / replacement / for
-     <brand>", which a first-party product never does, so genuine brand-led
-     titles ("Apple Watch …", "Nike Air Max …") are never touched. */
+     TITLE at ingest (buildSignature), so a common-word brand over-tags
+     non-brand items. The exact-brand query above is correct; the DATA is
+     over-broad. Until the extractor is tightened + the catalog re-ingested,
+     drop the clear mis-tags at display time so a brand page shows genuine
+     brand products. Three high-precision guards (a first-party product never
+     trips any of them, so "Apple Watch …" / "Nike Air Max …" are untouched):
+
+       (a) third-party "made for <brand>" accessories;
+       (b) the brand word used as a FLAVOUR / produce / scent, not the maker;
+       (c) category coherence — outlier categories the brand doesn't operate in.
+
+     Observed on /uk/brand/apple: "Apple Cider Vinegar Gummies", "Muller …
+     Apple Crumble Yogurt", "Olipop Crisp Apple Soda" (apple the fruit), and a
+     mislabeled "Apple Google Pixel Buds". (a)+(b) catch the produce items;
+     (c) catches the Pixel Buds (it sat alone in the "all" category). */
   const escaped = brandLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const thirdParty = new RegExp(
     `\\b(compatible with|replacement|spare part|for use with|fits|for\\s+(the\\s+)?${escaped})\\b`,
     "i",
   );
-  return dealsFromRows((data ?? []) as HubRow[]).filter((d) => !thirdParty.test(d.title));
+  /* (b) "<brand> <flavour-noun>" — e.g. "Apple cider", "Apple crumble",
+     "Orange juice". A maker's own product is never named this way; these are
+     groceries/toiletries that merely contain the word. */
+  const flavour = new RegExp(
+    `\\b${escaped}\\s+(cider|vinegar|crumble|cinnamon|juice|squash|cordial|smoothie|soda|sparkling|scented|flavou?r)\\b`,
+    "i",
+  );
+  const rows = ((data ?? []) as HubRow[]).filter(
+    (r) => !thirdParty.test(r.title) && !flavour.test(r.title),
+  );
+
+  /* (c) Category coherence. A title-derived brand also leaks into whole
+     categories the brand doesn't operate in (Apple → supermarket, home,
+     health, the "all" catch-all). Once the pool is big enough to trust the
+     brand's real categories, drop items in a tiny outlier category (< 3 of
+     the brand's items AND < 10% of the pool) — exactly where mis-tags land,
+     while genuine categories stay well populated. Thin brands (pool < 15)
+     skip this so a small but legitimate catalogue is never pruned. */
+  const pool = rows.length;
+  if (pool < 15) return dealsFromRows(rows);
+  const perCat = new Map<string, number>();
+  for (const r of rows) {
+    const c = r.category_slug ?? "";
+    perCat.set(c, (perCat.get(c) ?? 0) + 1);
+  }
+  const kept = rows.filter((r) => {
+    const n = perCat.get(r.category_slug ?? "") ?? 0;
+    return n >= 3 || n / pool >= 0.10;
+  });
+  return dealsFromRows(kept);
 });
 
 /* ── Amazon offers, every marketplace ─────────────────────────────
