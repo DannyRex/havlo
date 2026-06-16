@@ -131,12 +131,6 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     status: "shipped",
   },
   {
-    id: "barcode-scanner",
-    title: "Barcode scanner",
-    description: "Scan a barcode in-store and compare the shelf price against online stores.",
-    status: "shipped",
-  },
-  {
     id: "ebay-uk",
     title: "eBay UK inventory",
     description: "Real ebay.co.uk listings in the UK catalogue, accessories filtered out.",
