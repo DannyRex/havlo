@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { TrendingDown, ArrowRight, Plane, ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { formatPriceForUser, cleanTitle } from "@/lib/utils";
+import { formatPriceForUser, cleanTitle, proxiedImageUrl, downscaleCardImageUrl } from "@/lib/utils";
 import { pdpUrlForOffer } from "@/lib/pdp-url";
 import { useCountry } from "@/components/providers/CountryProvider";
 import { inferStoreCountry, isGlobalIntlStore } from "@/lib/country";
@@ -71,6 +71,36 @@ function LogoChip({
         />
       )}
     </span>
+  );
+}
+
+/* Product image for a cheaper-alternative card.
+
+   ROOT-CAUSE FIX (June 2026): this card used to render `<img src={imageUrl}>`
+   RAW — the only product image in the app NOT routed through proxiedImageUrl,
+   and with no onError fallback. The deals feed (MasonryCard / ResilientImage)
+   proxies every image; this didn't. So a freshly-ingested Jumia product whose
+   image_url is still the Google-Images thumbnail (gstatic — the provider's
+   r.thumbnail fallback) before the self-host pass swaps it to Supabase
+   rendered FINE in the deals feed (proxied -> adblock-safe) but BROKE in the
+   cheaper-alternatives here (raw gstatic -> blocked by adblock/tracking
+   protection), falling back to the Havlo mark. Same gap hit any
+   referer-gated CDN. Now: proxy + downscale like the feed, and degrade to the
+   Havlo mark on load error instead of a broken-image icon. */
+function DupeImage({ imageUrl, alt }: { imageUrl?: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  const src = imageUrl ? proxiedImageUrl(downscaleCardImageUrl(imageUrl)) : "";
+  if (!src || failed) return <HavloLogoFallback size="md" />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+      className="w-full h-full object-contain p-3 group-hover:scale-[1.04] transition-transform duration-500"
+    />
   );
 }
 
@@ -154,16 +184,7 @@ export default function DupeCard({
 
       {/* Image — varied aspect for masonry feel */}
       <div className={`relative w-full overflow-hidden bg-white ${aspect}`}>
-        {dupe.imageUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={dupe.imageUrl}
-            alt={dupe.title}
-            className="w-full h-full object-contain p-3 group-hover:scale-[1.04] transition-transform duration-500"
-          />
-        ) : (
-          <HavloLogoFallback size="md" />
-        )}
+        <DupeImage imageUrl={dupe.imageUrl} alt={dupe.title} />
       </div>
 
       {/* Caption */}

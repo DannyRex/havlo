@@ -1,12 +1,15 @@
 "use client";
 
 import { Globe } from "lucide-react";
+import { useState } from "react";
 import { pdpUrlForDeal } from "@/lib/pdp-url";
 import {
   formatUSDPrice,
   savings,
   formatCompact,
   formatCount,
+  proxiedImageUrl,
+  downscaleCardImageUrl,
 } from "@/lib/utils";
 import { MASONRY_ASPECTS, chunkLeftToRight } from "@/components/deals/masonry-layout";
 import { useCountry } from "@/components/providers/CountryProvider";
@@ -19,6 +22,29 @@ interface Props {
   items: Deal[];
   loading: boolean;
   providers: string[];
+}
+
+/* Live-result image — proxied + onError fallback, matching the deals feed.
+   Live results come from SerpAPI (Google Shopping), so imageUrl is very often
+   a gstatic thumbnail. Rendered RAW (the old code), gstatic is blocked by
+   adblock/tracking-protection and the card fell back to the Havlo mark; routed
+   through /api/img-proxy it's a havlo.io URL adblockers don't touch. Same gap
+   the dupe card had. */
+function LiveImage({ imageUrl }: { imageUrl?: string }) {
+  const [failed, setFailed] = useState(false);
+  const src = imageUrl ? proxiedImageUrl(downscaleCardImageUrl(imageUrl)) : "";
+  if (!src || failed) return <HavloLogoFallback size="md" />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+      className="absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-[1.04] transition-transform duration-500 motion-reduce:group-hover:scale-100"
+    />
+  );
 }
 
 /* ── Single live-result card — compact, image-first, varied aspect ── */
@@ -122,17 +148,7 @@ function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
     >
       {/* Image — varied aspect for masonry feel */}
       <div className={`relative overflow-hidden bg-white ${aspect}`}>
-        {deal.imageUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={deal.imageUrl}
-            alt=""
-            loading="lazy"
-            className="absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-[1.04] transition-transform duration-500 motion-reduce:group-hover:scale-100"
-          />
-        ) : (
-          <HavloLogoFallback size="md" />
-        )}
+        <LiveImage imageUrl={deal.imageUrl} />
 
         {/* Discount badge — perfect circle, top-right */}
         {hasDiscount && (
