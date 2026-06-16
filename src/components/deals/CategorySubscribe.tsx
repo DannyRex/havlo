@@ -128,7 +128,7 @@ export default function CategorySubscribe({ categorySlug, categoryName }: Props)
           deals in your inbox?
         </p>
         <p className="text-[11px] sm:text-[12px] text-ink-3 mt-0.5">
-          Three emails a week, Monday, Wednesday, and Friday. Unsubscribe in one click.
+          A few emails a week, only the deals worth opening. Unsubscribe in one click.
         </p>
       </div>
 

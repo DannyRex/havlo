@@ -121,7 +121,7 @@ export default function EmailCapture({
         <div>
           <p className="text-ink font-semibold mb-1">You&apos;re in.</p>
           <p className="text-ink-2 text-sm leading-relaxed">
-            Check your inbox. Your deals digest lands every Monday, Wednesday, and Friday.
+            Check your inbox. Your deals digest lands a few mornings a week, only when there&apos;s something worth opening.
           </p>
         </div>
       </div>

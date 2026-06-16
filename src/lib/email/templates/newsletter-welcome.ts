@@ -44,15 +44,15 @@ export function newsletterWelcome({ country, unsubscribeUrl }: Args): Email {
   const cc = (country ?? "ng").toLowerCase();
   const dealsUrl = `${SITE_URL}/${cc}/deals`;
 
-  const subject   = "You're in. First Havlo digest lands Monday, Wednesday, or Friday.";
-  const preheader = "Three emails a week, Monday, Wednesday, and Friday morning. Nothing on idle days.";
+  const subject   = "You're in. Your first Havlo digest is on the way.";
+  const preheader = "A few mornings a week, only the deals worth opening. Nothing on quiet days.";
 
   /* ── HTML body ──────────────────────────────────────────────── */
 
   const body = `
 ${paragraph("Hi,")}
 ${paragraph("Thanks for joining the Havlo deals digest.")}
-${paragraph(`Three mornings a week (Monday, Wednesday, and Friday), you'll get one email from this address with the strongest deals we found that day. We don't email on the other days. If there's nothing new worth opening, we don't send anything.`)}
+${paragraph(`A few mornings a week, you'll get one email from this address with the strongest deals we found that day. On the quiet days, nothing. If there's nothing new worth opening, we don't send anything.`)}
 ${paragraph(`Until the first one ships, ${textLink({ url: dealsUrl, label: `browse what's hot today` })}.`)}
 ${signature("Danny")}
 ${spacer(8)}
@@ -68,7 +68,7 @@ ${unsubscribeUrl ? footnote(`Changed your mind? <a href="${escapeHtml(unsubscrib
     body: [
       `Thanks for joining the Havlo deals digest.`,
       ``,
-      `Three mornings a week (Monday, Wednesday, and Friday), you'll get one email from this address with the strongest deals we found that day. We don't email on the other days. If there's nothing new worth opening, we don't send anything.`,
+      `A few mornings a week, you'll get one email from this address with the strongest deals we found that day. On the quiet days, nothing. If there's nothing new worth opening, we don't send anything.`,
       ``,
       `Until the first one ships, browse what's hot today: ${dealsUrl}`,
       ...(unsubscribeUrl ? [``, `Changed your mind? Unsubscribe in one click: ${unsubscribeUrl}`] : []),
