@@ -9,6 +9,7 @@ import { CountryProvider } from "@/components/providers/CountryProvider";
 import { USD_FX } from "@/lib/country";
 import JsonLd from "@/components/seo/JsonLd";
 import DeferredConsentStack from "@/components/seo/DeferredConsentStack";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/seo";
 
 const inter = Inter({
@@ -237,6 +238,11 @@ export default function RootLayout({
             cookie banner only renders on first visit. See
             DeferredConsentStack for the dynamic-import details. */}
         <DeferredConsentStack />
+        {/* Vercel Speed Insights — real-user Core Web Vitals (LCP/CLS/INP),
+            cookieless + anonymized (no consent gate needed), App-Router aware.
+            Needs Speed Insights ENABLED in the Vercel project (the dashboard
+            toggle that opened the install PR). */}
+        <SpeedInsights />
       </body>
     </html>
   );
