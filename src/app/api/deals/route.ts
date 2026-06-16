@@ -112,6 +112,12 @@ async function fetchPoolCached(params: {
      pool cap. Cache key includes this so per-store-filter views
      get their own warm pool. */
   stores?:       string[] | null;
+  /* "Deals" tier sentinel: push is_real_deal into the RPC (p_deals_only)
+     so the real-deal filter lands BEFORE the row-cap. Fixes the Deals
+     count swinging with sort (977 Relevance / 551 Latest) and unhides the
+     ~400 real deals the broad-pool cap dropped on Latest. Part of the
+     cache key (distinct from the broad tier-0 pool). */
+  dealsOnly?:    boolean;
 }): Promise<Deal[]> {
   /* Stable key — JSON.stringify omits undefined fields so absent
      category/search produces the same key as explicitly-undefined.
@@ -137,6 +143,7 @@ async function fetchPoolCached(params: {
     origin:       "all",
     country:      params.country,
     stores:       params.stores ?? undefined,
+    dealsOnly:    params.dealsOnly ?? false,
   });
 
   /* Health-aware caching — don't lock users into a degraded view.
@@ -452,6 +459,10 @@ export async function GET(req: NextRequest) {
            sort-stable. `|| undefined` for tier=all keeps the broad
            pool's shared cache key (no cold-bust, no per-default egress). */
         minDiscount: poolMinDiscount || undefined,
+        /* Deals tier rides p_deals_only instead of p_min_discount (which
+           stays 0 here so discount=0 cross-store-cheapest rows survive).
+           This is what makes the Deals count sort-stable. */
+        dealsOnly: isDealsMode,
       }),
       countryCorrectDropdownRows({
         countryCode: country.code,

@@ -32,6 +32,18 @@ export interface BrowseQuery {
       compete with the entire international catalog. Per-country
       fetches give every market 6000 rows of its own headroom. */
   country?: string;
+  /** "Deals" tier ( is_real_deal ) pushed INTO the RPC so the real-deal
+      filter lands BEFORE the row-cap, not after it app-side. Without
+      this, the broad pool is sort-ordered then capped, and a sort like
+      "newest" fills the cap with full-price market rows before the
+      app-side is_real_deal filter runs, so the Deals count swung with
+      sort (977 on Relevance, 551 on Latest) and ~400 real deals fell
+      outside the cap entirely on Latest. With p_deals_only the pool is
+      real-deals-only, so the count is sort-stable and every real deal is
+      reachable in every sort. Only set for the Deals tier; the literal
+      20%/50% tiers already push p_min_discount, and tier 0 uses the
+      precomputed counts. */
+  dealsOnly?: boolean;
 }
 
 /* ── Per-call execution options ───────────────────────────────────── */

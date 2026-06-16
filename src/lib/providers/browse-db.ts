@@ -552,6 +552,12 @@ export const dbBrowseProvider: BrowseProvider = {
       p_max_rows:       PASS_MAX,
       p_zero_discount_only: false,
       p_rotate_seed:    rotateSeed,
+      /* "Deals" tier: filter is_real_deal INSIDE the RPC, before the
+         row-cap, so the count is sort-stable and every real deal is
+         reachable in every sort (see BrowseQuery.dealsOnly). Off for
+         every other tier — the literal 20%/50% tiers ride p_min_discount
+         and tier 0 stays the broad pool. */
+      p_deals_only:     q.dealsOnly ?? false,
     };
 
     /* Pass A — country-local. Filter rows to is_international=false
