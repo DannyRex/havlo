@@ -829,6 +829,18 @@ export async function GET(req: NextRequest) {
          isStoreSearchUrl(deal.url) themselves (which can't work
          anyway now that url is empty). */
       isPriceFromOnly: isStoreSearchUrl(d.url),
+      /* Deal/trust signals the cards badge on. Three booleans (~60 bytes/
+         item), but without them the /deals feed could ONLY render the
+         price-derived discount badge: richer real-deals (cross-store
+         cheapest / below-30d-high, no markdown to strike), 30-day lows, and
+         used items all showed with NO badge at all (user report: "products
+         with no deal badge show up in deals"). isRealDeal drives the "Good
+         price" chip; at30DayLow + isUsed let it correctly defer to the
+         "Lowest in 30 days" badge and "Used / Refurbished" tag. Surgical
+         un-slim — still ~70% smaller than the pre-slim payload. */
+      isRealDeal:      d.isRealDeal ?? false,
+      at30DayLow:      d.at30DayLow ?? false,
+      isUsed:          d.isUsed ?? false,
     }));
 
     /* Cache window bumped May 2026 from s-maxage=60/swr=300 to

@@ -535,6 +535,22 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
           </p>
         )}
 
+        {/* Residual deal signal. A product can qualify for the deals feed via
+            the richer definition (cross-store cheapest OR below its 30-day
+            high; is_real_deal, migration 0083) yet show NO discount badge —
+            it has no original price to strike through, and isn't at its
+            30-day low. Without this it sat in the feed with no deal signal at
+            all (user report: "products with no deal badge show up in deals").
+            One honest green chip; the exact reason (cheapest vs below-high)
+            isn't surfaced by the browse_deals RPC. Never on used items —
+            they carry their own "Used / Refurbished" tag. */}
+        {deal.isRealDeal && !hasDiscount && !deal.at30DayLow && !deal.isUsed && (
+          <p className="text-[10px] text-success font-semibold mt-1 inline-flex items-center gap-1">
+            <span className="inline-block w-1 h-1 rounded-full bg-success" aria-hidden="true" />
+            Good price
+          </p>
+        )}
+
         {landedFmt && (
           /* Cross-border total. Was "landed" with a `title=...` HTML
              tooltip — but that doesn't render on touch devices, and

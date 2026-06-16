@@ -246,6 +246,17 @@ export default function ListCard({ deal, linkHref }: Props) {
           </p>
         )}
 
+        {/* Residual deal signal — mirror of MasonryCard. A real deal
+            (cross-store cheapest or below its 30-day high) with no discount
+            to strike and not at its 30-day low would otherwise show no badge
+            at all. */}
+        {deal.isRealDeal && !hasDiscount && !deal.at30DayLow && !deal.isUsed && (
+          <p className="text-[10px] text-success font-semibold mt-1 inline-flex items-center gap-1">
+            <span className="inline-block w-1 h-1 rounded-full bg-success" aria-hidden="true" />
+            Good price
+          </p>
+        )}
+
         {landedNgnStr && (
           <p className="text-[10px] text-ink-3 mt-0.5 flex items-center gap-1">
             <span>{landedNgnStr}</span>
