@@ -104,27 +104,30 @@ export default function Navbar() {
   return (
     <>
       {/* ── Top header (desktop + mobile) ──────────────────────────
-          sticky top-0, fully opaque (bg-bg) at EVERY breakpoint — no
+          position: FIXED, fully opaque (bg-bg) at every breakpoint — no
           backdrop-blur, no transform.
 
-          Flicker history: the bar was a frosted-glass panel on sm+ (bg-bg/85
-          + backdrop-blur-xl). backdrop-filter on a position:sticky element
-          strobes during scroll — the browser re-samples + re-blurs the
-          backdrop every frame, so the translucent background visibly flickers
-          through the bar. The fix was to make the bar fully OPAQUE at every
-          width, which removes the flicker at its source.
+          History (three rounds of mobile flicker/unstick):
+            1. Frosted glass (bg-bg/85 + backdrop-blur) strobed during scroll —
+               backdrop-filter re-samples every frame — so it was made OPAQUE.
+            2. A translateZ(0) GPU-promotion (to chase residual iOS jitter)
+               BROKE position:sticky on iOS — a transform on a sticky element
+               disables sticking — so the bar scrolled away; translateZ removed.
+            3. Sticky STILL intermittently unstuck + flickered on mobile across
+               multi-page navigation and iOS momentum scroll: sticky is
+               recomputed against its scroll container every frame and is
+               fragile to content reflow below it (streamed deals, 100dvh
+               recalc as the URL bar collapses). Switched to position: FIXED —
+               anchored to the viewport, so it CAN'T unstick and isn't
+               repainted by content reflow. The spacer below reserves the bar's
+               65px (h-16 + 1px border) since fixed is out of flow; the layout's
+               min-h-[calc(100dvh-65px)] then composes to a clean 100dvh.
 
-          IMPORTANT (June 2026 regression + fix): a follow-up promoted this
-          sticky bar to its own GPU layer with translateZ(0) +
-          backface-visibility:hidden to chase residual iOS momentum-scroll
-          jitter. That BROKE position:sticky on mobile — applying a `transform`
-          to a position:sticky element disables sticking in iOS Safari (known
-          WebKit behaviour), so the navbar scrolled away on phones. The
-          translateZ hack is removed: a working sticky navbar is the priority,
-          and the opaque background already handles the flicker without it. Do
-          NOT re-add a transform/filter to this element. */}
+          Still no `transform`/`filter` on this element — now because it
+          re-introduces the iOS repaint flicker, not the sticky issue. Opaque +
+          fixed is the stable combination. */}
       <header
-        className="sticky top-0 z-40 border-b border-border bg-bg"
+        className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-bg"
       >
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
 
@@ -192,6 +195,10 @@ export default function Navbar() {
           </div>
         </nav>
       </header>
+      {/* Spacer reserving the fixed header's footprint (h-16 nav + 1px
+          border = 65px) so page content starts below it. Matches the
+          layout's min-h-[calc(100dvh-65px)]. */}
+      <div className="h-[65px]" aria-hidden="true" />
 
       {/* ── Mobile left drawer ───────────────────────────────────── */}
       {/* Backdrop */}
