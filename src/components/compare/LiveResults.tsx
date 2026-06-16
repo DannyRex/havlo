@@ -244,8 +244,8 @@ export default function LiveResults({ items, loading, providers }: Props) {
      a secondary "≈ $X in USD" hint per card — but the headline is
      local. */
   const caption = country.code === "ng"
-    ? "Live picks from global stores. Prices in ₦, ships to Nigeria."
-    : `Live picks from global stores. Prices in ${country.currency}.`;
+    ? "Live results from other stores. Prices in ₦, ships to Nigeria."
+    : `Live results from other stores. Prices in ${country.currency}.`;
 
   return (
     <section className="mt-12 sm:mt-16">
@@ -258,13 +258,18 @@ export default function LiveResults({ items, loading, providers }: Props) {
             <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
           </span>
           <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-success">
-            Live, on sale now
+            From other stores
           </span>
         </div>
+        {/* Honest framing (June 2026): these are LIVE search matches from
+            other stores — same family as the product, but NOT price-vetted
+            the way the internal "Cheaper alternatives" rail above is. Calling
+            them "deals on sale" over-promised; "more from other stores" is
+            what they actually are. */}
         <h3 className="text-lg sm:text-xl font-bold text-ink tracking-[-0.02em]">
           {items.length > 0
-            ? `${formatCount(items.length)} live deals from global stores`
-            : "Live deals from global stores"}
+            ? `${formatCount(items.length)} more from other stores`
+            : "More from other stores"}
         </h3>
         <p className="text-xs sm:text-sm text-ink-2 mt-0.5">
           {caption}
