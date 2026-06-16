@@ -103,7 +103,9 @@ export async function generateMetadata({
       description,
       url,
       siteName: "Havlo",
-      locale: country.code === "de" ? "de_DE" : `en_${country.code.toUpperCase()}`,
+      /* Valid OG locale: our 'uk' slug must map to ISO 'GB' (en_GB) — share
+         scrapers (Facebook, etc.) ignore the malformed 'en_UK'. */
+      locale: country.code === "de" ? "de_DE" : `en_${country.code === "uk" ? "GB" : country.code.toUpperCase()}`,
     },
     twitter: {
       card: "summary_large_image",

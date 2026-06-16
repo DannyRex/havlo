@@ -78,6 +78,16 @@ const GLOBAL_PAGES = new Set([
   "disclaimer", "how-we-make-money",
 ]);
 
+/* Crawlers — search engines AND social-share scrapers — are EXEMPT from the
+   homepage geo-redirect (below), so the bare `/` stays one indexable page
+   for search and a shared havlo.io link still scrapes the bare-domain OG.
+   The broad `bot|crawl|spider|slurp` catches the search engines (Googlebot,
+   bingbot, …); the named ones are the social/OG scrapers that DON'T contain
+   "bot" (facebookexternalhit, whatsapp, …) plus the answer engines we allow
+   in robots.txt. Real browsers match none of these and get geo-routed. */
+const CRAWLER_UA =
+  /bot|crawl|spider|crawling|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|slackbot|telegrambot|whatsapp|discordbot|pinterest|redditbot|embedly|quora|skypeuripreview|nuzzel|vkshare|w3c_validator|applebot|gptbot|chatgpt|claude|anthropic|perplexity|bytespider|lighthouse|headlesschrome|google[- ]?page[- ]?speed/i;
+
 export function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const seg = path.split("/")[1]?.toLowerCase() ?? "";
@@ -104,18 +114,26 @@ export function middleware(req: NextRequest) {
   /* Bare root `/` renders a REAL, indexable homepage (the NG / x-default
      market) so the brand domain havlo.io can be indexed + rank for "havlo".
 
-     Country awareness, done server-side + COOKIE-gated (NOT geo): a RETURNING
-     visitor who explicitly chose a non-NG market (the havlo-country cookie,
-     set only by the country picker) is sent to their country homepage. A
-     crawler carries no cookie, so it is NEVER redirected and `/` stays one
-     indexable page — no cloaking, and Googlebot (crawled from any geo) is
-     never bounced off `/`. First-time / NG-cookie visitors render `/`.
+     Country awareness ("serve crawlers the indexable page, geo-route real
+     users" — founder direction, June 2026):
+       1. A RETURNING visitor with an explicit non-NG cookie (set only by the
+          country picker) → their country homepage.
+       2. A first-time REAL user with no cookie → geo-routed by IP to their
+          market, so a UK visitor lands on /uk instead of the NG x-default.
+       3. CRAWLERS (search + social-share scrapers, by UA) are EXEMPT from #2,
+          so `/` stays ONE indexable page: Googlebot (crawled from the US) is
+          a bot → never redirected → `/` is always crawlable, and a shared
+          havlo.io link still scrapes the bare-domain OG. NG geo, NG cookie,
+          and no-geo all fall through to `/` too.
 
-     Cookie-only on purpose: geo-redirecting first-timers would also redirect
-     Googlebot (US-crawled) to /us and de-index `/`. Other bare paths (/deals)
-     still geo-redirect in Case 2 below; this is `/` exactly. */
+     Geo-redirecting EVERYONE (incl. bots) would bounce Googlebot to /us and
+     de-index `/`; the UA exemption is what lets country-routing and an
+     indexable homepage coexist. The country pages carry country-specific
+     titles + OG + hreflang (en-GB→/uk, …) so the right variant can rank and
+     share correctly. */
   if (path === "/") {
     const chosen = req.cookies.get(COUNTRY_COOKIE)?.value?.toLowerCase();
+    /* 1. Explicit returning choice. */
     if (chosen && SUPPORTED.has(chosen) && chosen !== "ng" && !DEFERRED_LAUNCH.has(chosen)) {
       const target = req.nextUrl.clone();
       target.pathname = `/${chosen}`;
@@ -123,6 +141,19 @@ export function middleware(req: NextRequest) {
       res.headers.set("Cache-Control", "no-store");
       return res;
     }
+    /* 2. First-time REAL user (no cookie, not a crawler) → geo market. */
+    if (!chosen && !CRAWLER_UA.test(req.headers.get("user-agent") ?? "")) {
+      const geo = inferGeoCountry(req);
+      if (geo && geo !== "ng") {
+        const dest = DEFERRED_LAUNCH.has(geo) ? DEFERRED_FALLBACK : geo;
+        const target = req.nextUrl.clone();
+        target.pathname = `/${dest}`;
+        const res = NextResponse.redirect(target, 307);
+        res.headers.set("Cache-Control", "no-store");
+        return res;
+      }
+    }
+    /* 3. Crawler, NG geo/cookie, or no geo → the indexable `/`. */
     return passThrough();
   }
 
