@@ -177,6 +177,21 @@ export default function ListCard({ deal, linkHref }: Props) {
           </div>
         )}
 
+        {/* Price-quality badge — top-right of the thumbnail, mirror of
+            MasonryCard. Only when there's no discount circle to compete
+            with. Moves the "Good price" / "Lowest 30d" signal onto the
+            image so list + grid read identically. Same is_real_deal /
+            30d-low flags, no new compute. */}
+        {!hasDiscount && !deal.isUsed && (deal.at30DayLow || deal.isRealDeal) && (
+          <span
+            className="absolute top-1 right-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold text-white max-w-[88%] shadow-sm"
+            style={{ background: "rgba(5, 150, 105, 0.95)" }}
+          >
+            <span className="inline-block w-1 h-1 rounded-full bg-white/90 shrink-0" aria-hidden="true" />
+            <span className="truncate">{deal.at30DayLow ? "Lowest 30d" : "Good price"}</span>
+          </span>
+        )}
+
         {/* INTL badge — bottom-left of the thumbnail. Same visual
             language as MasonryCard so list + grid views stay
             consistent. Shows when the deal's store isn't anchored
@@ -236,24 +251,14 @@ export default function ListCard({ deal, linkHref }: Props) {
           <p className="text-[10px] text-ink-3 mt-0.5">{ngnEquivStr}</p>
         )}
 
-        {/* "Lowest in 30 days" badge — mirror of MasonryCard's badge.
-            Same offers_at_30d_low signal, same visual treatment so
-            list + grid views stay consistent. */}
-        {deal.at30DayLow && (
+        {/* "Lowest in 30 days" — mirror of MasonryCard. Only here when the
+            card ALSO has a discount (the circle owns the corner). Without a
+            discount, the corner pill above shows "Lowest 30d" and this line
+            is suppressed so the signal never doubles up. */}
+        {hasDiscount && deal.at30DayLow && (
           <p className="text-[10px] text-success font-semibold mt-1 inline-flex items-center gap-1">
             <span className="inline-block w-1 h-1 rounded-full bg-success" aria-hidden="true" />
             Lowest price in 30 days
-          </p>
-        )}
-
-        {/* Residual deal signal — mirror of MasonryCard. A real deal
-            (cross-store cheapest or below its 30-day high) with no discount
-            to strike and not at its 30-day low would otherwise show no badge
-            at all. */}
-        {deal.isRealDeal && !hasDiscount && !deal.at30DayLow && !deal.isUsed && (
-          <p className="text-[10px] text-success font-semibold mt-1 inline-flex items-center gap-1">
-            <span className="inline-block w-1 h-1 rounded-full bg-success" aria-hidden="true" />
-            Good price
           </p>
         )}
 

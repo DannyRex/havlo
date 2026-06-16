@@ -394,6 +394,27 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
           </div>
         )}
 
+        {/* Price-quality badge — top-right, SAME corner as the discount
+            circle and mutually exclusive with it (only fires when there's
+            no explicit markdown to put in the circle). Moves the old
+            below-image "Good price" / "Lowest in 30 days" text ONTO the
+            image so every card carries its deal signal in one consistent
+            place. Quiet emerald pill so it reads positive without
+            competing with the red discount circle. Accurate + zero
+            overhead: driven by the same is_real_deal / 30d-low flags
+            already on the payload — no new compute, no migration. The
+            label tiers by signal strength: at the 30-day floor is a
+            stronger claim than a generic real-deal, so it wins. */}
+        {!hasDiscount && !deal.isUsed && (deal.at30DayLow || deal.isRealDeal) && (
+          <span
+            className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-white select-none max-w-[70%] shadow-sm"
+            style={{ background: "rgba(5, 150, 105, 0.95)" }}
+          >
+            <span className="inline-block w-1 h-1 rounded-full bg-white/90 shrink-0" aria-hidden="true" />
+            <span className="truncate">{deal.at30DayLow ? "Lowest 30d" : "Good price"}</span>
+          </span>
+        )}
+
         {/* Cashback badge — top-left, opposite corner from the
             discount circle. As of QA Bucket 2#26, the badge is
             both a tooltip AND a clickable shortcut to the cashback
@@ -527,27 +548,17 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
             "this is cheaper than original price", the 30d badge says
             "this is the cheapest it's been recently anywhere". Both
             can fire on the same card; the visual hierarchy keeps the
-            discount badge dominant since it's the primary CTA. */}
-        {deal.at30DayLow && (
+            discount badge dominant since it's the primary CTA.
+
+            Only rendered HERE when the card ALSO has a discount: the
+            discount circle owns the top-right corner, so the 30-day-low
+            signal can't ride the corner pill and stays a line. When there's
+            no discount, the corner pill above shows "Lowest 30d" instead and
+            this line is suppressed (no duplicate signal). */}
+        {hasDiscount && deal.at30DayLow && (
           <p className="text-[10px] text-success font-semibold mt-1 inline-flex items-center gap-1">
             <span className="inline-block w-1 h-1 rounded-full bg-success" aria-hidden="true" />
             Lowest price in 30 days
-          </p>
-        )}
-
-        {/* Residual deal signal. A product can qualify for the deals feed via
-            the richer definition (cross-store cheapest OR below its 30-day
-            high; is_real_deal, migration 0083) yet show NO discount badge —
-            it has no original price to strike through, and isn't at its
-            30-day low. Without this it sat in the feed with no deal signal at
-            all (user report: "products with no deal badge show up in deals").
-            One honest green chip; the exact reason (cheapest vs below-high)
-            isn't surfaced by the browse_deals RPC. Never on used items —
-            they carry their own "Used / Refurbished" tag. */}
-        {deal.isRealDeal && !hasDiscount && !deal.at30DayLow && !deal.isUsed && (
-          <p className="text-[10px] text-success font-semibold mt-1 inline-flex items-center gap-1">
-            <span className="inline-block w-1 h-1 rounded-full bg-success" aria-hidden="true" />
-            Good price
           </p>
         )}
 
