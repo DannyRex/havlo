@@ -194,11 +194,26 @@ function composeBuckets(pool: Deal[], isNG: boolean): TrendingBuckets {
 export async function getTrendingBuckets(country: Country): Promise<TrendingBuckets | null> {
   const isNG = country.code === "ng";
 
+  /* The homepage is the front door — never feature a card that renders
+     blank or dead. Two guards added June 2026 after a post-deploy cache
+     rebuild surfaced a thin window of imageless / dead-passthrough cards:
+       1. require a real image (the old filter checked title + price only,
+          so an imageless row fell straight through to the Havlo-logo
+          fallback on the most prominent surface).
+       2. exclude dead Google-Shopping passthroughs — offers whose
+          outbound URL is a google.com/search?ibp=os redirect (no real
+          product page), which the PDP liveness gate then renders as
+          "No longer available" on click. Matched in both raw and
+          URL-encoded form since the URL is wrapped in /api/go?url=. */
+  const isDeadPassthrough = (u: string | undefined) =>
+    !!u && /ibp(?:=|%3d)os|google\.[a-z.]+(?:\/|%2f)search/i.test(u);
   const qualityFilter = (d: Deal) =>
     d.title.length >= 10 &&
     d.title.length <= 70 &&
     !d.title.includes("\\") &&
-    !(d.currency === "USD" && d.salePrice < 10);
+    !(d.currency === "USD" && d.salePrice < 10) &&
+    Boolean(d.imageUrl) &&
+    !isDeadPassthrough(d.url);
 
   /* Build the candidate pool. NG users get four merged pools; non-NG
      users get two — both more than the previous one-pool fetch, so
