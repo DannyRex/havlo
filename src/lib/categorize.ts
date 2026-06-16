@@ -228,8 +228,22 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   //    the same reason. "wine" is deliberately NOT matched bare —
   //    it's a fashion colour (COLOR_GROUPS maps wine→red) — and only
   //    counts with a drink-context word.
-  { pattern: /\b(whisky|whiskey|vodka|tequila|cognac|brandy|liqueur|\brum\b|hennessy|mo[eë]t|champagne|prosecco|baileys|smirnoff|jameson|jack\s*daniel|johnnie\s*walker|red\s*label|black\s*label|glenfiddich|martell|remy\s*martin|campari|absolut|olmeca|don\s*julio|(?:red|white|ros[eé]|sweet|dry|sparkling)\s*wine|wine\s*(?:75cl|70cl|gift|carton|bottle)|\blager\b|\bstout\b|guinness|heineken|budweiser|smirnoff\s*ice|bitter\s*lemon|energy\s*drink|malt\s*drink|\bmalta\b)\b/i, slug: "supermarket", reason: "drinks (alcohol / beverages)" },
-  { pattern: /\b(indomie|noodles|spaghetti|golden\s*morn|cornflakes|corn\s*flakes|\bcereal\b|\bmilo\b|bournvita|ovaltine|peak\s*milk|dano\s*milk|cowbell|milk\s*powder|(?:cooking|vegetable|groundnut|palm|sunflower)\s*oil|tomato\s*paste|seasoning\s*(?:cube|powder)?|maggi|knorr\s*(?:cube|seasoning|chicken|beef)|(?:basmati|long\s*grain|parboiled|jollof)\s*rice|rice\s*(?:5kg|10kg|25kg|50kg)|semovita|garri|table\s*water|bottled\s*water|soft\s*drink|pringles|toilet\s*(?:paper|roll|tissue)|detergent|washing\s*powder|bar\s*soap|air\s*freshener|insecticide)\b/i, slug: "supermarket", reason: "groceries / household consumables" },
+  { pattern: /\b(whisky|whiskey|vodka|tequila|cognac|brandy|liqueur|\brum\b|hennessy|mo[eë]t|prosecco|baileys|smirnoff|jameson|jack\s*daniel|johnnie\s*walker|red\s*label|black\s*label|glenfiddich|martell|remy\s*martin|campari|absolut|olmeca|don\s*julio|(?:red|white|ros[eé]|sweet|dry|sparkling)\s*wine|wine\s*(?:75cl|70cl|gift|carton|bottle)|\blager\b|\bstout\b|guinness|heineken|budweiser|smirnoff\s*ice|bitter\s*lemon|energy\s*drink|malt\s*drink|\bmalta\b)\b/i, slug: "supermarket", reason: "drinks (alcohol / beverages)" },
+  { pattern: /\b(indomie|noodles|spaghetti|golden\s*morn|cornflakes|corn\s*flakes|\bcereal\b|bournvita|ovaltine|peak\s*milk|dano\s*milk|cowbell|milk\s*powder|(?:cooking|vegetable|groundnut|palm|sunflower)\s*oil|tomato\s*paste|seasoning\s*(?:cube|powder)?|maggi|knorr\s*(?:cube|seasoning|chicken|beef)|(?:basmati|long\s*grain|parboiled|jollof)\s*rice|rice\s*(?:5kg|10kg|25kg|50kg)|semovita|garri|table\s*water|bottled\s*water|soft\s*drink|pringles|toilet\s*(?:paper|roll|tissue)|detergent|washing\s*powder|bar\s*soap|air\s*freshener|insecticide)\b/i, slug: "supermarket", reason: "groceries / household consumables" },
+  /* "Champagne" and "Milo" are ALSO a fashion colour ("...sandals in
+     champagne", "...top in champagne") and a style name ("Public Desire
+     Milo sandals", "Topshop Milo bag"), so the old bare matches mis-filed
+     apparel into supermarket (and supermarket rules run before fashion, so
+     they won). Gate both to a real drink/grocery context. June 2026 audit:
+       - Champagne: a champagne HOUSE (Moët, Veuve Clicquot, Dom Pérignon,
+         Bollinger, Laurent Perrier, Louis Roederer, Armand de Brignac…) OR
+         bare "champagne" co-occurring with a bottle/brut/volume marker.
+         "...in champagne" (colour, no house/bottle) no longer matches.
+       - Milo: only the Nestlé drink (milo + a grocery unit, or "Nestlé
+         Milo"). No real Milo-drink listings exist today; every "Milo" in
+         the catalog was a fashion style name, so this is purely defensive. */
+  { pattern: /\b(mo[eë]t|veuve\s*clicquot|dom\s*p[eé]rignon|bollinger|laurent\s*perrier|louis\s*roederer|armand\s*de\s*brignac|taittinger|lanson|\bmumm\b|perrier\s*jou[eë]t)\b|\bchampagne\b[\s\S]*\b(?:brut|vintage|magnum|demi[-\s]?sec|cuv[eé]e|\d+\s*cl|\d+\s*ml)\b|\b(?:brut|vintage|magnum|cuv[eé]e|\d+\s*cl|\d+\s*ml)\b[\s\S]*\bchampagne\b/i, slug: "supermarket", reason: "champagne (house / bottle context)" },
+  { pattern: /\bmilo\s*(?:\d|tin|refill|sachet|powder|nutri|chocolate|drink|hot)\b|\bnestl[eé]\s*milo\b/i, slug: "supermarket", reason: "Milo drink (grocery context)" },
 
   // ── Wearables / Fitness ──
   { pattern: /\b(apple\s*watch|smart\s*watch|smartwatch|garmin|fitbit|whoop|fossil\s*smart)\b/i, slug: "electronics", reason: "smartwatch" },
@@ -389,7 +403,7 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
      false-matching unrelated titles. `\btee\b` is gated to require an
      adjacent fashion qualifier so it doesn't match "Tee Time Golf",
      "Tee Off Tournament", etc. */
-  { pattern: /\b(jeans|denim|hoodie|jacket|skirt|trousers|chinos|polo|blouse|cardigan|sweatshirt|sweatpants|joggers|leggings|shorts|swimwear|swimsuit|bikini|underwear|boxers|briefs|lingerie|nightwear|pajamas|pyjamas|onesie|bodysuit|jumpsuit|romper|kaftan|kimono|robe|abaya|saree|kurta|ankara|agbada|dashiki)\b/i, slug: "fashion", reason: "clothing" },
+  { pattern: /\b(jeans|denim|hoodie|jacket|skirt|trousers|chinos|polo|blouse|cardigan|sweatshirt|sweatpants|joggers|leggings|shorts|swimwear|swimsuit|bikini|underwear|boxers|briefs|lingerie|nightwear|pajamas|pyjamas|onesie|bodysuit|jumpsuit|romper|camisole|cami\s+top|crop\s+top|tank\s+top|tube\s+top|halter\s+(?:top|neck|dress)|peplum|bralette|bandeau|corset|off[-\s]?shoulder|kaftan|kimono|robe|abaya|saree|kurta|ankara|agbada|dashiki)\b/i, slug: "fashion", reason: "clothing" },
   /* T-shirt + tee variants. Listed separately so the regex stays
      readable. `t[-\s]?shirts?` matches "T-shirt", "T shirt", "Tshirt",
      "T-Shirts", "T shirts". `tee\s*(shirt|top|dress)` matches "Tee
@@ -422,7 +436,7 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
      the trailing s). Now uses `handbags?` to allow optional plural,
      plus broader bag vocab so any obvious bag-product gets routed
      to fashion. */
-  { pattern: /\b(handbags?|backpacks?|tote\s*bags?|crossbody|messenger\s*bags?|shoulder\s*bags?|shopper\s*bags?|clutch|clutches|satchels?|duffels?|fanny\s*packs?|waist\s*packs?|purses?)\b/i, slug: "fashion", reason: "bag" },
+  { pattern: /\b(handbags?|backpacks?|tote\s*bags?|crossbody|messenger\s*bags?|shoulder\s*bags?|shopper\s*bags?|grab\s*bags?|bucket\s*bags?|straw\s*bags?|hobo\s*bags?|clutch|clutches|satchels?|duffels?|fanny\s*packs?|waist\s*packs?|purses?)\b/i, slug: "fashion", reason: "bag" },
   { pattern: /\b(leather\s*wallet|bifold\s*wallet|trifold\s*wallet|cardholder\s*wallet)\b/i, slug: "fashion", reason: "leather wallet" },
   { pattern: /\b(sunglasses|eyeglasses|wayfarer|aviator|ray-ban|raybans)\b/i, slug: "fashion", reason: "eyewear" },
 
