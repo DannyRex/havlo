@@ -15,6 +15,14 @@
   --bg-rgb:            255 255 255;
   --surface-rgb:       255 255 255;
   --surface-2-rgb:     248 250 255;     /* brighter + faint cool undertone */
+  /* Product-image tile. Light = pure white (photos already sit on white).
+     The .dark override is a soft OFF-WHITE, deliberately NOT theme-flipped
+     to dark: product images (especially transparent PNGs) must always sit
+     on a light tile so they never blend into the dark page, just a hair
+     under pure white so the tiles don't glare. Purely cosmetic — image
+     matching uses a precomputed, trim-based (background-agnostic)
+     image_phash and is unaffected by the display background. */
+  --img-tile-rgb:      255 255 255;
   /* June 2026 (Danny): all neutral borders are one subtle light-grey in
      light mode. 1px #efefef gives cards/dividers definition (surfaces are
      all near-white) without a heavy edge. */
@@ -59,6 +67,11 @@
   --bg-rgb:            10 12 16;
   --surface-rgb:       19 22 29;
   --surface-2-rgb:     27 31 40;
+  /* Soft off-white product tile — still clearly a LIGHT tile (products,
+     incl. transparent PNGs, sit on light, never blending into the dark
+     page) but ~7% under pure white with a faint cool tint so it doesn't
+     glare as a bright rectangle. Tune here to taste. */
+  --img-tile-rgb:      237 240 245;
   --border-rgb:        44 49 60;
   --border-strong-rgb: 72 79 94;
   /* Skeleton fill — lifted above surface-2 so placeholders separate clearly

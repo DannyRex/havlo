@@ -147,7 +147,7 @@ function LiveCard({ deal, aspect }: { deal: Deal; aspect: string }) {
       className="group card card-hover overflow-hidden flex flex-col"
     >
       {/* Image — varied aspect for masonry feel */}
-      <div className={`relative overflow-hidden bg-white ${aspect}`}>
+      <div className={`relative overflow-hidden bg-img-tile ${aspect}`}>
         <LiveImage imageUrl={deal.imageUrl} />
 
         {/* Discount badge — perfect circle, top-right */}

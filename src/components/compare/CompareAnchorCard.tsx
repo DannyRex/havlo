@@ -125,7 +125,7 @@ export default function CompareAnchorCard({ anchor, dupes, country, query, canCo
               but next/image's value on a single static-aspect cell
               was modest anyway. */}
           {anchor.imageUrl ? (
-            <div className="relative w-full sm:w-28 h-40 sm:h-28 rounded-xl overflow-hidden flex-shrink-0 bg-white">
+            <div className="relative w-full sm:w-28 h-40 sm:h-28 rounded-xl overflow-hidden flex-shrink-0 bg-img-tile">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={anchor.imageUrl}

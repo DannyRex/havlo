@@ -43,7 +43,7 @@ function LogoChip({
   const initial = storeName.trim().charAt(0).toUpperCase() || "•";
   return (
     <span
-      className="relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded bg-white ring-1 ring-black/[0.08]"
+      className="relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded bg-img-tile ring-1 ring-black/[0.08]"
       style={{ width: size, height: size }}
     >
       <span
@@ -183,7 +183,7 @@ export default function DupeCard({
       )}
 
       {/* Image — varied aspect for masonry feel */}
-      <div className={`relative w-full overflow-hidden bg-white ${aspect}`}>
+      <div className={`relative w-full overflow-hidden bg-img-tile ${aspect}`}>
         <DupeImage imageUrl={dupe.imageUrl} alt={dupe.title} />
       </div>
 

@@ -160,7 +160,7 @@ export default function ListCard({ deal, linkHref }: Props) {
       className="group flex gap-3 items-start p-2.5 rounded-2xl border border-border bg-surface hover:border-border-strong hover:shadow-card transition-all"
     >
       {/* Image — square thumbnail on the left */}
-      <div className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-white border border-border">
+      <div className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-img-tile border border-border">
         <ResilientThumb deal={deal} />
 
         {/* Discount badge — perfect circle, top-right of the thumbnail */}

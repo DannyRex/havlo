@@ -29,6 +29,10 @@ const config: Config = {
         bg:           "rgb(var(--bg-rgb) / <alpha-value>)",
         surface:      "rgb(var(--surface-rgb) / <alpha-value>)",
         "surface-2":  "rgb(var(--surface-2-rgb) / <alpha-value>)",
+        /* Product-image tile (bg-img-tile): white in light mode, soft
+           off-white in dark — NOT theme-flipped, so product photos always
+           sit on a light tile. See --img-tile-rgb in globals.css. */
+        "img-tile":   "rgb(var(--img-tile-rgb) / <alpha-value>)",
         border:       "rgb(var(--border-rgb) / <alpha-value>)",
         "border-strong": "rgb(var(--border-strong-rgb) / <alpha-value>)",
         // Semantic text

@@ -382,7 +382,7 @@ export default function ProductHero({ offer, countryCode, totalStores, hasCheape
           object-contain letterboxes, so the container colour shows
           around the photo. Keeps bg-surface-2 for the no-image
           HavloLogoFallback, which is designed for the dark surface. */}
-      <div className={`relative aspect-square md:aspect-[4/5] rounded-2xl sm:rounded-3xl border border-border overflow-hidden ${imgSrc && !imgFailed ? "bg-white" : "bg-surface-2"}`}>
+      <div className={`relative aspect-square md:aspect-[4/5] rounded-2xl sm:rounded-3xl border border-border overflow-hidden ${imgSrc && !imgFailed ? "bg-img-tile" : "bg-surface-2"}`}>
         {imgSrc && !imgFailed ? (
           /* Plain <img> (May 2026 v3) — was next/image with priority.
              Vercel free-tier image transformation cap (5K/mo) was
