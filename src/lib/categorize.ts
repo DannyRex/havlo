@@ -159,7 +159,11 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   // Generic-phone titles without those tokens fall through to the
   // null category and won't surface as phones — better than the 152+
   // false positives we caught.
-  { pattern: /\b(iphone|galaxy\s*(s|a|m|note|z)\d|pixel\s*\d|tecno|infinix|redmi|oneplus|xiaomi|huawei|motorola|moto\s*g|moto\s*e|nokia|smartphone)\b/i, slug: "phones", reason: "phone model" },
+  /* `\d+` (not `\d`) on the Galaxy / Pixel model number: the trailing
+     `\b` after a single `\d` meant two-digit models — Galaxy S20-S24,
+     Note20, A54, M34, Pixel 10 — failed to match (only single-digit
+     S9/Pixel9 did). Caught in the June 2026 category audit. */
+  { pattern: /\b(iphone|galaxy\s*(s|a|m|note|z)\d+|pixel\s*\d+|tecno|infinix|redmi|oneplus|xiaomi|huawei|motorola|moto\s*g|moto\s*e|nokia|smartphone)\b/i, slug: "phones", reason: "phone model" },
   // Branded-phone fallback: a title with "phone" + one of these
   // explicit phone-spec markers (RAM/storage/network) is real phone.
   // Keeps generic flagship-y titles like "5G Phone 8GB+256GB" as
@@ -349,6 +353,29 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
   // ── Fashion ──
   { pattern: /\b(nike|adidas|puma|reebok|new\s*balance|asics|under\s*armour)\s+\w*\b.*\b(shoe|sneaker|trainer|boot|sandal)\b/i, slug: "fashion", reason: "branded footwear" },
   { pattern: /\b(air\s*force|air\s*jordan|adidas\s*samba|nike\s*dunk|stan\s*smith|yeezy|ultra\s*boost|crocs)\b/i, slug: "fashion", reason: "iconic sneaker" },
+  /* Generic footwear — brand-agnostic. The two rules above only catch a
+     hardcoded brand list (nike/adidas/…) plus iconic model names, so
+     OFF-list brands (Clarks, Converse, Tommy Hilfiger, HOKA, Brooks, On,
+     D&G) and unbranded shoes returned null and KEPT whatever source
+     category the feed gave them. June 2026 audit found 300+ shoes
+     mis-shelved in electronics (115), sports (95), and uncategorised
+     (82). These rules classify by the footwear noun itself — no brand
+     required. Homonym gates, each from a real catalog false-positive:
+       • "trainers" PLURAL only (singular "Trainer" is gym kit — "TRX
+         Suspension Trainer System", "Elliptical Cross Trainer"), and a
+         lookbehind also drops plural equipment ("Elliptical Trainers").
+       • "shoe(s)" excludes shoe furniture / care (rack, box, polish,
+         tree, insole, horn…) — those are home, not apparel.
+       • bare "heel" / "boots" NOT matched (Achilles heel, heel pain;
+         Boots the pharmacy, car boot) — both need a footwear qualifier.
+     All routed to fashion, matching the branded-footwear convention, so
+     the retag also moves athletic shoes out of sports (sports keeps the
+     actual equipment: weights, balls, suspension trainers). */
+  { pattern: /\b(sneakers?|loafers?|moccasins?|espadrilles?|brogues?|plimsolls?|slippers?|flip[-\s]?flops?|sandals?)\b/i, slug: "fashion", reason: "footwear noun" },
+  { pattern: /(?<!\b(?:elliptical|cross|suspension|resistance|balance|core|abs?|cycling|bike|smart|turbo|vibration|stair)\s)\btrainers\b/i, slug: "fashion", reason: "trainers (footwear, plural)" },
+  { pattern: /\bshoes?\b(?!\s*(?:rack|racks|box|boxes|cabinet|shelf|shelves|organi[sz]er|polish|horn|tree|trees|insoles?|cleaner|brush|brushes|bag|bags|deodori[sz]er|dryer|stretcher|holder|stand))/i, slug: "fashion", reason: "shoe(s)" },
+  { pattern: /\b(high|kitten|block|stiletto|wedge|platform|cone|cuban)[-\s]*heels?\b|\bheeled\s*(?:sandals?|shoes?|boots?|mules?)\b|\bcourt\s*shoes?\b|\bmary\s*janes?\b|\bballet\s*(?:flats?|pumps?)\b/i, slug: "fashion", reason: "heels / dress footwear" },
+  { pattern: /\b(ankle|chelsea|combat|hiking|chukka|cowboy|biker|riding|knee[-\s]?high|thigh[-\s]?high|rain|snow|wellington|wellies|work|desert|winter|leather|suede)\s*boots?\b|\bfootwear\b/i, slug: "fashion", reason: "boots / footwear" },
   /* Clothing words. 'coat' alone false-matched 'Color Wow Dream Coat
      Spray' (hair treatment) in retag dry-run. Disambiguated by
      pairing 'coat' with weather/winter context, and dropping 'coat'
