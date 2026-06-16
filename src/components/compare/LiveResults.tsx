@@ -274,7 +274,7 @@ export default function LiveResults({ items, loading, providers }: Props) {
             <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
           </span>
           <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-success">
-            From other stores
+            More to compare
           </span>
         </div>
         {/* Honest framing (June 2026): these are LIVE search matches from
@@ -284,8 +284,8 @@ export default function LiveResults({ items, loading, providers }: Props) {
             what they actually are. */}
         <h3 className="text-lg sm:text-xl font-bold text-ink tracking-[-0.02em]">
           {items.length > 0
-            ? `${formatCount(items.length)} more from other stores`
-            : "More from other stores"}
+            ? `${formatCount(items.length)} from other stores`
+            : "From other stores"}
         </h3>
         <p className="text-xs sm:text-sm text-ink-2 mt-0.5">
           {caption}
