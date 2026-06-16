@@ -1256,7 +1256,6 @@ export default function DealFeed({
           <CategorySubscribe
             categorySlug={activeCat.slug}
             categoryName={activeCat.name}
-            categoryColor={activeCat.color}
           />
         );
       })()}
