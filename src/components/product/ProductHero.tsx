@@ -668,8 +668,16 @@ export default function ProductHero({ offer, countryCode, totalStores, hasCheape
               variant when totalStores isn't computable (curated
               Amazon rows whose product_id isn't in the products
               table). */}
+          {/* Loading label is NEUTRAL, not a comparison promise. The old
+              loading copy ("Compare prices across stores") asserted a
+              cross-store comparison before the data had loaded, so a
+              single-listing product visibly DOWNGRADED to "Search other
+              stores" once it resolved — the user read a promise that then
+              retracted. "Checking other stores…" describes the in-flight
+              lookup and settles cleanly into ANY of the three outcomes
+              (compare N / see cheaper / search) with no retraction. */}
           {loading
-            ? <>Compare prices across stores</>
+            ? <>Checking other stores…</>
             : typeof totalStores === "number" && totalStores > 1
               ? <>Compare prices across {totalStores} stores</>
               : hasCheaperAlternatives
