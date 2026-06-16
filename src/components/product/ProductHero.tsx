@@ -99,6 +99,13 @@ interface Props {
       Drives the "Compare prices across N stores" CTA label so the
       user knows how much broader the compare view is than the PDP. */
   totalStores?: number;
+  /** Whether cheaper ALTERNATIVE products (dupes) exist for this item.
+      With totalStores, it decides the secondary CTA's promise: a real
+      cross-store comparison (totalStores > 1) or cheaper alternatives
+      keeps a comparison CTA; neither present demotes it to an honest
+      "Search other stores" (a live lookup) rather than promising a
+      comparison that isn't there. Undefined until the comparison loads. */
+  hasCheaperAlternatives?: boolean;
   /** Per-store breakdown for the new PriceComparisonBar (store dots
       + cheapest-at action + verdict math). All effective prices are
       country-aware NGN — formatPriceForUser converts at render time.
@@ -170,7 +177,7 @@ function convertToUserCurrency(
   return country.currency === "USD" ? Math.round(out * 100) / 100 : Math.round(out);
 }
 
-export default function ProductHero({ offer, countryCode, totalStores, perStoreOffers, outOfStockOffers, priceHistory, signedOutboundUrl, localAlternative, isLocallyShoppable, loading }: Props) {
+export default function ProductHero({ offer, countryCode, totalStores, hasCheaperAlternatives, perStoreOffers, outOfStockOffers, priceHistory, signedOutboundUrl, localAlternative, isLocallyShoppable, loading }: Props) {
   const country = getCountry(countryCode);
   /* Only fx comes from context — country stays prop-derived (the PDP
      is rendered per /[country]/ URL, which must win over any
@@ -601,13 +608,20 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
             (curated Amazon slugs like 'amazon-us-iphone-15-pro-max')
             return empty from the backstop and are harmless — the
             primary FTS path is still the main route for those. */}
-        {/* CTA always visible, regardless of totalStores. Founder
-            direction May 2026: keep the affordance present even
-            when there's only 1 known listing — the comparison
-            view itself communicates "we're watching for more"
-            and gives users the same price-bar context, so the
-            button is a useful shortcut even when N=1. Briefly
-            tried hiding when N <= 1 (84d1767) — reverted. */}
+        {/* Secondary CTA stays present (never a dead hole), but its LABEL
+            tells the truth about what the click delivers, resolved once the
+            comparison data has loaded:
+              • totalStores > 1            → "Compare prices across N stores"
+              • cheaper alternatives exist → "See cheaper alternatives"
+              • neither (single listing)   → "Search other stores" (an honest
+                live lookup, NOT a promise of a comparison we don't have)
+            Supersedes the earlier "always say 'across stores'" direction
+            (84d1767, June 2026): a compare CTA that lands on a single price
+            trains distrust in the core verb, while the primary "Visit
+            {store}" + the price alert still give a single-listing product
+            real actions. Destination is unchanged (/compare handles all
+            three: anchor + dupes + live search), so the user is never
+            stranded; only the promise is made honest. */}
         <Link
           href={(() => {
             const params = new URLSearchParams({ q: offer.title, mode: "similar" });
@@ -654,9 +668,13 @@ export default function ProductHero({ offer, countryCode, totalStores, perStoreO
               variant when totalStores isn't computable (curated
               Amazon rows whose product_id isn't in the products
               table). */}
-          {typeof totalStores === "number" && totalStores > 1
-            ? <>Compare prices across {totalStores} stores</>
-            : <>Compare prices across stores</>}
+          {loading
+            ? <>Compare prices across stores</>
+            : typeof totalStores === "number" && totalStores > 1
+              ? <>Compare prices across {totalStores} stores</>
+              : hasCheaperAlternatives
+                ? <>See cheaper alternatives</>
+                : <>Search other stores</>}
         </Link>
 
         {/* Tertiary CTA — set a price alert. Tucked below the

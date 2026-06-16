@@ -119,6 +119,7 @@ export default function PdpInteractive({ offer, countryCode, signedOutboundUrl, 
         countryCode={countryCode}
         signedOutboundUrl={signedOutboundUrl}
         totalStores={data?.totalStores}
+        hasCheaperAlternatives={data ? data.dupesForRail.length > 0 : undefined}
         perStoreOffers={data?.perStoreOffers}
         outOfStockOffers={data?.outOfStock ?? []}
         priceHistory={data?.priceHistory ?? undefined}
