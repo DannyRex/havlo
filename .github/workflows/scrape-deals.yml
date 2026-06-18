@@ -8,21 +8,32 @@ on:
     # and the newsletter ships right after each. GitHub Actions is free
     # (public repo = unlimited hosted-runner minutes).
     #
-    # SerpAPI cost (Developer plan = 5,000 credits/mo). Per run, after
-    # dropping the dead-yield Temu lane (Temu pulled its Google Shopping
-    # listings Apr 2025):
-    #     standard ingest         60   (12 categories x 5 countries)
+    # SerpAPI cost (Developer plan = 5,000 credits/mo). Per run, after the
+    # Jun 2026 vertical-depth rebalance (de-emphasized 6 comparison-dead
+    # categories, aligned NG to the head-product spine, and dropped the
+    # redundant serpapi-amazon pass from the standard sweep):
+    #     standard ingest         30   (6 tech categories x 5 countries,
+    #                                    serpapi-shopping ONLY — amazon / jumia /
+    #                                    aliexpress each have their own job, and
+    #                                    model-level density now comes from
+    #                                    ingest:head, so the daily amazon +
+    #                                    aliexpress category passes were dropped)
     #     jumia (+img backfill)   ~54   (29 queries + ~25 google_images)
-    #     ng long-tail            72   (Slot 12 + Kara 10 + Konga 14, x2)
+    #     ng long-tail            ~174  (Slot 30 + Konga 39 + Kara 18, x2 —
+    #                                    derived from the head-product spine)
     #     uk retailers            42   (sum of per-retailer FLAGSHIP_SKUS)
     #     cross-border (SHEIN)    40   (4 markets x 10 SKUs)
     #     -------------------------------
-    #     ~270 credits/run  x  ~13 runs/mo  =  ~3,500/mo  (~70% of plan)
+    #     ~340 credits/run  x  ~13 runs/mo  =  ~4,420/mo  (~88% of plan)
     #     + amazon (engine=amazon) 64/run, WEDNESDAYS ONLY  =  ~275/mo
-    #     = ~3,775/mo total  (~75% of plan)
+    #     = ~4,695/mo total  (~94% of plan)
     #
-    # Leaves ~1,225/mo for live-search + growth. (Jun 2026 recount: the
-    # earlier "~1,384/mo" here was stale, pre-Konga and pre-cross-border.)
+    # Headroom is tight (~305/mo for live-search + growth). The NG lane is now
+    # the dominant cost — the amazon-pass trim above offset most of the NG
+    # spine-alignment increase and keeps the program under the 5k ceiling
+    # (without it the standard sweep was ~120/run and total ~5.5k, OVER plan).
+    # ingest:head (~660/run) is MANUAL and not counted here. If live-search
+    # starts hitting the credit guard, trim the NG per-merchant lists next.
     # True daily would be ~270 x 30 = ~8,200/mo, OVER the 5k ceiling, so
     # daily needs a plan bump, not just a cron change. Note a cadence
     # change touches three places: this cron, the complementary cron in

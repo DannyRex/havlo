@@ -134,6 +134,20 @@ async function main() {
     }
   }
 
+  /* Default cron sweep (no explicit --provider, no forced mode) runs the
+     google_shopping lane ONLY. serpapi-amazon, serpapi-jumia and the
+     AliExpress affiliate API each have their own dedicated cron job with a
+     query shape tuned to that source, so sweeping them again here by bare
+     category name was redundant spend — and low comparison density at that
+     (an Amazon "Phones" category page is single-seller). Model-level density
+     now comes from ingest:head (specific SKUs, every serpapi engine), and
+     serpapi-shopping already surfaces Amazon as one of many sellers, so
+     Amazon coverage is preserved. Explicit --provider= or --mode=market
+     still override this. Trimmed June 2026 to balance against ingest:head. */
+  if (!args.providerId && !args.forceMode) {
+    providers = providers.filter((p) => p.id === "serpapi-shopping");
+  }
+
   if (providers.length === 0) {
     console.error("✗ No active search providers. Set SERPAPI_KEY (or other) in .env.local");
     process.exit(1);
