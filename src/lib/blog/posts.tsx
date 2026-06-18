@@ -1923,7 +1923,7 @@ export const posts: BlogPost[] = [
         </p>
         <p>
           Search any of these on Havlo to see live prices across stores in
-          your country. We surface the cheapest current listing and the
+          your country. We show you the cheapest current listing and the
           cross-border landed cost, so you can decide where to actually buy.
         </p>
       </>

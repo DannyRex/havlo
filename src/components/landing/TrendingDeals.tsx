@@ -295,7 +295,7 @@ export default function TrendingDeals({
   countryCode: string;
 }) {
   return (
-    <section className="py-12 sm:py-20 bg-bg">
+    <section className="py-10 sm:py-14 bg-bg">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-end justify-between mb-6 sm:mb-8 gap-4 px-1 sm:px-0">
           <div>

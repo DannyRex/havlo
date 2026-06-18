@@ -345,7 +345,7 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
   return (
     <section
       aria-label="Search for products"
-      className="relative bg-bg pt-12 pb-10 sm:pt-24 sm:pb-16"
+      className="relative bg-bg pt-12 pb-6 sm:pt-24 sm:pb-10"
     >
       {/* Hero sits on a FLAT bg-bg so it reads as one continuous
           white surface with the opaque white navbar above it. A faint

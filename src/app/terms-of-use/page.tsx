@@ -5,7 +5,7 @@ const sections = [
   {
     title: "Using Havlo",
     paragraphs: [
-      "Havlo gives you price comparisons, deal discovery, and product shortcuts to third-party retailers. By using the site, you agree to use it lawfully and in a way that does not disrupt the platform or other users.",
+      "Havlo gives you price comparisons, current deals, and quick links out to third-party retailers. By using the site, you agree to use it lawfully and in a way that does not disrupt the platform or other users.",
     ],
   },
   {
