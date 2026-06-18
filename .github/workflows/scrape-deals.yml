@@ -10,8 +10,8 @@ on:
     #
     # SerpAPI cost (Developer plan = 5,000 credits/mo). Per run, after the
     # Jun 2026 vertical-depth rebalance (de-emphasized 6 comparison-dead
-    # categories, aligned NG to the head-product spine, and restricted the
-    # standard sweep to serpapi-shopping):
+    # categories, aligned NG to the head-product spine then right-sized it, and
+    # restricted the standard sweep to serpapi-shopping):
     #     standard ingest         30   (6 tech categories x 5 countries,
     #                                    serpapi-shopping ONLY — the serpapi-jumia
     #                                    pass that also ran here fired over
@@ -20,21 +20,22 @@ on:
     #                                    results; Jumia's real NG coverage is the
     #                                    dedicated job below)
     #     jumia (+img backfill)   ~54   (29 queries + ~25 google_images, NG)
-    #     ng long-tail            ~174  (Slot 30 + Konga 39 + Kara 18, x2 —
-    #                                    derived from the head-product spine)
+    #     ng long-tail            ~110  (Slot 19 + Konga 18 + Kara 18, x2 —
+    #                                    spine-derived; phones capped to the ~12
+    #                                    highest-volume NG models, thinner
+    #                                    verticals run single-merchant)
     #     uk retailers            42   (sum of per-retailer FLAGSHIP_SKUS)
     #     cross-border (SHEIN)    40   (4 markets x 10 SKUs)
     #     -------------------------------
-    #     ~340 credits/run  x  ~13 runs/mo  =  ~4,420/mo  (~88% of plan)
+    #     ~276 credits/run  x  ~13 runs/mo  =  ~3,590/mo  (~72% of plan)
     #     + amazon (engine=amazon) 64/run, WEDNESDAYS ONLY  =  ~275/mo
-    #     = ~4,695/mo total  (~94% of plan)
+    #     = ~3,865/mo total  (~77% of plan)
     #
-    # Headroom is tight (~305/mo for live-search + growth). The NG lane is now
-    # the dominant cost. The jumia-pass trim (~30/run) partly offsets the NG
-    # spine-alignment increase (72 -> 174/run); the program stays under the 5k
-    # ceiling but only just. ingest:head (~660/run) is MANUAL and not counted
-    # here. If live-search starts hitting the credit guard, trim the NG
-    # per-merchant lists next — that lane is where the spend now concentrates.
+    # Healthy headroom (~1,135/mo for live-search + growth). NG is still the
+    # single largest lane (the dense vertical, so worth it); if you need more
+    # room, trim the NG audio / computing picks next. The jumia-pass trim
+    # (~30/run) + NG right-size (174 -> 110/run) are what reclaimed the room.
+    # ingest:head (~660/run) is MANUAL and not counted here.
     # True daily would be ~270 x 30 = ~8,200/mo, OVER the 5k ceiling, so
     # daily needs a plan bump, not just a cron change. Note a cadence
     # change touches three places: this cron, the complementary cron in
