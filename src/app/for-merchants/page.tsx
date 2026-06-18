@@ -81,7 +81,7 @@ const FAQ = [
   },
   {
     q: "What about returns, customer support, or fraud?",
-    a: "Havlo never holds payment or ships goods. Every transaction is between the shopper and you. You handle returns, support, fraud, and warranty the same way you do today. We're a discovery and comparison layer, nothing more.",
+    a: "Havlo never holds payment or ships goods. Every transaction is between the shopper and you. You handle returns, support, fraud, and warranty the same way you do today. We just help shoppers find and compare. That's it.",
   },
   {
     q: "How often do prices refresh?",
@@ -120,13 +120,13 @@ export default function ForMerchantsPage() {
             For merchants &amp; brands
           </p>
           <h1 className="text-3xl sm:text-5xl font-bold text-ink tracking-[-0.025em] leading-[1.05] mb-5">
-            Reach shoppers who are ready to buy.
+            Show up when people are deciding where to buy.
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-lg leading-relaxed">
             Havlo helps shoppers in six markets compare prices across local
-            stores and cross-border options. Send us a product feed and we
-            surface your products to people who are already deciding what to
-            buy. You handle the sale.
+            stores and cross-border options. Send us a product feed and your
+            products show up while shoppers are comparing prices. You handle
+            the sale.
           </p>
         </header>
 

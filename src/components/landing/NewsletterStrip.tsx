@@ -21,8 +21,8 @@ export default function NewsletterStrip() {
           The best price drops, in your inbox.
         </h2>
         <p className="text-sm sm:text-base text-ink-2 max-w-md mx-auto mb-7 sm:mb-8 leading-relaxed">
-          Just the price drops worth opening. Unsubscribe in one click, no hard
-          feelings.
+          We only email when something&apos;s genuinely cheaper. Unsubscribe in
+          one click, no hard feelings.
         </p>
         <div className="flex justify-center">
           <EmailCapture heading="" subheading="" source="homepage-strip" />

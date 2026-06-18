@@ -39,7 +39,7 @@ export async function generateMetadata({
   const country = getCountry(params.country);
   const url = `${SITE_URL}/${country.code}/blog`;
   const title = `Blog · Havlo ${country.name}`;
-  const description = `Buyer's guides and price-comparison breakdowns for shoppers in ${country.name}, plus the tradeoffs that matter when you're deciding what to buy.`;
+  const description = `Buyer's guides and price-comparison breakdowns for shoppers in ${country.name}, plus the tradeoffs that actually matter before you buy.`;
   return {
     title,
     description,
@@ -83,7 +83,7 @@ export default function CountryBlogIndex({
           </h1>
           <p className="text-ink-2 text-[15px] sm:text-lg leading-relaxed max-w-xl">
             Where the best prices actually are in {country.name},
-            plus the tradeoffs that matter when you&apos;re deciding what to buy.
+            plus the tradeoffs that matter before you buy.
           </p>
         </header>
 
