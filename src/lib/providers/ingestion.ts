@@ -1253,6 +1253,31 @@ export async function ingestDeals(
   const offerRows = offerWrites.map(({ deal, productId }) =>
     dealToOfferRow(deal, productId, sourceProvider, sourceQuery, runStartedAt),
   );
+  /* Collapse rows that share an (store_id, url) conflict key WITHIN this
+     batch before the upsert. A single INSERT ... ON CONFLICT statement
+     cannot touch the same target row twice — Postgres aborts the WHOLE
+     statement with "ON CONFLICT DO UPDATE command cannot affect row a second
+     time", which silently zeroed entire merchant batches (Konga surfaced the
+     same /product/ URL from two different queries → 92 deals, 0 saved).
+     Keep the LAST occurrence per key (the last write would win the upsert
+     anyway), pruning offerWrites in lockstep so the upserted count + the
+     displaced-offer probe below stay aligned. */
+  {
+    const lastIdxByKey = new Map<string, number>();
+    offerRows.forEach((r, i) => lastIdxByKey.set(`${r.store_id} ${r.url}`, i));
+    if (lastIdxByKey.size < offerRows.length) {
+      const keep = new Set(lastIdxByKey.values());
+      const dedupRows: typeof offerRows = [];
+      const dedupWrites: typeof offerWrites = [];
+      offerRows.forEach((r, i) => {
+        if (keep.has(i)) { dedupRows.push(r); dedupWrites.push(offerWrites[i]); }
+      });
+      const collapsed = offerRows.length - dedupRows.length;
+      offerRows.length = 0; offerRows.push(...dedupRows);
+      offerWrites.length = 0; offerWrites.push(...dedupWrites);
+      console.log(`[ingest] ${sourceProvider}: collapsed ${collapsed} duplicate (store_id,url) offer row(s) before upsert`);
+    }
+  }
   const displacedProductIds = new Set<string>();
   if (offerRows.length > 0) {
     const storeIds = Array.from(new Set(offerRows.map((r) => r.store_id)));
