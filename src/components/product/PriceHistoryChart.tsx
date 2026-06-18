@@ -333,10 +333,27 @@ export default function PriceHistoryChart({
     ? "today"
     : dateFmt.format(new Date(sliced[geom.lowestIdx].day));
 
-  /* Shared time-window caption for the Lowest / Highest tiles so both
-     read with the same framing ("in 30 days" / "all time") instead of a
-     date on one and a range on the other (#23). */
-  const rangeCaption = range.label === "All" ? "all time" : `in ${range.label.toLowerCase()}`;
+  /* Window word folded into the Lowest/Highest tile LABELS ("30D low",
+     "All-time high") so those stats read unmistakably as the price's range
+     OVER TIME — not the spectrum bar's "highest now" current cross-store
+     spread. A launch UX pass found users conflating the two ("highest £197"
+     on the spectrum vs "£230" on the chart, same page): both correct (today's
+     priciest store vs the 30-day peak of the cheapest line) but reading as a
+     contradiction. Putting the window in the label makes the lenses distinct;
+     the captions now carry WHEN each extreme occurred. */
+  const windowWord = range.label === "All" ? "All-time" : range.label;
+  /* Date the highest tracked price occurred, mirroring lowestDate, so both
+     extreme tiles caption with "when". If the live price is the peak, "today". */
+  const currentIsHighest = currentNgn >= geom.highestNgn;
+  const highestDate = currentIsHighest
+    ? "today"
+    : (() => {
+        let idx = 0, max = sliced[0].minPriceNgn;
+        for (let i = 1; i < sliced.length; i++) {
+          if (sliced[i].minPriceNgn > max) { max = sliced[i].minPriceNgn; idx = i; }
+        }
+        return dateFmt.format(new Date(sliced[idx].day));
+      })();
 
   /* Reference-line label that floats on the right edge. Slight
      dim so it doesn't compete with the line. */
@@ -637,20 +654,21 @@ export default function PriceHistoryChart({
       {/* ── Tiles strip ─────────────────────────────────────── */}
       <div className="mt-3 sm:mt-4 grid grid-cols-3 gap-2">
         {/* Lowest / Highest describe the price RANGE over the selected
-            period; "Right now" is the current price. Labels kept to that
-            plain trio (#23) so the context reads at a glance. Captions
-            carry the time window consistently ("in 30 days" / "all time")
-            instead of a bare date or the old "this view" jargon. */}
+            window — the window lives in the LABEL ("30D low", "All-time
+            high") so these can't be misread as the spectrum bar's current
+            cross-store spread above. "Right now" is the visiting price.
+            Captions carry WHEN each extreme occurred (#23: consistent
+            framing across all three tiles). */}
         <Tile
-          label="Lowest"
+          label={`${windowWord} low`}
           value={formatPriceForUser(geom.lowestNgn, country)}
-          caption={rangeCaption}
+          caption={lowestDate}
           tone="success"
         />
         <Tile
-          label="Highest"
+          label={`${windowWord} high`}
           value={formatPriceForUser(geom.highestNgn, country)}
-          caption={rangeCaption}
+          caption={highestDate}
         />
         <Tile
           label="Right now"
