@@ -46,6 +46,18 @@ function inferModeForCategory(slug: string, forceMode?: "deals" | "market"): "de
   return MARKET_MODE_CATEGORIES.has(slug) ? "market" : "deals";
 }
 
+/* Comparison-DEAD categories — density is 0-15% in every market and 0% local
+   for most (Jun 2026 vertical-depth analysis, docs/vertical-depth-plan.md).
+   The default paid sweep SKIPS these to save SerpAPI credits and concentrate
+   spend on the tech cluster that actually compares (phones / computing /
+   audio / gaming / electronics / appliances + the head-product spine, see
+   scripts/ingest-head-products.ts). These categories STAY in the catalog:
+   existing rows + the free scrapers keep them alive for the SEO long tail,
+   and an explicit `--category=fashion` still runs them for a manual one-off. */
+const DEEMPHASIZED_CATEGORIES = new Set([
+  "fashion", "beauty", "health", "supermarket", "home", "sports",
+]);
+
 /* The international markets Nigerian shoppers most commonly import from.
    - us:  Amazon.com, eBay, Walmart, Best Buy
    - uk:  Amazon.co.uk, ASOS, Argos, Currys
@@ -129,7 +141,10 @@ async function main() {
 
   let targetCategories = args.categorySlugs
     ? categories.filter((c) => args.categorySlugs!.includes(c.slug))
-    : categories.filter((c) => c.slug !== "all");
+    /* Default cron sweep: tech cluster only — skip "all" and the
+       comparison-dead categories to save SerpAPI credits. Explicit
+       --category= still runs anything. */
+    : categories.filter((c) => c.slug !== "all" && !DEEMPHASIZED_CATEGORIES.has(c.slug));
 
   if (args.forceMode === "market" && !args.categorySlugs) {
     targetCategories = targetCategories.filter((c) => MARKET_MODE_CATEGORIES.has(c.slug));

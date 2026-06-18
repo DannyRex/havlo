@@ -16,6 +16,7 @@
     "ai:embed:images": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/embed-deals.ts --images",
     "ai:reindex": "tsx --tsconfig tsconfig.scripts.json scripts/ai-search/reindex.ts",
     "ingest": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-providers.ts",
+    "ingest:head": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-head-products.ts",
     "ingest:serpapi": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-providers.ts --provider=serpapi-shopping",
     "ingest:aliexpress": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-providers.ts --provider=aliexpress-affiliate",
     "ingest:scraped": "tsx --tsconfig tsconfig.scripts.json scripts/ingest-scraped.ts",
