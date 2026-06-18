@@ -19,7 +19,7 @@ export default function HomeOG() {
         headline="Find similar products"
         subline="for less."
         subhead="Paste a link or search anything. Havlo finds cheaper alternatives across the stores you already know."
-        statusDot={{ color: "#22C55E", text: "Live · 1,500+ stores worldwide" }}
+        statusDot={{ color: "#22C55E", text: "Live · 1,700+ stores worldwide" }}
       />
     ),
     size,
