@@ -72,11 +72,22 @@ export const organizationJsonLd = {
     height:   512,
   },
   description:  "Independent price-comparison and product-discovery platform serving shoppers in Nigeria, UK, US, India, UAE, and South Africa.",
+  slogan:       "Shop smarter.",
+  /* Markets + topics reinforce Havlo as a multi-market shopping-comparison
+     ENTITY. This is the disambiguation lever for the bare-term "havlo"
+     SERP, which is currently dominated by an unrelated music artist named
+     Havlo: the more concrete, cross-referenced brand signal Google has, the
+     sooner it can tell the two apart. The bigger half of this lever is
+     OFF-site — see the sameAs note below. */
+  areaServed:   ["Nigeria", "United Kingdom", "United States", "India", "United Arab Emirates", "South Africa"],
+  knowsAbout:   ["Price comparison", "Online shopping deals", "Product price tracking", "Cross-border shopping"],
   sameAs: [
-    /* Verified social accounts. Google reads these for entity
-       verification + sitelinks; helps unlock the knowledge-panel
-       social row in branded search results. Add new accounts as
-       they're claimed (X, TikTok, LinkedIn, etc.). */
+    /* Verified social accounts. Google cross-references these to build +
+       disambiguate the entity and to unlock the knowledge-panel social row
+       in branded search. ONLY Instagram is live today — Instagram alone
+       will NOT out-signal the music artist. Claim X, LinkedIn (company),
+       Facebook, TikTok and YouTube as "Havlo", link havlo.io from each
+       profile, then add the URLs here. That cross-link is what moves it. */
     "https://instagram.com/havlo.io",
   ],
   contactPoint: {
