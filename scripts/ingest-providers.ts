@@ -135,15 +135,16 @@ async function main() {
   }
 
   /* Default cron sweep (no explicit --provider, no forced mode) runs the
-     google_shopping lane ONLY. serpapi-amazon, serpapi-jumia and the
-     AliExpress affiliate API each have their own dedicated cron job with a
-     query shape tuned to that source, so sweeping them again here by bare
-     category name was redundant spend — and low comparison density at that
-     (an Amazon "Phones" category page is single-seller). Model-level density
-     now comes from ingest:head (specific SKUs, every serpapi engine), and
-     serpapi-shopping already surfaces Amazon as one of many sellers, so
-     Amazon coverage is preserved. Explicit --provider= or --mode=market
-     still override this. Trimmed June 2026 to balance against ingest:head. */
+     google_shopping lane ONLY. getActiveSearchProviders() also returns the
+     serpapi-jumia engine plus the free AliExpress / Konga / pg-FTS providers,
+     but each has its own dedicated cron job (ingest:jumia, ingest:aliexpress,
+     the NG-merchant lane). serpapi-jumia in particular was firing over this
+     sweep's us/uk/ae/in/za grid — markets Jumia doesn't operate in — so it
+     burned ~1 credit/call for ~zero results (~30 wasted searches/run).
+     Model-level density now comes from ingest:head, so the bare-category
+     fan-out across the extra engines is redundant. Restricting to
+     serpapi-shopping drops that waste with no coverage loss. Explicit
+     --provider= or --mode=market still override. Trimmed June 2026. */
   if (!args.providerId && !args.forceMode) {
     providers = providers.filter((p) => p.id === "serpapi-shopping");
   }
