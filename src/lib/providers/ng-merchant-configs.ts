@@ -12,6 +12,7 @@
    credit cost per ingest run is (∑ queries) × 1 credit. */
 
 import type { MerchantConfig } from "./search-ng-merchant-serpapi";
+import { headProductSeeds } from "./head-products";
 
 /* Shared product-URL helpers — kept inline so the config blocks
    stay tight + readable. */
@@ -218,50 +219,28 @@ export const NG_MERCHANT_CONFIGS_INACTIVE: MerchantConfig[] = [
 ];
 
 /* ── Per-merchant query lists ─────────────────────────────────────
-   Hand-picked queries that cover each merchant's strongest verticals.
-   Small lists keep SerpAPI credit cost predictable; we can grow
-   these as the catalog matures.
+   The active tech merchants (Slot, Konga, Kara) DERIVE their query lists
+   from the single head-product spine (head-products.ts), so NG stays in
+   lockstep with the other markets: the same iPhone / Galaxy / Tecno / etc.
+   models Havlo saturates in us/uk/ae/in/za get pulled across the NG
+   retailers too, which is what builds the multi-seller comparison. Each
+   merchant takes only the spine categories it actually stocks; the
+   inactive merchants below keep hand lists for future probes.
 
-   Total per ingest run = sum of (config.queries.length) across the
-   active configs, each query firing google + a google_images companion.
-   Slot 12 + Kara 10 + Konga 14 = 36 queries x 2 = ~72 credits per run.
-   Mon/Wed/Fri cron (~13 runs/mo) = ~940 credits/month, well under the
-   5,000 Developer plan budget.
+   Credit cost (active configs, each query firing google + a google_images
+   companion ≈ 2 credits): Slot ~30 + Konga ~39 + Kara ~18 ≈ 87 queries ≈
+   ~174 credits/run. Mon/Wed/Fri cron (~13 runs/mo) ≈ ~2,260 credits/month,
+   under the 5,000 Developer plan budget. A query that returns 0 organic
+   results still costs 1 credit, so each merchant is scoped to the spine
+   categories it genuinely stocks rather than the whole spine. */
+const ngHead = headProductSeeds("ng");
+const headQ = (cats: string[]): string[] =>
+  ngHead.filter((s) => cats.includes(s.categorySlug)).map((s) => s.q);
 
-   Query design: lead with high-velocity SKUs that the merchant
-   genuinely stocks. A query that returns 0 organic results still
-   costs 1 credit, so prefer queries that exist in the merchant's
-   catalog over speculative ones. */
 export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
-  /* Slot is a phone-first retailer. iPhones, Samsung Galaxy,
-     Tecno + Infinix (NG-favourite mid-range), accessories. */
-  slot: [
-    "iPhone 15",
-    "iPhone 16",
-    "Samsung Galaxy S24",
-    "Samsung Galaxy A05",
-    "Tecno Spark",
-    "Tecno Camon",
-    "Infinix Hot",
-    "Infinix Note",
-    "Xiaomi Redmi",
-    "iPad",
-    "MacBook",
-    "AirPods",
-    /* Broadened June 2026: more NG-popular phone models + the accessory
-       lines Slot stocks deepest (Oraimo is the dominant NG accessory brand;
-       power banks / earbuds / smartwatches move heavily). */
-    "iPhone 13",
-    "iPhone 14",
-    "Samsung Galaxy A15",
-    "Samsung Galaxy A35",
-    "Tecno Spark 20",
-    "Infinix Smart",
-    "itel",
-    "Oraimo",
-    "power bank",
-    "smartwatch",
-  ],
+  /* Slot — phone-first electronics retailer. Spine phones + audio +
+     electronics (covers Oraimo power banks / smartwatches + Apple Watch). */
+  slot: headQ(["phones", "audio", "electronics"]),
 
   /* 3C Hub: phones + laptops + gaming + audio. */
   threechub: [
@@ -335,26 +314,14 @@ export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
     "fruit juice",
   ],
 
-  /* Kara: electronics + appliances + small kitchen. */
+  /* Kara — electronics + appliances + small kitchen. The top spine phones
+     plus Kara's appliance set (appliances aren't in the spine; Kara is the
+     one NG merchant with real multi-seller appliance potential). */
   kara: [
-    "iPhone",
-    "Samsung Galaxy",
-    "blender",
-    "microwave",
-    "iron",
-    "kettle",
-    "fan",
-    "vacuum cleaner",
-    "rice cooker",
-    "deep freezer",
-    "air conditioner",
-    "washing machine",
-    "television",
-    "air fryer",
-    "pressure cooker",
-    "water dispenser",
-    "standing fan",
-    "generator",
+    ...headQ(["phones"]).slice(0, 6),
+    "blender", "microwave", "air fryer", "washing machine", "television",
+    "deep freezer", "air conditioner", "standing fan", "water dispenser",
+    "generator", "rice cooker", "kettle",
   ],
 
   /* Obiwezy: refurbished phones + laptops. The "UK used" qualifier
@@ -376,35 +343,10 @@ export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
     "HP laptop UK used",
   ],
 
-  /* Konga: broad general-merchandise marketplace. Lead with brand+model
-     SKUs across the verticals Konga stocks deepest — phones, computing,
-     TVs, appliances, audio, gaming, beauty. Brand+model queries surface
-     /product/ detail pages (which carry price markup); bare category
-     words ("Phones", "Smart TV") return Konga's category landings, which
-     don't. 14 queries to match Konga's wider catalog vs the phone-first
-     Slot/Kara lists. */
-  konga: [
-    "iPhone 15",
-    "Samsung Galaxy A",
-    "Tecno Spark",
-    "Infinix Hot",
-    "HP Pavilion laptop",
-    "Dell Inspiron laptop",
-    "Hisense TV",
-    "LG TV",
-    "Hisense fridge",
-    "Scanfrost washing machine",
-    "Oraimo earbuds",
-    "JBL speaker",
-    "PlayStation 5",
-    "Nivea body lotion",
-    "iPhone 16",
-    "Samsung Galaxy S24",
-    "MacBook",
-    "Lenovo IdeaPad laptop",
-    "Samsung TV",
-    "air conditioner",
-    "Binatone blender",
-    "power bank",
-  ],
+  /* Konga — broad general-merchandise marketplace; stocks the widest tech
+     range of the three. Spine phones + computing + audio + gaming +
+     electronics. Brand+model queries surface /product/ detail pages (which
+     carry price markup); bare category words return Konga's category
+     landings, which don't. */
+  konga: headQ(["phones", "computing", "audio", "gaming", "electronics"]),
 };
