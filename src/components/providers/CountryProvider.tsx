@@ -119,13 +119,24 @@ export function CountryProvider({ initialCode, fxSnapshot, children }: Props) {
   useEffect(() => {
     const seg = pathname.split("/")[1]?.toLowerCase();
     if (seg && COUNTRY_CODES.has(seg)) {
-      /* URL carries a country — the strongest signal. Re-sync on every
-         navigation and keep the cookie in lockstep (middleware uses it
-         to resolve bare-path links). */
-      if (seg !== code) {
-        setCode(seg);
-        writeCookie(COUNTRY_COOKIE, seg, 365);
-      }
+      /* URL carries a country — sync the DISPLAY to it, but do NOT
+         touch the preference cookie here.
+
+         The cookie is the user's EXPLICIT choice, written only by
+         setCountry() (the country picker). Writing it on every passive
+         URL sync was wrong on two counts:
+           1. Browser back/forward to an old-country URL silently
+              overwrote the chosen country — user report: "I change
+              country, hit back, and my selection reverts." Now the
+              page you navigate back to renders for its own URL country,
+              but your saved preference (and bare havlo.io/ routing) is
+              untouched.
+           2. A shared /ng/deals link re-pinned a UK visitor's cookie to
+              NG — the exact thing middleware Case 1 deliberately avoids
+              ("a UK user sees ng by default"). Display following the URL
+              while the cookie stays the explicit pick keeps the two in
+              their intended roles. */
+      if (seg !== code) setCode(seg);
       return;
     }
     /* Bare/global path (/, /about, legal pages): no country segment, so

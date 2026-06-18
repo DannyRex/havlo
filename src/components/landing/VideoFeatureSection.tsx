@@ -65,6 +65,14 @@ export default function VideoFeatureSection({
 
   const src = mounted && resolvedTheme === "dark" ? srcDark : srcLight;
 
+  /* Letterbox / pre-load backing. A bare <video> with object-contain
+     paints its empty area (before load, and the letterbox bars when the
+     clip's aspect ratio doesn't fill the 16:9 box) BLACK by default —
+     which showed as black borders around the frame in light mode (user
+     report). Match the backing to the section background so the bars are
+     invisible in both themes: light surface in light mode, dark in dark. */
+  const frameBg = surface ? "bg-surface" : "bg-bg";
+
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !inView || !src) return;
@@ -115,11 +123,12 @@ export default function VideoFeatureSection({
               surface-2 backing rather than cropping it. */}
           <div
             ref={boxRef}
-            /* Bare frame: no grey backing, no border, just the clip. Any
-               letterbox falls on the section bg, not a grey box. Full-bleed
-               on mobile (-mx-4 cancels the section's px-4) so the in-clip UI
-               is large enough to read; inset + rounded from sm up. */
-            className={`relative aspect-video overflow-hidden -mx-4 sm:mx-0 rounded-none sm:rounded-2xl ${reverse ? "md:order-1" : ""}`}
+            /* Frame backing matches the section bg (frameBg) so any
+               letterbox bars or the pre-load empty state read as the
+               surface, not a black box. Full-bleed on mobile (-mx-4
+               cancels the section's px-4) so the in-clip UI is large
+               enough to read; inset + rounded from sm up. */
+            className={`relative aspect-video overflow-hidden -mx-4 sm:mx-0 rounded-none sm:rounded-2xl ${frameBg} ${reverse ? "md:order-1" : ""}`}
           >
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
             <video
@@ -129,7 +138,7 @@ export default function VideoFeatureSection({
               playsInline
               preload="none"
               aria-hidden="true"
-              className="absolute inset-0 w-full h-full object-contain"
+              className={`absolute inset-0 w-full h-full object-contain ${frameBg}`}
             />
           </div>
         </div>

@@ -491,6 +491,16 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
      not the real store). WooCommerce search verified live:
      /?s=<q>&post_type=product returns product cards. */
   "appliance-city":    { name: "Appliance City",    searchUrl: (q) => `https://www.appliancecity.co.uk/?s=${encodeURIComponent(q)}&post_type=product`, homepage: "https://www.appliancecity.co.uk" },
+  /* ── Launch-readiness audit (Jun 2026) — head stores whose relay clicks
+     were landing on a GUESSED homepage (health-check uncurated_head_store).
+     Only live-VERIFIED entries are added; the rest of that finding was
+     deliberately SKIPPED because a curated guess would be worse than the
+     liveness-gated homepage fallback:
+       · "geekom" → geekom.com is a PARKED domain-for-sale page, not a store.
+       · vlebazaar / monitors / lowestrate-shopping / thinvent-technologies
+         → search URL could not be verified live; left to the fallback. */
+  "apple":              { name: "Apple",              searchUrl: (q) => `https://www.apple.com/search/${encodeURIComponent(q)}`,              homepage: "https://www.apple.com" },
+  "home-outlet-direct": { name: "Home Outlet Direct", searchUrl: (q) => `https://www.homeoutletdirect.com/search?q=${encodeURIComponent(q)}`, homepage: "https://www.homeoutletdirect.com" },
   /* Ernest Jones (UK jeweller, Signet group) — EVERY offer is a Google
      relay, so with no entry all clicks were hitting the dead
      ernestjones.com guess. Domain verified live (site 403s automation);
