@@ -248,6 +248,19 @@ export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
     "iPad",
     "MacBook",
     "AirPods",
+    /* Broadened June 2026: more NG-popular phone models + the accessory
+       lines Slot stocks deepest (Oraimo is the dominant NG accessory brand;
+       power banks / earbuds / smartwatches move heavily). */
+    "iPhone 13",
+    "iPhone 14",
+    "Samsung Galaxy A15",
+    "Samsung Galaxy A35",
+    "Tecno Spark 20",
+    "Infinix Smart",
+    "itel",
+    "Oraimo",
+    "power bank",
+    "smartwatch",
   ],
 
   /* 3C Hub: phones + laptops + gaming + audio. */
@@ -264,6 +277,16 @@ export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
     "JBL speaker",
     "Apple Watch",
     "Dell laptop",
+    "Tecno",
+    "Infinix",
+    "HP laptop",
+    "Lenovo laptop",
+    "Oraimo",
+    "power bank",
+    "smartwatch",
+    "JBL soundbar",
+    "DualSense controller",
+    "gaming mouse",
   ],
 
   /* Jiji: classifieds — broader category queries pull more results.
@@ -281,6 +304,12 @@ export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
     "Generator",
     "Refrigerator",
     "Air conditioner",
+    "MacBook Lagos",
+    "iPad",
+    "smartwatch",
+    "washing machine",
+    "microwave",
+    "home theatre",
   ],
 
   /* Spar Nigeria — supermarket. Lead with the high-frequency basket
@@ -296,6 +325,14 @@ export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
     "biscuits",
     "soap",
     "baby formula",
+    "spaghetti",
+    "cooking oil",
+    "sugar",
+    "toilet roll",
+    "toothpaste",
+    "shampoo",
+    "bottled water",
+    "fruit juice",
   ],
 
   /* Kara: electronics + appliances + small kitchen. */
@@ -310,6 +347,14 @@ export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
     "vacuum cleaner",
     "rice cooker",
     "deep freezer",
+    "air conditioner",
+    "washing machine",
+    "television",
+    "air fryer",
+    "pressure cooker",
+    "water dispenser",
+    "standing fan",
+    "generator",
   ],
 
   /* Obiwezy: refurbished phones + laptops. The "UK used" qualifier
@@ -323,6 +368,12 @@ export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
     "PlayStation UK used",
     "Apple Watch UK used",
     "AirPods UK used",
+    "iPhone 12 UK used",
+    "iPhone 13 UK used",
+    "iPhone 14 UK used",
+    "Samsung Galaxy S UK used",
+    "Dell laptop UK used",
+    "HP laptop UK used",
   ],
 
   /* Konga: broad general-merchandise marketplace. Lead with brand+model
@@ -347,5 +398,13 @@ export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
     "JBL speaker",
     "PlayStation 5",
     "Nivea body lotion",
+    "iPhone 16",
+    "Samsung Galaxy S24",
+    "MacBook",
+    "Lenovo IdeaPad laptop",
+    "Samsung TV",
+    "air conditioner",
+    "Binatone blender",
+    "power bank",
   ],
 };
