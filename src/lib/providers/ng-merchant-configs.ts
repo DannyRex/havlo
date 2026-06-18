@@ -223,24 +223,52 @@ export const NG_MERCHANT_CONFIGS_INACTIVE: MerchantConfig[] = [
    from the single head-product spine (head-products.ts), so NG stays in
    lockstep with the other markets: the same iPhone / Galaxy / Tecno / etc.
    models Havlo saturates in us/uk/ae/in/za get pulled across the NG
-   retailers too, which is what builds the multi-seller comparison. Each
-   merchant takes only the spine categories it actually stocks; the
-   inactive merchants below keep hand lists for future probes.
+   retailers too, which is what builds the multi-seller comparison.
 
-   Credit cost (active configs, each query firing google + a google_images
-   companion ≈ 2 credits): Slot ~30 + Konga ~39 + Kara ~18 ≈ 87 queries ≈
-   ~174 credits/run. Mon/Wed/Fri cron (~13 runs/mo) ≈ ~2,260 credits/month,
-   under the 5,000 Developer plan budget. A query that returns 0 organic
-   results still costs 1 credit, so each merchant is scoped to the spine
-   categories it genuinely stocks rather than the whole spine. */
+   Right-sized June 2026 to ~110 credits/run (down from ~174): the full spine
+   ran the NG lane hot, so phones — the one genuinely dense NG vertical — are
+   capped to the ~12 highest-VOLUME models for NG (budget/mid Tecno / Infinix /
+   itel / Redmi + mainstream iPhone / Galaxy-A lead; the ultra-premium spine
+   models — Pro Max, S25 Ultra, Phantom V, Zero 40 — are dropped from the LOCAL
+   lane, since ingest:head still covers them in the other markets and a
+   cross-border offer still surfaces them on NG PDPs). Those top phones run at
+   BOTH Slot + Konga so each holds ≥2 NG sellers; the thinner verticals (audio /
+   computing / gaming / electronics) run at a single merchant.
+
+   Credit cost (each query firing google + a google_images companion ≈ 2
+   credits): Slot ~19 + Konga ~18 + Kara ~18 ≈ 55 queries ≈ ~110 credits/run.
+   Mon/Wed/Fri cron (~13 runs/mo) ≈ ~1,430 credits/month. A 0-result query
+   still costs 1 credit, so the picks are NG-volume-weighted, not the raw
+   global-flagship order of the spine. */
 const ngHead = headProductSeeds("ng");
 const headQ = (cats: string[]): string[] =>
   ngHead.filter((s) => cats.includes(s.categorySlug)).map((s) => s.q);
+/* Pick the NG-relevant subset of spine models for a category set. Filters the
+   spine output by exact name, so it stays coupled to head-products.ts (a model
+   renamed or removed there silently drops here) while letting the NG lane lead
+   with the brands that actually move locally instead of the global order. */
+const ngPick = (cats: string[], names: string[]): string[] => {
+  const want = new Set(names);
+  return headQ(cats).filter((q) => want.has(q));
+};
+
+/* The ~12 highest-volume phones for NG — capped + run across multiple
+   merchants for cross-seller comparison on the models that matter most here. */
+const NG_TOP_PHONES = ngPick(["phones"], [
+  "Tecno Spark 20", "Infinix Hot 50", "itel A70", "Tecno Camon 30",
+  "Infinix Note 40", "Redmi Note 13", "Samsung Galaxy A15", "Samsung Galaxy A55",
+  "iPhone 14", "iPhone 15", "iPhone 16", "Samsung Galaxy S24",
+]);
 
 export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
-  /* Slot — phone-first electronics retailer. Spine phones + audio +
-     electronics (covers Oraimo power banks / smartwatches + Apple Watch). */
-  slot: headQ(["phones", "audio", "electronics"]),
+  /* Slot — phone-first retailer. Top phones (paired with Konga for density) +
+     the accessory lines it stocks deepest (Oraimo / JBL audio, Oraimo / Anker
+     power banks, Oraimo smartwatch). */
+  slot: [
+    ...NG_TOP_PHONES,
+    ...ngPick(["audio"], ["Oraimo earbuds", "JBL Charge 5", "AirPods Pro 2", "Sony WH-1000XM5"]),
+    ...ngPick(["electronics"], ["Oraimo power bank", "Oraimo smartwatch", "Anker power bank"]),
+  ],
 
   /* 3C Hub: phones + laptops + gaming + audio. */
   threechub: [
@@ -314,11 +342,12 @@ export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
     "fruit juice",
   ],
 
-  /* Kara — electronics + appliances + small kitchen. The top spine phones
-     plus Kara's appliance set (appliances aren't in the spine; Kara is the
-     one NG merchant with real multi-seller appliance potential). */
+  /* Kara — electronics + appliances + small kitchen. The top 6 phones (a 3rd
+     NG seller on the most popular handsets) plus Kara's appliance set
+     (appliances aren't in the spine; Kara is the one NG merchant with real
+     multi-seller appliance potential). */
   kara: [
-    ...headQ(["phones"]).slice(0, 6),
+    ...NG_TOP_PHONES.slice(0, 6),
     "blender", "microwave", "air fryer", "washing machine", "television",
     "deep freezer", "air conditioner", "standing fan", "water dispenser",
     "generator", "rice cooker", "kettle",
@@ -343,10 +372,15 @@ export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
     "HP laptop UK used",
   ],
 
-  /* Konga — broad general-merchandise marketplace; stocks the widest tech
-     range of the three. Spine phones + computing + audio + gaming +
-     electronics. Brand+model queries surface /product/ detail pages (which
-     carry price markup); bare category words return Konga's category
-     landings, which don't. */
-  konga: headQ(["phones", "computing", "audio", "gaming", "electronics"]),
+  /* Konga — broad general-merchandise marketplace. The same top phones as Slot
+     (so each holds ≥2 NG sellers) + the wider tech Konga carries that Slot
+     doesn't (computing + gaming). Audio / electronics stay on Slot so the
+     thinner verticals aren't paid for twice. Brand+model queries surface
+     /product/ detail pages (which carry price markup); bare category words
+     return Konga's category landings, which don't. */
+  konga: [
+    ...NG_TOP_PHONES,
+    ...ngPick(["computing"], ["MacBook Air M3", "HP Pavilion laptop", "Lenovo IdeaPad laptop"]),
+    ...headQ(["gaming"]),
+  ],
 };
