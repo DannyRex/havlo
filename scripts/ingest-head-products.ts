@@ -46,9 +46,15 @@ async function main() {
     }
   }
 
-  const providers = getActiveSearchProviders().filter((p) => p.id.includes("serpapi"));
+  /* google_shopping lane ONLY. getActiveSearchProviders() also returns the
+     serpapi-jumia engine, but Jumia doesn't operate in the head lane's markets
+     (us/uk/ae/in/za) — running it there burned ~half of every run's searches
+     for ~0 results (the first run logged 166 wasted Jumia calls + most of its
+     89 errors). serpapi-shopping is the engine that actually serves these
+     markets; NG head products come from the site-scoped lane (ingest:ng-serpapi). */
+  const providers = getActiveSearchProviders().filter((p) => p.id === "serpapi-shopping");
   if (providers.length === 0) {
-    console.error("✗ Head-product ingest needs a SerpAPI provider. Set SERPAPI_KEY in .env.local");
+    console.error("✗ Head-product ingest needs the serpapi-shopping provider. Set SERPAPI_KEY in .env.local");
     process.exit(1);
   }
 

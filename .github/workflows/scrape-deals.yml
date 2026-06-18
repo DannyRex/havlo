@@ -35,7 +35,7 @@ on:
     # single largest lane (the dense vertical, so worth it); if you need more
     # room, trim the NG audio / computing picks next. The jumia-pass trim
     # (~30/run) + NG right-size (174 -> 110/run) are what reclaimed the room.
-    # ingest:head (~660/run) is MANUAL and not counted here.
+    # ingest:head (~330/run, serpapi-shopping only) is MANUAL and not counted here.
     # True daily would be ~270 x 30 = ~8,200/mo, OVER the 5k ceiling, so
     # daily needs a plan bump, not just a cron change. Note a cadence
     # change touches three places: this cron, the complementary cron in
