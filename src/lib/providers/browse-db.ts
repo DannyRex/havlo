@@ -94,6 +94,24 @@ function rowToDeal(r: BestOfferRow, popularity?: PopularityRecord): Deal {
   };
 }
 
+/* Non-product "deals" that dilute the browse feed — gift cards, vouchers,
+   phone top-ups/airtime, and add-on warranty/protection/insurance plans.
+   They're valid catalog rows but read as junk in a "best deals" grid (user
+   QA: "MORiSH Gift Card £9 doesn't feel like a deal"). Title-only and
+   word-anchored so it can't over-match: "extended warranty" filters the
+   add-on product, but a TV listed "with 2 year warranty" still passes —
+   bare "warranty" is deliberately NOT matched. Applied to the BROWSE feed
+   only; search results stay unfiltered so a user who searches "gift card"
+   still finds them. */
+const NON_PRODUCT_JUNK =
+  /\b(gift\s?cards?|e-?gift|gift\s?vouchers?|vouchers?|top[\s-]?ups?|recharge\s?cards?|airtime|extended\s?warranty|warranty\s?plan|protection\s?plan|care\s?plan|insurance\s?plan)\b/i;
+
+/* A feed row is "quality" when it has an image (a blank tile reads as broken
+   in the grid) and isn't one of the non-product junk types above. */
+function isQualityFeedRow(r: BestOfferRow): boolean {
+  return Boolean(r.image_url) && !NON_PRODUCT_JUNK.test(r.title ?? "");
+}
+
 /* isUsableMerchantUrl moved to src/lib/url-helpers.ts so /compare
    (pg-fts.ts) can apply the same filter — without that, Google-relay
    URLs were leaking into the comparison results and bouncing users
@@ -754,6 +772,7 @@ export const dbBrowseProvider: BrowseProvider = {
     const fromDb = allRows
       .filter((r) => isUsableMerchantUrl(r.url))
       .filter((r) => !looksCounterfeit(r.title))
+      .filter(isQualityFeedRow)
       .map((r) => rowToDeal(r, popularity));
     /* Merge curated Amazon catalog with the ingested data, then
        re-apply the requested sort to the combined array. Lets

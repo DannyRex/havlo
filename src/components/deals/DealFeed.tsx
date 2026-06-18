@@ -77,6 +77,18 @@ const SORTS: { value: SortOption; label: string }[] = [
   { value: "price_desc", label: "Price: high → low" },
 ];
 
+/* Subhead mirrors the ACTIVE sort so it can't claim "newest first" while the
+   user is sorted by Top discount (user QA: the subtitle was hardcoded to
+   "newest" under every sort). Keyed to SortOption. */
+const SORT_SUBTITLE: Record<SortOption, string> = {
+  relevance:  "The best deals first, then everything else.",
+  newest:     "The newest deals first, then everything else.",
+  discount:   "Biggest discounts first.",
+  popular:    "Most popular with shoppers first.",
+  price_asc:  "Cheapest first.",
+  price_desc: "Highest price first.",
+};
+
 /* ── Skeleton tile rendered during initial load ────────────────── */
 function SkeletonTile({ aspect }: { aspect: string }) {
   return (
@@ -883,7 +895,7 @@ export default function DealFeed({
           Browse deals & new arrivals
         </h1>
         <p className="text-sm sm:text-base text-ink-2 mt-2 max-w-2xl">
-          The newest deals first, then everything else.
+          {SORT_SUBTITLE[sort]}
         </p>
         {activeCounts?.deals !== undefined && activeCounts.total > 0 && (
           /* Deal-count summary on its own line — separate paragraph
