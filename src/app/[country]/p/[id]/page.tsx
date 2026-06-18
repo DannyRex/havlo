@@ -475,7 +475,7 @@ export default async function ProductPage({ params }: PageProps) {
                 The {offer.title} in {country.name}
               </h2>
               <p className="text-[15px] text-ink-2 leading-relaxed max-w-2xl">
-                Havlo tracks the {offer.title}{offer.brand ? ` by ${offer.brand}` : ""}{fallbackCategoryName ? ` in ${fallbackCategoryName}` : ""} across the stores we cover in {country.name}. It is currently listed at {displayStoreName(offer.store_name)}. Check the price comparison and price history above, plus the similar products below, to find it for less before you buy.
+                The {offer.title}{offer.brand ? ` by ${offer.brand}` : ""} is currently listed at {displayStoreName(offer.store_name)} in {country.name}. Havlo checks its price against the other stores we cover and tracks how it moves over time, so you can tell a genuine markdown from a fake one and know whether to buy now or wait for a drop.
               </p>
             </>
           )}

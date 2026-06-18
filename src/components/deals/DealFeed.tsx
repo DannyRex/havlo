@@ -1089,17 +1089,19 @@ export default function DealFeed({
           The sort dropdown JSX is inlined twice rather than extracted
           to a helper — duplication is small (~10 lines), avoids the
           render overhead of a tiny client subcomponent. */}
-      {/* Sticky filter row with mobile HEADROOM: position:sticky pins it
-          under the navbar once scrolled to the top; on mobile it then
-          slides up behind the navbar on scroll-DOWN (-translate-y-full,
-          which tucks under the opaque z-40 navbar, no overshoot) and
-          reappears on scroll-UP. Desktop (sm+) stays pinned. */}
+      {/* Sticky filter row with HEADROOM: position:sticky pins it under the
+          navbar once scrolled to the top; it then slides up behind the navbar
+          on scroll-DOWN (-translate-y-full, which tucks under the opaque z-40
+          navbar, no overshoot) and reappears on scroll-UP. Applied on EVERY
+          breakpoint now (desktop too, June 2026) so the browsing space the
+          filter rows take is reclaimed while reading the grid; a single
+          scroll-up flick brings them straight back. */}
       <div
         ref={filterBarRef}
         className={cn(
           "sticky top-16 z-30 -mx-3 px-3 sm:-mx-6 sm:px-6 py-3 mb-6 bg-bg border-b border-border",
           "transition-transform duration-300 ease-out motion-reduce:transition-none",
-          filtersHidden ? "-translate-y-full sm:translate-y-0" : "translate-y-0",
+          filtersHidden ? "-translate-y-full" : "translate-y-0",
         )}
       >
         {/* Row 1 — CategoryNav (always full-width). The previous

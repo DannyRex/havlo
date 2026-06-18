@@ -495,16 +495,15 @@ export default function MasonryCard({ deal, aspect, showOriginBadge = true, prio
             size={18}
             pad={3}
           />
-          <span className="font-medium text-ink-2 truncate">{displayStore}</span>
-          <span aria-hidden="true" className="shrink-0 hidden sm:inline">·</span>
-          {/* Last-verified time. Was `hidden sm:inline` — desktop only —
-              which dropped the freshness cue from mobile cards. Now shown
-              on every breakpoint: `ml-auto` pins it to the far right on
-              mobile (where the · separator is hidden), and `sm:ml-0`
-              restores the inline "store · time" layout desktop already
-              had. suppressHydrationWarning — timeAgo reads Date.now(), so
-              SSR/CSR can differ at a minute/day boundary; harmless. */}
-          <span className="shrink-0 ml-auto sm:ml-0" suppressHydrationWarning>found {timeAgo(deal.postedAt).toLowerCase()}</span>
+          <span className="font-medium text-ink-2 truncate min-w-0">{displayStore}</span>
+          {/* Last-verified time. Pinned to the far right of the meta row on
+              EVERY breakpoint via `ml-auto` (desktop too, June 2026) so the
+              store name owns the left and the freshness cue floats clear of
+              the title on the right. The mid-row `·` separator is gone now
+              that the two ends no longer sit adjacent. suppressHydrationWarning
+              — timeAgo reads Date.now(), so SSR/CSR can differ at a minute/day
+              boundary; harmless. */}
+          <span className="shrink-0 ml-auto pl-1.5" suppressHydrationWarning>found {timeAgo(deal.postedAt).toLowerCase()}</span>
         </div>
 
         <p className="text-[12px] sm:text-[13px] font-medium text-ink leading-snug line-clamp-1 mb-1 sm:mb-1.5 tracking-[-0.005em]">
