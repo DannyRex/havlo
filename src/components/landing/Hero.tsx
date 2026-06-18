@@ -446,16 +446,7 @@ export default function Hero({ storeCount, countryCode, countryName, placeholder
               concise line per founder direction; the store-count and
               "stores we track" framings read as redundant with the trust
               pill above, "scanning prices across N stores".) */}
-          {/* NG-specific subhead (Jun 2026): leads on Havlo's dual model
-              — cheapest of the same product AND a cheaper alternative —
-              instead of the country-mention line. NG is the primary
-              market and the "or a similar one that is" tail is the
-              honest differentiator (dupes/alternatives) that a plain
-              price-comparison site can't claim. Other countries keep
-              the country-anchored line for SSR differentiation. */}
-          {countryCode === "ng"
-            ? "Paste a link or search any product. Havlo finds it cheaper, or a similar one that is."
-            : `Paste a link or search any product. Havlo finds it cheaper in ${countryPhrase(countryCode, countryName)}.`}
+          Paste a link or search any product. Havlo finds it cheaper in {countryPhrase(countryCode, countryName)}.
         </p>
 
         {/* Composer — mobile-optimised.
