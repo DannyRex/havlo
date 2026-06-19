@@ -483,7 +483,7 @@ export default async function ProductPage({ params }: PageProps) {
                 {merchantDescriptionForLd}
               </p>
               <p className="text-[13px] text-ink-3 leading-relaxed max-w-2xl mt-4">
-                Havlo tracks its price across the stores we cover in {country.name} and keeps a price history, so you can spot a real markdown before you buy. Currently listed at {displayStoreName(offer.store_name)}.
+                Havlo tracks its price across the stores we cover in {country.name} and keeps a price history. Currently listed at {displayStoreName(offer.store_name)}.
               </p>
             </>
           ) : (
@@ -492,7 +492,7 @@ export default async function ProductPage({ params }: PageProps) {
                 The {offer.title} in {country.name}
               </h2>
               <p className="text-[15px] text-ink-2 leading-relaxed max-w-2xl">
-                Havlo checks its price against the other stores we cover in {country.name} and tracks how it moves over time, so you can tell a genuine markdown from a fake one and know whether to buy now or wait for a drop. Currently listed at {displayStoreName(offer.store_name)}.
+                Havlo checks this price against the other stores we cover in {country.name} and tracks how it moves over time. Currently listed at {displayStoreName(offer.store_name)}.
               </p>
             </>
           )}
