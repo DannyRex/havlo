@@ -529,7 +529,15 @@ export async function pgFtsFindDupes(
 
   const { data: matches, error } = await supa.rpc("search_products_fts", {
     q: query,
-    max_results: 30,  /* halved May 2026 v3 for Supabase egress relief */
+    max_results: 60,  /* Restored from the May-2026 egress halving (60→30) — task #137.
+                         The 30-row raw pool starved the cheaper-alternatives rail: it
+                         feeds the variant partition (which pulls out same-product variants
+                         + siblings) AND the cheaper-only filter, and the JUNE precision
+                         gates (colour/overlap/family) — which landed AFTER the halving —
+                         trim it further still, so 30 candidates routinely collapsed to a
+                         handful. This dupes path is per-PDP/compare and ISR/unstable_cache
+                         cached (NOT the browse_deals RPC that actually dominated egress),
+                         so the ~22KB/uncached-call cost is negligible. */
   });
   if (error || !matches) return [];
 
@@ -913,7 +921,15 @@ export async function pgFtsFindSimilar(
   /* 3. Find similar products via FTS using the anchor's title (richer query than user's) */
   const { data: similarMatches } = await supa.rpc("search_products_fts", {
     q: anchor.title,
-    max_results: 30,  /* halved May 2026 v3 for Supabase egress relief */
+    max_results: 60,  /* Restored from the May-2026 egress halving (60→30) — task #137.
+                         The 30-row raw pool starved the cheaper-alternatives rail: it
+                         feeds the variant partition (which pulls out same-product variants
+                         + siblings) AND the cheaper-only filter, and the JUNE precision
+                         gates (colour/overlap/family) — which landed AFTER the halving —
+                         trim it further still, so 30 candidates routinely collapsed to a
+                         handful. This dupes path is per-PDP/compare and ISR/unstable_cache
+                         cached (NOT the browse_deals RPC that actually dominated egress),
+                         so the ~22KB/uncached-call cost is negligible. */
   });
 
   const dupes: DupeResult[] = ((similarMatches as FtsRow[]) ?? [])
