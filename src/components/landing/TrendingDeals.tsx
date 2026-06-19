@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { filterDealsForCountry, type Country } from "@/lib/country";
 import { classifyDeal } from "@/lib/providers/curated-helper";
+import { isPlaceholderImageUrl } from "@/lib/utils";
 import type { Deal, OriginFilter, SortOption } from "@/types";
 import TrendingDealsGrid from "@/components/landing/TrendingDealsGrid";
 import type { TrendingBuckets } from "@/components/landing/trending-compose";
@@ -213,6 +214,17 @@ export async function getTrendingBuckets(country: Country): Promise<TrendingBuck
     !d.title.includes("\\") &&
     !(d.currency === "USD" && d.salePrice < 10) &&
     Boolean(d.imageUrl) &&
+    /* Real product image only — a present-but-placeholder URL (merchant default
+       / pharmacy "image coming soon" / our empty-state) would otherwise ship to
+       the most prominent surface and read as a broken card. Mirrors the search
+       path's filter (browse-db). Founder direction Jun 2026. */
+    !isPlaceholderImageUrl(d.imageUrl) &&
+    /* Trending is a DEALS showcase, so only genuine deals belong — is_real_deal
+       (discount > 0 OR below-30d-high OR cross-store-cheapest, matview #214).
+       This intentionally drops full-price rows from the NG localFresh / Jumia
+       bridge pools; their real-deal members still surface, and the grid backfills
+       if a thin market runs short. Founder direction Jun 2026. */
+    d.isRealDeal === true &&
     !isDeadPassthrough(d.url);
 
   /* Build the candidate pool. NG users get four merged pools; non-NG
