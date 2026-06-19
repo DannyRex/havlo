@@ -277,7 +277,29 @@ export async function getTrendingBuckets(country: Country): Promise<TrendingBuck
     buckets.aliexpress.length + buckets.intlOther.length;
   if (totalCandidates === 0) return null;
 
-  return buckets;
+  /* Rotate each bucket by a time-derived offset before returning. The grid
+     HEAD (composePicks(..., false)) is DETERMINISTIC for the LCP byte-match,
+     so without this it freezes on whatever leads each bucket — and since the
+     non-NG pool is sorted discount-desc, the single highest-discount Amazon
+     item (e.g. the Kindle Paperwhite in uk/us) sat in the featured band on
+     EVERY rebuild. The offset advances hourly and is baked into the
+     server-serialized buckets, so the server LCP preload and the client HEAD
+     still agree within a render — only WHICH item leads cycles across the
+     hourly ISR rebuilds. Clicks remain the primary upstream sort
+     (byClicksDesc); at today's thin click volume that mostly ties, so this
+     restores variety without discarding a genuine popularity signal. */
+  const rot = Math.floor(Date.now() / 3_600_000); // advances every hour
+  const rotate = <T,>(a: T[]): T[] => {
+    if (a.length < 2) return a;
+    const k = rot % a.length;
+    return k === 0 ? a : [...a.slice(k), ...a.slice(0, k)];
+  };
+  return {
+    local:      rotate(buckets.local),
+    amazon:     rotate(buckets.amazon),
+    aliexpress: rotate(buckets.aliexpress),
+    intlOther:  rotate(buckets.intlOther),
+  };
 }
 
 /* ── TrendingDeals (presentational) ─────────────────────────────────
