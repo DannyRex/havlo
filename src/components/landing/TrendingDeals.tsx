@@ -358,7 +358,7 @@ export default function TrendingDeals({
             4-card head), so per-visit variety isn't capped by the ISR
             window. The server still preloads the SSR lead's image so the
             first paint is fast even though the client then reshuffles. */}
-        <TrendingDealsGrid buckets={buckets} />
+        <TrendingDealsGrid buckets={buckets} countryCode={countryCode} />
 
         <div className="mt-8 text-center sm:hidden">
           <Link href={`/${countryCode}/deals`} className="btn-secondary">
