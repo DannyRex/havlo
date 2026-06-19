@@ -84,29 +84,36 @@ export default function PdpBackLink({ countryCode }: Props) {
        never trust client storage blindly. */
     const readCrumb = (
       key: string, maxAgeMs: number, mustInclude: string,
-    ): { href: string; ts: number } | null => {
+    ): { href: string; ts: number; label?: string } | null => {
       try {
         const raw = sessionStorage.getItem(key);
         if (!raw) return null;
-        const p = JSON.parse(raw) as Partial<CompareBreadcrumb>;
+        const p = JSON.parse(raw) as Partial<CompareBreadcrumb> & { label?: string };
         if (!p.url || typeof p.ts !== "number") return null;
         if (Date.now() - p.ts > maxAgeMs) return null;
         const url = new URL(p.url, origin);
         if (url.origin !== origin || !url.pathname.includes(mustInclude)) return null;
-        return { href: url.pathname + url.search + url.hash, ts: p.ts };
+        return {
+          href: url.pathname + url.search + url.hash,
+          ts: p.ts,
+          label: typeof p.label === "string" ? p.label : undefined,
+        };
       } catch { return null; }
     };
 
-    /* The compare page and the deals feed each drop a breadcrumb on client-
-       side <Link> navigations (which document.referrer can't see in the App
-       Router). Whichever is FRESHER is the page the user actually came from,
-       so it wins — compare → "Back to results", deals → "Back to deals" with
-       filters intact. */
+    /* The compare page, the deals feed, and the homepage each drop a
+       breadcrumb on client-side <Link> navigations (which document.referrer
+       can't see in the App Router). Whichever is FRESHER is the page the user
+       actually came from, so it wins — compare → "Back to results"; the
+       browse crumb carries its own label (deals / home / ...), so a homepage
+       card → PDP → back returns home, and a filtered deals view returns there
+       with filters intact. The browse crumb takes any same-origin path (""),
+       since the homepage URL is the country root, not a /deals path. */
     const compareCrumb = readCrumb(COMPARE_URL_STORAGE_KEY, STALE_AFTER_MS, "/compare");
-    const browseCrumb  = readCrumb(BROWSE_URL_STORAGE_KEY,  BROWSE_STALE_AFTER_MS, "/deals");
+    const browseCrumb  = readCrumb(BROWSE_URL_STORAGE_KEY,  BROWSE_STALE_AFTER_MS, "");
     const crumbs: Array<{ href: string; ts: number; label: string }> = [];
-    if (compareCrumb) crumbs.push({ ...compareCrumb, label: "Back to results" });
-    if (browseCrumb)  crumbs.push({ ...browseCrumb,  label: "Back to deals"  });
+    if (compareCrumb) crumbs.push({ href: compareCrumb.href, ts: compareCrumb.ts, label: "Back to results" });
+    if (browseCrumb)  crumbs.push({ href: browseCrumb.href,  ts: browseCrumb.ts,  label: `Back to ${browseCrumb.label ?? "deals"}` });
     if (crumbs.length) {
       const best = crumbs.sort((a, b) => b.ts - a.ts)[0];
       setHref(best.href);

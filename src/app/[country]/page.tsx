@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import ReactDOM from "react-dom";
 import Hero from "@/components/landing/Hero";
 import TrendingDeals, { getTrendingBuckets } from "@/components/landing/TrendingDeals";
+import RecordBrowseCrumb from "@/components/nav/RecordBrowseCrumb";
 import { composePicks } from "@/components/landing/trending-compose";
 import CashbackTeaser from "@/components/landing/CashbackTeaser";
 import CategoryGrid from "@/components/landing/CategoryGrid";
@@ -225,6 +226,10 @@ export default async function HomePage({ params }: { params: { country: string }
   return (
     <>
       <JsonLd data={breadcrumb} />
+      {/* Drop a "Back to home" breadcrumb so a homepage card → PDP → back
+          returns here instead of falling through to a stale compare crumb or
+          bare /deals. */}
+      <RecordBrowseCrumb label="home" />
       {/* Recovery banner — only renders when /api/go bounced the user
           back here because a Google-relay merchant URL couldn't be
           resolved. Suspense boundary required because the banner

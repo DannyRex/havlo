@@ -795,7 +795,7 @@ export default function DealFeed({
     try {
       sessionStorage.setItem(
         "havlo:lastBrowseUrl",
-        JSON.stringify({ url: window.location.origin + target, ts: Date.now() }),
+        JSON.stringify({ url: window.location.origin + target, ts: Date.now(), label: "deals" }),
       );
     } catch { /* private mode / quota exceeded — silent no-op */ }
 
