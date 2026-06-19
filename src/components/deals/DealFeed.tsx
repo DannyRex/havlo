@@ -881,6 +881,19 @@ export default function DealFeed({
           ? { total: originCounts.intl, deals: originCounts.intlDeals }
           : { total: originCounts.all, deals: originCounts.allDeals };
 
+  /* Store-filter-aware display count (Jun 2026 — no-number-contradiction rule).
+     originCounts/activeCounts are ORIGIN-scoped and deliberately ignore the
+     store filter (so origin-tab clicks don't flicker, see originCountsKeyRef).
+     But the API's `total` IS origin + tier + search + STORE filtered — exactly
+     what the grid paginates. So the moment the user ticks a store, `total` is
+     the only honest figure: the header, the count beside Sort, and the
+     end-of-list line must all use it, or they contradict the rendered grid AND
+     the store dropdown. With no store filter, keep the origin-scoped counts
+     (which also drive the honest "top N of M" cap copy below). */
+  const storesSelected = selectedStores.size > 0;
+  const displayTotal = storesSelected ? total : (activeCounts?.total ?? total);
+  const displayDeals = storesSelected ? undefined : activeCounts?.deals;
+
   /* Show the comparison header only while the on-page search box still
      holds the query the fetched comparison resolved from. Editing or
      clearing the search drops the now-stale card (the effect above
@@ -913,7 +926,7 @@ export default function DealFeed({
         <p className="text-sm sm:text-base text-ink-2 mt-2 max-w-2xl">
           {SORT_SUBTITLE[sort]}
         </p>
-        {activeCounts?.deals !== undefined && activeCounts.total > 0 && (
+        {displayTotal > 0 && (
           /* Deal-count summary on its own line — separate paragraph
              so the metric breathes instead of crowding the subhead.
              Origin-scoped (activeCounts) so it agrees with the active
@@ -943,9 +956,9 @@ export default function DealFeed({
                  total), just show the total without an
                  interpretation. Honest framing over filler claims. */
           <p className="text-xs sm:text-sm text-ink-3 mt-2 tabular-nums">
-            {activeCounts.deals === undefined || activeCounts.deals === 0 || activeCounts.deals >= activeCounts.total
-              ? `Browsing ${formatCount(activeCounts.total)} products today.`
-              : <>Browsing {formatCount(activeCounts.total)} products · {formatCount(activeCounts.deals)} on sale right now.</>}
+            {displayDeals === undefined || displayDeals === 0 || displayDeals >= displayTotal
+              ? `Browsing ${formatCount(displayTotal)} products today.`
+              : <>Browsing {formatCount(displayTotal)} products · {formatCount(displayDeals)} on sale right now.</>}
           </p>
         )}
       </div>
@@ -1199,7 +1212,7 @@ export default function DealFeed({
                     already-stable slice rather than chasing a
                     per-request number. Falls back to `total` before
                     originCounts populates. */}
-                {formatCount(activeCounts?.total ?? total)} deals
+                {formatCount(displayTotal)} deals
               </span>
             )}
 
@@ -1436,9 +1449,9 @@ export default function DealFeed({
           pill above. */}
       {!loading && !hasMore && items.length > 0 && liveItems.length === 0 && !liveLoading && (
         <p className="text-center text-xs text-ink-3 mt-12">
-          {activeCounts && activeCounts.total > total + 24
+          {!storesSelected && activeCounts && activeCounts.total > total + 24
             ? `Showing the top ${formatCount(total)} of ${formatCount(activeCounts.total)}. Filter by category or store to surface more.`
-            : `That's all ${formatCount(activeCounts?.total ?? total)} deals for now.`}
+            : `That's all ${formatCount(total)} deals for now.`}
         </p>
       )}
     </div>
