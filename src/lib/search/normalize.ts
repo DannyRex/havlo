@@ -74,6 +74,17 @@ const BRANDS = [
      queries but didn't have brand→model extraction. */
   "logitech", "steelseries", "corsair", "hyperx", "alienware",
   "benq", "viewsonic", "asus", "gigabyte",
+  /* Jun 2026 NULL-signature recovery: recognizable manufacturer brands the
+     extractor was missing, surfaced by a stratified audit of ~12k NULL-signature
+     in-stock products (most NULLs are correctly generic; these are the genuinely
+     fixable branded subset). All are real distinct brands, NOT model/category
+     words. 'boat' (boAt audio) and 'astro' (Astro Gaming) are common words, so
+     they are CONTEXT_REQUIRED below. Deliberately OMITTED after adversarial
+     review — real token collisions for near-zero upside: 'wilson' (FG Wilson
+     generators / Wilson wok / Sekonda 'Wilson' watch), 'mitre' (mitre saw/box),
+     'valve' (Steam Deck listings are used/bundle eBay, no safe model). */
+  "motorola", "iqoo", "redmagic", "boat", "astro", "hmd", "gopro",
+  "beko", "amica", "agaro", "nutribullet", "cubitt", "marantz", "audioengine",
 ];
 
 // Aliases / canonicalization
@@ -269,6 +280,13 @@ const CONTEXT_REQUIRED: Record<string, RegExp> = {
   instant: /\binstant\s*(pot|vortex|omni|duo|pro|zest|ace|brands)\b/i,
   switch:  /\b(nintendo|joy[-\s]?con|switch\s+(oled|lite|sports))\b/i,
   honor:   /\bhonor\s*(\d|magic|pad|band|play|view|x\d|note|pro\b|plus\b|lite\b)/i,
+  /* Jun 2026 NULL-signature recovery — common-word brands gated to their real
+     product context so 'boat neck' apparel, 'astro turf', 'mac and cheese' /
+     'Mac-Book', 'mitre saw' can't mis-tag. A brand only counts when its line/SKU
+     cue is present in the title. */
+  boat:    /\b(airdopes|rockerz|nirvana|aavante|stone|bassheads|immortal|wave)\b/i,
+  astro:   /\ba\d{2}\b/i,
+  mac:     /\b(mac\s*(cosmetics|lipstick|foundation|powder|fix|studio|retro|matte|prep)|m\.a\.c)\b/i,
 };
 
 /* Index where the compatibility-governed region begins, or Infinity if
@@ -523,6 +541,16 @@ function findProductType(norm: string): string | null {
 
 // Common model-line keywords per brand — used to extract a tight model name
 const MODEL_HINTS: Record<string, RegExp[]> = {
+  /* Astro Gaming headsets. X-variant FIRST so "Astro A50 X" -> "a50 x" and
+     "Astro A50" -> "a50" land on DISTINCT keys. Without this, the bare-number
+     SKU fallback reads only "a50" off both and collapses a ~£260 A50 into a
+     ~£600 A50 X pool (price ratio 2.3x slips under the backfill's 4x merge
+     guard). Brand is CONTEXT_REQUIRED on /a\d{2}/ so 'astro turf' never reaches
+     here. */
+  astro: [
+    /\b(a\d{2}\s*x)\b/i,
+    /\b(a\d{2}[a-z]?)\b/i,
+  ],
   apple: [
     /* `pro\s*max` listed BEFORE bare `pro` so the alternation
        greedy-matches the longer suffix first. Probe May 2026:

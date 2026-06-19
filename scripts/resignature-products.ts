@@ -47,7 +47,7 @@ try {
 } catch { /* */ }
 
 import { getSupabaseAdmin } from "../src/lib/providers/db-client";
-import { buildSignature } from "../src/lib/search/normalize";
+import { buildSignature, isLooseCategoryModel } from "../src/lib/search/normalize";
 import { extractSizeTokens } from "../src/lib/search/query-understanding";
 
 interface CliArgs {
@@ -131,6 +131,14 @@ async function main(): Promise<void> {
     const [brand, model] = parts;
     if (!brand || brand === "?") return false;
     if (!model || model === "?") return false;
+    /* Mirror pg-fts.ts isSignatureTightEnoughForPooling: a brand|<loose
+       category> key (apparel/beauty category words like "dress"/"mascara",
+       or a "boat|dress"-style brand mis-tag) can RENAME a column but must
+       never trigger a destructive cross-product MERGE — those category keys
+       intentionally group DIFFERENT products. Added Jun 2026 alongside the
+       NULL-signature brand recovery as the safety net for any residual
+       common-word brand mis-tag. */
+    if (isLooseCategoryModel(model)) return false;
     return true;
   }
 
