@@ -357,7 +357,24 @@ export default async function ProductPage({ params }: PageProps) {
         .trim()
         .slice(0, 500)
     : null;
-  const productDescription = merchantDescriptionForLd && merchantDescriptionForLd.length >= 50
+  /* Marketplace listings (eBay etc.) often set the "description" to the
+     product TITLE, which already heads the About section — so rendering it as
+     body prose just echoes the title (the "dell inspiron ... / dell inspiron
+     ... / Havlo tracks the dell inspiron ..." repetition). Detect a
+     description that IS the title (or the title plus a few trailing chars) and
+     treat it as no-description, so the About block renders the templated
+     variant once instead of three times. */
+  const normForCompare = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const descNorm  = normForCompare(merchantDescriptionForLd ?? "");
+  const titleNorm = normForCompare(offer.title);
+  const descIsJustTitle = !!descNorm && (
+    descNorm === titleNorm ||
+    (descNorm.startsWith(titleNorm)  && descNorm.length  - titleNorm.length < 30) ||
+    (titleNorm.startsWith(descNorm)  && titleNorm.length - descNorm.length  < 30)
+  );
+  const hasRealDescription =
+    !!merchantDescriptionForLd && merchantDescriptionForLd.length >= 50 && !descIsJustTitle;
+  const productDescription = hasRealDescription && merchantDescriptionForLd
     ? merchantDescriptionForLd
     : offer.brand
       ? `${offer.title} from ${offer.brand}. Compare prices across stores in ${country.name} on Havlo. See similar products for less.`
@@ -457,7 +474,7 @@ export default async function ProductPage({ params }: PageProps) {
             floor when no merchant body exists. No em dashes / no "surface"
             verb per the house voice rules. */}
         <section className="mt-12 sm:mt-16 pt-8 border-t border-border" aria-label="Product details">
-          {merchantDescriptionForLd && merchantDescriptionForLd.length >= 50 ? (
+          {hasRealDescription ? (
             <>
               <h2 className="text-base font-semibold text-ink mb-3">
                 About the {offer.title}
@@ -466,7 +483,7 @@ export default async function ProductPage({ params }: PageProps) {
                 {merchantDescriptionForLd}
               </p>
               <p className="text-[13px] text-ink-3 leading-relaxed max-w-2xl mt-4">
-                Havlo tracks the {offer.title}{offer.brand ? ` by ${offer.brand}` : ""} across stores in {country.name}, with price history and similar products for less. Currently listed at {displayStoreName(offer.store_name)}.
+                Havlo tracks its price across the stores we cover in {country.name} and keeps a price history, so you can spot a real markdown before you buy. Currently listed at {displayStoreName(offer.store_name)}.
               </p>
             </>
           ) : (
@@ -475,7 +492,7 @@ export default async function ProductPage({ params }: PageProps) {
                 The {offer.title} in {country.name}
               </h2>
               <p className="text-[15px] text-ink-2 leading-relaxed max-w-2xl">
-                The {offer.title}{offer.brand ? ` by ${offer.brand}` : ""} is currently listed at {displayStoreName(offer.store_name)} in {country.name}. Havlo checks its price against the other stores we cover and tracks how it moves over time, so you can tell a genuine markdown from a fake one and know whether to buy now or wait for a drop.
+                Havlo checks its price against the other stores we cover in {country.name} and tracks how it moves over time, so you can tell a genuine markdown from a fake one and know whether to buy now or wait for a drop. Currently listed at {displayStoreName(offer.store_name)}.
               </p>
             </>
           )}
