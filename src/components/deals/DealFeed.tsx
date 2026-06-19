@@ -771,8 +771,6 @@ export default function DealFeed({
     }
 
     const desired = params.toString();
-    const current = searchParams.toString();
-    if (desired === current) return;
 
     /* Preserve the country prefix when writing the URL back. The
        bare /deals path triggers a middleware redirect to
@@ -785,7 +783,25 @@ export default function DealFeed({
        to — country.code reads URL-first via CountryProvider's
        useEffect, so this stays correct on country-scoped pages. */
     const prefix = `/${country.code}`;
-    router.replace(desired ? `${prefix}/deals?${desired}` : `${prefix}/deals`, { scroll: false });
+    const target = desired ? `${prefix}/deals?${desired}` : `${prefix}/deals`;
+
+    /* Breadcrumb for the PDP back link. Record THIS filtered deals view so a
+       "Back to deals" from a product page returns the user here with their
+       category / store / sort filters intact, instead of a bare /deals.
+       Mirrors the compare page's lastCompareUrl crumb; PdpBackLink picks
+       whichever crumb (this vs compare) is freshest. Written on mount + every
+       filter change, using `target` (not window.location.href, which lags the
+       async router.replace below). */
+    try {
+      sessionStorage.setItem(
+        "havlo:lastBrowseUrl",
+        JSON.stringify({ url: window.location.origin + target, ts: Date.now() }),
+      );
+    } catch { /* private mode / quota exceeded — silent no-op */ }
+
+    const current = searchParams.toString();
+    if (desired === current) return;
+    router.replace(target, { scroll: false });
   }, [category, tier, sort, searchDebounced, origin, selectedStores, router, searchParams, country.code]);
 
   const loadMore = useCallback(() => {

@@ -54,6 +54,13 @@ const COMPARE_URL_STORAGE_KEY = "havlo:lastCompareUrl";
    storage staleness. */
 const STALE_AFTER_MS = 15 * 1000;
 
+const BROWSE_URL_STORAGE_KEY = "havlo:lastBrowseUrl";
+/* Browse crumb gets a more generous window than the compare crumb: its
+   failure mode is benign (you still land on /deals, just possibly with
+   slightly stale filters), and people browse the feed a while before opening
+   a product. PdpBackLink takes whichever crumb is freshest. */
+const BROWSE_STALE_AFTER_MS = 5 * 60 * 1000;
+
 interface CompareBreadcrumb {
   url: string;
   ts:  number;
@@ -70,39 +77,50 @@ export default function PdpBackLink({ countryCode }: Props) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const origin = window.location.origin;
 
-    /* Pass 1: sessionStorage breadcrumb left by the compare page.
-       This is the primary signal because it works for client-side
-       <Link> navigations within the SPA, which document.referrer
-       does NOT capture. */
-    try {
-      const raw = sessionStorage.getItem(COMPARE_URL_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as CompareBreadcrumb;
-        if (parsed.url && Date.now() - parsed.ts < STALE_AFTER_MS) {
-          /* Verify the URL is same-origin + still a /compare path
-             (defensive — the storage value should always be these
-             but we don't trust client storage). */
-          const url = new URL(parsed.url, window.location.origin);
-          if (url.origin === window.location.origin && url.pathname.includes("/compare")) {
-            setHref(url.pathname + url.search + url.hash);
-            setLabel("Back to results");
-            return;
-          }
-        }
-      }
-    } catch {/* malformed storage — fall through to referrer */}
+    /* Read a {url, ts} breadcrumb, validated: parseable, fresh, same-origin,
+       and on the expected path. Returns the relative href + ts, or null. We
+       never trust client storage blindly. */
+    const readCrumb = (
+      key: string, maxAgeMs: number, mustInclude: string,
+    ): { href: string; ts: number } | null => {
+      try {
+        const raw = sessionStorage.getItem(key);
+        if (!raw) return null;
+        const p = JSON.parse(raw) as Partial<CompareBreadcrumb>;
+        if (!p.url || typeof p.ts !== "number") return null;
+        if (Date.now() - p.ts > maxAgeMs) return null;
+        const url = new URL(p.url, origin);
+        if (url.origin !== origin || !url.pathname.includes(mustInclude)) return null;
+        return { href: url.pathname + url.search + url.hash, ts: p.ts };
+      } catch { return null; }
+    };
 
-    /* Pass 2: document.referrer fallback. Works for full-page
-       loads from /compare (typed URL, hard refresh, external
-       link, share-preview click). Same-origin guard prevents
-       arbitrary referrers from setting the back link. */
+    /* The compare page and the deals feed each drop a breadcrumb on client-
+       side <Link> navigations (which document.referrer can't see in the App
+       Router). Whichever is FRESHER is the page the user actually came from,
+       so it wins — compare → "Back to results", deals → "Back to deals" with
+       filters intact. */
+    const compareCrumb = readCrumb(COMPARE_URL_STORAGE_KEY, STALE_AFTER_MS, "/compare");
+    const browseCrumb  = readCrumb(BROWSE_URL_STORAGE_KEY,  BROWSE_STALE_AFTER_MS, "/deals");
+    const crumbs: Array<{ href: string; ts: number; label: string }> = [];
+    if (compareCrumb) crumbs.push({ ...compareCrumb, label: "Back to results" });
+    if (browseCrumb)  crumbs.push({ ...browseCrumb,  label: "Back to deals"  });
+    if (crumbs.length) {
+      const best = crumbs.sort((a, b) => b.ts - a.ts)[0];
+      setHref(best.href);
+      setLabel(best.label);
+      return;
+    }
+
+    /* Full-page-load fallback (typed URL, hard refresh, external/share click):
+       document.referrer still carries a /compare origin. Same-origin guarded. */
     const ref = document.referrer;
     if (!ref) return;
     try {
       const url = new URL(ref);
-      if (url.origin !== window.location.origin) return;
-      if (!url.pathname.includes("/compare")) return;
+      if (url.origin !== origin || !url.pathname.includes("/compare")) return;
       setHref(url.pathname + url.search + url.hash);
       setLabel("Back to results");
     } catch {/* malformed referrer — keep the default deals link */}
