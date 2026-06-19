@@ -48,12 +48,40 @@ const danger: [string, string][] = [
 ];
 for (const [t, expect] of danger) console.log(`  ${sig(t).padEnd(26)}  ${t}\n      expect: ${expect}`);
 
+console.log("\n── SIZE-AS-MODEL (must become NULL model — was over-grouping) ──");
+const sizeBad = [
+  "Samsung 65 Inch QLED 4K Smart TV",
+  "TCL 43 Inches Android Smart TV",
+  "Hisense 55 inch UHD TV",
+  "LG 24 inch IPS Monitor",
+  "KitchenAid 36 in Gas Cooktop",
+  "Mango 100% Leather Crossbody Bag",
+  "Mango 100% Cotton Oversized Shirt",
+  "HP 15 Laptop Intel Core i5",
+  "Asus 15 Notebook",
+  "Dell 16 Laptop Premium",
+  'Samsung 55" Crystal UHD TV',
+];
+for (const t of sizeBad) console.log(`  ${sig(t).padEnd(26)}  ${t}`);
+
+console.log("\n── SIZE GUARD MUST NOT BREAK THESE (real numbered models) ──");
+const sizeGood = [
+  "Anker 737 Power Bank PowerCore 24000",
+  "Anker 313 Wall Charger",
+  "Anker 523 Nano Charger",
+  "HP 15-fc0057ni Laptop Ryzen 5",
+  "HP 15-dw3145ne Notebook",
+  "Hisense 50A6K 4K TV",
+  "JBL Clip 4 Portable Bluetooth Speaker",
+  "Xiaomi 14 Pro 5G Smartphone",
+  "Realme 12 Pro Plus",
+];
+for (const t of sizeGood) console.log(`  ${sig(t).padEnd(26)}  ${t}`);
+
 console.log("\n── REGRESSION (existing good signatures must be unchanged) ──");
 const regression = [
   "Apple iPhone 15 Pro Max 256GB",
   "Sony WH-1000XM5 Wireless Headphones",
-  "Anker 737 Power Bank PowerCore 24000",
-  "JBL Clip 4 Portable Bluetooth Speaker",
   "MAC Lipstick Ruby Woo",
 ];
 for (const t of regression) console.log(`  ${sig(t).padEnd(26)}  ${t}`);

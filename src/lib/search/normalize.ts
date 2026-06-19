@@ -850,6 +850,26 @@ const GENERIC_MODEL_NOISE = new Set([
   "tablet", "laptop", "notebook", "watch", "gaming", "console", "pro", "max",
   "plus", "mini", "ultra", "fe", "lite", "neo", "with", "and", "for",
   "ch", "cell", "wifi", "type", "usb", "hdmi", "dual",
+  /* Size-unit words (Jun 2026): keep them out of the model so a 2-token model
+     never becomes "<number> inch". The attribute-as-model guard in fallbackModel
+     then drops the leading bare size entirely. */
+  "inch", "inches", "cm", "mm",
+]);
+
+/* A laptop/monitor context — used only to recognise a LONE leading 2-digit panel
+   size (11-18") as a size, not a model. Brand phones with a bare number (Xiaomi
+   14, Realme 12) never match these words, so they keep their model. */
+const LAPTOP_CONTEXT = /\b(laptop|notebook|ultrabook|chromebook|macbook|ideapad|thinkpad|inspiron|vivobook|zenbook|aspire|swift|spectre|envy|pavilion|omen|legion|predator|nitro|monitor|ips)\b/i;
+/* A TV/display context — recognises a lone bare 2-digit screen size (e.g. from
+   a stripped 65") as a size when no "inch" word survived. */
+const TV_CONTEXT = /\b(tv|television|qled|oled|uhd|led\s*tv|smart\s*tv|monitor|display)\b/i;
+/* Generic descriptors that, AFTER a panel size, mean "still just a size" — chip
+   makers / marketing words, never a specific SKU. A real SKU (fc0057ni, dw3145ne)
+   is alphanumeric and is NOT in this set, so it survives. */
+const SIZE_DESCRIPTOR_NOISE = new Set([
+  "intel", "amd", "ryzen", "core", "celeron", "touchscreen", "touch",
+  "full", "premium", "business", "student", "everyday", "hd", "fhd", "uhd",
+  "ips", "cu", "cup", "inch", "in",
 ]);
 
 function fallbackModel(brand: string, norm: string): string | null {
@@ -873,6 +893,34 @@ function fallbackModel(brand: string, norm: string): string | null {
   // Require at least one token containing a digit (so we get model numbers like
   // "clip 4" or "a06") — bare adjectives ("portable", "stereo") are too generic.
   if (!kept.some((t) => /\d/.test(t))) return null;
+
+  /* Attribute-as-model guard (Jun 2026): a model that LEADS with a bare 2-3 digit
+     number which is really a SIZE or COMPOSITION, not a model code. Without this,
+     "Samsung 65 inch TV" → samsung|65, "TCL 43 Inches" → tcl|43 inches, "Mango
+     100% Leather Bag" → mango|100 leather, and "HP 15 Laptop" → hp|15 each
+     collapse genuinely-different products (a budget LED + a flagship OLED of the
+     same size, every "100% leather" Mango bag, every 15" HP) into one signature.
+     We drop to NULL — an honest opt-out; the title then falls through to the
+     ambiguous-hardware path. Carefully scoped to NOT touch real numbered models:
+       • anker|737 power, anker|313 — number not followed by a size unit.
+       • hp|15 fc0057ni — a real alphanumeric SKU follows the panel size.
+       • xiaomi 14 / realme 12 phones — no laptop/monitor context word. */
+  if (/^\d{2,3}$/.test(kept[0])) {
+    const num = kept[0];
+    // (A) explicit size unit immediately after the number ("65 inch", "36 in", "43 cm")
+    if (new RegExp(`\\b${num}\\s*(inch|inches|in|cm|mm)\\b`, "i").test(norm)) return null;
+    // (B) material composition ("100% leather/cotton/...") read as a model
+    if (num === "100" && /\b100\s+(leather|cotton|suede|wool|silk|polyester|linen|denim|nylon|cashmere|velvet)\b/i.test(norm)) return null;
+    // (C) lone laptop/monitor panel size (11-18"), or size + a generic descriptor
+    //     (intel/amd/touchscreen/premium...) — but NOT size + a real SKU code.
+    if (/^1[1-8]$/.test(num) && LAPTOP_CONTEXT.test(norm)) {
+      if (kept.length === 1) return null;
+      if (kept.length === 2 && SIZE_DESCRIPTOR_NOISE.has(kept[1])) return null;
+    }
+    // (D) lone bare 2-digit TV/monitor screen size where the unit word didn't
+    //     survive stripping (e.g. 65" → "65") — gated to a TV/display context.
+    if (kept.length === 1 && /^[2-9][0-9]$/.test(num) && TV_CONTEXT.test(norm)) return null;
+  }
   return kept.join(" ");
 }
 
