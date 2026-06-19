@@ -91,6 +91,13 @@ export default function StoreLogo({
   const [tier, setTier] = useState<Tier>(
     primaryUsable ? "primary" : favicon ? "favicon" : "letter",
   );
+  /* Whether the current tier's image actually painted (naturalWidth > 0).
+     Used to hide the always-on letter base once a BUNDLED /logos asset has
+     loaded — without this a transparent or wordmark logo (e.g. 3C Hub) lets
+     the base initial bleed through as a stray glyph beside the mark (user
+     report: "arbitrary 3"). Scoped to the primary tier in render so the
+     favicon blank-paint safety net stays untouched. */
+  const [imgPainted, setImgPainted] = useState(false);
 
   const src =
     tier === "primary" ? storeLogoUrl
@@ -101,6 +108,7 @@ export default function StoreLogo({
   /* Step down a tier on each image error:
      primary -> favicon (Google) -> favicon2 (DuckDuckGo) -> letter. */
   function handleError() {
+    setImgPainted(false); // current src failed; re-show the base while the next tier loads
     setTier((t) =>
       t === "primary" && favicon ? "favicon"
       : (t === "primary" || t === "favicon") && favicon2 ? "favicon2"
@@ -124,6 +132,7 @@ export default function StoreLogo({
     const img = imgRef.current;
     if (!img || !img.complete) return;
     if (img.naturalWidth === 0) { handleError(); return; }
+    setImgPainted(true);
     if (tier === "favicon" && favicon2 && img.naturalWidth <= 16) setTier("favicon2");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tier, src]);
@@ -153,13 +162,20 @@ export default function StoreLogo({
           <img> overlays it when a tier resolves. Guarantees a visible
           store indicator in both themes even when every logo tier
           fails or a favicon loads but paints nothing. */}
-      <span
-        aria-hidden="true"
-        className="font-bold text-ink-2 select-none"
-        style={{ fontSize: Math.max(11, Math.round(inner * 0.55)) }}
-      >
-        {initial}
-      </span>
+      {/* Letter badge — base layer behind the logo. Removed once a BUNDLED
+          (primary) /logos asset has painted, so a transparent or wordmark
+          logo doesn't leave the initial bleeding through beside it (the
+          "arbitrary 3" on 3C Hub). Favicon tiers keep the always-on base as
+          a blank-paint safety net. */}
+      {!(imgPainted && tier === "primary") && (
+        <span
+          aria-hidden="true"
+          className="font-bold text-ink-2 select-none"
+          style={{ fontSize: Math.max(11, Math.round(inner * 0.55)) }}
+        >
+          {initial}
+        </span>
+      )}
       {src && (
         /* Plain <img> — skip the Vercel transform cap for store-logo
            thumbnails (rendered dozens of times per page, already tiny
@@ -174,6 +190,7 @@ export default function StoreLogo({
           loading="lazy"
           decoding="async"
           className={`absolute inset-0 m-auto object-contain ${invertClass}`}
+          onLoad={(e) => { if (e.currentTarget.naturalWidth > 0) setImgPainted(true); }}
           onError={handleError}
         />
       )}
