@@ -20,6 +20,7 @@ import { pdpUrlForDeal } from "@/lib/pdp-url";
 import { categories as ALL_CATEGORIES } from "@/lib/data/categories";
 import { cn, formatCount } from "@/lib/utils";
 import { useHideOnScrollDown } from "@/lib/use-hide-on-scroll";
+import { readSeen, recordSeen, freshFirst } from "@/lib/trending-seen";
 import type { Deal } from "@/types";
 
 type SortKey = "recommended" | "discount" | "price-asc" | "price-desc" | "newest";
@@ -81,9 +82,21 @@ export default function AmazonDealsBrowser({
      order), then set once post-mount so the order reshuffles each visit
      without a hydration mismatch. */
   const [shuffleSeed, setShuffleSeed] = useState<number | null>(null);
+  /* Recently-seen window for this country, read ONCE post-mount (null on the
+     server + first paint so SSR/hydration keep the prop order). Once set, the
+     "Recommended" sort deprioritises products shown on recent visits so each
+     visit LEADS with fresh inventory instead of reshuffling the same faces —
+     the shuffle alone had no memory. The window's start + prior ids are kept in
+     a ref so persisting what's shown doesn't reset the window's TTL. */
+  const [seenSet, setSeenSet] = useState<Set<string> | null>(null);
+  const seenWindowRef = useRef<{ windowStart: number; priorIds: string[] } | null>(null);
   useEffect(() => {
     setShuffleSeed(Math.floor(Math.random() * 2 ** 31));
-  }, []);
+    const now = Date.now();
+    const { windowStart, ids } = readSeen(countryCode, now);
+    seenWindowRef.current = { windowStart, priorIds: ids };
+    setSeenSet(new Set(ids));
+  }, [countryCode]);
 
   /* Mobile headroom: hide the sticky filter bar on scroll-down, reveal on
      scroll-up (same as the /deals feed). Desktop stays pinned. */
@@ -131,14 +144,29 @@ export default function AmazonDealsBrowser({
         );
         break;
       default:
-        /* "recommended" — keep the server's discount-ranked order until
-           the client seed lands, then shuffle per visit so repeat
-           visitors see a fresh mix (the strongest deals still seeded the
-           list, they're just no longer always top-to-bottom). */
+        /* "recommended" — keep the server's discount-ranked order until the
+           client lands, then (a) shuffle per visit so the strongest deals seed
+           the list without always sitting top-to-bottom, and (b) push
+           recently-seen products to the BACK so each visit leads with fresh
+           faces. Nothing is dropped — seen items just fall below the fresh
+           ones, so the catalogue still feels deep on every visit. */
         if (shuffleSeed !== null) seededShuffle(arr, shuffleSeed);
+        if (seenSet) return freshFirst(arr, (d) => d.id, seenSet);
     }
     return arr;
-  }, [deals, cat, market, sort, shuffleSeed]);
+  }, [deals, cat, market, sort, shuffleSeed, seenSet]);
+
+  /* Persist what's actually on screen so the NEXT visit deprioritises it. Runs
+     on mount + when the revealed window grows or the result set changes; the
+     util FIFO-caps + dedupes, so repeated calls are cheap and idempotent. This
+     does NOT update seenSet, so the order the user is currently looking at stays
+     stable while they browse — only the next visit reflects it. */
+  useEffect(() => {
+    const win = seenWindowRef.current;
+    if (!win) return;
+    const shownIds = filtered.slice(0, reveal).map((d) => d.id);
+    recordSeen(countryCode, win.windowStart, win.priorIds, shownIds);
+  }, [filtered, reveal, countryCode]);
 
   /* Reset the reveal window whenever the result SET changes (category
      or country). Re-sorting keeps the window — same items, new order. */
