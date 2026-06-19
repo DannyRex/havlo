@@ -43,7 +43,7 @@ import {
   useCallback, useEffect, useId, useLayoutEffect,
   useMemo, useRef, useState,
 } from "react";
-import { formatPriceForUser, formatPriceForUserExact, timeAgo } from "@/lib/utils";
+import { convertForUser, formatPriceForUser, formatPriceForUserExact, timeAgo } from "@/lib/utils";
 import type { Country } from "@/lib/country";
 import type { PriceHistoryPoint } from "@/lib/search/price-history";
 import {
@@ -88,7 +88,6 @@ const HOVER_DOT_RADIUS  = 4.5;
 /* ── Visual tokens ────────────────────────────────────────────── */
 const LINE_HEX          = "#16a34a";  // success
 const REF_LINE_HEX      = "#6b7280";  // neutral grey, distinct from line
-const GRID_HEX_ALPHA    = "rgba(120, 113, 108, 0.18)";
 
 /* ── Range toggle options ─────────────────────────────────────── */
 const RANGE_OPTIONS = [
@@ -143,14 +142,40 @@ export default function PriceHistoryChart({
      currentNgn) change. The math doesn't depend on hover state.
      currentNgn flows through because the reference-line Y position
      depends on it. */
-  /* Geometry — the plotted line, fill, current-price Y, and the high/low
-     extreme markers. The chart runs WITHOUT a left Y-axis gutter now: the
-     price-step gridlines were removed to cut visual noise (owner direction
-     June 2026 — "many lines feel noisy, show one"). The exact numbers live in
-     the tiles below + the single reference-line label. */
+  /* Y-axis price ticks — compact labels in a LEFT GUTTER (owner direction
+     June 2026: "add the vertical price y axis, no grid lines"). Same "nice"
+     price steps as before, but we render ONLY the labels — no horizontal
+     gridlines. The gutter width depends on the longest label and shifts the
+     plot's x math right, so it's computed before geometry; padYDomain matches
+     the geometry's domain so labels land on the right pixels. */
+  const { yTicks, axisGutter } = useMemo(() => {
+    if (sliced.length === 0) {
+      return { yTicks: [] as Array<{ y: number; label: string }>, axisGutter: PAD_LEFT };
+    }
+    let lo = sliced[0].minPriceNgn;
+    let hi = lo;
+    for (const p of sliced) {
+      if (p.minPriceNgn < lo) lo = p.minPriceNgn;
+      if (p.minPriceNgn > hi) hi = p.minPriceNgn;
+    }
+    const { yMin, yMax } = padYDomain(lo, hi);
+    const minDisp = convertForUser(yMin, country, "NGN");
+    const maxDisp = convertForUser(yMax, country, "NGN");
+    const chartH  = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+    const ticks = buildYTicks(minDisp, maxDisp, chartH).map((t) => ({
+      y:     t.y,
+      label: axisPriceLabel(t.value, country),
+    }));
+    const longest = ticks.reduce((m, t) => Math.max(m, t.label.length), 0);
+    const gutter = ticks.length > 0 ? Math.min(64, Math.max(36, longest * 6 + 12)) : PAD_LEFT;
+    return { yTicks: ticks, axisGutter: gutter };
+  }, [sliced, country]);
+
+  /* Geometry — plotted line, fill, current-price Y, high/low markers. Left pad
+     is the Y-axis gutter so the plot starts right of the price labels. */
   const geom = useMemo(
-    () => computeGeometryFull(sliced, width, currentNgn, range.days, PAD_LEFT),
-    [sliced, width, currentNgn, range.days],
+    () => computeGeometryFull(sliced, width, currentNgn, range.days, axisGutter),
+    [sliced, width, currentNgn, range.days, axisGutter],
   );
 
   /* Store-count provenance for the footer strip. Swept over the
@@ -442,17 +467,22 @@ export default function PriceHistoryChart({
             </linearGradient>
           </defs>
 
-          {/* Subtle grid — vertical lines at axis ticks only.
-              Horizontal grid omitted; the price tiles below show
-              numeric anchors. */}
-          {geom.axisTicks.map((t, i) => (
-            <line
-              key={`grid-${i}`}
-              x1={t.x} x2={t.x}
-              y1={PAD_TOP} y2={CHART_HEIGHT - PAD_BOTTOM}
-              stroke={GRID_HEX_ALPHA}
-              strokeWidth={1}
-            />
+          {/* Y axis — price LABELS only, in the left gutter (owner direction:
+              "vertical price y axis, no grid lines"). No horizontal gridlines
+              and no vertical gridlines; the labels alone carry the scale,
+              right-aligned against the gutter edge and vertically centred on
+              their price level. */}
+          {yTicks.map((t, i) => (
+            <text
+              key={`ylabel-${i}`}
+              x={axisGutter - 6}
+              y={t.y + 3}
+              fontSize={10}
+              textAnchor="end"
+              className="fill-ink-3 tabular-nums select-none"
+            >
+              {t.label}
+            </text>
           ))}
 
           {/* Area fill under the smooth line, capped at the chart bottom */}
@@ -463,7 +493,7 @@ export default function PriceHistoryChart({
               range. Replaces the old your-price line + lowest dot: one line,
               not several. */}
           <line
-            x1={PAD_LEFT}
+            x1={axisGutter}
             x2={width - PAD_RIGHT}
             y1={refY}
             y2={refY}
@@ -583,7 +613,7 @@ export default function PriceHistoryChart({
         <div
           className="absolute pointer-events-none text-[10px] font-medium text-ink-3 px-1.5 py-0.5 rounded-md bg-surface/80 border border-border"
           style={{
-            left: PAD_LEFT + 2,
+            left: axisGutter + 2,
             top:  refY > CHART_HEIGHT / 2 ? refY - 20 : refY + 4,
             transition: reducedMotion ? "none" : "top 200ms ease-out",
             maxWidth: "55%",
@@ -1116,6 +1146,44 @@ function padYDomain(lowestNgn: number, highestNgn: number): { yMin: number; yMax
   const rangeRaw = highestNgn - lowestNgn;
   const range    = rangeRaw === 0 ? Math.max(highestNgn * 0.1, 100) : rangeRaw;
   return { yMin: lowestNgn - range * 0.12, yMax: highestNgn + range * 0.12 };
+}
+
+/* Axis price label — compact (₦450K / £250 / ₦1.5M) so the left gutter stays
+   narrow. One decimal of real precision with ".0" stripped. Exact values live
+   in the tooltip + stat tiles. */
+function axisPriceLabel(displayValue: number, country: Country): string {
+  const strip = (s: string) => s.replace(/\.0$/, "");
+  const v = Math.abs(displayValue);
+  if (v >= 999_950) return `${country.symbol}${strip((displayValue / 1_000_000).toFixed(1))}M`;
+  if (v >= 1_000)   return `${country.symbol}${strip((displayValue / 1_000).toFixed(1))}K`;
+  return `${country.symbol}${Math.round(displayValue)}`;
+}
+
+/* "Nice" price tick positions for the Y axis. Callers pass the domain in the
+   USER's display currency so steps snap to round numbers in what the user
+   reads (£25 steps, not NGN-nice values that convert to £247). Steps snap to
+   1/2/2.5/5 × 10^n; Y mapping is linear so display-unit positions land on the
+   same pixel as NGN. */
+function buildYTicks(
+  yMin: number,
+  yMax: number,
+  chartH: number,
+): { y: number; value: number }[] {
+  const span = yMax - yMin;
+  if (!(span > 0)) return [];
+  const rawStep = span / 3; // aim for ~3 ticks
+  const mag  = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const norm = rawStep / mag;
+  const step = (norm >= 5 ? 5 : norm >= 2.5 ? 2.5 : norm >= 2 ? 2 : 1) * mag;
+  const ticks: { y: number; value: number }[] = [];
+  for (let v = Math.ceil(yMin / step) * step; v <= yMax + step * 1e-6; v += step) {
+    const y = PAD_TOP + ((yMax - v) / span) * chartH;
+    /* Skip ticks hugging the very top/bottom edge — they'd collide with the
+       line's padding band or the x-axis date row. */
+    if (y < PAD_TOP + 6 || y > CHART_HEIGHT - PAD_BOTTOM - 6) continue;
+    ticks.push({ y, value: v });
+  }
+  return ticks;
 }
 
 /* Add currentRefY post-hoc since it depends on `currentNgn` which
