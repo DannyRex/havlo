@@ -85,7 +85,7 @@ const FAQ = [
   },
   {
     q: "How often do prices refresh?",
-    a: "We re-fetch feeds twice a week minimum. Higher-volume partners can opt for daily polling. If your inventory moves fast, send us a webhook URL we can hit on price changes.",
+    a: "Prices refresh on a regular crawl: a full pass three times a week, plus lighter daily runs for the fastest-moving stores. So a typical price is at most a day or two old, and a price drop is usually live on Havlo within a day. Direct feeds and price-change webhooks for high-volume partners are on the roadmap.",
   },
   {
     q: "Which markets will my products appear in?",
