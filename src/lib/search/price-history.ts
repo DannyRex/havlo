@@ -99,11 +99,14 @@ export async function fetchProductPriceHistory(
 export interface PriceHistoryPoint {
   /** ISO date string for the bucket (yyyy-mm-dd). */
   day:         string;
-  /** Lowest price seen across all stores on this day, in NGN
-      (USD prices converted at a fixed rate inside the RPC). */
+  /** Lowest carried-forward price across all live listings on this day, in
+      NGN. Each listing holds its last seen price until re-scraped (so a day
+      only one store was refreshed still reports the true cheapest), and USD
+      is converted at the LIVE fx_rate inside the RPC — the same rate the
+      chart's "now" dot uses, so the line lands on the dot (migration 0088). */
   minPriceNgn: number;
-  /** Number of distinct stores carrying the product that day —
-      drives the chart's confidence dimming on single-store days. */
+  /** Number of distinct stores with a live (carried-forward) offer that day —
+      drives the chart's store-count provenance + single-store dimming. */
   storeCount:  number;
 }
 
