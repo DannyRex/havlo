@@ -59,7 +59,7 @@ const STEPS = [
   {
     icon: TrendingUp,
     title: "You start receiving traffic",
-    body: "Shoppers who reach a product page see your store as one of the options. When they click through, we send them straight to you. No checkout layer.",
+    body: "Shoppers who reach a product page see your store as one of the options. When they click through, we send them straight to you. There's no checkout layer on Havlo.",
   },
 ];
 
@@ -89,7 +89,7 @@ const FAQ = [
   },
   {
     q: "Which markets will my products appear in?",
-    a: "Nigeria, UK, US, India, UAE, and South Africa today. Germany is in deferred launch. We country-target based on your store's shipping reach. If you only ship within Nigeria, your products only appear on /ng.",
+    a: "Nigeria, UK, US, India, UAE, and South Africa today. We country-target based on your store's shipping reach. If you only ship within a certain country, your products only appear in that country's section.",
   },
 ];
 
