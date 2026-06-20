@@ -21,6 +21,7 @@
 import type { Deal } from "@/types";
 import { USD_FX } from "@/lib/country";
 import { isAccessoryListing } from "@/lib/search/price-floor";
+import { upgradeEbayImageUrl } from "@/lib/utils";
 
 const SERPAPI_ENDPOINT = "https://serpapi.com/search.json";
 
@@ -132,7 +133,7 @@ export async function fetchEbayUkDealsViaSerpapi(query: EbayQuery, apiKey: strin
       salePrice:       usd,
       discountPercent: 0,
       currency:        "USD",      // GBP converted above; Deal currency is USD|NGN
-      imageUrl:        r.thumbnail || undefined,
+      imageUrl:        r.thumbnail ? upgradeEbayImageUrl(r.thumbnail) : undefined,
       url:             link,       // ebay.co.uk -> ebayMarketFromUrl tags store_country UK
       expiresAt:       null,
       isHot:           false,

@@ -426,6 +426,29 @@ export function downscaleCardImageUrl(url: string | null | undefined, maxW = 640
   return out;
 }
 
+/* Upgrade an eBay thumbnail to eBay's largest render. i.ebayimg.com encodes
+   the requested size in the filename as s-l<NN> (s-l64 … s-l1600). SerpAPI's
+   eBay engine hands back the small s-l140 thumbnail, which self-hosts as a
+   blurry ~140px webp (founder report June 2026: "eBay pictures are mostly
+   blur"). Rewriting the token to s-l1600 makes the self-host pipeline fetch
+   the full-size image (then cap it to a <=1000px webp). eBay serves the
+   largest available size when the original is smaller than the request, so
+   this rarely 404s. The COMPLEMENT of downscaleCardImageUrl: that clamps an
+   oversized merchant hero DOWN; this lifts an undersized eBay thumb UP. Only
+   i.ebayimg.com URLs carrying an s-l token are touched — gstatic thumbnails
+   and every other host pass through unchanged. */
+export function upgradeEbayImageUrl(url: string | null | undefined): string {
+  if (!url) return url ?? "";
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return url;
+  }
+  if (host !== "i.ebayimg.com" && !host.endsWith(".ebayimg.com")) return url;
+  return url.replace(/(\/s-l)\d{2,4}(\.\w+)(?=$|[?#])/i, "$11600$2");
+}
+
 export function formatNaira(amount: number): string {
   /* Always prefix with the literal ₦ symbol. Was using
      `Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" })`
