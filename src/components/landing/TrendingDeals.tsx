@@ -68,9 +68,10 @@ const fetchPoolCached = unstable_cache(
       { timeoutMs: TRENDING_FETCH_TIMEOUT_MS, noCuratedFallback: true },
     );
   },
-  /* v2 (May 2026): bumped from v1 to evict any 5-card degraded pools
-     persisted by the pre-fix timeout fallback on first render after deploy. */
-  ["trending-pool-v2"],
+  /* v3 (Jun 2026): bumped so the badge-only fresh-pool fix (minDiscount>=5)
+     evicts the stale discount>=15-only pools on deploy instead of waiting out
+     the 30-min TTL. v2 (May 2026): evicted 5-card timeout-fallback pools. */
+  ["trending-pool-v3"],
   { revalidate: 1800, tags: ["trending-pool"] },
 );
 
@@ -223,9 +224,9 @@ export async function getTrendingBuckets(country: Country): Promise<TrendingBuck
        belong — match the discount BADGE the card paints (displayDiscountPct of
        the struck→sale prices, the SAME fn MasonryCard uses). Founder direction
        Jun 2026: keep the "good deal" / lowest-in-30d quality-labelled rows
-       (is_real_deal WITHOUT a visible markdown) OFF trending. Also drops the NG
-       localFresh / Jumia 0%-discount bridge pools; the grid backfills if a thin
-       market runs short. */
+       (is_real_deal WITHOUT a visible markdown) OFF trending. The candidate
+       pools below all fetch discounted inventory (minDiscount >= 5), so this is
+       the precise per-card badge gate, not the pool's depth limiter. */
     displayDiscountPct(d.originalPrice, d.salePrice) > 0 &&
     !isDeadPassthrough(d.url);
 
@@ -233,15 +234,17 @@ export async function getTrendingBuckets(country: Country): Promise<TrendingBuck
      users get two — both more than the previous one-pool fetch, so
      the client's per-visit pick has real depth to draw from.
 
-     NG localFresh fetches 0%-discount local inventory sorted by
-     newest. Bridge for retailers whose ingest path doesn't carry
-     original_price metadata (Jumia via SerpAPI Google site-filter,
-     Bitmarte, HealthPlus, etc): without it they'd be invisible on the
-     homepage because the discount>=15 floor on the other pools
-     excludes every row with discountPercent=0. The fourth NG pool is
-     a Jumia-only direct pull as a backstop so Jumia inventory is
-     always available even when localFresh's merged result is
-     Konga/Ajebomarket-heavy.
+     The "fresh" pools fetch DISCOUNTED inventory (minDiscount >= 5)
+     sorted by newest, adding depth + recency UNDER the discount>=15
+     pools. Most markdowns sit in the 1-14% band the >=15 floor skips
+     (only ~half of UK/IN/ZA/AE badge inventory clears 15%, vs ~89% for
+     NG's deep-discount locals), so once trending went badge-only
+     (qualityFilter needs a visible markdown, Jun 2026) the >=15-only
+     pool ran thin and stopped rotating EVERYWHERE except NG. The fresh
+     pools refill that band. They used to fetch minDiscount=0 as a bridge
+     for no-markdown stores, but those are exactly what the founder
+     pulled OFF trending, so a 0% bridge just gets re-filtered out. The
+     fourth NG pool is a Jumia-only backstop for Jumia's discounted rows.
 
      Every fetch routes through fetchPoolCached (defined above) so
      repeat ISR builds within the 30-min TTL hit the data cache
@@ -256,7 +259,7 @@ export async function getTrendingBuckets(country: Country): Promise<TrendingBuck
        stays clean for the next render to retry. */
     const [discountPool, freshPool] = await Promise.all([
       fetchPoolCached({ sort: "discount", minDiscount: 15, origin: "intl", country: country.code }).catch(() => [] as Deal[]),
-      fetchPoolCached({ sort: "newest",   minDiscount: 0,  origin: "intl", country: country.code }).catch(() => [] as Deal[]),
+      fetchPoolCached({ sort: "newest",   minDiscount: 5,  origin: "intl", country: country.code }).catch(() => [] as Deal[]),
     ]);
     pool = filterDealsForCountry(
       [...discountPool, ...freshPool].filter(qualityFilter),
@@ -269,8 +272,8 @@ export async function getTrendingBuckets(country: Country): Promise<TrendingBuck
     const [localPool, intlPool, localFreshPool, jumiaOnlyPool] = await Promise.all([
       fetchPoolCached({ sort: "discount", minDiscount: 15, origin: "local", country: country.code }).catch(() => [] as Deal[]),
       fetchPoolCached({ sort: "discount", minDiscount: 15, origin: "intl",  country: country.code }).catch(() => [] as Deal[]),
-      fetchPoolCached({ sort: "newest",   minDiscount: 0,  origin: "local", country: country.code }).catch(() => [] as Deal[]),
-      fetchPoolCached({ sort: "newest",   minDiscount: 0,  origin: "local", country: country.code, stores: ["jumia"] }).catch(() => [] as Deal[]),
+      fetchPoolCached({ sort: "newest",   minDiscount: 5,  origin: "local", country: country.code }).catch(() => [] as Deal[]),
+      fetchPoolCached({ sort: "newest",   minDiscount: 5,  origin: "local", country: country.code, stores: ["jumia"] }).catch(() => [] as Deal[]),
     ]);
     pool = [
       ...localPool.filter(qualityFilter),
