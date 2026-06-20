@@ -1220,3 +1220,22 @@ export async function getShoppableStoreCount(countryCode: string): Promise<numbe
   if (value > 0) shoppableCountCache.set(key, { value, expires: now + SHOPPABLE_COUNT_TTL_MS });
   return value;
 }
+
+/* Global "stores worldwide" count for the country-AGNOSTIC OG card (a shared
+   havlo.io link has no country in scope). Counts the integrated store registry
+   — the universe of stores Havlo compares across — via a cheap exact head-count,
+   cached on the same 15-min TTL. Returns 0 on failure so the OG route can hide
+   the badge rather than render a wrong number. */
+let globalStoreCountCache: { value: number; expires: number } | null = null;
+export async function getGlobalShoppableStoreCount(): Promise<number> {
+  const now = Date.now();
+  if (globalStoreCountCache && globalStoreCountCache.expires > now) return globalStoreCountCache.value;
+  const supa = getSupabaseAdmin();
+  if (!supa) return 0;
+  const { count, error } = await supa
+    .from("stores")
+    .select("id", { count: "exact", head: true });
+  const value = error || count == null ? 0 : count;
+  if (value > 0) globalStoreCountCache = { value, expires: now + SHOPPABLE_COUNT_TTL_MS };
+  return value;
+}
