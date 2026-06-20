@@ -35,6 +35,7 @@
 
 import type { Deal } from "@/types";
 import { buildAttributes } from "./search-serpapi";
+import { isPlaceholderImageUrl } from "@/lib/utils";
 
 const SERPAPI_ENDPOINT = "https://serpapi.com/search.json";
 
@@ -208,7 +209,12 @@ function mapToDeal(
      the card shows the clean empty-state instead of a page URL that 403s. (When
      google_images DOES return a real CDN image, that's still used as before.) */
   const canonicalUrl = canonicaliseMerchantUrl(url);
-  const imageUrl: string | undefined = imageByUrl.get(canonicalUrl) ?? r.thumbnail;
+  let imageUrl: string | undefined = imageByUrl.get(canonicalUrl) ?? r.thumbnail;
+  /* Never store a merchant placeholder graphic (medplus's image-place-holder.png,
+     pharmacy "image coming soon" templates, etc.) as the product image — it would
+     render the store's filler art instead of the clean empty-state. General guard
+     across every NG merchant, not store-specific. */
+  if (imageUrl && isPlaceholderImageUrl(imageUrl)) imageUrl = undefined;
 
   return {
     id:              `serp-${config.storeId}-${Date.now().toString(36)}-${idx}`,
