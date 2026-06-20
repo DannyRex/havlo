@@ -3,7 +3,7 @@ import { unstable_cache } from "next/cache";
 import { getActiveBrowseProvider } from "@/lib/providers";
 import { filterDealsForCountry, type Country } from "@/lib/country";
 import { classifyDeal } from "@/lib/providers/curated-helper";
-import { isPlaceholderImageUrl } from "@/lib/utils";
+import { isPlaceholderImageUrl, displayDiscountPct } from "@/lib/utils";
 import type { Deal, OriginFilter, SortOption } from "@/types";
 import TrendingDealsGrid from "@/components/landing/TrendingDealsGrid";
 import type { TrendingBuckets } from "@/components/landing/trending-compose";
@@ -219,12 +219,14 @@ export async function getTrendingBuckets(country: Country): Promise<TrendingBuck
        the most prominent surface and read as a broken card. Mirrors the search
        path's filter (browse-db). Founder direction Jun 2026. */
     !isPlaceholderImageUrl(d.imageUrl) &&
-    /* Trending is a DEALS showcase, so only genuine deals belong — is_real_deal
-       (discount > 0 OR below-30d-high OR cross-store-cheapest, matview #214).
-       This intentionally drops full-price rows from the NG localFresh / Jumia
-       bridge pools; their real-deal members still surface, and the grid backfills
-       if a thin market runs short. Founder direction Jun 2026. */
-    d.isRealDeal === true &&
+    /* Trending is a DEALS showcase, so only products with an ACTUAL markdown
+       belong — match the discount BADGE the card paints (displayDiscountPct of
+       the struck→sale prices, the SAME fn MasonryCard uses). Founder direction
+       Jun 2026: keep the "good deal" / lowest-in-30d quality-labelled rows
+       (is_real_deal WITHOUT a visible markdown) OFF trending. Also drops the NG
+       localFresh / Jumia 0%-discount bridge pools; the grid backfills if a thin
+       market runs short. */
+    displayDiscountPct(d.originalPrice, d.salePrice) > 0 &&
     !isDeadPassthrough(d.url);
 
   /* Build the candidate pool. NG users get four merged pools; non-NG
