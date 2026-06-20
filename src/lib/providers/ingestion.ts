@@ -1264,7 +1264,7 @@ export async function ingestDeals(
      displaced-offer probe below stay aligned. */
   {
     const lastIdxByKey = new Map<string, number>();
-    offerRows.forEach((r, i) => lastIdxByKey.set(`${r.store_id} ${r.url}`, i));
+    offerRows.forEach((r, i) => lastIdxByKey.set(`${r.store_id}|${r.url}`, i));
     if (lastIdxByKey.size < offerRows.length) {
       const keep = new Set(lastIdxByKey.values());
       const dedupRows: typeof offerRows = [];
