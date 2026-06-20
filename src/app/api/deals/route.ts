@@ -748,35 +748,40 @@ export async function GET(req: NextRequest) {
        every underlying variant. */
     const canonicalKey = (storeName: string) => displayStoreName(storeName).toLowerCase();
 
-    /* Build the dropdown from the cap-free RPC result (NOT the items
-       pool). The RPC ALREADY applies the user's category / discount /
-       search filters server-side, so the qualifying_count it returns
-       is authoritative. JS layer's only job is to apply the canonical
-       display-name dedup (Walmart variants → "Walmart", Amazon variants
-       → "Amazon UK" / "Amazon US", etc.). Pre-RPC the dropdown was
-       sourced from the items pool, which has per-pass row caps; 80-90%
-       of stores were getting squeezed out for non-NG countries. */
+    /* Dropdown store counts come from the SAME origin-filtered pool the grid
+       paginates (qualifyingByOrigin), so each store's number EQUALS what the
+       user actually sees when they tick it — the founder's no-number-
+       contradiction rule. (Jun 2026 fix: the prior cap-free RPC count used a
+       LOOSER deal/in-stock basis than the items pool, so e.g. Kara read "81" in
+       the dropdown yet the Deals grid showed 6 — Kara's stock carries no nominal
+       discount, so only its is_real_deal rows qualify, and the RPC wasn't
+       counting on that basis.) Grouped by canonical display name, which is also
+       the key the store filter matches on, so count('kara') == total when Kara
+       is ticked. The cap-free RPC list is still consulted only for the canonical
+       display NAME. Stores with nothing in the current view are omitted — listing
+       a store that yields 0 cards on selection would itself be a contradiction.
+
+       Trade-off vs the old cap-free count: in a market large enough to truncate
+       the 3-pass pool, a store can carry more inventory than the pool holds. We
+       deliberately show the pool figure (what's actually browsable) so the count
+       never exceeds the grid; whole-catalogue store discovery is a tier-clear
+       away, not a dropdown promise we can't keep. */
     const storesAggregate = (() => {
-      const map = new Map<string, { id: string; name: string; count: number }>();
-      for (const row of dropdownStoresRaw) {
-        const key  = canonicalKey(row.store_name);
-        const name = displayStoreName(row.store_name);
-        const existing = map.get(key);
-        if (existing) {
-          /* Variant collapse: sum the underlying variants' counts
-             into the canonical entry (Walmart-seller-A + Walmart-
-             seller-B → "Walmart" with the combined count). */
-          existing.count += row.qualifying_count;
-        } else {
-          map.set(key, { id: key, name, count: row.qualifying_count });
-        }
+      const poolCount = new Map<string, number>();
+      const poolName  = new Map<string, string>();
+      for (const d of qualifyingByOrigin) {
+        const key = canonicalKey(d.storeName);
+        poolCount.set(key, (poolCount.get(key) ?? 0) + 1);
+        if (!poolName.has(key)) poolName.set(key, displayStoreName(d.storeName));
       }
-      /* Sort by qualifying count DESC so stores with the most
-         actionable inventory at the current tier float to the top.
-         Stores with count=0 (visible but no qualifying rows) settle
-         at the bottom — they still appear because the user can clear
-         their tier filter to see them. */
-      return Array.from(map.values()).sort((a, b) => b.count - a.count);
+      /* Prefer the RPC's canonical display name where it has one. */
+      for (const row of dropdownStoresRaw) {
+        const key = canonicalKey(row.store_name);
+        if (poolCount.has(key)) poolName.set(key, displayStoreName(row.store_name));
+      }
+      return Array.from(poolCount.entries())
+        .map(([key, count]) => ({ id: key, name: poolName.get(key) ?? key, count }))
+        .sort((a, b) => b.count - a.count);
     })();
 
     /* Multi-store filter — match by canonical display name now that
