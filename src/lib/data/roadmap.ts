@@ -48,15 +48,15 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
   {
     id: "ask-havlo",
     title: "Ask Havlo",
-    description: "Describe what you need, like 'best washing machine under $450 for a family of 5', and get an answer built from real prices across stores.",
+    description: "Describe what you need, like 'best washing machine under $450 for a family of 5', and get an answer built from cheapest prices across stores.",
     status: "up-next",
     /* Market-priced examples so the teaser reads native everywhere. */
     localDescription: {
-      ng: "Describe what you need, like 'best washing machine under ₦400k for a family of 5', and get an answer built from real prices across stores.",
-      uk: "Describe what you need, like 'best washing machine under £350 for a family of 5', and get an answer built from real prices across stores.",
-      in: "Describe what you need, like 'best washing machine under ₹30,000 for a family of 5', and get an answer built from real prices across stores.",
-      ae: "Describe what you need, like 'best washing machine under AED 1,500 for a family of 5', and get an answer built from real prices across stores.",
-      za: "Describe what you need, like 'best washing machine under R8,000 for a family of 5', and get an answer built from real prices across stores.",
+      ng: "Describe what you need, like 'best washing machine under ₦400k for a family of 5', and get an answer built from cheapest prices across stores.",
+      uk: "Describe what you need, like 'best washing machine under £350 for a family of 5', and get an answer built from cheapest prices across stores.",
+      in: "Describe what you need, like 'best washing machine under ₹30,000 for a family of 5', and get an answer built from cheapest prices across stores.",
+      ae: "Describe what you need, like 'best washing machine under AED 1,500 for a family of 5', and get an answer built from cheapest prices across stores.",
+      za: "Describe what you need, like 'best washing machine under R8,000 for a family of 5', and get an answer built from cheapest prices across stores.",
     },
   },
   {
@@ -82,7 +82,7 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
   {
     id: "trade-in-guide",
     title: "What's my phone worth?",
-    description: "A live resale and trade-in value guide built from real market prices.",
+    description: "A live resale and trade-in value guide built from current market prices.",
     status: "exploring",
   },
   {
