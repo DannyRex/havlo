@@ -132,15 +132,24 @@ export default function StoreLogo({
     const img = imgRef.current;
     if (!img || !img.complete) return;
     if (img.naturalWidth === 0) { handleError(); return; }
-    setImgPainted(true);
+    /* >16 = a real logo painted (hide the letter base); a 16px Google globe
+       upgrades to icon.horse instead of being treated as a usable mark. */
+    setImgPainted(img.naturalWidth > 16);
     if (tier === "favicon" && favicon2 && img.naturalWidth <= 16) setTier("favicon2");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tier, src]);
 
   /* Outer cell uses page-matching bg + visible border so the cell is
-     delimited in BOTH light and dark modes. */
+     delimited in BOTH light and dark modes. Favicon tiers are the exception:
+     full-colour brand marks are often dark-on-transparent, so on a dark cell
+     they vanish. Give those a white plate in dark mode (logos are designed for
+     light backgrounds). The bundled /logos tier is theme-inverted instead (see
+     invertClass) and the letter base is theme-aware, so both keep bg-bg. */
+  const isFaviconTier = tier === "favicon" || tier === "favicon2";
   const cellClass =
-    "rounded-lg overflow-hidden shrink-0 bg-bg border border-border flex items-center justify-center";
+    `rounded-lg overflow-hidden shrink-0 border border-border flex items-center justify-center ${
+      isFaviconTier ? "bg-bg dark:bg-white" : "bg-bg"
+    }`;
 
   const inner = size - pad * 2;
   const initial = storeName.trim().charAt(0).toUpperCase() || "•";
@@ -158,16 +167,15 @@ export default function StoreLogo({
 
   return (
     <div className={`${cellClass} relative`} style={{ width: size, height: size }}>
-      {/* Letter badge — ALWAYS rendered as the base layer; the logo
-          <img> overlays it when a tier resolves. Guarantees a visible
-          store indicator in both themes even when every logo tier
-          fails or a favicon loads but paints nothing. */}
-      {/* Letter badge — base layer behind the logo. Removed once a BUNDLED
-          (primary) /logos asset has painted, so a transparent or wordmark
-          logo doesn't leave the initial bleeding through beside it (the
-          "arbitrary 3" on 3C Hub). Favicon tiers keep the always-on base as
-          a blank-paint safety net. */}
-      {!(imgPainted && tier === "primary") && (
+      {/* Letter badge — base layer behind the logo, shown until a REAL logo
+          (naturalWidth > 16, ANY tier) actually paints over it. Hidden once
+          such a logo lands so a transparent / wordmark mark doesn't leave the
+          initial bleeding through beside it — the "arbitrary 3" on 3C Hub
+          (bundled tier) AND the letter behind brand favicons on /brands. A
+          tier that loads only the 16px globe or fails keeps the base visible
+          (imgPainted stays false; the globe upgrades to icon.horse, then to
+          the letter tier). */}
+      {!(imgPainted && tier !== "letter") && (
         <span
           aria-hidden="true"
           className="font-bold text-ink-2 select-none"
@@ -190,7 +198,11 @@ export default function StoreLogo({
           loading="lazy"
           decoding="async"
           className={`absolute inset-0 m-auto object-contain ${invertClass}`}
-          onLoad={(e) => { if (e.currentTarget.naturalWidth > 0) setImgPainted(true); }}
+          onLoad={(e) => {
+            const w = e.currentTarget.naturalWidth;
+            setImgPainted(w > 16);
+            if (w <= 16 && tier === "favicon" && favicon2) setTier("favicon2");
+          }}
           onError={handleError}
         />
       )}
