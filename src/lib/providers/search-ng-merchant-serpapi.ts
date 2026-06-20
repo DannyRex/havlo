@@ -198,22 +198,17 @@ function mapToDeal(
      The UI degrades gracefully to the category-gradient + emoji
      placeholder when imageUrl is absent.
 
-     Kara special case: Kara serves EVERY image via Cloudflare R2 with
-     7-day pre-signed URLs. The previous fix (pickImage filter) correctly
-     rejected those because they 403 after a week, but it left every Kara
-     product with NO image at all (only 13% coverage despite google_images
-     returning a URL for most). The HTML-page resolution path in
-     /api/img-proxy (HTML_PAGE_HOSTS + og:image extraction) now handles
-     Kara: storing the product PAGE URL as image_url means the proxy
-     fetches the page on demand, extracts a fresh signed URL from
-     og:image, and streams the bytes back. We only fall through to this
-     when google_images produced nothing usable — when it DID, prefer
-     the resolved image URL (no round-trip cost on render). */
+     Kara note (Jun 2026): Kara's real images live on Cloudflare R2 behind
+     7-day pre-signed URLs we can't store directly. The #28 fix stored the
+     product PAGE URL and let /api/img-proxy (HTML_PAGE_HOSTS) resolve a fresh
+     og:image on demand — but kara.com.ng now returns 403 to every non-browser
+     request, so that path is dead and rendered BROKEN images for the ~22 Kara
+     products that have no google_images thumbnail. Dropped the page-URL
+     fallback: when google_images has nothing usable, leave imageUrl undefined so
+     the card shows the clean empty-state instead of a page URL that 403s. (When
+     google_images DOES return a real CDN image, that's still used as before.) */
   const canonicalUrl = canonicaliseMerchantUrl(url);
-  let imageUrl: string | undefined = imageByUrl.get(canonicalUrl) ?? r.thumbnail;
-  if (!imageUrl && config.storeId === "kara") {
-    imageUrl = canonicalUrl;
-  }
+  const imageUrl: string | undefined = imageByUrl.get(canonicalUrl) ?? r.thumbnail;
 
   return {
     id:              `serp-${config.storeId}-${Date.now().toString(36)}-${idx}`,
