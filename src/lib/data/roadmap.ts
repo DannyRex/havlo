@@ -42,7 +42,7 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
   {
     id: "vip-deals-channel",
     title: "VIP flash-deal alerts",
-    description: "A members channel for the fastest movers: price errors and flash drops, hand checked and sent within minutes.",
+    description: "A members-only channel for the deals that vanish fast: store price mistakes and flash sales. Every one checked by hand and sent the minute we find it.",
     status: "up-next",
   },
   {
@@ -94,20 +94,13 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
   {
     id: "group-buying",
     title: "Group buying",
-    description: "Team up with other buyers to unlock bulk prices on big-ticket items.",
+    description: "When enough shoppers want the same big-ticket item, Havlo pools the orders into one. Everyone pays the bulk price.",
     status: "exploring",
-  },
-  {
-    id: "solar-hub",
-    title: "Solar and inverter comparison",
-    description: "Compare inverters, panels, and full solar bundles, with quotes from vetted installers.",
-    status: "exploring",
-    markets: ["ng"],
   },
   {
     id: "creator-storefronts",
     title: "Creator storefronts",
-    description: "Curated deal pages for creators and deal hunters, powered by Havlo's prices.",
+    description: "Build a shareable page of hand-picked deals. You choose the products, Havlo keeps every price live and cheapest across stores.",
     status: "exploring",
   },
 
