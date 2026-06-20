@@ -79,9 +79,16 @@ function refererFor(host: string): string | null {
    the correct per-host Referer. Falls back to the production img-proxy for
    Kara (whose image_url is a PAGE URL the proxy resolves to a fresh og:image)
    and for any direct fetch that fails or returns non-image bytes. */
-async function fetchImage(merchantUrl: string): Promise<Buffer | null> {
+/* Returns the image bytes, plus `nonImage` = true when a fetch returned 200 with
+   a NON-image content-type (i.e. the "image_url" is actually a PAGE URL, not an
+   image). That case is permanent — it can never become an image — so the caller
+   nulls it. A failed/blocked fetch (403, timeout) leaves nonImage=false so it's
+   retried next run instead of being thrown away. */
+async function fetchImage(merchantUrl: string): Promise<{ bytes: Buffer | null; nonImage: boolean }> {
   let host = "";
-  try { host = new URL(merchantUrl).hostname; } catch { return null; }
+  try { host = new URL(merchantUrl).hostname; } catch { return { bytes: null, nonImage: false }; }
+  let nonImage = false;
+  const isPageCt = (ct: string) => !ct.startsWith("image/") && (ct.startsWith("text/") || ct.includes("html") || ct.includes("json"));
 
   const karaPage = host === "kara.com.ng" || host.endsWith(".kara.com.ng");
   if (!karaPage) {
@@ -93,11 +100,14 @@ async function fetchImage(merchantUrl: string): Promise<Buffer | null> {
       const ref = refererFor(host);
       if (ref) headers["referer"] = ref;
       const res = await fetch(merchantUrl, { headers, redirect: "follow", signal: AbortSignal.timeout(15_000) });
-      if (res.ok && (res.headers.get("content-type") ?? "").startsWith("image/")) {
+      const ct = res.headers.get("content-type") ?? "";
+      if (res.ok && ct.startsWith("image/")) {
         const ab = await res.arrayBuffer();
-        if (ab.byteLength > 0 && ab.byteLength <= 8_000_000) return Buffer.from(ab);
+        if (ab.byteLength > 0 && ab.byteLength <= 8_000_000) return { bytes: Buffer.from(ab), nonImage: false };
+      } else if (res.ok && isPageCt(ct)) {
+        nonImage = true;   // a product PAGE served where an image was expected
       }
-    } catch { /* fall through to the proxy */ }
+    } catch { /* transient — fall through to the proxy */ }
   }
 
   /* Proxy fallback (Kara og:image, or a direct fetch that didn't yield an image). */
@@ -106,12 +116,16 @@ async function fetchImage(merchantUrl: string): Promise<Buffer | null> {
       signal: AbortSignal.timeout(15_000),
       headers: { "user-agent": "havlo-image-rehost/1.0" },
     });
-    if (!res.ok || !(res.headers.get("content-type") ?? "").startsWith("image/")) return null;
-    const ab = await res.arrayBuffer();
-    if (ab.byteLength === 0 || ab.byteLength > 8_000_000) return null;
-    return Buffer.from(ab);
+    const ct = res.headers.get("content-type") ?? "";
+    if (res.ok && ct.startsWith("image/")) {
+      const ab = await res.arrayBuffer();
+      if (ab.byteLength > 0 && ab.byteLength <= 8_000_000) return { bytes: Buffer.from(ab), nonImage: false };
+      return { bytes: null, nonImage };
+    }
+    if (res.ok && isPageCt(ct)) nonImage = true;
+    return { bytes: null, nonImage };
   } catch {
-    return null;
+    return { bytes: null, nonImage };
   }
 }
 
@@ -165,8 +179,18 @@ async function main(): Promise<void> {
       skipped++;
       return;
     }
-    const bytes = await fetchImage(row.image_url);
-    if (!bytes) { skipped++; return; }
+    const { bytes, nonImage } = await fetchImage(row.image_url);
+    if (!bytes) {
+      /* A URL that resolves to a PAGE (HTML), not an image, can never become an
+         image (the Kara product-page-URL class). Null it so the card shows the
+         clean empty-state instead of a broken image, and clear any phash. A
+         transient/blocked fetch (403/timeout) is left for the next run to retry. */
+      if (nonImage && !DRY_RUN) {
+        await supa!.from("products").update({ image_url: null, image_phash: null }).eq("id", row.id);
+      }
+      skipped++;
+      return;
+    }
     const webp = await normalizeToWebp(bytes);
     if (!webp) { skipped++; return; }
     if (DRY_RUN) { hosted++; return; }
