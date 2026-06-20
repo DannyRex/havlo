@@ -61,8 +61,10 @@ const footerSections = [
       { label: "Terms of Use",         href: "/terms-of-use"    },
       /* Accessibility statement — required by the EU Accessibility Act
          (in force 28 June 2025) for e-commerce-related services. Also
-         signals good faith on US ADA Title III + UK Equality Act. */
-      { label: "Accessibility",        href: "/accessibility"   },
+         signals good faith on US ADA Title III + UK Equality Act. Merged
+         into Terms of Use (Jun 2026); this deep-links to that section, and
+         /accessibility still resolves via a permanent redirect. */
+      { label: "Accessibility",        href: "/terms-of-use#accessibility" },
       /* DSA Contact link hidden until the EU/Germany launch — Havlo doesn't
          yet operate in the EU (DE deferred from ACTIVE_COUNTRIES), so the
          Digital Services Act point of contact isn't required. The
