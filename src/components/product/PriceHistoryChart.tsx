@@ -982,7 +982,7 @@ function todayMidnightUtcMs(): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
-function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: number, leftPad: number = PAD_LEFT): Geometry {
+function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: number, leftPad: number = PAD_LEFT, currentNgn?: number): Geometry {
   if (points.length === 0) {
     return {
       pathD: "", areaD: "", xs: [], ys: [],
@@ -1081,8 +1081,23 @@ function computeGeometry(points: PriceHistoryPoint[], width: number, rangeDays: 
      reading. */
   const lastPointX = xs[xs.length - 1];
   const lastPointY = ys[ys.length - 1];
-  const todayExtension = lastPointX < todayX
-    ? ` L ${todayX.toFixed(2)} ${lastPointY.toFixed(2)}`
+  /* The line's right edge must land ON the "now" dot so the timeline reads
+     continuously INTO the current price — not hold flat at the last recorded
+     reading and leave the hero dot floating above/below it (founder report
+     June 2026: "the line should correlate with the position of the dot". A
+     sparse history where only the pricier store was re-scraped on the last
+     day made the min-line end high while the live cheapest dot sat far below,
+     reading as a contradiction). When a current price is supplied the
+     extension targets its Y — same yForP formula + same clamp as the hero
+     dot's currentRefY, so the line meets the dot exactly; with no current
+     price it falls back to the old flat hold. */
+  const clampToBand = (y: number) =>
+    Math.max(PAD_TOP + 2, Math.min(CHART_HEIGHT - PAD_BOTTOM - 2, y));
+  const endY = currentNgn != null && Number.isFinite(currentNgn)
+    ? clampToBand(yForP(currentNgn))
+    : lastPointY;
+  const todayExtension = lastPointX < todayX || endY !== lastPointY
+    ? ` L ${todayX.toFixed(2)} ${endY.toFixed(2)}`
     : "";
 
   const pathD = points.length === 1
@@ -1195,7 +1210,7 @@ function computeGeometryFull(
   rangeDays: number,
   leftPad: number = PAD_LEFT,
 ): Geometry {
-  const g = computeGeometry(points, width, rangeDays, leftPad);
+  const g = computeGeometry(points, width, rangeDays, leftPad, currentNgn);
   if (points.length === 0) return g;
   const { yMin, yMax } = padYDomain(g.lowestNgn, g.highestNgn);
   const chartH   = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
