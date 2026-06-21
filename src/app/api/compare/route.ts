@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchByKey } from "@/lib/search";
+import { searchByKey, recomputeGroupStats } from "@/lib/search";
 import { pgFtsFindSimilar, pgFtsFindByProductId, pgFtsFindDupes, computeAnchorSpectrum } from "@/lib/search/pg-fts";
 import { getServerCountry } from "@/lib/country-server";
 import { getCountry, isOfferAllowedForCountry, COUNTRIES } from "@/lib/country";
@@ -225,7 +225,9 @@ function filterByCountry(
   function pruneOffers<T extends ProductGroup | DupeResult>(g: T): T | null {
     const offers = g.offers.filter((o) => isOfferAllowedForCountry(o, country));
     if (offers.length === 0) return null;
-    return { ...g, offers, storeCount: offers.length };
+    /* Recompute the headline from the survivors so pruning a cross-border
+       cheapest doesn't leave a stale (e.g. NG) bestPrice on the card. */
+    return recomputeGroupStats({ ...g, offers });
   }
 
   if (out.mode === "single") {

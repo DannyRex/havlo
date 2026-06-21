@@ -10,8 +10,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { pgFtsFindDupes } from "@/lib/search/pg-fts";
+import { recomputeGroupStats } from "@/lib/search";
 import { getServerCountry } from "@/lib/country-server";
-import { isOfferAllowedForCountry } from "@/lib/country";
+import { isOfferAllowedForCountry, getCountry, COUNTRIES } from "@/lib/country";
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
@@ -31,11 +32,19 @@ export async function GET(req: NextRequest) {
     const dupes = await pgFtsFindDupes(q, maxPriceNgn);
     /* For non-NG users, drop dupe-offers from NG-anchored stores.
        If a dupe loses all its offers we drop the dupe entirely. */
-    const country = getServerCountry();
+    /* Country resolution order: explicit ?country query param (validated against
+       COUNTRIES) > cookie/geo. The compare page lives at /<cc>/compare and MUST
+       pass ?country=<cc>; the old code relied on getServerCountry()'s cookie
+       alone, so a UK shopper whose cookie still read NG hit the ng branch below
+       and saw Jumia + naira leak into "more to compare". Mirrors /api/compare. */
+    const ccParam = req.nextUrl.searchParams.get("country")?.toLowerCase().trim();
+    const country = ccParam && COUNTRIES.some((c) => c.code === ccParam)
+      ? getCountry(ccParam)
+      : getServerCountry();
     const filteredDupes = country.code === "ng"
       ? dupes
       : dupes
-          .map((d) => ({
+          .map((d) => recomputeGroupStats({
             ...d,
             offers: d.offers.filter((o) => isOfferAllowedForCountry(o, country)),
           }))

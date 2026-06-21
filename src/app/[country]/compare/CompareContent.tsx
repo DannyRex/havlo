@@ -271,7 +271,7 @@ export default function CompareContent({
 
     if (sniffedAnchor) {
       const dupesFor = async (term: string): Promise<DupeResult[]> => {
-        const res = await fetch(`/api/compare/dupes?q=${encodeURIComponent(term)}&maxPriceNgn=${sniffedAnchor.bestPrice}`);
+        const res = await fetch(`/api/compare/dupes?q=${encodeURIComponent(term)}&maxPriceNgn=${sniffedAnchor.bestPrice}&country=${country.code}`);
         const data = await res.json() as { dupes: DupeResult[] };
         return data.dupes ?? [];
       };

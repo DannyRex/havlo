@@ -112,6 +112,26 @@ export interface DupeResult extends ProductGroup {
   savingsPercent: number;     // 0–100
 }
 
+/* Recompute a group's price headline from its (possibly filtered) offers.
+   After country / stock pruning drops the cheapest offer, bestPrice, worstPrice,
+   maxSavings and storeCount must follow, or the card keeps a stale (often
+   cross-border) headline price. For a DupeResult, re-derive savings vs the
+   implicit anchor from the pre-prune values (anchorBest = oldBest + oldSavings)
+   so the "save X" line stays consistent with the new bestPrice. */
+export function recomputeGroupStats<T extends ProductGroup>(g: T): T {
+  const prices = g.offers.map((o) => o.price).filter((p) => p > 0);
+  const best  = prices.length ? Math.min(...prices) : g.bestPrice;
+  const worst = prices.length ? Math.max(...prices) : g.worstPrice;
+  const out = { ...g, storeCount: g.offers.length, bestPrice: best, worstPrice: worst, maxSavings: Math.max(0, worst - best) } as T;
+  const d = out as unknown as Partial<DupeResult>;
+  if (typeof d.savingsVsAnchor === "number") {
+    const anchorBest = g.bestPrice + d.savingsVsAnchor;
+    d.savingsVsAnchor = Math.max(0, anchorBest - best);
+    d.savingsPercent  = anchorBest > 0 ? Math.min(99, Math.round((d.savingsVsAnchor / anchorBest) * 100)) : 0;
+  }
+  return out;
+}
+
 /* Lightweight 'did you mean' suggestion shape. We don't need full
    ProductGroup payloads here (no offers / brand / prices), just
    enough to render a clickable pill that re-runs search for that
