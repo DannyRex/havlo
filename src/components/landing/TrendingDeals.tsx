@@ -4,6 +4,7 @@ import { getActiveBrowseProvider } from "@/lib/providers";
 import { filterDealsForCountry, type Country } from "@/lib/country";
 import { classifyDeal } from "@/lib/providers/curated-helper";
 import { isPlaceholderImageUrl, displayDiscountPct } from "@/lib/utils";
+import { merchantSearchUrl } from "@/lib/merchant-search-urls";
 import type { Deal, OriginFilter, SortOption } from "@/types";
 import TrendingDealsGrid from "@/components/landing/TrendingDealsGrid";
 import type { TrendingBuckets } from "@/components/landing/trending-compose";
@@ -68,10 +69,11 @@ const fetchPoolCached = unstable_cache(
       { timeoutMs: TRENDING_FETCH_TIMEOUT_MS, noCuratedFallback: true },
     );
   },
-  /* v3 (Jun 2026): bumped so the badge-only fresh-pool fix (minDiscount>=5)
-     evicts the stale discount>=15-only pools on deploy instead of waiting out
-     the 30-min TTL. v2 (May 2026): evicted 5-card timeout-fallback pools. */
-  ["trending-pool-v3"],
+  /* v4 (Jun 2026): bumped for the merchant-routable relay fix (keep
+     google_shopping relay offers that resolve to a known merchant) so non-NG
+     markets fill 16 and rotate; evicts the stale thin pools on deploy. v3:
+     badge-only fresh-pool minDiscount>=5. v2: evicted 5-card timeout pools. */
+  ["trending-pool-v4"],
   { revalidate: 1800, tags: ["trending-pool"] },
 );
 
@@ -228,7 +230,15 @@ export async function getTrendingBuckets(country: Country): Promise<TrendingBuck
        pools below all fetch discounted inventory (minDiscount >= 5), so this is
        the precise per-card badge gate, not the pool's depth limiter. */
     displayDiscountPct(d.originalPrice, d.salePrice) > 0 &&
-    !isDeadPassthrough(d.url);
+    /* A Google-Shopping relay URL (google.com/search?ibp=oshop) is the bulk of
+       US/IN/ZA/AE inventory and is NOT dead: /api/go resolves it to the store's
+       product search via merchantSearchUrl, and the PDP CTA does the same. So
+       keep relay offers that route to a KNOWN merchant and only drop the
+       long-tail ones with no merchant to land on. The old blanket
+       isDeadPassthrough exclusion predated that fallback chain and starved
+       non-NG trending below 16 (US usable pool 19 → 531 with this), which also
+       killed per-refresh rotation since the pick had nothing fresh to draw. */
+    (!isDeadPassthrough(d.url) || !!merchantSearchUrl(d.storeId, d.storeName, d.title, country.code));
 
   /* Build the candidate pool. NG users get four merged pools; non-NG
      users get two — both more than the previous one-pool fetch, so
