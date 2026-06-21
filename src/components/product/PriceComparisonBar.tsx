@@ -231,6 +231,21 @@ export default function PriceComparisonBar({
       }))
       .sort((a, b) => a.leftPct - b.leftPct);
 
+    /* Dot cap (readability). A popular product can carry 60+ stores; plotting
+       every one turns the spectrum into a barcode. Keep the cheapest + dearest
+       endpoints plus an evenly-spaced sample between them, so the bar still
+       shows the true spread + the floor without the clutter. The verdict,
+       "cheapest at X", store count, and lowest/highest are all computed on the
+       FULL perStoreOffers above — only the rendered dots are thinned. The
+       visiting store is its own triangle marker and is never in cands. */
+    const MAX_DOTS = 14;
+    const dotCands = cands.length <= MAX_DOTS ? cands : (() => {
+      const keep = new Set<number>([0, cands.length - 1]);
+      const step = (cands.length - 1) / (MAX_DOTS - 1);
+      for (let i = 1; i < MAX_DOTS - 1; i++) keep.add(Math.round(i * step));
+      return Array.from(keep).sort((a, b) => a - b).map((i) => cands[i]);
+    })();
+
     let current: { offerIds: string[]; pcts: number[]; ngns: number[] } | null = null;
     const flush = () => {
       if (!current) return;
@@ -245,7 +260,7 @@ export default function PriceComparisonBar({
       });
       current = null;
     };
-    for (const c of cands) {
+    for (const c of dotCands) {
       const lastInCurrent = current ? current.pcts[current.pcts.length - 1] : null;
       if (current && lastInCurrent !== null && c.leftPct - lastInCurrent <= CLUSTER_THRESHOLD_PCT) {
         current.offerIds.push(c.offerId);
@@ -264,7 +279,7 @@ export default function PriceComparisonBar({
     for (const cluster of clusters) {
       const n = cluster.offerIds.length;
       if (n === 1) {
-        const cand = cands.find((c) => c.offerId === cluster.offerIds[0])!;
+        const cand = dotCands.find((c) => c.offerId === cluster.offerIds[0])!;
         dotAssignByOfferId.set(cluster.offerIds[0], {
           clusterId:      cluster.id,
           displayLeftPct: cand.leftPct,
