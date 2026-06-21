@@ -366,7 +366,7 @@ const RULES: Array<{ pattern: RegExp; slug: string; reason: string }> = [
 
   // ── Fashion ──
   { pattern: /\b(nike|adidas|puma|reebok|new\s*balance|asics|under\s*armour)\s+\w*\b.*\b(shoe|sneaker|trainer|boot|sandal)\b/i, slug: "fashion", reason: "branded footwear" },
-  { pattern: /\b(air\s*force|air\s*jordan|adidas\s*samba|nike\s*dunk|stan\s*smith|yeezy|ultra\s*boost|crocs)\b/i, slug: "fashion", reason: "iconic sneaker" },
+  { pattern: /\b(air\s*force|air\s*jordan|air\s*max|vapor\s*max|huarache|nike\s*shox|nike\s*blazer|nike\s*cortez|nike\s*pegasus|adidas\s*samba|adidas\s*gazelle|nike\s*dunk|stan\s*smith|yeezy|ultra\s*boost|crocs)\b/i, slug: "fashion", reason: "iconic sneaker" },
   /* Generic footwear — brand-agnostic. The two rules above only catch a
      hardcoded brand list (nike/adidas/…) plus iconic model names, so
      OFF-list brands (Clarks, Converse, Tommy Hilfiger, HOKA, Brooks, On,
