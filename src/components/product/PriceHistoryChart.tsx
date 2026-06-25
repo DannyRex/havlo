@@ -97,6 +97,20 @@ const RANGE_OPTIONS = [
 ] as const;
 type RangeKey = typeof RANGE_OPTIONS[number]["key"];
 
+/* Whether a range chip is offered for a given data span. A non-ALL window
+   is only meaningful once the data covers at least half of it; below that
+   it renders identically to a smaller window or to All, so the chip is
+   hidden. Single source of truth shared by RangeToggle (which chips to
+   render) and the default-range picker (which range to pre-select) so the
+   two can never disagree — the active range is therefore always a visible
+   chip. span <= 0 (a single point, no span yet) offers every chip, matching
+   the toggle's long-standing behaviour. */
+function isRangeOffered(key: RangeKey, spanDays: number): boolean {
+  if (key === "ALL") return true;
+  const days = RANGE_OPTIONS.find((r) => r.key === key)?.days ?? 0;
+  return spanDays <= 0 || spanDays >= days * 0.5;
+}
+
 export default function PriceHistoryChart({
   points, currentNgn, country, visitingStoreName, dataSource = "tracked",
 }: Props) {
@@ -104,18 +118,22 @@ export default function PriceHistoryChart({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<HTMLDivElement | null>(null);
 
-  /* Default range: prefer 90D when we have ≥ 7 days of data
-     (statistically interesting). Otherwise show All so users
-     aren't staring at a 1-2 point window. Initial value is
-     stable across SSR + client. */
+  /* Default range: the widest sub-window the data actually fills AND the
+     toggle actually offers — 90D for long spans, else 30D, else All.
+     Gating on isRangeOffered (the SAME visibility test RangeToggle uses)
+     guarantees the active range is never a hidden chip. The bug it fixes:
+     a short history (e.g. 9 points over 8 days) used to default to 30D —
+     stamping the verdict "Lowest in 30 days" and the "30D low/high" tiles —
+     while the 30D chip stays hidden for spans under 15 days, leaving only
+     an inactive "All" on screen. Such a span now defaults to All ("…since
+     tracking started" + "All-time" tiles + the All chip highlighted).
+     Stable across SSR + client. */
   const initialRange: RangeKey = useMemo(() => {
     if (points.length < 7) return "ALL";
-    /* If the span covered by `points` is less than 60 days,
-       starting on 90D would render the same data as All — pick
-       30D so the toggle actually does something visible. */
     const span = computeSpanDays(points);
-    if (span < 60) return "30D";
-    return "90D";
+    if (span >= 60 && isRangeOffered("90D", span)) return "90D";
+    if (isRangeOffered("30D", span)) return "30D";
+    return "ALL";
   }, [points]);
   const [rangeKey, setRangeKey] = useState<RangeKey>(initialRange);
 
@@ -793,9 +811,10 @@ function RangeToggle({ value, onChange, dataSpanDays }: RangeToggleProps) {
            Previously this just disabled the button, but a greyed-out
            tab still draws the eye to a control that can't do anything
            — better to remove it entirely until the data can fill it.
-           The All option is never hidden. */
-        const isHidden = r.key !== "ALL" && dataSpanDays > 0 && dataSpanDays < r.days * 0.5;
-        if (isHidden) return null;
+           The All option is never hidden. isRangeOffered is shared with
+           the default-range picker so a hidden chip is never the active
+           range. */
+        if (!isRangeOffered(r.key, dataSpanDays)) return null;
         return (
           <button
             key={r.key}
