@@ -92,3 +92,63 @@ export async function getPrecomputedOriginCounts(
     allDeals: r.all_deals, localDeals: r.local_deals, intlDeals: r.intl_deals,
   };
 }
+
+/* ── Per-store dropdown counts (migration 0089) ──────────────────────────
+   The /deals "Stores" filter reads these so each chip equals the store's true
+   reachable catalogue count (the SAME basis as the category tiles above),
+   instead of the broad-pool slice that drifted from the click result (and the
+   tier-dependent slice that produced "1 in All, 4 in Deals" for tiny stores).
+   Keyed (country, category_slug, store_key); the route picks all_count or
+   deals_count by the active tier. Same safe-by-fallback contract: null → the
+   caller keeps its live pool aggregate. */
+export interface PrecomputedStoreCount {
+  store_key:   string;
+  store_name:  string;
+  is_local:    boolean;
+  all_count:   number;
+  deals_count: number;
+}
+
+interface StoreRow extends PrecomputedStoreCount {
+  category_slug: string;
+  updated_at:    string;
+}
+
+const storeCache = new Map<string, { rows: StoreRow[]; expires: number }>();
+
+async function loadStoreRows(country: Country): Promise<StoreRow[] | null> {
+  const cc = country.code;
+  const now = Date.now();
+  const cached = storeCache.get(cc);
+  if (cached && cached.expires > now) return cached.rows;
+  const supa = getSupabaseAdmin();
+  if (!supa) return null;
+  try {
+    const { data, error } = await supa
+      .from("store_filter_counts")
+      .select("category_slug,store_key,store_name,is_local,all_count,deals_count,updated_at")
+      .eq("country", cc);
+    if (error || !Array.isArray(data) || data.length === 0) return null;
+    const rows = data as unknown as StoreRow[];
+    const newest = Math.max(...rows.map((r) => Date.parse(r.updated_at)));
+    if (!Number.isFinite(newest) || now - newest > STALE_MS) return null;
+    storeCache.set(cc, { rows, expires: now + CACHE_TTL_MS });
+    return rows;
+  } catch {
+    return null;
+  }
+}
+
+/* Precomputed dropdown store rows for a (country, category) view. null → the
+   caller falls back to its live pool aggregate (search / unsupported tier /
+   table missing / cron stalled). */
+export async function getPrecomputedStoreCounts(
+  country: Country,
+  categorySlug?: string,
+): Promise<PrecomputedStoreCount[] | null> {
+  const rows = await loadStoreRows(country);
+  if (!rows) return null;
+  const slug = categorySlug && categorySlug !== "all" ? categorySlug : "all";
+  const out = rows.filter((r) => r.category_slug === slug);
+  return out.length ? out : null;
+}

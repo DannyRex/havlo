@@ -48,3 +48,10 @@ jobs:
 
       - name: Compute + upsert category counts
         run: npx tsx scripts/compute-category-counts.ts
+
+      # Per-store dropdown counts (migration 0089) — same matview scan, same
+      # cadence, so the /deals Stores filter chips agree with the category
+      # tiles. Non-fatal: a failure here must not block the category refresh.
+      - name: Compute + upsert store counts
+        run: npx tsx scripts/compute-store-counts.ts
+        continue-on-error: true

@@ -3,7 +3,7 @@ import { getActiveBrowseProvider } from "@/lib/providers";
 import { spaceByStore } from "@/lib/providers/curated-helper";
 import { getServerCountry } from "@/lib/country-server";
 import { filterDealsForCountry, getCountry, inferStoreCountry, isGlobalIntlStore, isCrossBorderStore } from "@/lib/country";
-import { getPrecomputedOriginCounts } from "@/lib/deals/precomputed-counts";
+import { getPrecomputedOriginCounts, getPrecomputedStoreCounts } from "@/lib/deals/precomputed-counts";
 import { isStoreSearchUrl } from "@/lib/utils";
 import { displayStoreName } from "@/lib/store-display";
 import { fetchSearchSuggestions } from "@/lib/search/suggestions";
@@ -778,7 +778,27 @@ export async function GET(req: NextRequest) {
        deliberately show the pool figure (what's actually browsable) so the count
        never exceeds the grid; whole-catalogue store discovery is a tier-clear
        away, not a dropdown promise we can't keep. */
-    const storesAggregate = (() => {
+    /* Dropdown counts: prefer the precomputed per-store table (migration 0089)
+       so each chip equals the store's true reachable catalogue count (the same
+       basis as the category tiles + origin pills) instead of the broad-pool
+       slice that drifted from the click result. Only for the browse views the
+       table covers: no text search, and a tier it precomputes (all-products or
+       the Deals tier — 20%/50% fall through to the live aggregate). Origin-
+       scoped via is_local; safe-by-fallback to the pool aggregate below when
+       the table is missing / stale / a search or higher tier is active. */
+    const precomputedStores =
+      !(search && search.trim()) && (userMinDiscount === 0 || isDealsMode)
+        ? await getPrecomputedStoreCounts(country, category)
+        : null;
+    const storesAggregate = precomputedStores
+      ? precomputedStores
+          .filter((s) =>
+            effectiveOrigin === "all"   ? true :
+            effectiveOrigin === "local" ? s.is_local : !s.is_local)
+          .map((s) => ({ id: s.store_key, name: s.store_name, count: isDealsMode ? s.deals_count : s.all_count }))
+          .filter((s) => s.count > 0)
+          .sort((a, b) => b.count - a.count)
+      : (() => {
       const poolCount = new Map<string, number>();
       const poolName  = new Map<string, string>();
       for (const d of qualifyingByOrigin) {
