@@ -380,6 +380,12 @@ export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
      return Konga's category landings, which don't. */
   konga: [
     ...NG_TOP_PHONES,
+    /* Konga is one of NG's deepest phone marketplaces — the 12 shared
+       flagships above under-cover its budget/mid range, the volume tier that
+       actually moves on Konga. Add the high-volume NG models it stocks in
+       depth (brand+model so the /product/ gate lifts priced detail pages). */
+    "Tecno Spark 30", "Tecno Camon 20", "Infinix Smart 8", "Infinix Hot 40",
+    "itel A60", "Samsung Galaxy A05", "Samsung Galaxy A25", "Redmi 13C",
     ...ngPick(["computing"], ["MacBook Air M3", "HP Pavilion laptop", "Lenovo IdeaPad laptop"]),
     ...headQ(["gaming"]),
     /* Konga is general-merchandise, far broader than the phone-first Slot/Kara,
