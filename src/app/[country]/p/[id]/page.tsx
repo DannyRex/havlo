@@ -434,6 +434,44 @@ export default async function ProductPage({ params }: PageProps) {
     country:   country.code,
   }));
 
+  /* "About the product" block — defined here in server scope so its unique
+     body copy stays in the crawlable HTML, then handed to PdpInteractive as a
+     slot so it renders ABOVE the "you may also like" rail (which lives inside
+     that client component). SERVER-RENDERED unique body text: the merchant
+     description was previously fed ONLY to the Product JSON-LD; the visible
+     PDP was almost text-free (title + widgets + "keep browsing" links), the
+     thin-content profile Google parks in "Crawled - currently not indexed".
+     Surfacing the real description gives each page genuine, unique, on-topic
+     prose (and is useful to shoppers); a truthful templated line is the floor
+     when no merchant body exists. No em dashes / no "surface" verb per the
+     house voice rules. */
+  const aboutSection = (
+    <section className="mt-12 sm:mt-16 pt-8 border-t border-border" aria-label="Product details">
+      {hasRealDescription ? (
+        <>
+          <h2 className="text-base font-semibold text-ink mb-3">
+            About the {offer.title}
+          </h2>
+          <p className="text-[15px] text-ink-2 leading-relaxed max-w-2xl">
+            {merchantDescriptionForLd}
+          </p>
+          <p className="text-[13px] text-ink-3 leading-relaxed max-w-2xl mt-4">
+            Havlo tracks its price across the stores we cover in {country.name} and keeps a price history. Currently listed at {displayStoreName(offer.store_name)}.
+          </p>
+        </>
+      ) : (
+        <>
+          <h2 className="text-base font-semibold text-ink mb-3">
+            The {offer.title} in {country.name}
+          </h2>
+          <p className="text-[15px] text-ink-2 leading-relaxed max-w-2xl">
+            Havlo checks this price against the other stores we cover in {country.name} and tracks how it moves over time. Currently listed at {displayStoreName(offer.store_name)}.
+          </p>
+        </>
+      )}
+    </section>
+  );
+
   return (
     <main className="bg-bg">
       {/* JSON-LD: breadcrumb + product, both server-rendered inline so
@@ -462,41 +500,12 @@ export default async function ProductPage({ params }: PageProps) {
           countryCode={country.code}
           signedOutboundUrl={signedOutboundUrl}
           isLocallyShoppable={isLocallyShoppable}
+          aboutSlot={aboutSection}
         />
 
-        {/* About / details — SERVER-RENDERED unique body text.
-            The merchant description was previously fed ONLY to the Product
-            JSON-LD; the visible PDP was almost text-free (title + widgets +
-            "keep browsing" links), which is exactly the thin-content profile
-            Google parks in "Crawled - currently not indexed" (GSC). Surfacing
-            the real description here gives each page genuine, unique, on-topic
-            prose (and is useful to shoppers); a truthful templated line is the
-            floor when no merchant body exists. No em dashes / no "surface"
-            verb per the house voice rules. */}
-        <section className="mt-12 sm:mt-16 pt-8 border-t border-border" aria-label="Product details">
-          {hasRealDescription ? (
-            <>
-              <h2 className="text-base font-semibold text-ink mb-3">
-                About the {offer.title}
-              </h2>
-              <p className="text-[15px] text-ink-2 leading-relaxed max-w-2xl">
-                {merchantDescriptionForLd}
-              </p>
-              <p className="text-[13px] text-ink-3 leading-relaxed max-w-2xl mt-4">
-                Havlo tracks its price across the stores we cover in {country.name} and keeps a price history. Currently listed at {displayStoreName(offer.store_name)}.
-              </p>
-            </>
-          ) : (
-            <>
-              <h2 className="text-base font-semibold text-ink mb-3">
-                The {offer.title} in {country.name}
-              </h2>
-              <p className="text-[15px] text-ink-2 leading-relaxed max-w-2xl">
-                Havlo checks this price against the other stores we cover in {country.name} and tracks how it moves over time. Currently listed at {displayStoreName(offer.store_name)}.
-              </p>
-            </>
-          )}
-        </section>
+        {/* "About the product" now renders inside PdpInteractive (passed as
+            the aboutSlot prop above) so it precedes the "you may also like"
+            rail. Still server-rendered, so it stays in the crawlable HTML. */}
 
         {/* Keep-browsing rail — crawlable hub links (M2 de-orphaning).
             Server-rendered <Link>s so they sit in the crawlable HTML, not

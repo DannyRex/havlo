@@ -22,7 +22,7 @@
    in. Warm offers come back from the endpoint's edge cache in a few
    hundred ms. */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import nextDynamic from "next/dynamic";
 import { ArrowDown } from "lucide-react";
@@ -51,6 +51,10 @@ interface Props {
       the anchor store). Drives the hero banner immediately; the local
       ALTERNATIVE inside it streams in with the comparison data. */
   isLocallyShoppable: boolean;
+  /** Server-rendered "About the product" block, passed from page.tsx so its
+      unique body copy stays in the crawlable HTML while rendering ABOVE the
+      "you may also like" rail (which lives inside this client component). */
+  aboutSlot?:         ReactNode;
 }
 
 /* Masonry skeleton for the "You may also like" rail — mirrors the rail
@@ -80,7 +84,7 @@ function RailSkeleton() {
   );
 }
 
-export default function PdpInteractive({ offer, countryCode, signedOutboundUrl, isLocallyShoppable }: Props) {
+export default function PdpInteractive({ offer, countryCode, signedOutboundUrl, isLocallyShoppable, aboutSlot }: Props) {
   const country = getCountry(countryCode);
   const router  = useRouter();
   const [data, setData]       = useState<PdpData | null>(null);
@@ -148,6 +152,12 @@ export default function PdpInteractive({ offer, countryCode, signedOutboundUrl, 
       {data && data.otherConfigs.length > 0 && (
         <OtherConfigurations configs={data.otherConfigs} country={country} />
       )}
+
+      {/* "About the product" — server-rendered slot from page.tsx, placed
+          ABOVE the rail so the product's own description precedes "you may
+          also like" (founder direction June 2026). Renders immediately (it's
+          server content, not part of the streamed payload). */}
+      {aboutSlot}
 
       {/* "You may also like" rail, fallback rail, or nothing. */}
       {loading ? (
