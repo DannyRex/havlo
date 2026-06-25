@@ -27,6 +27,11 @@ const footerSections = [
          middleware (added to COUNTRY_SCOPED) like /deals + /compare. */
       { label: "Save with Amazon", href: "/amazon" },
       { label: "Find for less", href: "/compare" },
+      /* Cashback — same bare + middleware-countrified pattern as the others
+         (/cashback is in COUNTRY_SCOPED). It's a headline nav feature, so it
+         belongs in the footer's Product column too, next to its top-nav
+         neighbour "Find for less". */
+      { label: "Cashback",      href: "/cashback" },
       /* Shop by brand — entry point into the brand-hub system (M2 SEO
          de-orphaning). Root-relative; middleware countrifies to
          /[cc]/brands (registered in COUNTRY_SCOPED). */
