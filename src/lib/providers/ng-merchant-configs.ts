@@ -382,5 +382,17 @@ export const NG_MERCHANT_QUERIES: Record<string, string[]> = {
     ...NG_TOP_PHONES,
     ...ngPick(["computing"], ["MacBook Air M3", "HP Pavilion laptop", "Lenovo IdeaPad laptop"]),
     ...headQ(["gaming"]),
+    /* Konga is general-merchandise, far broader than the phone-first Slot/Kara,
+       and its direct scraper is Cloudflare-walled (June 2026) — so SerpAPI is
+       its only depth lever. Widen into the appliance / TV / power verticals it
+       stocks deepest. Brand+model strings (not bare category words) so
+       site:konga.com lifts /product/ detail pages with price markup, per the
+       kongaConfig note; the isProductUrl gate drops any category landings. */
+    "Hisense refrigerator", "LG refrigerator", "Haier Thermocool refrigerator",
+    "Hisense air conditioner", "LG air conditioner", "Midea air conditioner",
+    "LG washing machine",
+    "Hisense TV", "LG TV", "Samsung TV", "TCL TV",
+    "Sumec Firman generator",
+    "Binatone blender",
   ],
 };
