@@ -26,6 +26,25 @@ export const DARK_ON_TRANSPARENT_LOGOS = new Set<string>([
   "john-lewis-partners",
   "john-lewis",
   "johnlewis",
+  /* Bundled dark-on-transparent wordmarks, found by an ink-colour scan of
+     every public/logos/*.png (June 2026): near-monochrome dark marks that
+     vanished on the theme-flipping dark cell in dark mode (reported on the
+     brands page: "adidas logo not showing in dark mode"). dark:invert flips
+     each to light so it reads on dark while staying untouched in light mode.
+     Colour wordmarks (eBay, Jumia, …) and the white-ink set are deliberately
+     excluded — inverting those would wreck them; electronic-express is left
+     out too (22% coloured ink, not safe to invert). */
+  "adidas",
+  "asos",
+  "shein",
+  "fashion-nova",
+  "about-you",
+  "jd-williams",
+  "lookfantastic",
+  "care-to-beauty",
+  "smytten",
+  "nfm",
+  "93mobiles",
 ]);
 
 /** Tailwind class string for the theme-aware invert. Returns an
