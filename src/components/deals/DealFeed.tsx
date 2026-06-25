@@ -701,7 +701,14 @@ export default function DealFeed({
           originCountsKeyRef.current = newKey;
           hasReceivedClientCountsRef.current = true;
         }
-        if (Array.isArray(stores)) setStoreOptions(stores);
+        /* Keep the dropdown showing ALL stores even while one is ticked. A
+           store-filtered response's `stores` aggregate collapses to just the
+           selected store(s), so only refresh the roster from responses to
+           UNFILTERED-by-store fetches; the ticked stores stay highlighted and
+           the shopper can still see + add the others. (The precomputed-count
+           path returns the full roster regardless; this guards the live-pool
+           fallback + every pre-migration deploy.) */
+        if (Array.isArray(stores) && selectedStores.size === 0) setStoreOptions(stores);
         offsetRef.current = PAGE_SIZE;
         /* Scroll AFTER items have rendered. Doing it synchronously in the
            effect lands the user mid-page if the previous (longer) list
@@ -848,7 +855,10 @@ export default function DealFeed({
           originCountsKeyRef.current = newKey;
           hasReceivedClientCountsRef.current = true;
         }
-        if (Array.isArray(nextStores)) setStoreOptions(nextStores);
+        /* Same guard as the filter-change effect: a load-more while a store is
+           ticked returns the collapsed store-filtered roster, so don't let it
+           overwrite the full dropdown. */
+        if (Array.isArray(nextStores) && selectedStores.size === 0) setStoreOptions(nextStores);
         offsetRef.current += PAGE_SIZE;
       })
       .catch(() => {})
