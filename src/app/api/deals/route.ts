@@ -448,24 +448,25 @@ export async function GET(req: NextRequest) {
        paginates, so they are not fetched here — that keeps the pill equal
        to the displayed deal count.) Resolving the two in one Promise.all
        keeps total latency = max(individual), not sum. */
-    const [broadPool, dropdownStoresRaw] = await Promise.all([
+    const [allRawAcrossOrigins, dropdownStoresRaw] = await Promise.all([
       fetchPoolCached({
         categorySlug: category,
         sort,
         search,
         country: country.code,
-        /* Items pool is the BROAD pool (no store filter pushed into the
-           RPC), EVEN when the user has ticked stores. Each store's dropdown
-           count is that store's slice of THIS pool, so deriving the filtered
-           grid from the SAME pool makes "Shein (319)" deliver exactly 319 on
-           click. The previous per-store re-fetch pushed the filter into the
-           RPC, where the row-cap landed AFTER it and surfaced the store's
-           FULL inventory (835) — which then exceeded the dropdown's pool-
-           slice count (user report: "the dropdown number doesn't match;
-           there's usually more when the store is clicked"). Restores the
-           documented invariant (count never exceeds the grid). A niche store
-           ranked below the pool cap is handled by the fallback below. */
-        stores: undefined,
+        /* Store filter pushed into the RPC so a ticked store returns its FULL
+           inventory (the row-cap lands AFTER the filter), down to niche stores
+           with a single offer below the global pool cap. This is ALSO what
+           keeps the tier tabs monotonic for a filtered store: "All products"
+           is that store's whole in-stock set and "Deals" is the is_real_deal
+           subset of it, so Deals can never exceed All. Deriving the filtered
+           grid from the broad capped pool instead (briefly tried) made a tiny
+           store show FEWER in the crowded All-products pool than in the sparse
+           Deals pool — the "1 product in All, 4 in Deals" contradiction. The
+           dropdown-count-vs-click gap that motivated that experiment is the
+           lesser evil (a ticked store simply shows MORE than its pool-slice
+           preview) and is addressed separately via the cap-free count source. */
+        stores: realStoreIds,
         /* Push the tier into the fetch so the qualifying count is
            sort-stable. `|| undefined` for tier=all keeps the broad
            pool's shared cache key (no cold-bust, no per-default egress). */
@@ -495,31 +496,6 @@ export async function GET(req: NextRequest) {
         origin:      origin,
       }),
     ]);
-
-    /* Niche-store fallback. The items pool above is the broad pool so each
-       store's dropdown count equals what ticking it shows. But a store ranked
-       BELOW the broad pool's row-cap (e.g. a single-offer retailer reached via
-       a shared ?stores=<x> link) won't appear in that pool at all. When the
-       user explicitly requests stores and NONE of them made the broad pool,
-       refetch their own pool so the link still resolves — such stores were
-       never in the broad-pool dropdown, so surfacing them contradicts no
-       on-screen count. */
-    let allRawAcrossOrigins = broadPool;
-    if (realStoreIds && realStoreIds.length > 0) {
-      const wanted = new Set(realStoreIds.map((s) => s.toLowerCase()));
-      const coveredByBroadPool = broadPool.some((d) => wanted.has(d.storeId.toLowerCase()));
-      if (!coveredByBroadPool) {
-        allRawAcrossOrigins = await fetchPoolCached({
-          categorySlug: category,
-          sort,
-          search,
-          country: country.code,
-          stores: realStoreIds,
-          minDiscount: poolMinDiscount || undefined,
-          dealsOnly: isDealsMode,
-        });
-      }
-    }
 
     /* Country store filter — pure-function, runs over Deal[].
        The third arg is the user's EXPLICITLY-selected store set
