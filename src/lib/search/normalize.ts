@@ -476,6 +476,47 @@ export function isLooseCategoryModel(model: string | null | undefined): boolean 
   return LOOSE_CATEGORY_TYPES.has(model.toLowerCase().trim());
 }
 
+/* True when a signature's model slot is a UNIT / SPEC / capacity / CPU /
+   energy-rating / dimension / version / generic "series N" string rather
+   than a real model name. buildSignature occasionally mis-parsed these into
+   junk canonicals that then pooled unrelated products: apple|wine 75cl
+   caught every wine bottle, beats|i7 1355u was a laptop CPU, lg|side by side
+   / lg|27 cu / lg|2 star were appliance specs, abercrombie|3 pack a quantity.
+   Treated like isLooseCategoryModel — buildSignature drops the model so the
+   title gets a NULL signature (honest opt-out; dedups only via title_key).
+   Shared by the de-fragmentation backfill + the health-check monitor so all
+   three judge "is this a real model?" identically. */
+/* WHOLE_UNITS — when the ENTIRE model is a number + one of these, it's a spec,
+   never a model ("75cl", "8 kg", "27 cu", "2 star", "20000 mah", "512gb").
+   CONSUMABLE_UNITS — volume/weight/quantity only; used for the "<word> <qty>"
+   suffix rule ("wine 75cl", "tea 30g"). Storage/network/electrical units
+   (gb/tb/mah/w/v/5g) are DELIBERATELY excluded from the suffix rule because
+   they're genuinely part of electronics model names (Vivo V70 5G, OnePlus 15
+   512GB, Nokia 8110 4G) — keying them off there would null real phones. */
+const WHOLE_UNITS = "cl|ml|l|litre|liter|oz|floz|fl|g|kg|mg|gram|grams|lb|lbs|qt|gal|gallon|in|inch|inches|ft|cm|mm|m|w|watt|kw|kwh|v|volt|tb|gb|mb|kb|mah|ah|wh|hz|ghz|mhz|cu|pc|pcs|pack|packs|piece|pieces|count|ct|ply|set|sets|sheet|sheets|roll|rolls|capsule|capsules|tablet|tablets|wipe|wipes|bag|bags|cup|cups|pair|pairs|kit|kits|bundle|star|step|premium|series";
+const CONSUMABLE_UNITS = "cl|ml|l|litre|liter|oz|floz|fl|g|kg|mg|gram|grams|lb|lbs|qt|gal|gallon|pack|packs|piece|pieces|count|ct|ply|set|sets|sheet|sheets|roll|rolls|capsule|capsules|tablet|tablets|wipe|wipes|bag|bags|cup|cups";
+const SPEC_CATEGORY_PHRASES = new Set<string>([
+  "all in one", "air fryer", "smart tv", "noise cancelling", "noise canceling",
+  "windows", "windows 11", "windows 10", "ios", "android", "mac os", "chrome os",
+  "side by side", "french door", "top mount", "bottom freezer", "top freezer",
+]);
+export function isUnitOrSpecModel(model: string | null | undefined): boolean {
+  if (!model) return false;
+  const m = model.toLowerCase().trim();
+  if (/^\d+$/.test(m)) return true;                                          // bare number
+  if (/^\d+ \d+$/.test(m)) return true;                                      // "36 24" dimensions
+  if (new RegExp(`^\\d+(\\.\\d+)?\\s?(${WHOLE_UNITS})$`).test(m)) return true; // 75cl, 27 cu, 2 star, 20000 mah, 512gb
+  // "<one or two plain words> <number><consumable-unit>" — wine 75cl, olive oil 500ml.
+  // The leading word(s) must be PURE alpha so model codes (v70 5g, x9d 5g) are kept.
+  if (new RegExp(`^[a-z]+( [a-z]+)? \\d+(\\.\\d+)?\\s?(${CONSUMABLE_UNITS})$`).test(m)) return true;
+  if (/^\d+\s+in( 1)?$/.test(m)) return true;                               // "6 in", "6 in 1"
+  if (/^series \d+$/.test(m)) return true;                                  // "series 6" (too generic)
+  if (/^spf\s*\d+$/.test(m)) return true;                                   // "spf 30"
+  if (/^i[3579]\b/.test(m) || /\b(ryzen|celeron|pentium|core ultra)\b/.test(m)) return true; // CPU model
+  if (SPEC_CATEGORY_PHRASES.has(m)) return true;
+  return false;
+}
+
 /* AMBIGUOUS_HARDWARE_TYPES — electronics / appliance category words where a
    single brand sells MANY genuinely-distinct models (Logitech sells dozens of
    headsets; Samsung dozens of monitors; HP hundreds of laptops). Unlike the
@@ -1300,7 +1341,13 @@ export function buildSignature(
   const norm = stripPunct(title);
 
   const brand = findBrand(norm);
-  const model = findModel(brand, norm);
+  /* Drop a model the parser resolved to a unit/spec/CPU/capacity string
+     (e.g. "wine 75cl", "i7 1355u", "27 cu", "series 6") — those are not
+     real models and keying on them pools unrelated products. Falls through
+     to a NULL signature exactly like the loose-category / ambiguous-hardware
+     opt-outs. */
+  const rawModel = findModel(brand, norm);
+  const model = rawModel && isUnitOrSpecModel(rawModel) ? null : rawModel;
   const storageGb = findStorage(norm);
   const ramGb = findRam(norm);
   const inches = findInches(norm);
