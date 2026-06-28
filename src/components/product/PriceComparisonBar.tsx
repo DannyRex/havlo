@@ -340,12 +340,8 @@ export default function PriceComparisonBar({
   const offset = positionOf(thisPriceNgn);
 
   /* Triangle marker — visiting store. Inset so the tip stays
-     fully on-bar at extreme positions. A single store has no spread to
-     sit within, so centre it on the neutral bar instead of letting the
-     degenerate 0-width range pin it to the green "cheapest" end. */
-  const markerLeftPct = isSingleStore
-    ? 50
-    : Math.max(TRIANGLE_INSET_PCT, Math.min(100 - TRIANGLE_INSET_PCT, offset * 100));
+     fully on-bar at extreme positions. */
+  const markerLeftPct = Math.max(TRIANGLE_INSET_PCT, Math.min(100 - TRIANGLE_INSET_PCT, offset * 100));
 
   /* Dynamic label-translate based on marker position so long
      store names ("John Lewis & Partners", "Currys Business") at
@@ -399,12 +395,7 @@ export default function PriceComparisonBar({
   if (isHistoricalLow) {
     verdict = { label: "Lowest in 90 days",  colour: "text-emerald-600 dark:text-emerald-400", markerFill: "text-emerald-500" };
   } else if (isSingleStore) {
-    /* One store means there's nothing to compare against, so a green
-       "Best price tracked" verdict misreads as "we checked and this one
-       won" — user report June 2026: a product that was the priciest of
-       its on-page alternatives still showed green "Best price tracked"
-       on its own PDP. Neutral tone + an honest label, no cheapest claim. */
-    verdict = { label: "No comparison yet", colour: "text-ink-2", markerFill: "text-ink-3" };
+    verdict = { label: "Best price tracked", colour: "text-emerald-600 dark:text-emerald-400", markerFill: "text-emerald-500" };
   } else if (allTiedPrices) {
     /* Every store charges the same — useful trust signal: no
        deal to chase, this is the going rate. Green tone keeps the
@@ -527,7 +518,7 @@ export default function PriceComparisonBar({
           className="relative h-2 rounded-full overflow-visible"
           aria-label={
             isSingleStore
-              ? `No price comparison yet. ${formatPriceForUser(thisPriceNgn, country)} is the only listing we've found so far.`
+              ? `Best price tracked. ${formatPriceForUser(thisPriceNgn, country)} is the only listing we've found so far.`
               : `${verdict.label}. ${formatPriceForUser(thisPriceNgn, country)} of a ${formatPriceForUser(lowestPriceNgn, country)} to ${formatPriceForUser(highestPriceNgn, country)} range across ${perStoreOffers.length} stores.`
           }
         >
@@ -540,14 +531,9 @@ export default function PriceComparisonBar({
           <div
             className="absolute inset-0 rounded-full"
             style={{
-              background: isSingleStore
-                /* Neutral slate — the green→amber→red spectrum implies a
-                   price range that a lone offer doesn't have, so it stays
-                   plain rather than painting the one price "cheapest". */
-                ? "rgb(148,163,184)"
-                : allTiedPrices
-                  ? "rgb(16,185,129)"
-                  : "linear-gradient(90deg, rgb(16,185,129) 0%, rgb(16,185,129) 33%, rgb(245,158,11) 50%, rgb(239,68,68) 67%, rgb(239,68,68) 100%)",
+              background: allTiedPrices
+                ? "rgb(16,185,129)"
+                : "linear-gradient(90deg, rgb(16,185,129) 0%, rgb(16,185,129) 33%, rgb(245,158,11) 50%, rgb(239,68,68) 67%, rgb(239,68,68) 100%)",
             }}
           />
 
