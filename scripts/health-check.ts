@@ -42,6 +42,7 @@ import { sendEmail } from "../src/lib/email/send";
 import { shellMarketing, tokens, escapeHtml as esc, spacer } from "../src/lib/email/templates/_layout";
 import { merchantSearchUrl, smartFallbackUrl, merchantHomepage } from "../src/lib/merchant-search-urls";
 import { isGoogleRelay } from "../src/lib/url-helpers";
+import { isUnitOrSpecModel } from "../src/lib/search/normalize";
 
 const ALWAYS_EMAIL = process.argv.includes("--always-email");
 const DRY_RUN      = process.argv.includes("--dry-run");
@@ -469,6 +470,41 @@ async function runChecks(supa: NonNullable<ReturnType<typeof getSupabaseAdmin>>)
       detail:    topPair
         ? `worst pair: ${(topPair as { k: string; n: number }).k} → ${(topPair as { k: string; n: number }).n} offers. URL canonicalisation may be missing a tracking-param key for this merchant.`
         : "URL canonicalisation may be missing a tracking-param key for some merchant.",
+    });
+  }
+
+  /* ── Signature pollution + fragmentation backlog ──────────────────
+     The de-fragmentation prevention guard. buildSignature now rejects
+     unit/spec models (isUnitOrSpecModel), so polluted canonicals
+     (apple|wine 75cl, beats|i7 1355u, lg|side by side …) should stay at
+     0 — any regrowth means a parser gap or a manual edit and is worth a
+     look. The orphan count is context for how much the de-frag scripts
+     (npm run defragment / defragment-llm) have left to re-pool. Single
+     cheap pass over the signature column. */
+  {
+    const sigRows = await fetchPaged<{ signature: string | null }>(
+      supa, "products", "signature", (qb) => qb);
+    let polluted = 0, orphan = 0;
+    for (const r of sigRows) {
+      if (!r.signature) { orphan++; continue; }
+      if (isUnitOrSpecModel(r.signature.split("|")[1])) polluted++;
+    }
+    if (polluted > 0) {
+      findings.push({
+        severity:  "WARN",
+        id:        "polluted_signatures",
+        headline:  "product signatures whose model is a unit / spec, not a real model",
+        value:     polluted,
+        threshold: 0,
+        detail:    "Run `npm run clean-signatures -- --apply`. If this regrows after a clean run, buildSignature's isUnitOrSpecModel has a parser gap to close.",
+      });
+    }
+    findings.push({
+      severity: "INFO",
+      id:       "orphan_products",
+      headline: "products with no signature (de-fragmentation backlog)",
+      value:    orphan,
+      detail:   "Most are genuinely unique long-tail items. Re-pool the same-product fragments with `npm run defragment` (brand-named) + `npm run defragment-llm` (brand-less).",
     });
   }
 
