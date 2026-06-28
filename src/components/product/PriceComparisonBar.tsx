@@ -221,7 +221,14 @@ export default function PriceComparisonBar({
   const dotAssignByOfferId = new Map<string, DotAssignment>();
   {
     const cands = perStoreOffers
-      .filter((row) => row.storeId !== thisStoreId)
+      /* Exclude only the EXACT visiting offer (its triangle marker
+         represents it), NOT every offer that shares its storeId. A
+         marketplace like eBay can carry the same product under one
+         storeId at several prices (a fragment listing plus the pooled
+         canonical), and the cheaper one must still get its own dot
+         rather than vanish — the bar was counting "across 2 stores"
+         while plotting a single marker (user report June 2026). */
+      .filter((row) => !(row.storeId === thisStoreId && Math.abs(row.effectiveNgn - thisPriceNgn) < 1))
       .map((row) => ({
         offerId:      row.offerId,
         effectiveNgn: row.effectiveNgn,
@@ -431,9 +438,12 @@ export default function PriceComparisonBar({
      (current price minus cheapest known) and the link routes to
      /compare so the user sees the full breakdown in context. */
   const cheapest = perStoreOffers[0];
+  /* Gate on price, not a differing storeId: a cheaper listing at the
+     SAME marketplace (another eBay seller for the same product) is a
+     real saving and now gets its own dot above, so the "Save £X" row
+     must surface it too rather than skipping it as "same store". */
   const notOnCheapest = !isSingleStore
     && cheapest
-    && cheapest.storeId !== thisStoreId
     && cheapest.effectiveNgn < thisPriceNgn;
   const cheaperSavings = notOnCheapest ? thisPriceNgn - cheapest.effectiveNgn : 0;
   const cheaperHref = (() => {
@@ -547,7 +557,11 @@ export default function PriceComparisonBar({
               popover above the bar with store name + price +
               cross-border flag. */}
           {!isSingleStore && perStoreOffers.map((row) => {
-            if (row.storeId === thisStoreId) return null;
+            /* Skip only the exact visiting offer (its triangle marker
+               stands in for it), matching the `cands` filter above so a
+               cheaper same-storeId listing keeps its dot. The assignment
+               lookup below is the real gate now. */
+            if (row.storeId === thisStoreId && Math.abs(row.effectiveNgn - thisPriceNgn) < 1) return null;
             const assignment = dotAssignByOfferId.get(row.offerId);
             if (!assignment) return null;
 
