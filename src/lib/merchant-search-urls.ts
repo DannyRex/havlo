@@ -234,6 +234,12 @@ const MERCHANTS: Record<string, MerchantHandlers> = {
      redirects to a global splash page (no search). The real ZA
      storefront is on .co.za. */
   "cash-converters":  { name: "Cash Converters", searchUrl: (q) => `https://www.cashconverters.co.za/search?q=${encodeURIComponent(q)}`,            homepage: "https://www.cashconverters.co.za" },
+  /* Same shape, reported June 2026: storeId "cash-generator" had no
+     entry, so the smart fallback guessed cashgenerator.com. Cash
+     Generator is a UK reseller and its real storefront is .co.uk.
+     Verified 2026-06-28: cashgenerator.co.uk/search?q= returns a real
+     Searchanise results page ("1002 results found for xbox"). */
+  "cash-generator":   { name: "Cash Generator",  searchUrl: (q) => `https://cashgenerator.co.uk/search?q=${encodeURIComponent(q)}`,              homepage: "https://cashgenerator.co.uk" },
   /* Audit May 2026 row 35: storeId "outdoorphoto" had no entry, so
      the smart fallback synthesised outdoorphoto.com which is a
      parked GoDaddy "domain for sale" page. The real ZA storefront
