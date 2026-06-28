@@ -42,6 +42,7 @@
     "resignature": "tsx --tsconfig tsconfig.scripts.json scripts/resignature-products.ts",
     "clean-signatures": "tsx --tsconfig tsconfig.scripts.json scripts/clean-polluted-signatures.ts",
     "defragment": "tsx --tsconfig tsconfig.scripts.json scripts/defragment-products.ts",
+    "defragment-llm": "tsx --tsconfig tsconfig.scripts.json scripts/defragment-llm.ts",
     "backfill:brand": "tsx --tsconfig tsconfig.scripts.json scripts/backfill-brand.ts",
     "prune:price-history": "tsx --tsconfig tsconfig.scripts.json scripts/prune-price-history.ts",
     "seed:price-history": "tsx --tsconfig tsconfig.scripts.json scripts/seed-missing-history.ts",

@@ -89,7 +89,7 @@ function modelTokenIsSpecific(model: string): boolean {
 /* Supplementary accessory / spare-part guard. looksLikeAccessory catches
    the common cases; this adds the part nouns + "for <product>" framing that
    slipped through (earpad sweat covers, replacement batteries for Nokia 3310). */
-const ACCESSORY_RE = /\b(case|cases|cover|covers|sleeve|pouch|protector|earpad|ear pad|eartip|ear tip|strap|band|charger|charging|cable|adapter|adaptor|mount|holder|stand|battery|batteries|screen protector|tempered glass|skin|decal|sticker|grip|bumper|replacement|spare|for jbl|for sony|for bose|for apple|for samsung|for nokia)\b/i;
+const ACCESSORY_RE = /\b(case|cases|cover|covers|sleeve|pouch|protector|earpad|ear pad|eartip|ear tip|strap|band|charger|charging|cable|adapter|adaptor|mount|holder|stand|battery|batteries|screen protector|tempered glass|skin|decal|sticker|grip|bumper|replacement|spare|lens mod|job lot|accessory|accessories|for jbl|for sony|for bose|for apple|for samsung|for nokia)\b/i;
 
 function toUsd(price: number, currency: string | null): number {
   if (!price || price <= 0) return 0;
