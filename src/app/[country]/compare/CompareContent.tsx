@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { SearchX, CheckCircle, AlertCircle, Coins } from "lucide-react";
+import { SearchX, CheckCircle, AlertCircle, Coins, Globe } from "lucide-react";
 import Link from "next/link";
 import SearchBar from "@/components/compare/SearchBar";
 import PriceResults from "@/components/compare/PriceResults";
@@ -12,11 +12,13 @@ import DupeMasonry from "@/components/compare/DupeMasonry";
 import LiveResults from "@/components/compare/LiveResults";
 import EmptySearchState from "@/components/empty/EmptySearchState";
 import TrendingChipRail from "@/components/compare/TrendingChipRail";
+import MasonryCard from "@/components/deals/MasonryCard";
 import { formatNaira } from "@/lib/utils";
 import { sniffToAnchor } from "@/lib/sniff-to-anchor";
 import { getCashbackForUrl } from "@/lib/cashback";
 import { logSearchEvent } from "@/lib/search/log-search";
 import { useCountry } from "@/components/providers/CountryProvider";
+import { getCountry } from "@/lib/country";
 import type { SearchOutput, DupeResult } from "@/lib/search";
 import type { SniffResult } from "@/app/api/sniff/route";
 import type { Deal } from "@/types";
@@ -122,6 +124,27 @@ export default function CompareContent({
   const anchorBackstopRef = useRef<{ q: string; pid: string; oid: string } | null>(
     (initialPid || initialOid) ? { q: normalizeQ(initialQuery), pid: initialPid, oid: initialOid } : null,
   );
+
+  /* ── Browse fallback (#1) + cross-market reach (#3) ─────────────────
+     A broad category term ("lawnmower", "headphones") has no single
+     product to anchor on, so the compare engine settles for a lone
+     single-store "Your pick" with no alternatives — which reads as
+     "nothing here" even though the catalog carries 15 of them. When the
+     result for a TEXT query isn't a real cross-store comparison, we pull
+     the catalog's actual matches via the /deals browse search and show
+     them as a grid instead. And when even the local catalog is empty,
+     /api/search-reach reports how many we track in other markets so the
+     empty state can be honest ("we have 16, mostly UK shops") rather
+     than blank. */
+  const [browseItems, setBrowseItems]     = useState<Deal[]>([]);
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const [reach, setReach] = useState<
+    { total: number; capped: boolean; topCountry: { code: string; count: number } | null } | null
+  >(null);
+  /* Keyed to the query a probe ran for, so a settled result re-rendering
+     (e.g. live results landing) doesn't re-fire the browse fetch, and a
+     genuinely new query always does. */
+  const browseProbeRef = useRef<string>("");
 
   /* ── Fetch live results alongside the internal (DB) search ──
      `dbAltsPromise` resolves to the number of cross-store alternatives
@@ -478,6 +501,83 @@ export default function CompareContent({
     } catch { /* private mode or quota exceeded — silent no-op */ }
   }, [initialQuery, initialPid, initialKey]);
 
+  /* ── Thin-result recovery probe ────────────────────────────────────
+     Runs once the compare result has settled. A strong anchor (2+
+     stores) is the comparison doing its job, so we leave it alone and
+     skip the probe entirely. Otherwise we ask the browse catalog what
+     it actually has for this query; if that's empty for this market we
+     follow up with the country-blind reach count. Both are best-effort
+     and never block the primary compare view. */
+  useEffect(() => {
+    const q = query.trim();
+    const isText = !!q && !looksLikeUrl(q);
+    const strongAnchor = result?.mode === "similar" && result.anchor.storeCount >= 2;
+
+    if (!isText || loading || sniffLoading || !result || result.mode === "single" || strongAnchor) {
+      setBrowseItems([]);
+      setReach(null);
+      return;
+    }
+    if (browseProbeRef.current === q) return;
+    browseProbeRef.current = q;
+    setBrowseLoading(true);
+    setReach(null);
+
+    (async () => {
+      try {
+        const res  = await fetch(`/api/deals?search=${encodeURIComponent(q)}&country=${country.code}&origin=all`);
+        const data = await res.json();
+        const items = (Array.isArray(data.items) ? data.items : []) as Deal[];
+        if (browseProbeRef.current !== q) return;
+        setBrowseItems(items);
+
+        /* Nothing shoppable from here? Find out what we track elsewhere
+           so the empty state can name the real number + market. */
+        if (items.length === 0) {
+          try {
+            const reachRes  = await fetch(`/api/search-reach?q=${encodeURIComponent(q)}`);
+            const reachData = await reachRes.json();
+            if (browseProbeRef.current === q && reachData?.total > 0) setReach(reachData);
+          } catch { /* reach is a nice-to-have; ignore failures */ }
+        }
+      } catch {
+        if (browseProbeRef.current === q) setBrowseItems([]);
+      } finally {
+        if (browseProbeRef.current === q) setBrowseLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, query, loading, sniffLoading, country.code]);
+
+  /* ── Render flags for the thin-result recovery ─────────────────────
+     showBrowseGrid: the compare view isn't a real comparison and the
+       browse catalog has clearly more (≥4, and ≥2× what compare showed)
+       — swap in the browse grid. The 2× gate protects a genuine
+       cheaper-alternatives result with several dupes from being replaced.
+     showReachNote: even the local catalog is empty, but we track the
+       item in other markets — say so honestly. */
+  const qTrim = query.trim();
+  const isTextQuery = !!qTrim && !looksLikeUrl(qTrim);
+  const compareShownProducts = result?.mode === "similar" ? 1 + result.dupes.length : 0;
+  const showBrowseGrid =
+    isTextQuery && !loading && !sniffLoading &&
+    browseItems.length >= 4 && browseItems.length >= compareShownProducts * 2;
+  const showReachNote =
+    isTextQuery && !loading && !sniffLoading && !browseLoading &&
+    browseItems.length === 0 && !!reach && reach.total > 0;
+
+  /* Honest one-liner for the reach note. Names the market most of the
+     matches sit in so the shopper knows WHY they can't buy them here. */
+  const reachCount = reach ? (reach.capped ? `${reach.total}+` : `${reach.total}`) : "";
+  const reachTopName = reach?.topCountry ? getCountry(reach.topCountry.code).name : null;
+  const reachLine = !reach
+    ? ""
+    : reach.topCountry && reach.topCountry.code === country.code
+      ? `They might be out of stock in ${country.name} right now. Here are other ways forward:`
+      : reachTopName
+        ? `Most are listed by ${reachTopName} shops, which don't always ship to ${country.name}. Here are other ways to get it:`
+        : `They're listed in markets we can't reach from ${country.name} yet. Here are other ways forward:`;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
       <SearchBar
@@ -696,6 +796,66 @@ export default function CompareContent({
         </div>
       )}
 
+      {/* ── BROWSE FALLBACK (#1) — category-style query ──
+           The compare engine couldn't build a real cross-store
+           comparison (a broad term anchors on one arbitrary product),
+           but the catalog clearly carries plenty. Show the real matches
+           as a grid so the search lands on inventory, not a dead end.
+           Tapping any card opens its PDP, where the cross-store view
+           lives. */}
+      {showBrowseGrid && (
+        <div className="mt-8 sm:mt-10">
+          <div className="max-w-5xl mx-auto mb-5 sm:mb-6 px-1">
+            <h2 className="text-lg sm:text-xl font-bold text-ink tracking-[-0.02em]">
+              What we&apos;re tracking for &ldquo;{qTrim}&rdquo;
+            </h2>
+            <p className="text-xs sm:text-sm text-ink-2 mt-0.5">
+              Tap a product to compare it across stores.
+            </p>
+          </div>
+          <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            {browseItems.slice(0, 24).map((deal, i) => (
+              <MasonryCard
+                key={deal.id ?? i}
+                deal={deal}
+                aspect="aspect-[4/5] sm:aspect-[5/6]"
+                priority={i < 4}
+              />
+            ))}
+          </div>
+          {/* Fresh Google Shopping results still ride along below the
+              catalog grid when the live lane returned anything. */}
+          {(liveLoading || liveResults.length > 0) && (
+            <div className="mt-10">
+              <LiveResults items={liveResults} loading={liveLoading} providers={liveProviders} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── CROSS-MARKET NOTE (#3) — honest "we have it, just not here" ──
+           The local catalog is empty for this query, but we DO track it
+           in other markets. Name the count + the market instead of
+           leaving the shopper with a blank "nothing found". */}
+      {showReachNote && reach && (
+        <div className="mt-10 max-w-xl mx-auto px-4">
+          <div className="rounded-2xl border border-border bg-surface-2 p-4 sm:p-5 flex items-start gap-3">
+            <span className="shrink-0 w-9 h-9 rounded-full bg-surface text-ink-2 flex items-center justify-center">
+              <Globe size={17} strokeWidth={1.75} aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-ink leading-snug">
+                We track {reachCount} {reach.total === 1 ? "match" : "matches"} for &ldquo;{qTrim}&rdquo;
+                {reachTopName && reach.topCountry?.code !== country.code ? `, mostly in ${reachTopName}` : ""}
+              </p>
+              <p className="text-[13px] text-ink-2 mt-1 leading-relaxed">
+                {reachLine}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── SINGLE — key-based price comparison across stores ── */}
       {!loading && result?.mode === "single" && (
         <div className="mt-10 max-w-3xl mx-auto">
@@ -704,7 +864,7 @@ export default function CompareContent({
       )}
 
       {/* ── SIMILAR — anchor product + cheaper alternatives ── */}
-      {!loading && result?.mode === "similar" && (
+      {!loading && result?.mode === "similar" && !showBrowseGrid && (
         <div className="mt-8 sm:mt-10">
           {/* Anchor hero card (extracted May 2026, phase 3 refactor).
               Owns the image + title + price-summary + store-rows
@@ -813,7 +973,7 @@ export default function CompareContent({
            B) live has items   → show LiveResults with a context note
            C) live providers misconfigured → distinct "service unavailable" message
            D) both genuinely empty → "no matches" guidance */}
-      {!loading && result?.mode === "empty" && query && (() => {
+      {!loading && result?.mode === "empty" && query && !showBrowseGrid && (() => {
         // Prefer the sniffed product title over the raw URL when present
         const displayQuery =
           sniffResult?.ok && sniffResult.title ? sniffResult.title : query;
