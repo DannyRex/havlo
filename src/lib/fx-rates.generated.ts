@@ -5,9 +5,9 @@
 export const FX_GENERATED: Record<string, number> = {
   "USD": 1,
   "NGN": 1375.73,
-  "GBP": 0.7549,
-  "EUR": 0.8766,
+  "GBP": 0.7537,
+  "EUR": 0.8783,
   "AED": 3.6725,
-  "INR": 94.6933,
-  "ZAR": 16.3843
+  "INR": 95.2406,
+  "ZAR": 16.4117
 };
