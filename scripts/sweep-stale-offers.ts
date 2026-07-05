@@ -117,34 +117,39 @@ async function main() {
      each pass walks the entire backlog with no advancing offset. This
      also removes the old 5000-row reporting cap as a hidden ceiling on
      what actually gets swept. */
-  const BATCH = 1000;
-  const MAX_BATCHES = 500;         // safety cap: 500k offers/run
+  const SELECT_BATCH = 1000;   // candidate ids fetched per pass (cheap GET + limit)
+  const UPDATE_CHUNK = 100;    // ids per UPDATE .in(): the filter travels in the URL,
+                               // and a 1000-id list overran PostgREST's URL limit
+                               // ("Bad Request", ~37 chars/uuid). 100 stays well under it.
+  const MAX_PASSES = 1000;     // safety cap: 1M offers/run
   let flipped = 0;
-  for (let pass = 0; pass < MAX_BATCHES; pass++) {
+  for (let pass = 0; pass < MAX_PASSES; pass++) {
     const { data: batch, error: selErr } = await supa
       .from("offers")
       .select("id")
       .lt("last_seen_at", threshold)
       .eq("in_stock", true)
-      .order("last_seen_at", { ascending: true })
-      .limit(BATCH);
+      .limit(SELECT_BATCH);
     if (selErr) {
       console.error("✗ TTL sweep batch scan failed:", selErr.message);
       process.exit(1);
     }
     if (!batch || batch.length === 0) break;
     const ids = (batch as { id: string }[]).map((r) => r.id);
-    const { error: updErr } = await supa
-      .from("offers")
-      .update({ in_stock: false })
-      .in("id", ids);
-    if (updErr) {
-      console.error("✗ TTL sweep failed:", updErr.message);
-      process.exit(1);
+    for (let j = 0; j < ids.length; j += UPDATE_CHUNK) {
+      const chunk = ids.slice(j, j + UPDATE_CHUNK);
+      const { error: updErr } = await supa
+        .from("offers")
+        .update({ in_stock: false })
+        .in("id", chunk);
+      if (updErr) {
+        console.error("✗ TTL sweep failed:", updErr.message);
+        process.exit(1);
+      }
+      flipped += chunk.length;
     }
-    flipped += ids.length;
     console.log(`  …flipped ${flipped}`);
-    if (ids.length < BATCH) break;
+    if (ids.length < SELECT_BATCH) break;
   }
   console.log(`✓ Flipped ${flipped} offers to in_stock=false.`);
 
