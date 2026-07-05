@@ -107,17 +107,46 @@ async function main() {
     return;
   }
 
-  /* Apply: single UPDATE statement covers every candidate. */
-  const { error: updErr } = await supa
-    .from("offers")
-    .update({ in_stock: false })
-    .lt("last_seen_at", threshold)
-    .eq("in_stock", true);
-  if (updErr) {
-    console.error("✗ TTL sweep failed:", updErr.message);
-    process.exit(1);
+  /* Apply in batches to stay under the Postgres statement timeout.
+     A single catalog-wide UPDATE timed out (Jul 2026 cron failure:
+     "canceling statement due to statement timeout") once the stale
+     backlog grew past a few thousand rows — the previous version
+     flipped every candidate in one statement. Batching by primary key
+     keeps each statement small and fast; and because every flipped row
+     drops out of the in_stock=true filter, re-selecting the first page
+     each pass walks the entire backlog with no advancing offset. This
+     also removes the old 5000-row reporting cap as a hidden ceiling on
+     what actually gets swept. */
+  const BATCH = 1000;
+  const MAX_BATCHES = 500;         // safety cap: 500k offers/run
+  let flipped = 0;
+  for (let pass = 0; pass < MAX_BATCHES; pass++) {
+    const { data: batch, error: selErr } = await supa
+      .from("offers")
+      .select("id")
+      .lt("last_seen_at", threshold)
+      .eq("in_stock", true)
+      .order("last_seen_at", { ascending: true })
+      .limit(BATCH);
+    if (selErr) {
+      console.error("✗ TTL sweep batch scan failed:", selErr.message);
+      process.exit(1);
+    }
+    if (!batch || batch.length === 0) break;
+    const ids = (batch as { id: string }[]).map((r) => r.id);
+    const { error: updErr } = await supa
+      .from("offers")
+      .update({ in_stock: false })
+      .in("id", ids);
+    if (updErr) {
+      console.error("✗ TTL sweep failed:", updErr.message);
+      process.exit(1);
+    }
+    flipped += ids.length;
+    console.log(`  …flipped ${flipped}`);
+    if (ids.length < BATCH) break;
   }
-  console.log(`✓ Flipped ${candidates.length} offers to in_stock=false.`);
+  console.log(`✓ Flipped ${flipped} offers to in_stock=false.`);
 
   /* Refresh the cheapest-offer matview (QA Jun 2026 BLOCKER fix).
      product_best_offers reads from mv_cheapest_offer_usd (0079; FX-
