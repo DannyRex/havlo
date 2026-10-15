@@ -56,6 +56,25 @@ export default function robots(): MetadataRoute.Robots {
          hammering origins. No upside to either. */
       { userAgent: "CCBot",           disallow: "/" },
       { userAgent: "Bytespider",      disallow: "/" },
+      /* Crawlers that cost money and send nobody (Oct 2026 Vercel bill).
+         In one week they made ~73k of ~86k product-page requests, and every
+         hit on an expired PDP re-renders it and rewrites its ISR + data-cache
+         entries: ~92% of the account's ISR write charge. Real shoppers were
+         ~3.5k of those requests. None of these appear in search results or
+         cite sources:
+           AhrefsBot          — SEO tool backlink index (55k/week alone)
+           meta-externalagent — Meta AI training crawler (NOT
+                                meta-externalfetcher, which builds link
+                                previews when someone shares a URL)
+           PetalBot           — Huawei Petal Search, negligible in our markets
+           SemrushBot, MJ12bot, DotBot — SEO/link-index crawlers, same story
+         Google, Bing and the answer engines above stay allowed. */
+      { userAgent: "AhrefsBot",          disallow: "/" },
+      { userAgent: "meta-externalagent", disallow: "/" },
+      { userAgent: "PetalBot",           disallow: "/" },
+      { userAgent: "SemrushBot",         disallow: "/" },
+      { userAgent: "MJ12bot",            disallow: "/" },
+      { userAgent: "DotBot",             disallow: "/" },
     ],
     sitemap: "https://havlo.io/sitemap.xml",
     host:    "https://havlo.io",
