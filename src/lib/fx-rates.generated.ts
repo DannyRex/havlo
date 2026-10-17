@@ -4,10 +4,10 @@
    constant. The daily FX cron rewrites + commits this. "1 USD = X". */
 export const FX_GENERATED: Record<string, number> = {
   "USD": 1,
-  "NGN": 1331.19,
-  "GBP": 0.7541,
-  "EUR": 0.8917,
+  "NGN": 1332.43,
+  "GBP": 0.7508,
+  "EUR": 0.8895,
   "AED": 3.6725,
-  "INR": 95.1001,
-  "ZAR": 16.5235
+  "INR": 95.112,
+  "ZAR": 16.4682
 };
